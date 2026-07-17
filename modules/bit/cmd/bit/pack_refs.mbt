@@ -91,6 +91,10 @@ fn collect_refs_to_pack(
 }
 
 ///|
+/// Remove directories left empty after pruning a loose ref, mirroring git's
+/// files backend: only directories deeper than `refs/<category>` are removed.
+/// `.git/refs` and `.git/refs/heads` / `.git/refs/tags` etc. must survive —
+/// deleting `.git/refs` makes real git no longer recognize the repository.
 fn cleanup_empty_dirs(
   fs : OsFs,
   git_dir : String,
@@ -106,8 +110,9 @@ fn cleanup_empty_dirs(
     current = current + "/" + parts[i]
     dirs.push(current)
   }
+  // dirs[0] = .git/refs, dirs[1] = .git/refs/<category>; keep both.
   let mut i = dirs.length() - 1
-  while i >= 0 {
+  while i >= 2 {
     let dir = dirs[i]
     let entries = fs.readdir(dir)
     if entries.length() == 0 {

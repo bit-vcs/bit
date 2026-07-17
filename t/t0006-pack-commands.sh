@@ -30,4 +30,23 @@ test_expect_success 'pack-objects file-output stdin-object mode works in standal
     test_file_exists ".git/objects/pack/test-$pack_id.idx"
 '
 
+# Regression: pruning loose refs after pack-refs must never delete .git/refs
+# itself (real git refuses to recognize the repository without it) nor the
+# refs/heads and refs/tags category directories.
+test_expect_success 'pack-refs --all keeps .git/refs and category dirs' '
+    mkdir packrefs-keep &&
+    cd packrefs-keep &&
+    git_cmd init &&
+    echo x > f.txt &&
+    git_cmd add f.txt &&
+    git_cmd commit -m one &&
+    git_cmd tag v1 &&
+    git_cmd pack-refs --all &&
+    test -d .git/refs &&
+    test -d .git/refs/heads &&
+    test -d .git/refs/tags &&
+    grep -q "refs/heads/" .git/packed-refs &&
+    cd ..
+'
+
 test_done

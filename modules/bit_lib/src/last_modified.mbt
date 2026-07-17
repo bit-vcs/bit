@@ -322,11 +322,28 @@ fn last_modified_walk(
   while stack.length() > 0 {
     let cur = stack.unsafe_pop()
     let c = commits.get(cur.to_hex()).unwrap()
+    // Parents whose objects are absent (shallow-clone boundary) are dropped,
+    // so the commit is attributed like a root instead of aborting the walk.
+    let kept : Array[@bit.ObjectId] = []
     for p in c.parents {
       let hex = p.to_hex()
-      if !(commits.contains(hex)) {
-        commits[hex] = last_modified_load_commit(db, fs, p)
-        stack.push(p)
+      if commits.contains(hex) {
+        kept.push(p)
+        continue
+      }
+      match db.get(fs, p) {
+        Some(_) => {
+          commits[hex] = last_modified_load_commit(db, fs, p)
+          stack.push(p)
+          kept.push(p)
+        }
+        None => ()
+      }
+    }
+    if kept.length() != c.parents.length() {
+      c.parents.clear()
+      for k in kept {
+        c.parents.push(k)
       }
     }
   }

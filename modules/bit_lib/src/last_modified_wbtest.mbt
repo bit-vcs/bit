@@ -353,3 +353,42 @@ test "last-modified: merge attributes each path to its own branch" {
   lm_assert(got, [("main", "file"), ("side", "other")])
   js_destroy_host(host)
 }
+
+///|
+test "last-modified: shallow boundary (missing parent object) does not abort" {
+  let (host, _ids) = lm_setup_basic()
+  let fs = js_make_host_fs(host)
+  let rfs : &@bit.RepoFileSystem = fs
+  let ffs : &@bit.FileSystem = fs
+  let git_dir = js_resolve_git_dir(fs, "/repo")
+  let db = ObjectDb::load(rfs, git_dir)
+  guard rev_parse(rfs, git_dir, "HEAD") is Some(head) else { abort("rev HEAD") }
+  let head_info = rebase_parse_commit_full(db, rfs, head)
+  // Craft a commit whose sole parent object does not exist in the repository,
+  // mimicking the boundary commit of a shallow clone.
+  let missing = @bit.ObjectId::from_hex(
+    "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+  )
+  let tip = @bit.Commit::new(
+    head_info.tree,
+    [missing],
+    "T <t@e.com>",
+    1700000300L,
+    "+0000",
+    "T <t@e.com>",
+    1700000300L,
+    "+0000",
+    "shallow tip\n",
+  )
+  let (tip_id, compressed) = @bit.create_commit(tip)
+  write_object_bytes(ffs, git_dir, tip_id, compressed)
+  // Must not raise; every path is attributed to the boundary commit itself.
+  let results = last_modified_compute(
+    db, rfs, tip_id, "shallow-tip", -1, false, -1, [], [],
+  )
+  assert_true(results.length() > 0)
+  for r in results {
+    assert_eq(r.oid.to_hex(), tip_id.to_hex())
+  }
+  js_destroy_host(host)
+}
