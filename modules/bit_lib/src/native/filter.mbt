@@ -1,6 +1,13 @@
 ///| Native filter command execution
 
 ///|
+fn fs_error_message(err : @fs.IOError) -> String {
+  match err {
+    @fs.IOError::IOError(message) => message
+  }
+}
+
+///|
 /// Run a filter command (clean or smudge) on content via temp file + shell.
 pub async fn run_filter_command(
   root : String,
@@ -12,7 +19,7 @@ pub async fn run_filter_command(
   @fs.write_bytes_to_file(temp_path, content) catch {
     err =>
       raise @bit.GitError::IoError(
-        "filter write temp failed: \{@debug.render(@debug.to_repr(err))}",
+        "filter write temp failed: \{fs_error_message(err)}",
       )
   }
   let shell_cmd = build_filter_shell_command(command)

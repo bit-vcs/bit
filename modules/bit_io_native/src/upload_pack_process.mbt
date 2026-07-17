@@ -8,6 +8,13 @@ priv struct ProcessSpec {
 }
 
 ///|
+fn fs_error_message(err : @fs.IOError) -> String {
+  match err {
+    @fs.IOError::IOError(message) => message
+  }
+}
+
+///|
 priv enum SshVariant {
   Ssh
   Plink
@@ -643,7 +650,7 @@ async fn run_process_with_files(
   @fs.write_bytes_to_file(stdin_path, stdin_bytes) catch {
     e =>
       raise @bit.GitError::IoError(
-        "failed to write stdin temp file: \{@debug.render(@debug.to_repr(e))}",
+        "failed to write stdin temp file: \{fs_error_message(e)}",
       )
   }
   let stdin = @process.redirect_from_file(stdin_path) catch {
@@ -716,7 +723,7 @@ async fn run_process_with_files(
     e => {
       cleanup_temp_files(cleanup_paths)
       raise @bit.GitError::IoError(
-        "failed to read stdout: \{@debug.render(@debug.to_repr(e))}",
+        "failed to read stdout: \{fs_error_message(e)}",
       )
     }
   }
@@ -724,7 +731,7 @@ async fn run_process_with_files(
     e => {
       cleanup_temp_files(cleanup_paths)
       raise @bit.GitError::IoError(
-        "failed to read stderr: \{@debug.render(@debug.to_repr(e))}",
+        "failed to read stderr: \{fs_error_message(e)}",
       )
     }
   }
