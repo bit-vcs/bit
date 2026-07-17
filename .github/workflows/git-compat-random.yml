@@ -35,7 +35,7 @@ jobs:
         shard: [1, 2, 3, 4, 5]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -106,7 +106,7 @@ jobs:
       - name: Upload compat results
         if: >-
           ${{ steps.shard_guard.outputs.should_run == 'true' && (success() || failure()) }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: compat-random-run-${{ github.run_id }}-shard-${{ matrix.shard }}
           path: compat-random-results
@@ -118,10 +118,10 @@ jobs:
     if: always()
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download all compat artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: "compat-random-run-${{ github.run_id }}-*"
           path: compat-random-results
@@ -133,7 +133,7 @@ jobs:
           bash tools/aggregate-git-compat-random.sh compat-random-results | tee compat-random-summary.md
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
 
@@ -164,7 +164,7 @@ jobs:
 
       - name: Upload summary
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: compat-random-summary-${{ github.run_id }}
           path: compat-random-summary.md
