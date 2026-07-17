@@ -1,6 +1,6 @@
 name = "mizchi/bit_ignore"
 
-version = "0.45.0"
+version = "0.45.1"
 
 repository = "https://github.com/mizchi/bit-vcs"
 

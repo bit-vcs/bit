@@ -1,15 +1,15 @@
 name = "mizchi/bit_repo_ops"
 
-version = "0.45.0"
+version = "0.45.1"
 
 import {
-  "mizchi/bit_core@0.45.0",
-  "mizchi/bit_hash@0.45.0",
-  "mizchi/bit_object@0.45.0",
-  "mizchi/bit_lib@0.45.0",
-  "mizchi/bit_repo@0.45.0",
-  "mizchi/bit_types@0.45.0",
-  "mizchi/bit_utils@0.45.0",
+  "mizchi/bit_core@0.45.1",
+  "mizchi/bit_hash@0.45.1",
+  "mizchi/bit_object@0.45.1",
+  "mizchi/bit_lib@0.45.1",
+  "mizchi/bit_repo@0.45.1",
+  "mizchi/bit_types@0.45.1",
+  "mizchi/bit_utils@0.45.1",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"
