@@ -1,6 +1,7 @@
 ///|
 /// git history: EXPERIMENTAL history-rewriting command group (git 2.55).
-/// Currently only the `fixup` subcommand is implemented.
+/// Implemented subcommands: `fixup`, `reword`. `split` requires interactive
+/// hunk selection and is not implemented yet.
 
 ///|
 async fn handle_history(args : Array[String]) -> Unit raise Error {
@@ -11,9 +12,14 @@ async fn handle_history(args : Array[String]) -> Unit raise Error {
   let rest = args[1:].to_array()
   match sub {
     "fixup" => handle_history_fixup(rest)
+    "reword" => handle_history_reword(rest)
+    "split" =>
+      raise @bitcore.GitError::InvalidObject(
+        "git history split is not implemented yet (requires interactive hunk selection)",
+      )
     _ =>
       raise @bitcore.GitError::InvalidObject(
-        "git history: unknown subcommand '\{sub}' (only 'fixup' is supported)",
+        "git history: unknown subcommand '\{sub}' (supported: fixup, reword)",
       )
   }
 }
@@ -99,42 +105,9 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("nothing to fixup: no staged changes")
   }
 
-  // Collect the tips to consider: all branches (+ HEAD) or just HEAD.
-  let (head_ref, branches) = @bitlib.list_branches(rfs, git_dir)
-  let tips : Array[@bitlib.HistoryRefUpdate] = []
-  if only_head {
-    // Only rewrite HEAD's branch; error if target is not in HEAD ancestry.
-    if not(@bitlib.merge_base_is_ancestor(db, rfs, target, head)) {
-      raise @bitcore.GitError::InvalidObject(
-        "rewritten commit must be an ancestor of HEAD when using --update-refs=head",
-      )
-    }
-    match head_ref {
-      Branch(name) =>
-        tips.push({
-          refname: "refs/heads/" + name,
-          old_id: head,
-          new_id: head,
-        })
-      Detached(_) =>
-        tips.push({ refname: "HEAD", old_id: head, new_id: head })
-    }
-  } else {
-    for b in branches {
-      tips.push({
-        refname: "refs/heads/" + b.name,
-        old_id: b.id,
-        new_id: b.id,
-      })
-    }
-  }
-
-  // Reject histories containing merges between target and any tip.
-  for tip in tips {
-    if @bitlib.merge_base_is_ancestor(db, rfs, target, tip.new_id) {
-      history_reject_merges_cmd(db, rfs, target, tip.new_id)
-    }
-  }
+  let (head_ref, tips) = history_collect_tips_cmd(
+    db, rfs, git_dir, target, head, only_head,
+  )
 
   let reedit_message : String? = if reedit {
     // Open the target's message in the editor and use whatever comes back.
@@ -167,14 +140,195 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
   }
 
   // Apply the ref updates, recording a reflog entry for each.
+  let new_head = history_apply_updates_cmd(
+    ffs, rfs, git_dir, result.updates, head_ref, "fixup: updating " + spec,
+  )
+
+  // Reset the index to the new HEAD so staged changes are consumed, while
+  // leaving unstaged worktree changes in place (mixed reset semantics).
+  // Best-effort: a failure here must not abort the (already applied) rewrite.
+  match new_head {
+    Some(nh) =>
+      try
+        ignore(
+          @bitlib.reset(ffs, rfs, root, nh.to_hex(), @bitlib.ResetMode::Mixed),
+        )
+      catch {
+        _ => ()
+      }
+    None => ()
+  }
+}
+
+///|
+/// git history reword <commit> [--dry-run] [--update-refs=(branches|head)]
+/// Rewrite the target commit's message via the editor and replay descendants.
+async fn handle_history_reword(args : Array[String]) -> Unit raise Error {
+  let root = get_work_root()
+  let fs = OsFs::new()
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let ffs : &@bitcore.FileSystem = fs
+  let git_dir = resolve_git_dir(rfs, root)
+
+  // -- parse arguments ------------------------------------------------------
+  let mut dry_run = false
+  let mut only_head = false
+  let mut target_spec : String? = None
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "-n" | "--dry-run" => dry_run = true
+      "--" => ()
+      _ =>
+        if arg.has_prefix("--update-refs=") {
+          let v = String::unsafe_substring(arg, start=14, end=arg.length())
+          match v {
+            "branches" => only_head = false
+            "head" => only_head = true
+            _ =>
+              raise @bitcore.GitError::InvalidObject(
+                "invalid --update-refs value: \{v}",
+              )
+          }
+        } else if arg.has_prefix("-") {
+          raise @bitcore.GitError::InvalidObject(
+            "unknown history reword argument: \{arg}",
+          )
+        } else if target_spec is None {
+          target_spec = Some(arg)
+        } else {
+          raise @bitcore.GitError::InvalidObject(
+            "command expects a single revision",
+          )
+        }
+    }
+    i += 1
+  }
+  guard target_spec is Some(spec) else {
+    raise @bitcore.GitError::InvalidObject("command expects a single revision")
+  }
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+
+  // Resolve target and HEAD.
+  guard @bitrepo.rev_parse(rfs, git_dir, spec) is Some(target) else {
+    raise @bitcore.GitError::InvalidObject("commit cannot be found: \{spec}")
+  }
+  guard @bitrepo.rev_parse(rfs, git_dir, "HEAD") is Some(head) else {
+    raise @bitcore.GitError::InvalidObject("cannot look up HEAD")
+  }
+  let (head_ref, tips) = history_collect_tips_cmd(
+    db, rfs, git_dir, target, head, only_head,
+  )
+
+  // Obtain the new message: original body + hint comments, via the editor.
+  let orig_msg = history_commit_message_cmd(db, rfs, target)
+  guard resolve_commit_editor() is Some(editor) else {
+    raise @bitcore.GitError::InvalidObject(
+      "no editor configured; set GIT_EDITOR (or VISUAL/EDITOR)",
+    )
+  }
+  let msg_path = git_dir + "/COMMIT_EDITMSG"
+  let template = orig_msg +
+    "\n# Please enter the new commit message for the reworded commit.\n" +
+    "# Lines starting with '#' will be ignored, and an empty message\n" +
+    "# aborts the operation.\n"
+  ffs.write_string(msg_path, template)
+  let code = run_editor_on_path(editor, msg_path)
+  if code != 0 {
+    raise @bitcore.GitError::InvalidObject("editor exited with \{code}")
+  }
+  let new_message = history_clean_editmsg(decode_bytes(rfs.read_file(msg_path)))
+  if new_message == "" {
+    raise @bitcore.GitError::InvalidObject(
+      "Aborting commit due to empty commit message.",
+    )
+  }
+
+  let result = @bitlib.history_reword(
+    db, ffs, rfs, git_dir, target, new_message, tips,
+  )
+
+  if dry_run {
+    for u in result.updates {
+      print_line("update \{u.refname} \{u.new_id.to_hex()} \{u.old_id.to_hex()}")
+    }
+    return
+  }
+  ignore(
+    history_apply_updates_cmd(
+      ffs, rfs, git_dir, result.updates, head_ref, "reword: updating " + spec,
+    ),
+  )
+}
+
+///|
+/// Collect the ref tips a history rewrite should consider (all branches, or
+/// just HEAD's branch with --update-refs=head), and reject histories that
+/// contain merges between the target and any tip.
+fn history_collect_tips_cmd(
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  target : @bitcore.ObjectId,
+  head : @bitcore.ObjectId,
+  only_head : Bool,
+) -> (@bitlib.HeadRef, Array[@bitlib.HistoryRefUpdate]) raise Error {
+  let (head_ref, branches) = @bitlib.list_branches(rfs, git_dir)
+  let tips : Array[@bitlib.HistoryRefUpdate] = []
+  if only_head {
+    // Only rewrite HEAD's branch; error if target is not in HEAD ancestry.
+    if not(@bitlib.merge_base_is_ancestor(db, rfs, target, head)) {
+      raise @bitcore.GitError::InvalidObject(
+        "rewritten commit must be an ancestor of HEAD when using --update-refs=head",
+      )
+    }
+    match head_ref {
+      Branch(name) =>
+        tips.push({
+          refname: "refs/heads/" + name,
+          old_id: head,
+          new_id: head,
+        })
+      Detached(_) => tips.push({ refname: "HEAD", old_id: head, new_id: head })
+    }
+  } else {
+    for b in branches {
+      tips.push({
+        refname: "refs/heads/" + b.name,
+        old_id: b.id,
+        new_id: b.id,
+      })
+    }
+  }
+
+  // Reject histories containing merges between target and any tip.
+  for tip in tips {
+    if @bitlib.merge_base_is_ancestor(db, rfs, target, tip.new_id) {
+      history_reject_merges_cmd(db, rfs, target, tip.new_id)
+    }
+  }
+  (head_ref, tips)
+}
+
+///|
+/// Write the rewritten refs and reflog entries; returns the new HEAD commit
+/// when HEAD's branch was among the updated refs.
+async fn history_apply_updates_cmd(
+  ffs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  updates : Array[@bitlib.HistoryRefUpdate],
+  head_ref : @bitlib.HeadRef,
+  reflog_msg : String,
+) -> @bitcore.ObjectId? raise Error {
   let mut new_head : @bitcore.ObjectId? = None
   let head_branch = match head_ref {
     Branch(name) => Some("refs/heads/" + name)
     Detached(_) => None
   }
   let (rl_author, rl_email, rl_ts, rl_tz) = get_committer_identity()
-  let reflog_msg = "fixup: updating " + spec
-  for u in result.updates {
+  for u in updates {
     history_write_ref_cmd(ffs, git_dir, u.refname, u.new_id)
     try
       @bitlib.append_reflog(
@@ -196,24 +350,9 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
       new_head = Some(u.new_id)
     }
   }
-
-  // Reset the index to the new HEAD so staged changes are consumed, while
-  // leaving unstaged worktree changes in place (mixed reset semantics).
-  // Best-effort: a failure here must not abort the (already applied) rewrite.
-  match new_head {
-    Some(nh) =>
-      try
-        ignore(
-          @bitlib.reset(ffs, rfs, root, nh.to_hex(), @bitlib.ResetMode::Mixed),
-        )
-      catch {
-        _ => ()
-      }
-    None => ()
-  }
+  new_head
 }
 
-///|
 ///|
 fn history_is_blank_line(s : String) -> Bool {
   for c in s {

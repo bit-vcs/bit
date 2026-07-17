@@ -179,6 +179,57 @@ pub fn history_fixup(
     rewrite_map[target_id.to_hex()] = id
   }
 
+  let updates = history_replay_descendants(
+    db, fs, rfs, git_dir, target_id, rewrite_map, tips, empty, "fixup",
+  )
+  { updates, rewritten: rewritten_target }
+}
+
+///|
+/// Rewrite a commit's message in place (same tree, parents, author, and
+/// committer) and replay its descendants. Core of `git history reword`.
+/// If the new message equals the old one, the rewritten commit hashes to the
+/// same id and the result contains no ref updates.
+pub fn history_reword(
+  db : ObjectDb,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  target_id : @bit.ObjectId,
+  new_message : String,
+  tips : Array[HistoryRefUpdate],
+) -> HistoryFixupResult raise @bit.GitError {
+  let target = rebase_parse_commit_full(db, rfs, target_id)
+  let new_id = history_write_commit(
+    db, fs, git_dir, target.tree, target.parents, target, Some(new_message),
+  )
+  let rewrite_map : Map[String, @bit.ObjectId] = {}
+  rewrite_map[target_id.to_hex()] = new_id
+  // Trees are untouched by a reword, so descendants can never become empty
+  // during replay; Keep preserves commits that were already empty.
+  let updates = history_replay_descendants(
+    db, fs, rfs, git_dir, target_id, rewrite_map, tips,
+    HistoryEmptyAction::Keep, "reword",
+  )
+  { updates, rewritten: Some(new_id) }
+}
+
+///|
+/// Replay every descendant of `target_id` reachable from `tips` onto its
+/// rewritten parent (per `rewrite_map`, which is extended in place), and
+/// return the resulting ref updates. Chains must be linear; the caller is
+/// responsible for rejecting merges. `op` names the command in error messages.
+fn history_replay_descendants(
+  db : ObjectDb,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  target_id : @bit.ObjectId,
+  rewrite_map : Map[String, @bit.ObjectId],
+  tips : Array[HistoryRefUpdate],
+  empty : HistoryEmptyAction,
+  op : String,
+) -> Array[HistoryRefUpdate] raise @bit.GitError {
   // Collect descendants of target reachable from the tips (linear chains only;
   // merges are rejected by the caller). Each chain is walked tip -> target.
   let descendants : Array[@bit.ObjectId] = []
@@ -230,7 +281,7 @@ pub fn history_fixup(
     )
     if !(ok) {
       raise @bit.GitError::InvalidObject(
-        "fixup would produce conflicts while replaying \{c.to_hex()}",
+        "\{op} would produce conflicts while replaying \{c.to_hex()}",
       )
     }
     let becomes_empty = replayed_tree == new_parent_tree
@@ -274,7 +325,7 @@ pub fn history_fixup(
       None => ()
     }
   }
-  { updates, rewritten: rewritten_target }
+  updates
 }
 
 ///|
