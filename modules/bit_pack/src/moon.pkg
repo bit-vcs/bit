@@ -18,6 +18,7 @@ import {
   "moonbitlang/x/fs",
   "mizchi/tempfile",
   "moonbitlang/core/bench",
+  "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/strconv",
 } for "test"

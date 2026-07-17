@@ -14,6 +14,7 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/process",
   "moonbitlang/async/stdio",
+  "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
@@ -30,8 +31,9 @@ import {
   "moonbitlang/core/test",
 } for "wbtest"
 
+pkgtype(kind: "executable")
+
 options(
-  is_main: true,
   "native-stub": [ "hub_libgit2_stub.c", "time_stub.c" ],
   targets: {
     "git_helpers.mbt": [ "native" ],

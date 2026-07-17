@@ -366,7 +366,7 @@ fn check_pack_strict_and_fsck(
   if !strict && !fsck_objects {
     return warnings
   }
-  let pack_ids : Map[String, Bool] = {}
+  let pack_ids : Map[String, Bool] = Map([])
   for obj in objects {
     let hex = obj.id.to_hex()
     if strict && pack_ids.contains(hex) {
@@ -385,7 +385,7 @@ fn check_pack_strict_and_fsck(
       }
     None => None
   }
-  let repo_cache : Map[String, Bool] = {}
+  let repo_cache : Map[String, Bool] = Map([])
   for obj in objects {
     if (strict || fsck_objects) &&
       !ignore_missing_email &&
@@ -793,7 +793,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         let pack = @fs.read_file_to_bytes(pack_path) catch {
           err if @async.is_cancellation_error(err) => raise err
           err => {
-            @stdio.stderr.write("fatal: " + err.to_string() + "\n")
+            @stdio.stderr.write(
+            "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
+          )
             @sys.exit(1)
             Bytes::default()
           }
@@ -801,7 +803,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         let max_depth = @pack.max_delta_chain_length(pack) catch {
           err if @async.is_cancellation_error(err) => raise err
           err => {
-            @stdio.stderr.write("fatal: " + err.to_string() + "\n")
+            @stdio.stderr.write(
+            "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
+          )
             @sys.exit(1)
             0
           }
@@ -823,7 +827,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         let pack = @fs.read_file_to_bytes(pack_path) catch {
           err if @async.is_cancellation_error(err) => raise err
           err => {
-            @stdio.stderr.write("fatal: " + err.to_string() + "\n")
+            @stdio.stderr.write(
+            "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
+          )
             @sys.exit(1)
             Bytes::default()
           }
@@ -837,7 +843,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         let idx = @fs.read_file_to_bytes(idx_path) catch {
           err if @async.is_cancellation_error(err) => raise err
           err => {
-            @stdio.stderr.write("fatal: " + err.to_string() + "\n")
+            @stdio.stderr.write(
+            "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
+          )
             @sys.exit(1)
             Bytes::default()
           }
@@ -861,7 +869,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
                 err => {
                   @stdio.stderr.write(
                     "error: could not read reverse index: " +
-                    err.to_string() +
+                    @debug.render(@debug.to_repr(err)) +
                     "\n",
                   )
                   @sys.exit(1)
@@ -961,7 +969,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
             @bitobject.HashAlgorithm::Sha1
           }
           // Collect IDs of objects already in the pack
-          let pack_ids : Map[String, Bool] = {}
+          let pack_ids : Map[String, Bool] = Map([])
           for obj in objects {
             let hex = @bitobject.hash_object_content_with_algo(
               hash_algo,
@@ -1085,7 +1093,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
       let pack = @fs.read_file_to_bytes(pack_path) catch {
         err if @async.is_cancellation_error(err) => raise err
         err => {
-          @stdio.stderr.write("fatal: " + err.to_string() + "\n")
+          @stdio.stderr.write(
+            "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
+          )
           @sys.exit(1)
           Bytes::default()
         }

@@ -252,13 +252,13 @@ impl HubRepoBackend for GitHubRepoBackend with fn current_branch_name(
 ) {
   if !can_use_hub_git_backend() {
     let fallback = BitHubRepoBackend::{  }
-    return fallback.current_branch_name(root)
+    return HubRepoBackend::current_branch_name(fallback, root)
   }
   match hub_git_head_ref_name(root) {
     Some(name) => parse_branch_ref_name(name)
     None => {
       let fallback = BitHubRepoBackend::{  }
-      fallback.current_branch_name(root)
+      HubRepoBackend::current_branch_name(fallback, root)
     }
   }
 }
@@ -271,11 +271,11 @@ fn resolve_hub_git_dir(root : String) -> String {
   match resolve_hub_repo_backend_kind() {
     HubRepoBackendKind::Bit => {
       let backend = BitHubRepoBackend::{  }
-      backend.resolve_git_dir(root)
+      HubRepoBackend::resolve_git_dir(backend, root)
     }
     HubRepoBackendKind::Git => {
       let backend = GitHubRepoBackend::{  }
-      backend.resolve_git_dir(root)
+      HubRepoBackend::resolve_git_dir(backend, root)
     }
   }
 }
@@ -285,11 +285,11 @@ fn detect_hub_current_branch_name(root : String) -> String? {
   match resolve_hub_repo_backend_kind() {
     HubRepoBackendKind::Bit => {
       let backend = BitHubRepoBackend::{  }
-      backend.current_branch_name(root)
+      HubRepoBackend::current_branch_name(backend, root)
     }
     HubRepoBackendKind::Git => {
       let backend = GitHubRepoBackend::{  }
-      backend.current_branch_name(root)
+      HubRepoBackend::current_branch_name(backend, root)
     }
   }
 }

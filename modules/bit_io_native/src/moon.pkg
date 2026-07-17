@@ -10,6 +10,7 @@ import {
   "moonbitlang/async/fs" @afs,
   "moonbitlang/async/http",
   "moonbitlang/async/process",
+  "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
   "moonbitlang/x/codec/base64",

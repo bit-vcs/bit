@@ -10,7 +10,10 @@ pub async fn run_filter_command(
 ) -> Bytes raise @bit.GitError {
   let temp_path = git_dir + "/bit-filter.tmp"
   @fs.write_bytes_to_file(temp_path, content) catch {
-    err => raise @bit.GitError::IoError("filter write temp failed: \{err}")
+    err =>
+      raise @bit.GitError::IoError(
+        "filter write temp failed: \{@debug.render(@debug.to_repr(err))}",
+      )
   }
   let shell_cmd = build_filter_shell_command(command)
   let (code, stdout) = @process.collect_stdout(
