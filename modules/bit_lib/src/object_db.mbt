@@ -302,11 +302,29 @@ fn evict_pack_cache(db : ObjectDb) -> Unit {
 }
 
 ///|
+/// Resolve the git dir that owns object storage. A linked worktree's git dir
+/// has no objects/ of its own; its "commondir" file points at the main
+/// repository's git dir, which owns objects and the commit graph.
+fn object_storage_git_dir(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> String {
+  if fs.is_dir(join_path(git_dir, "objects")) {
+    return git_dir
+  }
+  match resolve_ref_commondir(fs, git_dir) {
+    Some(common) => common
+    None => git_dir
+  }
+}
+
+///|
 /// Load ObjectDb with full loose object scan (slower but complete)
 pub fn ObjectDb::load(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> ObjectDb raise @bit.GitError {
+  let git_dir = object_storage_git_dir(fs, git_dir)
   let db = ObjectDb::load_from_objects_dir(fs, join_path(git_dir, "objects"))
   db.commit_graph = CommitGraphFile::load(fs, git_dir) catch { _ => None }
   db
@@ -354,6 +372,7 @@ pub fn ObjectDb::load_lazy(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> ObjectDb raise @bit.GitError {
+  let git_dir = object_storage_git_dir(fs, git_dir)
   let db = ObjectDb::load_lazy_from_objects_dir(
     fs,
     join_path(git_dir, "objects"),
