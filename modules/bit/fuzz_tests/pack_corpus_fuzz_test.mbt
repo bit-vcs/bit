@@ -106,7 +106,9 @@ fn mutate_truncate(pack : Bytes, new_len : Int) -> Bytes {
 /// always discard the streamed objects (the harness only cares that
 /// the call returns or raises, not what comes out).
 fn try_parse(bytes : Bytes) -> Unit {
-  ignore(try? @pack.parse_packfile_stream(bytes, fn(_obj) { () }))
+  try ignore(@pack.parse_packfile_stream(bytes, fn(_obj) { () })) catch {
+    _ => ()
+  }
 }
 
 ///|

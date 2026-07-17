@@ -50,9 +50,10 @@ test "packfile parse: trailer mismatch" {
   let tampered = Bytes::from_array(
     FixedArray::makei(bytes.length(), fn(i) { bytes[i] }),
   )
-  let result = try? parse_packfile(tampered)
-  match result {
-    Err(@bit.GitError::HashMismatch(_, _)) => ()
+  try ignore(parse_packfile(tampered)) catch {
+    @bit.GitError::HashMismatch(_, _) => ()
+    _ => assert_true(false)
+  } noraise {
     _ => assert_true(false)
   }
 }

@@ -179,14 +179,17 @@ test "branch: create_branch_at rejects checked out branch" {
   fs.write_string(
     "/repo/.git/refs/heads/topic", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
   )
-  let result = try? create_branch_at(
+  try create_branch_at(
     fs,
     fs,
     "/repo",
     "topic",
     @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
-  )
-  assert_true(result is Err(_))
+  ) catch {
+    _ => () // expected
+  } noraise {
+    _ => fail("expected create_branch_at to raise")
+  }
   assert_eq(
     fs.read_string("/repo/.git/refs/heads/topic"),
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
@@ -207,14 +210,17 @@ test "branch: create_branch_at rejects branch checked out in linked worktree" {
   fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree1/.git\n")
   fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/topic\n")
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
-  let result = try? create_branch_at(
+  try create_branch_at(
     fs,
     fs,
     "/repo",
     "topic",
     @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
-  )
-  assert_true(result is Err(_))
+  ) catch {
+    _ => () // expected
+  } noraise {
+    _ => fail("expected create_branch_at to raise")
+  }
 }
 
 ///|
@@ -247,8 +253,11 @@ test "branch: delete_branch rejects branch checked out in linked worktree" {
   fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree1/.git\n")
   fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/topic\n")
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
-  let result = try? delete_branch(fs, fs, "/repo", "topic", force=true)
-  assert_true(result is Err(_))
+  try delete_branch(fs, fs, "/repo", "topic", force=true) catch {
+    _ => () // expected
+  } noraise {
+    _ => fail("expected delete_branch to raise")
+  }
   assert_true(fs.is_file("/repo/.git/refs/heads/topic"))
 }
 
@@ -286,8 +295,11 @@ test "branch: rename_branch rejects target checked out in linked worktree" {
   fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree1/.git\n")
   fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/foo\n")
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
-  let result = try? rename_branch(fs, fs, "/repo", "bar", "foo", force=true)
-  assert_true(result is Err(_))
+  try rename_branch(fs, fs, "/repo", "bar", "foo", force=true) catch {
+    _ => () // expected
+  } noraise {
+    _ => fail("expected rename_branch to raise")
+  }
 }
 
 ///|
@@ -411,14 +423,17 @@ test "branch: create_lightweight_tag rejects conflicting parent ref path" {
   fs.write_string(
     "/repo/.git/refs/tags/foo/bar", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
   )
-  let result = try? create_lightweight_tag(
+  try create_lightweight_tag(
     fs,
     fs,
     "/repo/.git",
     "foo",
     @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
-  )
-  assert_true(result is Err(_))
+  ) catch {
+    _ => () // expected
+  } noraise {
+    _ => fail("expected create_lightweight_tag to raise")
+  }
   assert_true(fs.is_file("/repo/.git/refs/tags/foo/bar"))
   assert_true(!fs.is_file("/repo/.git/refs/tags/foo"))
 }
@@ -429,14 +444,17 @@ test "branch: create_lightweight_tag rejects conflicting packed ref path" {
   fs.write_string(
     "/repo/.git/packed-refs", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/foo/bar\n",
   )
-  let result = try? create_lightweight_tag(
+  try create_lightweight_tag(
     fs,
     fs,
     "/repo/.git",
     "foo",
     @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
-  )
-  assert_true(result is Err(_))
+  ) catch {
+    _ => () // expected
+  } noraise {
+    _ => fail("expected create_lightweight_tag to raise")
+  }
   assert_true(!fs.is_file("/repo/.git/refs/tags/foo"))
 }
 

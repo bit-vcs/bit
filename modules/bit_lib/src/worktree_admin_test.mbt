@@ -17,12 +17,19 @@ fn setup_worktree_admin_fs() -> @bit.TestFs {
 ///|
 fn setup_worktree_repo_fs() -> @bit.TestFs {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  try ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   fs.write_string("/repo/init.t", "main\n")
-  ignore(try? add_paths(fs, fs, "/repo", ["init.t"]))
-  ignore(
-    try? commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000700L),
-  )
+  try add_paths(fs, fs, "/repo", ["init.t"]) catch {
+    _ => ()
+  }
+  try ignore(
+      commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000700L),
+    )
+    catch {
+    _ => ()
+  }
   fs
 }
 
@@ -333,7 +340,9 @@ test "worktree admin: linked worktrees are sorted lexically by path" {
 ///|
 test "worktree admin: create_worktree resolves dash to previous checkout branch" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  try ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   fs.write_string("/repo/init.t", "main\n")
   add_paths(fs, fs, "/repo", ["init.t"])
   ignore(commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000400L))
@@ -373,7 +382,9 @@ test "worktree admin: create_worktree with new branch writes branch and HEAD ref
 ///|
 test "worktree admin: create_worktree resolves HEAD to detached commit" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  try ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   fs.write_string("/repo/init.t", "main\n")
   add_paths(fs, fs, "/repo", ["init.t"])
   ignore(commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000450L))
@@ -395,7 +406,9 @@ test "worktree admin: create_worktree resolves HEAD to detached commit" {
 ///|
 test "worktree admin: create_worktree rejects nonempty existing directory" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  try ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   fs.write_string("/repo/init.t", "main\n")
   add_paths(fs, fs, "/repo", ["init.t"])
   ignore(commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000500L))
@@ -415,7 +428,9 @@ test "worktree admin: create_worktree rejects nonempty existing directory" {
 ///|
 test "worktree admin: create_worktree disambiguates duplicate basename" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  try ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   fs.write_string("/repo/init.t", "main\n")
   add_paths(fs, fs, "/repo", ["init.t"])
   ignore(commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000600L))
@@ -817,7 +832,9 @@ test "worktree admin: repair rejects explicit path whose .git is a directory" {
     new_branch=None,
   )
   remove_test_dir(fs, "/repo/repo")
-  ignore(try? init_repo(fs, "/repo/repo"))
+  try ignore(init_repo(fs, "/repo/repo")) catch {
+    _ => ()
+  }
 
   let err = try {
     ignore(repair_worktree_detailed(fs, fs, "/repo", worktree_paths=["repo"]))

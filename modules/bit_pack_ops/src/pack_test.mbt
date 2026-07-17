@@ -1,7 +1,9 @@
 ///|
 async test "pack package: collect reachable objects" {
   let fs = @bit.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  try ignore(@bitlib.init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   fs.write_string("/repo/a.txt", "hello\n")
   @bitlib.add_paths_async(fs, fs, "/repo", ["a.txt"])
   let commit_id = @bitlib.commit(

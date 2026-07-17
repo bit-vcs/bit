@@ -51,7 +51,7 @@ test "workspace: flow ir keeps selected dependency edges" {
   let ir = workspace_flow_ir(manifest, selected, "test")
   assert_eq(ir.nodes.length(), 2)
   assert_eq(ir.tasks.length(), 2)
-  let task_map : Map[String, @bitflow.FlowTask] = {}
+  let task_map : Map[String, @bitflow.FlowTask] = Map([])
   for task in ir.tasks {
     task_map[task.id] = task
   }
@@ -314,7 +314,7 @@ async test "workspace: collect_changed_node_ids tracks signature drift" {
     version: 1,
     nodes: [root_node, dep_node],
   }
-  let lock_signatures : Map[String, String] = {}
+  let lock_signatures : Map[String, String] = Map([])
   for node in manifest.nodes {
     let node_root = workspace_node_abs_path(root, node.path)
     let signature = workspace_node_directory_signature_with_mode(
@@ -504,7 +504,7 @@ test "workspace: bitflow cache plan reflects task metadata changes" {
   let selected : Map[String, Bool] = { "pkg": true }
   let signatures : Map[String, String] = { "pkg": "pkg-1" }
   let ir1 = workspace_flow_ir(manifest, selected, "test")
-  let cache : Map[String, String] = {}
+  let cache : Map[String, String] = Map([])
   let plan1 = @bitflow.plan_task_cache(ir1, signatures, cache)
   assert_eq(plan1.issues.length(), 0)
   assert_eq(plan1.decisions.length(), 1)
@@ -621,12 +621,9 @@ async test "workspace: node signature changes by fingerprint mode" {
   let fs = @osfs.OsFs::new()
   let root = "/tmp/bit-test-workspace-signature-mode-" +
     get_current_timestamp().to_string()
-  let cleanup_before : Result[Int, Error] = try? @process.run(
-    "rm",
-    ["-rf", root],
-    inherit_env=true,
-  )
-  ignore(cleanup_before)
+  try ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
+    _ => ()
+  }
   fs.mkdir_p(root)
   let init_code = try
     @process.collect_output(
@@ -641,12 +638,9 @@ async test "workspace: node signature changes by fingerprint mode" {
     (code, _, _) => code
   }
   if init_code != 0 {
-    let cleanup_failed : Result[Int, Error] = try? @process.run(
-      "rm",
-      ["-rf", root],
-      inherit_env=true,
-    )
-    ignore(cleanup_failed)
+    try ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
+      _ => ()
+    }
     return
   }
   fs.write_string(root + "/file.txt", "payload\n")
@@ -664,12 +658,9 @@ async test "workspace: node signature changes by fingerprint mode" {
     (Some(fast_sig), Some(bit_sig)) => assert_eq(fast_sig == bit_sig, false)
     _ => fail("workspace signature should exist for initialized repository")
   }
-  let cleanup_after : Result[Int, Error] = try? @process.run(
-    "rm",
-    ["-rf", root],
-    inherit_env=true,
-  )
-  ignore(cleanup_after)
+  try ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
+    _ => ()
+  }
 }
 
 ///|
@@ -759,7 +750,7 @@ test "workspace: parse star flow ir supports load and external inputs" {
   assert_eq(ir.tasks.length(), 2)
   assert_eq(ir.entry_targets.length(), 1)
   assert_eq(ir.entry_targets[0], "dep:test")
-  let task_map : Map[String, @bitflow.FlowTask] = {}
+  let task_map : Map[String, @bitflow.FlowTask] = Map([])
   for task in ir.tasks {
     task_map[task.id] = task
   }

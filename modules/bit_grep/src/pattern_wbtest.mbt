@@ -123,17 +123,14 @@ test "grep pattern: extract_commit_message_from_raw returns message body" {
 
 ///|
 test "grep pattern: validate rejects unmatched group syntax" {
-  let result : Result[Unit, Error] = try? validate_grep_patterns(
-    ["("],
-    GrepPatternType::Basic,
-  )
-  match result {
-    Ok(_) => fail("expected invalid regex error")
-    Err(err) =>
+  try validate_grep_patterns(["("], GrepPatternType::Basic) catch {
+    err =>
       debug_inspect(
         err.to_string().contains("invalid regular expression"),
         content="true",
       )
+  } noraise {
+    _ => fail("expected invalid regex error")
   }
 }
 
