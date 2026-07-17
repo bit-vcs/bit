@@ -12,6 +12,9 @@ test("workspace modules form a publish DAG with resolvable internal versions", (
   const modules = loadWorkspaceModules();
   const byName = new Map(modules.map((module) => [module.name, module]));
 
+  assert.ok(modules.length > 0);
+  assert.equal(modules.every((module) => module.manifestPath.endsWith("moon.mod")), true);
+
   for (const module of modules) {
     for (const [dependency, version] of Object.entries(module.deps ?? {})) {
       if (byName.has(dependency)) {
@@ -35,6 +38,6 @@ test("mizchi/bit module root is the installable main package", () => {
   assert.equal(existsSync(path.join(bit.directory, "moon.pkg")), true);
   assert.match(
     readFileSync(path.join(bit.directory, "moon.pkg"), "utf8"),
-    /options\(is_main: true\)/,
+    /pkgtype\(kind: "executable"\)/,
   );
 });

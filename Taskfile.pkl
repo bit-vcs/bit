@@ -9,6 +9,7 @@ local moonbitSources: Listing<String> = new {
   "modules/**/*.mbt"
   "modules/**/moon.pkg"
   "modules/**/moon.pkg.json"
+  "modules/**/moon.mod"
   "modules/**/moon.mod.json"
   "moon.work"
 }
@@ -606,8 +607,6 @@ local playgroundDev: Task = new {
 local releaseCheck: Task = new {
   name = "release-check"
   description = "Pre-release gate: info + check + test + treeshake + e2e"
-  // `moon fmt` now requires a workspace-wide moon.mod migration. Keep that
-  // migration separate until Nix and release tooling stop reading moon.mod.json.
   deps { info; check; test; verifyJsLibTreeshake; e2e }
 }
 
