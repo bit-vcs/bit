@@ -15,13 +15,13 @@ Analyze and triage issues.
 
 ## Steps
 
-1. **Read the issue**: `bit issue get <id>`
+1. **Read the issue**: `bit issue get <id>` (skip `session:<branch>` labeled issues — they are session-coordination records, not backlog)
 2. **Categorize**: Determine type (bug, feature, question, improvement, docs)
 3. **Assess complexity**: Estimate as small/medium/large based on:
    - Number of files likely affected
    - Whether it requires new architecture
    - Test coverage implications
-4. **Suggest labels**: Based on category and affected area
+4. **Suggest labels**: Follow the label conventions in the **bit-issue** skill — one priority (`P0`, `P0.5`, `P1`, `P2`, `P3`, `P4`) + area (`merge`, `test`, `hub`, `perf`, `wasm`, `object`, `relay`, `sparse`, …) + optional type (`bug`, `edge-case`, `epic`)
 5. **Propose approach**: Brief implementation plan if applicable
 6. **Update issue**: Add labels and comment with analysis
 
@@ -32,8 +32,8 @@ Analyze and triage issues.
 
 **Type**: bug | feature | question | improvement
 **Complexity**: small | medium | large
-**Labels**: label1, label2
-**Area**: src/cmd/bit, src/lib, src/pack, etc.
+**Labels**: P1, merge, bug
+**Area**: modules/bit_core, modules/bit/cmd/bit, modules/bitx_hub, etc.
 
 ## Analysis
 Brief description of what needs to be done.
@@ -47,7 +47,8 @@ Brief description of what needs to be done.
 ## Commands
 
 ```bash
-bit issue update <id> --label "bug" --label "priority:medium"
+# --label replaces the whole set: pass priority + area + type together
+bit issue update <id> --label "P1" --label "merge" --label "bug"
 bit issue comment add <id> --body "Triage: ..."
 ```
 

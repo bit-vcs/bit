@@ -1013,6 +1013,26 @@ fn can_handle_global_config_in_shim(opts : GlobalOptions) -> Bool {
 }
 
 ///|
+/// Commands that exist only in bit. Real git cannot handle them, so config
+/// injection (-c / GIT_CONFIG_*) must never route them to a real git binary.
+fn is_bit_only_command(cmd : String) -> Bool {
+  match normalize_dispatch_command(cmd) {
+    "hub"
+    | "pr"
+    | "issue"
+    | "relay"
+    | "workspace"
+    | "repo"
+    | "hq"
+    | "subdir-clone"
+    | "ai"
+    | "rebase-ai"
+    | "debug" => true
+    _ => false
+  }
+}
+
+///|
 fn should_delegate_to_real_git(
   args : Array[String],
   opts : GlobalOptions,
@@ -1043,7 +1063,10 @@ fn should_delegate_to_real_git(
       // config/status are handled natively by default; like every other
       // command they only fall back when global config injection (-c /
       // GIT_CONFIG_*) is present and the shim cannot apply it itself.
-      if cmd == "worktree" || cmd == "submodule" || cmd == "submodule--helper" {
+      if cmd == "worktree" ||
+        cmd == "submodule" ||
+        cmd == "submodule--helper" ||
+        is_bit_only_command(cmd) {
         false
       } else if shim_handles_config {
         false

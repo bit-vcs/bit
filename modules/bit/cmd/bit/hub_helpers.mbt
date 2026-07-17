@@ -396,6 +396,11 @@ fn format_issue_json(issue : @hub.Issue) -> String {
   for p in linked {
     linked_parts.push(json_escape_string(p))
   }
+  let blocked_by = issue.blocked_by()
+  let blocked_by_parts : Array[String] = []
+  for b in blocked_by {
+    blocked_by_parts.push(json_escape_string(b))
+  }
   let parent = match issue.parent_id {
     Some(pid) => json_escape_string(pid)
     None => "null"
@@ -414,6 +419,7 @@ fn format_issue_json(issue : @hub.Issue) -> String {
   buf.write_string(",\"labels\":[" + label_parts.join(",") + "]")
   buf.write_string(",\"assignees\":[" + assignee_parts.join(",") + "]")
   buf.write_string(",\"linked_prs\":[" + linked_parts.join(",") + "]")
+  buf.write_string(",\"blocked_by\":[" + blocked_by_parts.join(",") + "]")
   buf.write_string(",\"parent_id\":" + parent)
   buf.write_string("}")
   buf.to_string()
