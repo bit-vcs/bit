@@ -38,11 +38,18 @@ moon test --target native -p mizchi/bit/tests
 moon test --target native -p mizchi/bit/fuzz_tests || true
 moon test --target native -p mizchi/bit/cmd/git-bit
 
-for shard in 0 1 2 3 4 5; do
-  # shellcheck disable=SC2012
-  files=$(ls modules/bit/cmd/bit/*.mbt | sort | awk "(NR-1) % 6 == $shard")
-  echo "[native] cmd/bit shard $shard/6"
-  # Moon expects the selected files as separate positional arguments.
-  # shellcheck disable=SC2086
-  moon test --target native --no-parallelize $files
-done
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  # moonc currently ICEs while linking cmd/bit's native whitebox driver on
+  # arm64 macOS. The six shards run in Linux CI; the native release build and
+  # all non-CLI native package tests above still run locally.
+  echo "[native] skipping cmd/bit whitebox shards on Darwin (moonc layout ICE)"
+else
+  for shard in 0 1 2 3 4 5; do
+    # shellcheck disable=SC2012
+    files=$(ls modules/bit/cmd/bit/*.mbt | sort | awk "(NR-1) % 6 == $shard")
+    echo "[native] cmd/bit shard $shard/6"
+    # Moon expects the selected files as separate positional arguments.
+    # shellcheck disable=SC2086
+    moon test --target native --no-parallelize $files
+  done
+fi

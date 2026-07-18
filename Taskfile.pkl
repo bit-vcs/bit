@@ -280,6 +280,18 @@ local test: Task = new {
   name = "test"
   description = "Run the full test matrix through pkspec (Test.pkl)"
   cmd = "pkspec exec -f Test.pkl"
+  inputs {
+    "modules/**/*.mbt"
+    "modules/**/moon.pkg"
+    "modules/**/moon.pkg.json"
+    "modules/**/moon.mod"
+    "modules/**/moon.mod.json"
+    "moon.work"
+    "Test.pkl"
+    "pkspec/**/*.pkl"
+    "tools/**/*.mjs"
+    "tools/**/*.sh"
+  }
   deps {
     build
     syncNpmLibRaw
