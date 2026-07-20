@@ -407,7 +407,10 @@ test "gc tolerates symref files under refs" {
   let git_dir = root + "/.git"
   let (commit_id, _, _) = build_simple_repo(fs, root)
   fs.mkdir_p(git_dir + "/refs/remotes/origin")
-  fs.write_string(git_dir + "/refs/remotes/origin/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    git_dir + "/refs/remotes/origin/HEAD",
+    "ref: refs/heads/main\n",
+  )
   // Must not raise, and reachable objects stay reachable.
   let result = gc_repo(fs, fs, root)
   for id in result.dangling {

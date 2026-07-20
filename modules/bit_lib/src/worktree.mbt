@@ -28,7 +28,9 @@ pub async fn status(
   let autocrlf = read_autocrlf_setting(fs, actual_git_dir)
   let skip_worktree_paths = read_skip_worktree_paths(fs, actual_git_dir)
   let racy_git = racy_git_enabled()
-  let index_entries = read_index_entries(fs, actual_git_dir)
+  let (index_entries, cache_tree) = read_index_entries_with_cache_tree(
+    fs, actual_git_dir,
+  )
   t0 = profile_lap(profile, "status read_index_entries", t0)
   let (unstaged_modified, unstaged_deleted, untracked) = index_guided_status_walk(
     fs,
@@ -53,7 +55,8 @@ pub async fn status(
   let staged_modified : Array[String] = []
   let staged_deleted : Array[String] = []
   collect_staged_changes_from_head(
-    fs, actual_git_dir, index_map, skip_worktree_paths, staged_modified, staged_deleted,
+    fs, actual_git_dir, cache_tree, index_map, skip_worktree_paths, staged_modified,
+    staged_deleted,
   )
   t0 = profile_lap(profile, "status read_head_entries", t0)
   for path in index_map.keys() {
@@ -1499,6 +1502,7 @@ fn resolve_worktree_common_git_dir(
 fn collect_staged_changes_from_head(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
+  cache_tree : IndexCacheTree?,
   index_map : Map[String, IndexEntry],
   skip_worktree_paths : Map[String, Bool],
   staged_modified : Array[String],
@@ -1527,6 +1531,7 @@ fn collect_staged_changes_from_head(
             fs,
             info.tree,
             "",
+            cache_tree,
             index_map,
             skip_worktree_paths,
             staged_modified,
@@ -1544,11 +1549,19 @@ fn collect_staged_changes_db(
   fs : &@bit.RepoFileSystem,
   tree_id : @bit.ObjectId,
   prefix : String,
+  cache_tree : IndexCacheTree?,
   index_map : Map[String, IndexEntry],
   skip_worktree_paths : Map[String, Bool],
   staged_modified : Array[String],
   staged_deleted : Array[String],
 ) -> Unit raise @bit.GitError {
+  match cache_tree {
+    Some(tree) if index_cache_tree_matches_tree(tree, tree_id) => {
+      index_map_remove_tree_paths(index_map, prefix)
+      return
+    }
+    _ => ()
+  }
   let tree_obj = db.get(fs, tree_id)
   match tree_obj {
     None => raise @bit.GitError::InvalidObject("Missing tree object")
@@ -1572,6 +1585,7 @@ fn collect_staged_changes_db(
             fs,
             entry.id,
             path,
+            index_cache_tree_child(cache_tree, entry.name),
             index_map,
             skip_worktree_paths,
             staged_modified,
@@ -1591,6 +1605,52 @@ fn collect_staged_changes_db(
         }
       }
     }
+  }
+}
+
+///|
+fn index_cache_tree_matches_tree(
+  cache_tree : IndexCacheTree,
+  tree_id : @bit.ObjectId,
+) -> Bool {
+  match cache_tree.oid {
+    Some(cache_tree_id) =>
+      cache_tree.entry_count >= 0 && cache_tree_id == tree_id
+    None => false
+  }
+}
+
+///|
+fn index_cache_tree_child(
+  cache_tree : IndexCacheTree?,
+  name : String,
+) -> IndexCacheTree? {
+  match cache_tree {
+    None => None
+    Some(tree) => {
+      for subtree in tree.subtrees {
+        if subtree.name == name {
+          return Some(subtree)
+        }
+      }
+      None
+    }
+  }
+}
+
+///|
+fn index_map_remove_tree_paths(
+  index_map : Map[String, IndexEntry],
+  prefix : String,
+) -> Unit {
+  let paths : Array[String] = []
+  for path in index_map.keys() {
+    if prefix.length() == 0 || path.has_prefix(prefix + "/") {
+      paths.push(path)
+    }
+  }
+  for path in paths {
+    index_map.remove(path)
   }
 }
 

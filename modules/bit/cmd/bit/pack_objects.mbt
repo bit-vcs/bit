@@ -1249,11 +1249,8 @@ fn read_pack_objects(
 }
 
 ///|
-fn object_hex(
-  obj : @bitcore.PackObject,
-  algo? : @bitobject.HashAlgorithm = Sha1,
-) -> String {
-  @bitobject.hash_object_content_with_algo(algo, obj.obj_type, obj.data).to_hex()
+fn object_hex(obj : @bitcore.PackObject) -> String {
+  obj.id.to_hex()
 }
 
 ///|

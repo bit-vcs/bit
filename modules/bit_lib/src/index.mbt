@@ -120,7 +120,13 @@ pub fn read_index_entries(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Array[IndexEntry] raise @bit.GitError {
-  let staged_entries = read_index_stage_entries(fs, git_dir)
+  index_entries_from_stage_entries(read_index_stage_entries(fs, git_dir))
+}
+
+///|
+fn index_entries_from_stage_entries(
+  staged_entries : Array[IndexStageEntry],
+) -> Array[IndexEntry] {
   let mut has_conflicts = false
   for item in staged_entries {
     if item.stage != 0 {
@@ -154,6 +160,31 @@ pub fn read_index_entries(
     }
     entries
   }
+}
+
+///|
+/// Read the index entries and optional TREE extension from one index snapshot.
+/// A missing or malformed extension falls back to the ordinary staged-tree walk.
+fn read_index_entries_with_cache_tree(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> (Array[IndexEntry], IndexCacheTree?) raise @bit.GitError {
+  let path = join_path(git_dir, "index")
+  if !fs.is_file(path) {
+    return ([], None)
+  }
+  let data = fs.read_file(path)
+  let hash_size = index_repo_hash_size(fs, git_dir)
+  let staged_entries = index_read_stage_entries_from_bytes(data, hash_size~)
+  let index_entries = index_entries_from_stage_entries(staged_entries)
+  let cache_tree = if staged_entries.any(fn(item) { item.stage != 0 }) {
+    None
+  } else {
+    index_read_cache_tree_from_bytes(data, hash_size~) catch {
+      _ => None
+    }
+  }
+  (index_entries, cache_tree)
 }
 
 ///|

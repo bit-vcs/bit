@@ -1203,7 +1203,7 @@ pub fn js_status(host_id : Int, root : String) -> Result[Status, String] {
   let fs = js_make_host_fs(host_id)
   js_wrap_error(() => {
     let git_dir = js_resolve_git_dir(fs, root)
-    let entries = read_index_entries(fs, git_dir)
+    let (entries, cache_tree) = read_index_entries_with_cache_tree(fs, git_dir)
     let index_map : Map[String, IndexEntry] = Map([])
     for entry in entries {
       index_map[entry.path] = entry
@@ -1247,7 +1247,8 @@ pub fn js_status(host_id : Int, root : String) -> Result[Status, String] {
     let staged_deleted : Array[String] = []
     let skip_worktree_paths : Map[String, Bool] = Map([])
     collect_staged_changes_from_head(
-      fs, git_dir, staged_index_map, skip_worktree_paths, staged_modified, staged_deleted,
+      fs, git_dir, cache_tree, staged_index_map, skip_worktree_paths, staged_modified,
+      staged_deleted,
     )
     let staged_added = staged_index_map.keys().to_array()
     staged_added.sort()

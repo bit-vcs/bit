@@ -422,13 +422,11 @@ pub fn upload_pack(
     let have_set : Map[String, Bool] = Map([])
     let have_objects = collect_reachable_objects_from_commits(db, fs, req.haves)
     for obj in have_objects {
-      let id = @bit.hash_object_content(obj.obj_type, obj.data)
-      have_set[id.to_hex()] = true
+      have_set[obj.id.to_hex()] = true
     }
     let filtered : Array[@bit.PackObject] = []
     for obj in objects {
-      let id = @bit.hash_object_content(obj.obj_type, obj.data)
-      if !have_set.contains(id.to_hex()) {
+      if !have_set.contains(obj.id.to_hex()) {
         filtered.push(obj)
       }
     }
@@ -779,13 +777,11 @@ pub fn upload_pack_v2(
     let have_set : Map[String, Bool] = Map([])
     let have_objects = collect_reachable_objects_from_commits(db, fs, req.haves)
     for obj in have_objects {
-      let id = @bit.hash_object_content(obj.obj_type, obj.data)
-      have_set[id.to_hex()] = true
+      have_set[obj.id.to_hex()] = true
     }
     let filtered : Array[@bit.PackObject] = []
     for obj in objects {
-      let id = @bit.hash_object_content(obj.obj_type, obj.data)
-      if !have_set.contains(id.to_hex()) {
+      if !have_set.contains(obj.id.to_hex()) {
         filtered.push(obj)
       }
     }
