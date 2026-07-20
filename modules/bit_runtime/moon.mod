@@ -1,16 +1,16 @@
 name = "mizchi/bit_runtime"
 
-version = "0.45.1"
+version = "0.45.2"
 
 import {
-  "mizchi/bit_core@0.45.1",
-  "mizchi/bit_io@0.45.1",
-  "mizchi/bit_lib@0.45.1",
-  "mizchi/bit_object@0.45.1",
-  "mizchi/bit_repo@0.45.1",
-  "mizchi/bit_repo_ops@0.45.1",
-  "mizchi/bit_types@0.45.1",
-  "mizchi/bit_utils@0.45.1",
+  "mizchi/bit_core@0.45.2",
+  "mizchi/bit_io@0.45.2",
+  "mizchi/bit_lib@0.45.2",
+  "mizchi/bit_object@0.45.2",
+  "mizchi/bit_repo@0.45.2",
+  "mizchi/bit_repo_ops@0.45.2",
+  "mizchi/bit_types@0.45.2",
+  "mizchi/bit_utils@0.45.2",
   "moonbitlang/x@0.4.40",
 }
 

@@ -1,15 +1,15 @@
 name = "mizchi/bitx_subdir"
 
-version = "0.45.1"
+version = "0.45.2"
 
 import {
-  "mizchi/bit_core@0.45.1",
-  "mizchi/bit_object@0.45.1",
-  "mizchi/bit_repo@0.45.1",
-  "mizchi/bit_io@0.45.1",
-  "mizchi/bit_lib@0.45.1",
-  "mizchi/bit_types@0.45.1",
-  "mizchi/bit_vfs@0.45.1",
+  "mizchi/bit_core@0.45.2",
+  "mizchi/bit_object@0.45.2",
+  "mizchi/bit_repo@0.45.2",
+  "mizchi/bit_io@0.45.2",
+  "mizchi/bit_lib@0.45.2",
+  "mizchi/bit_types@0.45.2",
+  "mizchi/bit_vfs@0.45.2",
   "mizchi/zlib@0.4.8",
 }
 
