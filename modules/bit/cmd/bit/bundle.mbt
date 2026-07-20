@@ -94,10 +94,11 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
       None => ()
     }
   }
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let exclude_ids : Map[String, Bool] = Map([])
   for spec in excludes {
     match @bitrepo.rev_parse(fs, git_dir, spec) {
-      Some(id) => walk_commits_to_map(fs, git_dir, id, exclude_ids)
+      Some(id) => walk_commits_to_map(db, fs, id, exclude_ids)
       None => ()
     }
   }
@@ -120,7 +121,7 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
   let header = lines.join("\n")
   let header_bytes = @utf8.encode(header[:])
   // Collect all reachable objects
-  let objects = collect_bundle_objects(fs, git_dir, start_ids, exclude_ids)
+  let objects = collect_bundle_objects(db, fs, start_ids, exclude_ids)
   // Create packfile
   let pack_data = @pack.create_packfile(objects)
   // Write bundle
@@ -140,12 +141,11 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn collect_bundle_objects(
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  git_dir : String,
   start_ids : Array[@bitcore.ObjectId],
   exclude_ids : Map[String, Bool],
 ) -> Array[@bitcore.PackObject] raise Error {
-  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let visited : Map[String, Bool] = Map([])
   let objects : Array[@bitcore.PackObject] = []
   let queue : Array[@bitcore.ObjectId] = []

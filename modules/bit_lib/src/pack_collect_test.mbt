@@ -350,3 +350,32 @@ test "collect_reachable_objects_from_commits: deduplicates" {
   }
   assert_eq(shared_count, 1)
 }
+
+///|
+test "collect_reachable_objects_excluding_commits: stops at have commits" {
+  let fs = @bit.TestFs::new()
+  init_repo(fs, "/repo") catch {
+    _ => ()
+  }
+  fs.write_file("/repo/shared.txt", b"shared")
+  let base = commit(fs, fs, "/repo", "base", "test <test@test.com>", 1000L) catch {
+    _ => return ()
+  }
+  fs.write_file("/repo/new.txt", b"new")
+  let tip = commit(fs, fs, "/repo", "tip", "test <test@test.com>", 2000L) catch {
+    _ => return ()
+  }
+  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+
+  let objects = collect_reachable_objects_excluding_commits(db, fs, [tip], [
+    base,
+  ]) catch {
+    _ => return ()
+  }
+  let ids : Map[String, Bool] = Map([])
+  for obj in objects {
+    ids[obj.id.to_hex()] = true
+  }
+  assert_true(ids.contains(tip.to_hex()))
+  assert_true(!ids.contains(base.to_hex()))
+}

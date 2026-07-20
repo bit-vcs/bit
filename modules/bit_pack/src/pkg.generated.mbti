@@ -33,7 +33,11 @@ pub fn create_packfile_with_delta_stats_compression(Array[@bit_object.PackObject
 
 pub fn create_packfile_with_delta_stats_compression_reuse(Array[@bit_object.PackObject], @bit_object.PackDeltaMode, @bit_object.PackCompression, Bool, Int, Int, hash_size? : Int) -> (Bytes, Int)
 
+pub fn create_packfile_with_delta_stats_compression_reuse_and_metadata(Array[@bit_object.PackObject], @bit_object.PackDeltaMode, @bit_object.PackCompression, Bool, Int, Int, hash_size? : Int) -> (Bytes, Int, Array[@bit_object.PackObject])
+
 pub fn create_packfiles_with_size_limit(Array[@bit_object.PackObject], @bit_object.PackDeltaMode, @bit_object.PackCompression, Bool, Int, Int64, Int, hash_size? : Int) -> (Array[Bytes], Int)
+
+pub fn create_packfiles_with_size_limit_and_metadata(Array[@bit_object.PackObject], @bit_object.PackDeltaMode, @bit_object.PackCompression, Bool, Int, Int64, Int, hash_size? : Int) -> (Array[(Bytes, Array[@bit_object.PackObject])], Int)
 
 pub fn decode_type_and_size_at(Bytes, Int) -> (Int, Int, Int) raise @bit_object.GitError
 

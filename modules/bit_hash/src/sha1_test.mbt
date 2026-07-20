@@ -23,6 +23,14 @@ test "sha1_raw abc" {
 }
 
 ///|
+test "sha1_prefixed_raw: git blob object" {
+  let prefix = Bytes::from_array([b'b', b'l', b'o', b'b', b' ', b'3', b'\x00'])
+  let content = Bytes::from_array([b'a', b'b', b'c'])
+  let got = sha1_prefixed_raw(prefix, content) |> raw_to_hex
+  inspect(got, content="f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f")
+}
+
+///|
 test "Sha1State: abc" {
   let state = Sha1State::new()
   state.update(Bytes::from_array([b'a', b'b', b'c']))

@@ -132,11 +132,7 @@ pub fn create_object(
 ///|
 /// Hash object content (without compression) - optimized with incremental SHA1
 pub fn hash_object_content(obj_type : ObjectType, content : Bytes) -> ObjectId {
-  let state = Sha1State::new()
-  let header = "\{obj_type.to_string()} \{content.length()}\u0000"
-  state.update_string(header)
-  state.update(content)
-  state.finish()
+  hash_object_content_with_algo(Sha1, obj_type, content)
 }
 
 ///|

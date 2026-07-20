@@ -1110,13 +1110,13 @@ fn log_assign_left_right_marker(
 
 ///|
 fn log_build_left_right_markers(
+  db : @bitlib.ObjectDb,
   fs : OsFs,
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   symmetric_ranges : Array[(String, String)],
   ignore_missing : Bool,
 ) -> Map[String, String] raise Error {
-  let db = @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir))
   let markers : Map[String, String] = Map([])
   for pair in symmetric_ranges {
     let left_spec = pair.0
@@ -1138,11 +1138,10 @@ fn log_build_left_right_markers(
         let left_seen : Map[String, Bool] = Map([])
         let right_seen : Map[String, Bool] = Map([])
         let merge_base_seen : Map[String, Bool] = Map([])
-        walk_commits_to_map(fs, git_dir, left_commit, left_seen)
-        walk_commits_to_map(fs, git_dir, right_commit, right_seen)
-        match log_find_merge_base(rfs, git_dir, left_commit, right_commit) {
-          Some(base_id) =>
-            walk_commits_to_map(fs, git_dir, base_id, merge_base_seen)
+        walk_commits_to_map(db, fs, left_commit, left_seen)
+        walk_commits_to_map(db, fs, right_commit, right_seen)
+        match log_find_merge_base(db, rfs, left_commit, right_commit) {
+          Some(base_id) => walk_commits_to_map(db, fs, base_id, merge_base_seen)
           None => ()
         }
         let left_entries : Array[(String, Bool)] = left_seen.iter().collect()
@@ -1217,6 +1216,7 @@ fn log_add_resolved_ancestry_root(
 
 ///|
 fn log_resolve_ancestry_roots(
+  db : @bitlib.ObjectDb,
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   ancestry_path : Bool,
@@ -1230,7 +1230,6 @@ fn log_resolve_ancestry_roots(
     return roots
   }
   let seen : Map[String, Bool] = Map([])
-  let db = @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir))
   if ancestry_path_specs.length() > 0 {
     for spec in ancestry_path_specs {
       log_add_resolved_ancestry_root(
@@ -1260,7 +1259,7 @@ fn log_resolve_ancestry_roots(
             Some(id) => id
             None => right_id
           }
-          match log_find_merge_base(rfs, git_dir, left_commit, right_commit) {
+          match log_find_merge_base(db, rfs, left_commit, right_commit) {
             Some(base_id) => {
               let hex = base_id.to_hex()
               if !seen.contains(hex) {
@@ -1289,8 +1288,8 @@ fn log_resolve_ancestry_roots(
 
 ///|
 fn log_commit_has_ancestor(
+  db : @bitlib.ObjectDb,
   rfs : &@bitcore.RepoFileSystem,
-  git_dir : String,
   commit_id : @bitcore.ObjectId,
   ancestor_ids : Array[@bitcore.ObjectId],
   first_parent? : Bool = false,
@@ -1302,7 +1301,6 @@ fn log_commit_has_ancestor(
   for id in ancestor_ids {
     ancestors[id.to_hex()] = true
   }
-  let db = @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir))
   let seen : Map[String, Bool] = Map([])
   let queue : Array[@bitcore.ObjectId] = [commit_id]
   while queue.length() > 0 {
@@ -2203,11 +2201,10 @@ fn log_collect_reflog_targets(
 
 ///|
 fn log_sort_targets_by_time(
+  db : @bitlib.ObjectDb,
   rfs : &@bitcore.RepoFileSystem,
-  git_dir : String,
   targets : Array[(String, @bitcore.ObjectId)],
-) -> Array[(String, @bitcore.ObjectId)] raise Error {
-  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+) -> Array[(String, @bitcore.ObjectId)] {
   let ordered : Array[(Int64, Int, (String, @bitcore.ObjectId))] = []
   for i in 0..<targets.length() {
     let target = targets[i]
@@ -2230,12 +2227,11 @@ fn log_sort_targets_by_time(
 
 ///|
 fn log_find_merge_base(
+  db : @bitlib.ObjectDb,
   rfs : &@bitcore.RepoFileSystem,
-  git_dir : String,
   left : @bitcore.ObjectId,
   right : @bitcore.ObjectId,
 ) -> @bitcore.ObjectId? raise Error {
-  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let left_ancestors : Map[String, Bool] = Map([])
   let left_queue : Array[@bitcore.ObjectId] = [left]
   while left_queue.length() > 0 {
@@ -4770,13 +4766,13 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     )
     let left_right_markers = if left_right && symmetric_ranges.length() > 0 {
       log_build_left_right_markers(
-        fs, rfs, git_dir, symmetric_ranges, ignore_missing,
+        db, fs, rfs, git_dir, symmetric_ranges, ignore_missing,
       )
     } else {
       Map([])
     }
     let ancestry_roots = log_resolve_ancestry_roots(
-      rfs, git_dir, ancestry_path, ancestry_path_specs, range_excludes, symmetric_ranges,
+      db, rfs, git_dir, ancestry_path, ancestry_path_specs, range_excludes, symmetric_ranges,
       ignore_missing,
     )
     let seen : Map[String, Bool] = Map([])
@@ -4794,7 +4790,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       let targets = if no_walk_unsorted {
         resolved_targets
       } else {
-        log_sort_targets_by_time(rfs, git_dir, resolved_targets)
+        log_sort_targets_by_time(db, rfs, resolved_targets)
       }
       for target in targets {
         if formatted_lines.length() >= max_count {
@@ -4806,13 +4802,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           continue
         }
         if ancestry_roots.length() > 0 &&
-          !log_commit_has_ancestor(
-            rfs,
-            git_dir,
-            id,
-            ancestry_roots,
-            first_parent~,
-          ) {
+          !log_commit_has_ancestor(db, rfs, id, ancestry_roots, first_parent~) {
           continue
         }
         if !log_commit_matches_text_filters(
@@ -4908,8 +4898,8 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         match @bitrepo.rev_parse(rfs, git_dir, spec) {
           Some(id) =>
             walk_commits_to_map(
+              db,
               fs,
-              git_dir,
               id,
               exclude_ids,
               first_parent=exclude_first_parent_only,
@@ -4928,11 +4918,11 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             @bitrepo.rev_parse(rfs, git_dir, right_spec),
           ) {
           (Some(left_id), Some(right_id)) =>
-            match log_find_merge_base(rfs, git_dir, left_id, right_id) {
+            match log_find_merge_base(db, rfs, left_id, right_id) {
               Some(base_id) =>
                 walk_commits_to_map(
+                  db,
                   fs,
-                  git_dir,
                   base_id,
                   exclude_ids,
                   first_parent=exclude_first_parent_only,
@@ -4947,6 +4937,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         }
       }
       let entries = log_walk_commits(
+        db,
         rfs,
         git_dir,
         start_ids,
@@ -4986,8 +4977,8 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         }
         if ancestry_roots.length() > 0 &&
           !log_commit_has_ancestor(
+            db,
             rfs,
-            git_dir,
             entry.id,
             ancestry_roots,
             first_parent~,
@@ -5157,10 +5148,11 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       default_head=!saw_revision_input,
       ignore_missing~,
     )
+    let db = @bitlib.ObjectDb::load(rfs, git_dir)
     let targets = if no_walk_unsorted {
       resolved_targets
     } else {
-      log_sort_targets_by_time(rfs, git_dir, resolved_targets)
+      log_sort_targets_by_time(db, rfs, resolved_targets)
     }
     let selection_ref_names = if show_decorations || simplify_by_decoration {
       log_build_ref_names(rfs, git_dir, decoration_options)
@@ -5168,9 +5160,8 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       Map([])
     }
     let ref_names = if show_decorations { selection_ref_names } else { Map([]) }
-    let db = @bitlib.ObjectDb::load(rfs, git_dir)
     let ancestry_roots = log_resolve_ancestry_roots(
-      rfs, git_dir, ancestry_path, ancestry_path_specs, range_excludes, symmetric_ranges,
+      db, rfs, git_dir, ancestry_path, ancestry_path_specs, range_excludes, symmetric_ranges,
       ignore_missing,
     )
     let seen : Map[String, Bool] = Map([])
@@ -5186,13 +5177,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           continue
         }
         if ancestry_roots.length() > 0 &&
-          !log_commit_has_ancestor(
-            rfs,
-            git_dir,
-            id,
-            ancestry_roots,
-            first_parent~,
-          ) {
+          !log_commit_has_ancestor(db, rfs, id, ancestry_roots, first_parent~) {
           continue
         }
         if !log_commit_matches_text_filters(
@@ -5259,13 +5244,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           continue
         }
         if ancestry_roots.length() > 0 &&
-          !log_commit_has_ancestor(
-            rfs,
-            git_dir,
-            id,
-            ancestry_roots,
-            first_parent~,
-          ) {
+          !log_commit_has_ancestor(db, rfs, id, ancestry_roots, first_parent~) {
           continue
         }
         if !log_commit_matches_text_filters(
@@ -5466,14 +5445,18 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     for target in start_targets {
       start_ids.push(target.1)
     }
+    let walk_db = @bitlib.ObjectDb::load(
+      rfs,
+      log_resolve_common_git_dir(rfs, git_dir),
+    )
     // Build exclude_ids from range_excludes
     let exclude_ids : Map[String, Bool] = Map([])
     for spec in range_excludes {
       match @bitrepo.rev_parse(rfs, git_dir, spec) {
         Some(id) =>
           walk_commits_to_map(
+            walk_db,
             fs,
-            git_dir,
             id,
             exclude_ids,
             first_parent=exclude_first_parent_only,
@@ -5492,11 +5475,11 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           @bitrepo.rev_parse(rfs, git_dir, right_spec),
         ) {
         (Some(left_id), Some(right_id)) =>
-          match log_find_merge_base(rfs, git_dir, left_id, right_id) {
+          match log_find_merge_base(walk_db, rfs, left_id, right_id) {
             Some(base_id) =>
               walk_commits_to_map(
+                walk_db,
                 fs,
-                git_dir,
                 base_id,
                 exclude_ids,
                 first_parent=exclude_first_parent_only,
@@ -5534,22 +5517,19 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     } else {
       Map([])
     }
-    let walk_db = @bitlib.ObjectDb::load(
-      rfs,
-      log_resolve_common_git_dir(rfs, git_dir),
-    )
     let left_right_markers = if left_right && symmetric_ranges.length() > 0 {
       log_build_left_right_markers(
-        fs, rfs, git_dir, symmetric_ranges, ignore_missing,
+        walk_db, fs, rfs, git_dir, symmetric_ranges, ignore_missing,
       )
     } else {
       Map([])
     }
     let ancestry_roots = log_resolve_ancestry_roots(
-      rfs, git_dir, ancestry_path, ancestry_path_specs, range_excludes, symmetric_ranges,
-      ignore_missing,
+      walk_db, rfs, git_dir, ancestry_path, ancestry_path_specs, range_excludes,
+      symmetric_ranges, ignore_missing,
     )
     let entries = log_walk_commits(
+      walk_db,
       rfs,
       git_dir,
       start_ids,
@@ -5593,8 +5573,8 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         }
         if ancestry_roots.length() > 0 &&
           !log_commit_has_ancestor(
+            walk_db,
             rfs,
-            git_dir,
             entry.id,
             ancestry_roots,
             first_parent~,
@@ -5680,8 +5660,8 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         }
         if ancestry_roots.length() > 0 &&
           !log_commit_has_ancestor(
+            walk_db,
             rfs,
-            git_dir,
             entry.id,
             ancestry_roots,
             first_parent~,
@@ -5979,9 +5959,79 @@ fn log_entry_marker_prefix(
 }
 
 ///|
+fn log_get_cached_commit(
+  cache : Map[String, @bitcore.PackObject],
+  id : @bitcore.ObjectId,
+  loader : (@bitcore.ObjectId) -> @bitcore.PackObject?,
+) -> @bitcore.PackObject? {
+  let hex = id.to_hex()
+  match cache.get(hex) {
+    Some(object) => Some(object)
+    None =>
+      match loader(id) {
+        Some(object) => {
+          cache[hex] = object
+          Some(object)
+        }
+        None => None
+      }
+  }
+}
+
+///|
+fn log_load_walk_commit(
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  cache : Map[String, @bitcore.PackObject],
+  id : @bitcore.ObjectId,
+) -> @bitcore.PackObject? {
+  log_get_cached_commit(cache, id, fn(id) {
+    db.get(rfs, id) catch {
+      _ => None
+    }
+  })
+}
+
+///|
+fn log_get_walk_commit_timestamp(
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  cache : Map[String, @bitcore.PackObject],
+  id : @bitcore.ObjectId,
+) -> Int64 {
+  match log_load_walk_commit(db, rfs, cache, id) {
+    Some(object) => log_extract_committer_timestamp(object.data)
+    None => 0L
+  }
+}
+
+///|
+fn log_get_walk_commit_tree(
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  cache : Map[String, @bitcore.PackObject],
+  id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId? {
+  match db.get_commit_graph_commit(id) {
+    Some(info) => Some(info.tree)
+    None =>
+      match log_load_walk_commit(db, rfs, cache, id) {
+        Some(object) if object.obj_type == @bitcore.ObjectType::Commit => {
+          let info = @bitcore.parse_commit(object.data) catch {
+            _ => return None
+          }
+          Some(info.tree)
+        }
+        _ => None
+      }
+  }
+}
+
+///|
 /// BFS walk from start_ids, excluding exclude_ids, with timestamp filtering.
 /// Returns entries sorted by timestamp descending (or topologically if topo_order).
 fn log_walk_commits(
+  db : @bitlib.ObjectDb,
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   start_ids : Array[@bitcore.ObjectId],
@@ -5994,22 +6044,25 @@ fn log_walk_commits(
   topo_order? : Bool = false,
   show_boundary? : Bool = false,
 ) -> Array[LogWalkEntry] raise Error {
-  let db = @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir))
+  db.set_skip_verify(true)
+  let commit_cache : Map[String, @bitcore.PackObject] = Map([])
   let result : Array[LogWalkEntry] = []
   let visited : Map[String, Bool] = Map([])
   let boundary_seen : Map[String, Bool] = Map([])
   let boundary_ids : Array[@bitcore.ObjectId] = []
-  // Priority queue: (timestamp, id) sorted desc by timestamp
-  // Use insertion-sorted array
-  let queue : Array[(Int64, @bitcore.ObjectId)] = []
+  // Max heap: (committer timestamp, insertion order, id). The insertion
+  // order preserves the old queue's stable behaviour for equal timestamps.
+  let queue : Array[(Int64, Int, @bitcore.ObjectId)] = []
+  let mut queue_sequence = 0
   // For topo_order: DFS stack follows first-parent chains
   let topo_stack : Array[@bitcore.ObjectId] = []
   for id in start_ids {
     let hex = id.to_hex()
     if !visited.contains(hex) && !exclude_ids.contains(hex) {
       // Get timestamp for sorting
-      let ts = log_get_commit_timestamp(db, rfs, id)
-      log_queue_insert(queue, (ts, id))
+      let ts = log_get_walk_commit_timestamp(db, rfs, commit_cache, id)
+      log_queue_push(queue, (ts, queue_sequence, id))
+      queue_sequence += 1
       visited[hex] = true
     }
   }
@@ -6019,18 +6072,7 @@ fn log_walk_commits(
     let id = if topo_order && topo_stack.length() > 0 {
       topo_stack.unsafe_pop()
     } else if queue.length() > 0 {
-      let (_, qid) = queue[0]
-      // Remove front
-      let new_q : Array[(Int64, @bitcore.ObjectId)] = []
-      for i in 1..<queue.length() {
-        new_q.push(queue[i])
-      }
-      while queue.length() > 0 {
-        ignore(queue.unsafe_pop())
-      }
-      for item in new_q {
-        queue.push(item)
-      }
+      let (_, _, qid) = log_queue_pop(queue).unwrap()
       qid
     } else {
       break
@@ -6040,7 +6082,7 @@ fn log_walk_commits(
       continue
     }
     // Get commit data
-    let obj = db.get(rfs, id)
+    let obj = log_load_walk_commit(db, rfs, commit_cache, id)
     guard obj is Some(o) else { continue }
     let info = @bitcore.parse_commit(o.data)
     let parents = log_resolve_parents(rfs, git_dir, id, info.parents)
@@ -6066,8 +6108,11 @@ fn log_walk_commits(
           if idx == 0 {
             topo_stack.push(parent)
           } else {
-            let pts = log_get_commit_timestamp(db, rfs, parent)
-            log_queue_insert(queue, (pts, parent))
+            let pts = log_get_walk_commit_timestamp(
+              db, rfs, commit_cache, parent,
+            )
+            log_queue_push(queue, (pts, queue_sequence, parent))
+            queue_sequence += 1
           }
         }
       }
@@ -6083,8 +6128,9 @@ fn log_walk_commits(
         }
         if !visited.contains(phex) {
           visited[phex] = true
-          let pts = log_get_commit_timestamp(db, rfs, parent)
-          log_queue_insert(queue, (pts, parent))
+          let pts = log_get_walk_commit_timestamp(db, rfs, commit_cache, parent)
+          log_queue_push(queue, (pts, queue_sequence, parent))
+          queue_sequence += 1
         }
       }
     }
@@ -6099,7 +6145,7 @@ fn log_walk_commits(
     }
     let parent_tree : @bitcore.ObjectId? = if include_parent_tree &&
       parents.length() > 0 {
-      log_get_commit_tree(db, rfs, parents[0])
+      log_get_walk_commit_tree(db, rfs, commit_cache, parents[0])
     } else {
       None
     }
@@ -6108,7 +6154,7 @@ fn log_walk_commits(
   }
   if show_boundary {
     for boundary_id in boundary_ids {
-      let obj = db.get(rfs, boundary_id)
+      let obj = log_load_walk_commit(db, rfs, commit_cache, boundary_id)
       guard obj is Some(o) else { continue }
       if o.obj_type != @bitcore.ObjectType::Commit {
         continue
@@ -6124,7 +6170,7 @@ fn log_walk_commits(
       )
       let parent_tree : @bitcore.ObjectId? = if include_parent_tree &&
         parents.length() > 0 {
-        log_get_commit_tree(db, rfs, parents[0])
+        log_get_walk_commit_tree(db, rfs, commit_cache, parents[0])
       } else {
         None
       }
@@ -6135,28 +6181,67 @@ fn log_walk_commits(
 }
 
 ///|
-/// Insert into timestamp-descending sorted array.
-fn log_queue_insert(
-  queue : Array[(Int64, @bitcore.ObjectId)],
-  item : (Int64, @bitcore.ObjectId),
+
+///|
+/// Higher timestamps win; equal timestamps keep insertion order.
+fn log_queue_higher_priority(
+  left : (Int64, Int, @bitcore.ObjectId),
+  right : (Int64, Int, @bitcore.ObjectId),
+) -> Bool {
+  left.0 > right.0 || (left.0 == right.0 && left.1 < right.1)
+}
+
+///|
+/// Insert an item into a max heap in O(log N).
+fn log_queue_push(
+  queue : Array[(Int64, Int, @bitcore.ObjectId)],
+  item : (Int64, Int, @bitcore.ObjectId),
 ) -> Unit {
-  let ts = item.0
-  let mut pos = queue.length()
-  // Find insertion point (descending order)
-  for i in 0..<queue.length() {
-    if ts > queue[i].0 {
-      pos = i
+  queue.push(item)
+  let mut child = queue.length() - 1
+  while child > 0 {
+    let parent = (child - 1) / 2
+    if !log_queue_higher_priority(queue[child], queue[parent]) {
       break
     }
+    let temp = queue[parent]
+    queue[parent] = queue[child]
+    queue[child] = temp
+    child = parent
   }
-  queue.push(item) // push to end first
-  // Shift elements right
-  let mut j = queue.length() - 1
-  while j > pos {
-    queue[j] = queue[j - 1]
-    j -= 1
+}
+
+///|
+/// Remove the highest-priority item from a max heap in O(log N).
+fn log_queue_pop(
+  queue : Array[(Int64, Int, @bitcore.ObjectId)],
+) -> (Int64, Int, @bitcore.ObjectId)? {
+  if queue.length() == 0 {
+    return None
   }
-  queue[pos] = item
+  let first = queue[0]
+  let last = queue.unsafe_pop()
+  if queue.length() == 0 {
+    return Some(first)
+  }
+  queue[0] = last
+  let mut parent = 0
+  let mut child = 1
+  while child < queue.length() {
+    if child + 1 < queue.length() &&
+      log_queue_higher_priority(queue[child + 1], queue[child]) {
+      child += 1
+    }
+    if !log_queue_higher_priority(queue[child], queue[parent]) {
+      break
+    }
+    let temp = queue[parent]
+    queue[parent] = queue[child]
+    queue[child] = temp
+    parent = child
+    child = parent * 2 + 1
+  }
+  Some(first)
 }
 
 ///|
@@ -6455,7 +6540,7 @@ async fn log_with_graph(
   let exclude_ids : Map[String, Bool] = Map([])
   for spec in range_excludes {
     match @bitrepo.rev_parse(rfs, git_dir, spec) {
-      Some(id) => walk_commits_to_map(OsFs::new(), git_dir, id, exclude_ids)
+      Some(id) => walk_commits_to_map(db, OsFs::new(), id, exclude_ids)
       None =>
         raise @bitcore.GitError::InvalidObject("Unknown revision: " + spec)
     }
@@ -6469,6 +6554,7 @@ async fn log_with_graph(
   // gathers the full reachable history and we truncate the sorted result. (A
   // walk-then-truncate would topo-sort the wrong subset near the cutoff.)
   let walked = log_walk_commits(
+    db,
     rfs,
     git_dir,
     starts,

@@ -933,7 +933,7 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
     )
     for target in exclude_targets {
       let (_, exclude_id) = target
-      walk_commits_to_map(fs, git_dir, exclude_id, exclude_ids)
+      walk_commits_to_map(db, fs, exclude_id, exclude_ids)
     }
     let max_count = if options.max_count > 0 {
       options.max_count
@@ -943,8 +943,8 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
     let blocks : Array[String] = []
     for
       entry in log_walk_commits(
-        fs, git_dir, start_ids, exclude_ids, max_count, -9223372036854775807L, 9223372036854775807L,
-        false,
+        db, fs, git_dir, start_ids, exclude_ids, max_count, -9223372036854775807L,
+        9223372036854775807L, false,
       ) {
       let obj = db.get(fs, entry.id)
       guard obj is Some(o) else { continue }

@@ -9,6 +9,73 @@ fn pack_array_to_bytes(arr : Array[Byte]) -> Bytes {
 }
 
 ///|
+let pack_writer_crc32_poly : UInt = (Int::reinterpret_as_uint(237) << 24) |
+  (Int::reinterpret_as_uint(184) << 16) |
+  (Int::reinterpret_as_uint(131) << 8) |
+  Int::reinterpret_as_uint(32)
+
+///|
+let pack_writer_crc32_table : FixedArray[UInt] = FixedArray::makei(256, fn(i) {
+  let mut c = i.reinterpret_as_uint()
+  for _ in 0..<8 {
+    if (c & Int::reinterpret_as_uint(1)) == Int::reinterpret_as_uint(1) {
+      c = (c >> 1) ^ pack_writer_crc32_poly
+    } else {
+      c = c >> 1
+    }
+  }
+  c
+})
+
+///|
+/// Compute an entry CRC directly from the bytes just written to a pack.
+fn pack_writer_crc32_range(data : Array[Byte], start : Int, end : Int) -> UInt {
+  let mut crc : UInt = Int::reinterpret_as_uint(-1)
+  for i = start; i < end; i = i + 1 {
+    let index = UInt::reinterpret_as_int(
+      (crc ^ Int::reinterpret_as_uint(data[i].to_int())) &
+      Int::reinterpret_as_uint(255),
+    )
+    crc = (crc >> 8) ^ pack_writer_crc32_table[index]
+  }
+  crc ^ Int::reinterpret_as_uint(-1)
+}
+
+///|
+/// Return the object ID appropriate for the pack's hash algorithm.
+fn pack_writer_object_id(
+  obj : @bit.PackObject,
+  hash_size : Int,
+) -> @bit.ObjectId {
+  if obj.id.bytes.length() == hash_size {
+    obj.id
+  } else {
+    @bit.hash_object_content_with_algo(
+      hash_algo_from_size(hash_size),
+      obj.obj_type,
+      obj.data,
+    )
+  }
+}
+
+///|
+/// Preserve the original object content together with index metadata.
+fn pack_writer_metadata(
+  obj : @bit.PackObject,
+  offset : Int,
+  crc32 : UInt,
+  hash_size : Int,
+) -> @bit.PackObject {
+  @bit.PackObject::with_metadata(
+    obj.obj_type,
+    obj.data,
+    pack_writer_object_id(obj, hash_size),
+    offset,
+    crc32,
+  )
+}
+
+///|
 /// Compress pack data. Use stored when compression expands data.
 fn compress_pack_data(
   data : Bytes,
@@ -824,18 +891,50 @@ pub fn create_packfiles_with_size_limit(
   window : Int,
   hash_size? : Int = 20,
 ) -> (Array[Bytes], Int) {
+  let (pack_entries, delta_count) = create_packfiles_with_size_limit_and_metadata(
+    objects,
+    delta_mode,
+    compression,
+    reuse_only,
+    max_depth,
+    size_limit,
+    window,
+    hash_size~,
+  )
   let packs : Array[Bytes] = []
+  for entry in pack_entries {
+    packs.push(entry.0)
+  }
+  (packs, delta_count)
+}
+
+///|
+/// Create size-limited packfiles and retain index metadata for every entry.
+pub fn create_packfiles_with_size_limit_and_metadata(
+  objects : Array[@bit.PackObject],
+  delta_mode : @bit.PackDeltaMode,
+  compression : @bit.PackCompression,
+  reuse_only : Bool,
+  max_depth : Int,
+  size_limit : Int64,
+  window : Int,
+  hash_size? : Int = 20,
+) -> (Array[(Bytes, Array[@bit.PackObject])], Int) {
+  let packs : Array[(Bytes, Array[@bit.PackObject])] = []
   let mut total_delta_count = 0
   if objects.length() == 0 {
     packs.push(
-      finalize_pack(
-        {
-          let r : Array[Byte] = []
-          write_pack_header(r)
-          r
-        },
-        0,
-        hash_size~,
+      (
+        finalize_pack(
+          {
+            let r : Array[Byte] = []
+            write_pack_header(r)
+            r
+          },
+          0,
+          hash_size~,
+        ),
+        [],
       ),
     )
     return (packs, 0)
@@ -846,6 +945,7 @@ pub fn create_packfiles_with_size_limit(
   write_pack_header(result)
   let mut offset = 12
   let mut nr_written = 0
+  let mut written_objects : Array[@bit.PackObject] = []
   let window_by_type : Map[Int, Array[DeltaWindowEntry]] = Map([])
   for obj in objects {
     let key = obj.obj_type.to_packfile_type()
@@ -920,12 +1020,15 @@ pub fn create_packfiles_with_size_limit(
     if nr_written >= 1 &&
       (offset + written + hash_size).to_int64() >= size_limit {
       // Finalize current pack
-      packs.push(finalize_pack(result, nr_written, hash_size~))
+      packs.push(
+        (finalize_pack(result, nr_written, hash_size~), written_objects),
+      )
       // Start a new pack
       result = []
       write_pack_header(result)
       offset = 12
       nr_written = 0
+      written_objects = []
       window_by_type.clear()
       // Re-write the object without delta (base is in previous pack)
       let (written2, _) = pack_object_with_delta(
@@ -939,6 +1042,14 @@ pub fn create_packfiles_with_size_limit(
         hash_size~,
       )
       offset = 12 + written2
+      written_objects.push(
+        pack_writer_metadata(
+          obj,
+          12,
+          pack_writer_crc32_range(result, 12, offset),
+          hash_size,
+        ),
+      )
       let new_entries : Array[DeltaWindowEntry] = []
       new_entries.push({ offset: 12, obj, depth: 0, block_index: None })
       window_by_type[key] = new_entries
@@ -956,13 +1067,21 @@ pub fn create_packfiles_with_size_limit(
       if entries.length() > window_size {
         ignore(entries.remove(0))
       }
+      written_objects.push(
+        pack_writer_metadata(
+          obj,
+          offset,
+          pack_writer_crc32_range(temp, 0, written),
+          hash_size,
+        ),
+      )
       offset += written
       nr_written += 1
     }
   }
   // Finalize last pack
   if nr_written > 0 {
-    packs.push(finalize_pack(result, nr_written, hash_size~))
+    packs.push((finalize_pack(result, nr_written, hash_size~), written_objects))
   }
   (packs, total_delta_count)
 }
@@ -978,6 +1097,29 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
   window : Int,
   hash_size? : Int = 20,
 ) -> (Bytes, Int) {
+  let (pack, delta_count, _) = create_packfile_with_delta_stats_compression_reuse_and_metadata(
+    objects,
+    delta_mode,
+    compression,
+    reuse_only,
+    max_depth,
+    window,
+    hash_size~,
+  )
+  (pack, delta_count)
+}
+
+///|
+/// Create a packfile and retain the index metadata collected while writing.
+pub fn create_packfile_with_delta_stats_compression_reuse_and_metadata(
+  objects : Array[@bit.PackObject],
+  delta_mode : @bit.PackDeltaMode,
+  compression : @bit.PackCompression,
+  reuse_only : Bool,
+  max_depth : Int,
+  window : Int,
+  hash_size? : Int = 20,
+) -> (Bytes, Int, Array[@bit.PackObject]) {
   let result : Array[Byte] = []
 
   // Magic: "PACK"
@@ -1016,6 +1158,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
   let mut offset = 12
   let window_by_type : Map[Int, Array[DeltaWindowEntry]] = Map([])
   let mut delta_count = 0
+  let written_objects : Array[@bit.PackObject] = []
   for obj in sorted {
     let obj_offset = offset
     let key = obj.obj_type.to_packfile_type()
@@ -1084,7 +1227,16 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
       precomputed,
       hash_size~,
     )
-    offset = offset + written
+    let packed_end = obj_offset + written
+    written_objects.push(
+      pack_writer_metadata(
+        obj,
+        obj_offset,
+        pack_writer_crc32_range(result, obj_offset, packed_end),
+        hash_size,
+      ),
+    )
+    offset = packed_end
     if used_delta {
       delta_count = delta_count + 1
     }
@@ -1106,7 +1258,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
   for b in trailer.bytes {
     result.push(b)
   }
-  (pack_array_to_bytes(result), delta_count)
+  (pack_array_to_bytes(result), delta_count, written_objects)
 }
 
 ///|

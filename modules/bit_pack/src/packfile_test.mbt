@@ -87,6 +87,93 @@ test "packfile multiple objects" {
 }
 
 ///|
+test "packfile writer metadata builds the same index without reparsing" {
+  let obj1 = @bit.PackObject::new(
+    @bit.ObjectType::Blob,
+    Bytes::from_array([b'a']),
+  )
+  let obj2 = @bit.PackObject::new(
+    @bit.ObjectType::Blob,
+    Bytes::from_array([b'b']),
+  )
+  let (pack, _, written) = create_packfile_with_delta_stats_compression_reuse_and_metadata(
+    [obj1, obj2],
+    @bit.PackDeltaMode::NoDelta,
+    @bit.PackCompression::Default,
+    false,
+    0,
+    1,
+  )
+
+  assert_true(written.length() == 2)
+  assert_true(written[0].offset >= 12)
+  assert_true(written[1].offset > written[0].offset)
+  assert_true(written[0].crc32 != 0U)
+  let expected = build_pack_index(pack)
+  let actual = build_pack_index_from_objects(pack, written)
+  assert_true(actual.length() == expected.length())
+  for i in 0..<actual.length() {
+    assert_true(actual[i] == expected[i])
+  }
+}
+
+///|
+test "size-limited pack writer metadata builds indexes without reparsing" {
+  let obj1 = @bit.PackObject::new(
+    @bit.ObjectType::Blob,
+    Bytes::from_array([b'a', b'a', b'a', b'a', b'a', b'a', b'a', b'a']),
+  )
+  let obj2 = @bit.PackObject::new(
+    @bit.ObjectType::Blob,
+    Bytes::from_array([b'b', b'b', b'b', b'b', b'b', b'b', b'b', b'b']),
+  )
+  let (entries, _) = create_packfiles_with_size_limit_and_metadata(
+    [obj1, obj2],
+    @bit.PackDeltaMode::NoDelta,
+    @bit.PackCompression::Stored,
+    false,
+    0,
+    40L,
+    1,
+  )
+
+  assert_true(entries.length() == 2)
+  for entry in entries {
+    let expected = build_pack_index(entry.0)
+    let actual = build_pack_index_from_objects(entry.0, entry.1)
+    assert_true(actual.length() == expected.length())
+    for i in 0..<actual.length() {
+      assert_true(actual[i] == expected[i])
+    }
+  }
+}
+
+///|
+test "packfile writer metadata uses the requested SHA-256 object IDs" {
+  let obj = @bit.PackObject::new(
+    @bit.ObjectType::Blob,
+    Bytes::from_array([b's', b'h', b'a', b'2', b'5', b'6']),
+  )
+  let (pack, _, written) = create_packfile_with_delta_stats_compression_reuse_and_metadata(
+    [obj],
+    @bit.PackDeltaMode::NoDelta,
+    @bit.PackCompression::Default,
+    false,
+    0,
+    1,
+    hash_size=32,
+  )
+
+  let expected = build_pack_index(pack, hash_size=32)
+  let actual = build_pack_index_from_objects(pack, written, hash_size=32)
+  assert_true(written[0].id.bytes.length() == 32)
+  assert_true(actual.length() == expected.length())
+  for i in 0..<actual.length() {
+    assert_true(actual[i] == expected[i])
+  }
+}
+
+///|
 test "create commit packfile" {
   let content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o', b'\n'])
   let commit = @bit.Commit::new(

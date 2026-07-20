@@ -1,6 +1,20 @@
 ///| Whitebox tests for packfile delta encoding/decoding
 
 ///|
+test "delta copy: copies a byte range" {
+  let source = Bytes::from_array([b'a', b'b', b'c', b'd', b'e'])
+  let out : FixedArray[Byte] = FixedArray::make(5, b'_')
+
+  copy_delta_bytes(source, 1, out, 2, 3)
+
+  assert_true(out[0] == b'_')
+  assert_true(out[1] == b'_')
+  assert_true(out[2] == b'b')
+  assert_true(out[3] == b'c')
+  assert_true(out[4] == b'd')
+}
+
+///|
 test "delta: build and apply roundtrip" {
   let base = @utf8.encode("Hello, World!\n")
   let target = @utf8.encode("Hello, MoonBit!\n")

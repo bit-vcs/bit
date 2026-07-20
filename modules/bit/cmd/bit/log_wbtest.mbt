@@ -90,6 +90,31 @@ test "log: log_find_tripledot parses A...B ranges" {
 }
 
 ///|
+test "log: commit cache avoids loading an object twice" {
+  let id = @bitcore.hash_object_content(
+    @bitcore.ObjectType::Commit,
+    b"tree 0000000000000000000000000000000000000000\n\nmessage\n",
+  )
+  let object = @bitcore.PackObject::new(
+    @bitcore.ObjectType::Commit,
+    b"tree 0000000000000000000000000000000000000000\n\nmessage\n",
+  )
+  let cache : Map[String, @bitcore.PackObject] = Map([])
+  let loads = [0]
+  let loader = fn(_ : @bitcore.ObjectId) -> @bitcore.PackObject? {
+    loads[0] += 1
+    Some(object)
+  }
+
+  let first = log_get_cached_commit(cache, id, loader)
+  let second = log_get_cached_commit(cache, id, loader)
+
+  assert_true(first is Some(_))
+  assert_true(second is Some(_))
+  @test.assert_eq(loads[0], 1)
+}
+
+///|
 test "log: revision input handles caret and not-mode excludes" {
   let revs : Array[String] = []
   let excludes : Array[String] = []
@@ -370,7 +395,9 @@ test "log: ancestry path keeps commits descended from bottom commits" {
   let exclude_ids : Map[String, Bool] = Map([])
   exclude_ids[root.to_hex()] = true
   exclude_ids[bottom.to_hex()] = true
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let entries = log_walk_commits(
+    db,
     fs,
     git_dir,
     [merge],
@@ -381,12 +408,12 @@ test "log: ancestry path keeps commits descended from bottom commits" {
     false,
   )
   @test.assert_eq(entries.length(), 2)
-  assert_true(log_commit_has_ancestor(fs, git_dir, merge, [bottom]))
-  assert_false(log_commit_has_ancestor(fs, git_dir, side, [bottom]))
+  assert_true(log_commit_has_ancestor(db, fs, merge, [bottom]))
+  assert_false(log_commit_has_ancestor(db, fs, side, [bottom]))
 
   let ancestry_entries : Array[LogWalkEntry] = []
   for entry in entries {
-    if log_commit_has_ancestor(fs, git_dir, entry.id, [bottom]) {
+    if log_commit_has_ancestor(db, fs, entry.id, [bottom]) {
       ancestry_entries.push(entry)
     }
   }
@@ -422,7 +449,9 @@ test "log: boundary walk appends excluded parent with marker flag" {
   let exclude_ids : Map[String, Bool] = Map([])
   exclude_ids[first.to_hex()] = true
   exclude_ids[second.to_hex()] = true
+  let db = @bitlib.ObjectDb::load(fs, "/repo/.git")
   let entries = log_walk_commits(
+    db,
     fs,
     "/repo/.git",
     [third],
@@ -967,8 +996,8 @@ test "log: is_short_count_flag" {
 }
 
 ///|
-test "log: log_queue_insert maintains descending order" {
-  let queue : Array[(Int64, @bitcore.ObjectId)] = []
+test "log: priority queue pops latest timestamps first and keeps equal timestamps stable" {
+  let queue : Array[(Int64, Int, @bitcore.ObjectId)] = []
   let id1 = @bitcore.ObjectId::from_hex(
     "1111111111111111111111111111111111111111",
   )
@@ -978,12 +1007,16 @@ test "log: log_queue_insert maintains descending order" {
   let id3 = @bitcore.ObjectId::from_hex(
     "3333333333333333333333333333333333333333",
   )
-  log_queue_insert(queue, (100L, id1))
-  log_queue_insert(queue, (300L, id3))
-  log_queue_insert(queue, (200L, id2))
-  @test.assert_eq(queue[0].0, 300L)
-  @test.assert_eq(queue[1].0, 200L)
-  @test.assert_eq(queue[2].0, 100L)
+  log_queue_push(queue, (100L, 0, id1))
+  log_queue_push(queue, (300L, 1, id3))
+  log_queue_push(queue, (200L, 2, id2))
+  log_queue_push(queue, (200L, 3, id1))
+
+  @test.assert_eq(log_queue_pop(queue).unwrap().2, id3)
+  @test.assert_eq(log_queue_pop(queue).unwrap().2, id2)
+  @test.assert_eq(log_queue_pop(queue).unwrap().2, id1)
+  @test.assert_eq(log_queue_pop(queue).unwrap().2, id1)
+  @test.assert_eq(log_queue_pop(queue), None)
 }
 
 ///|

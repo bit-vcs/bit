@@ -457,8 +457,10 @@ fn collect_commits_in_range(
   base : @bitcore.ObjectId,
   end : @bitcore.ObjectId,
 ) -> Array[@bitcore.ObjectId] raise Error {
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let excluded : Map[String, Bool] = Map([])
   let base_entries = log_walk_commits(
+    db,
     rfs,
     git_dir,
     [base],
@@ -472,6 +474,7 @@ fn collect_commits_in_range(
     excluded[entry.id.to_hex()] = true
   }
   let entries = log_walk_commits(
+    db,
     rfs,
     git_dir,
     [end],

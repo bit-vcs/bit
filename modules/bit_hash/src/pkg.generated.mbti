@@ -20,6 +20,8 @@ pub fn sha1_bytes(Bytes) -> Bytes
 
 pub fn sha1_prefix_raw(Bytes, Int) -> FixedArray[Byte]
 
+pub fn sha1_prefixed_raw(Bytes, Bytes) -> FixedArray[Byte]
+
 pub fn sha1_raw(Bytes) -> FixedArray[Byte]
 
 pub fn sha256_array_prefix_raw(Array[Byte], Int) -> FixedArray[Byte]

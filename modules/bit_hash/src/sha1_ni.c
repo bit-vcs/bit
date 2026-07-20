@@ -12,6 +12,18 @@
 #include <string.h>
 
 /*
+ * Apple Silicon ships a hardware-backed SHA-1 implementation through
+ * CommonCrypto. Keep this native-only path behind the C target check; other
+ * platforms continue through the portable/SHA-NI dispatch below.
+ */
+#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
+#  include <CommonCrypto/CommonDigest.h>
+#  define USE_APPLE_ARM_SHA1 1
+#else
+#  define USE_APPLE_ARM_SHA1 0
+#endif
+
+/*
  * Function-level target attributes allow SHA-NI intrinsics with clang/gcc
  * even without -msha on the command line.
  * TCC doesn't support __attribute__((target(...))), so we fall back there.
@@ -286,6 +298,13 @@ static void sha1_scalar_blocks(uint32_t h[5], const uint8_t* data, size_t num_bl
   }
 }
 
+#if USE_SHA_NI
+#  define SHA1_DISPATCH(st, d, n) \
+     (sha1_ni_ok() ? sha1_ni_blocks((st),(d),(n)) : sha1_scalar_blocks((st),(d),(n)))
+#else
+#  define SHA1_DISPATCH(st, d, n) sha1_scalar_blocks((st),(d),(n))
+#endif
+
 /* ── MoonBit-callable entry points ────────────────────────────────────── */
 
 /*
@@ -305,13 +324,6 @@ void sha1_compute(const uint8_t* data, int32_t len, uint8_t* out) {
   /* Process all full blocks from the input directly. */
   int32_t full_blocks = len / 64;
   int32_t remainder   = len % 64;
-
-#if USE_SHA_NI
-#  define SHA1_DISPATCH(st, d, n) \
-     (sha1_ni_ok() ? sha1_ni_blocks((st),(d),(n)) : sha1_scalar_blocks((st),(d),(n)))
-#else
-#  define SHA1_DISPATCH(st, d, n) sha1_scalar_blocks((st),(d),(n))
-#endif
 
   if (full_blocks > 0) {
     SHA1_DISPATCH(state, data, (size_t)full_blocks);
@@ -353,6 +365,86 @@ void sha1_compute(const uint8_t* data, int32_t len, uint8_t* out) {
     out[i*4 + 2] = (uint8_t)(state[i] >>  8);
     out[i*4 + 3] = (uint8_t)(state[i]      );
   }
+}
+
+static void sha1_update_part(uint32_t state[5], uint8_t block[64],
+                             size_t *block_len, const uint8_t *data,
+                             size_t len) {
+  if (*block_len > 0) {
+    size_t take = 64 - *block_len;
+    if (take > len) take = len;
+    memcpy(block + *block_len, data, take);
+    *block_len += take;
+    data += take;
+    len -= take;
+    if (*block_len == 64) {
+      SHA1_DISPATCH(state, block, 1);
+      *block_len = 0;
+    }
+  }
+  size_t full_blocks = len / 64;
+  if (full_blocks > 0) {
+    SHA1_DISPATCH(state, data, full_blocks);
+    data += full_blocks * 64;
+    len -= full_blocks * 64;
+  }
+  if (len > 0) {
+    memcpy(block, data, len);
+    *block_len = len;
+  }
+}
+
+/*
+ * Hash two consecutive byte slices without a temporary concatenation. This is
+ * the shape used by Git object IDs: "<type> <size>\\0" followed by content.
+ */
+void sha1_compute_prefixed(const uint8_t* prefix, int32_t prefix_len,
+                           const uint8_t* data, int32_t data_len,
+                           uint8_t* out) {
+#if USE_APPLE_ARM_SHA1
+  CC_SHA1_CTX ctx;
+  CC_SHA1_Init(&ctx);
+  if (prefix_len > 0)
+    CC_SHA1_Update(&ctx, prefix, (CC_LONG)prefix_len);
+  if (data_len > 0)
+    CC_SHA1_Update(&ctx, data, (CC_LONG)data_len);
+  CC_SHA1_Final(out, &ctx);
+#else
+  uint32_t state[5] = {
+    0x67452301u, 0xefcdab89u, 0x98badcfeu, 0x10325476u, 0xc3d2e1f0u
+  };
+  uint8_t block[64];
+  size_t block_len = 0;
+  uint64_t total_len = (uint64_t)(uint32_t)prefix_len +
+                       (uint64_t)(uint32_t)data_len;
+  sha1_update_part(state, block, &block_len, prefix, (size_t)prefix_len);
+  sha1_update_part(state, block, &block_len, data, (size_t)data_len);
+
+  block[block_len++] = 0x80;
+  if (block_len > 56) {
+    memset(block + block_len, 0, 64 - block_len);
+    SHA1_DISPATCH(state, block, 1);
+    block_len = 0;
+  }
+  memset(block + block_len, 0, 56 - block_len);
+  uint64_t bit_len = total_len * 8;
+  block[56] = (uint8_t)(bit_len >> 56);
+  block[57] = (uint8_t)(bit_len >> 48);
+  block[58] = (uint8_t)(bit_len >> 40);
+  block[59] = (uint8_t)(bit_len >> 32);
+  block[60] = (uint8_t)(bit_len >> 24);
+  block[61] = (uint8_t)(bit_len >> 16);
+  block[62] = (uint8_t)(bit_len >> 8);
+  block[63] = (uint8_t)bit_len;
+  SHA1_DISPATCH(state, block, 1);
+
+  for (int i = 0; i < 5; i++) {
+    out[i * 4] = (uint8_t)(state[i] >> 24);
+    out[i * 4 + 1] = (uint8_t)(state[i] >> 16);
+    out[i * 4 + 2] = (uint8_t)(state[i] >> 8);
+    out[i * 4 + 3] = (uint8_t)state[i];
+  }
+#endif
 }
 
 /*
