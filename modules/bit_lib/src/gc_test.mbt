@@ -431,3 +431,88 @@ test "gc keeps objects reachable from linked worktree HEADs" {
   let db = ObjectDb::load(fs, git_dir)
   assert_true(db.get(fs, wt_blob) is Some(_))
 }
+
+///|
+test "gc keeps objects reachable from per-worktree refs" {
+  let fs = @bit.TestFs::new()
+  let root = "/repo"
+  let git_dir = root + "/.git"
+  let _ = build_simple_repo(fs, root)
+  let (bisect_commit, bisect_blob) = build_side_graph(fs, git_dir, "bisect\n")
+  fs.mkdir_p(git_dir + "/worktrees/wt/refs/bisect")
+  // worktree HEAD is a symref, so only the per-worktree ref keeps this alive.
+  fs.write_string(git_dir + "/worktrees/wt/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    git_dir + "/worktrees/wt/refs/bisect/bad",
+    bisect_commit.to_hex() + "\n",
+  )
+  let result = gc_repo(fs, fs, root)
+  for id in result.dangling {
+    assert_true(id.to_hex() != bisect_commit.to_hex())
+  }
+  let db = ObjectDb::load(fs, git_dir)
+  assert_true(db.get(fs, bisect_blob) is Some(_))
+}
+
+///|
+/// A reflog-only object (unreferenced by any ref) must survive `bit gc --prune`,
+/// not just full `bit gc`. Regression for the prune/repack reflog-root gap.
+test "prune keeps reflog-only objects" {
+  let fs = @bit.TestFs::new()
+  let root = "/repo"
+  let git_dir = root + "/.git"
+  let _ = build_simple_repo(fs, root)
+  let (orphan_commit, orphan_blob) = build_side_graph(fs, git_dir, "old head\n")
+  // Referenced only by a reflog entry (e.g. an amended commit).
+  fs.mkdir_p(git_dir + "/logs/refs/heads")
+  fs.write_string(
+    git_dir + "/logs/HEAD",
+    @bit.ObjectId::zero().to_hex() +
+    " " +
+    orphan_commit.to_hex() +
+    " Test <t@e.com> 0 +0000\tcommit\n",
+  )
+  let result = prune_repo(fs, fs, root)
+  for id in result.pruned {
+    assert_true(id.to_hex() != orphan_commit.to_hex())
+    assert_true(id.to_hex() != orphan_blob.to_hex())
+  }
+  let db = ObjectDb::load(fs, git_dir)
+  assert_true(db.get(fs, orphan_commit) is Some(_))
+  assert_true(db.get(fs, orphan_blob) is Some(_))
+}
+
+///|
+test "repack keeps reflog-only objects in the pack" {
+  let fs = @bit.TestFs::new()
+  let root = "/repo"
+  let git_dir = root + "/.git"
+  let _ = build_simple_repo(fs, root)
+  let (orphan_commit, _) = build_side_graph(fs, git_dir, "reflog only\n")
+  fs.write_string(
+    git_dir + "/logs/HEAD",
+    @bit.ObjectId::zero().to_hex() +
+    " " +
+    orphan_commit.to_hex() +
+    " Test <t@e.com> 0 +0000\tcommit\n",
+  )
+  let result = repack_repo(fs, fs, root)
+  match result {
+    None => fail("expected pack")
+    Some(r) => {
+      let pack_path = git_dir +
+        "/objects/pack/pack-" +
+        r.pack_id.to_hex() +
+        ".pack"
+      let objects = @pack.parse_packfile(fs.read_file(pack_path))
+      let mut found = false
+      for obj in objects {
+        if @bit.hash_object_content(obj.obj_type, obj.data).to_hex() ==
+          orphan_commit.to_hex() {
+          found = true
+        }
+      }
+      assert_true(found)
+    }
+  }
+}

@@ -79,6 +79,32 @@ test_expect_success 'gc from linked worktree keeps shared refs alive' '
 	 grep "memory fact" actual2)
 '
 
+test_expect_success 'per-worktree refs keep objects alive across gc' '
+	(cd repo &&
+	 blob=$(echo "bisect state" | $BIT hash-object -w --stdin) &&
+	 wt_tree=$(printf "100644 blob %s\tb.md\n" "$blob" | $BIT mktree) &&
+	 wt_commit=$(echo "bisect" | $BIT commit-tree $wt_tree) &&
+	 mkdir -p .git/worktrees/wt/refs/bisect &&
+	 echo "ref: refs/heads/wt-branch" > .git/worktrees/wt/HEAD &&
+	 echo "$wt_commit" > .git/worktrees/wt/refs/bisect/bad &&
+	 $BIT gc -q &&
+	 $BIT cat-file -p $wt_commit:b.md > actual &&
+	 echo "bisect state" > expect &&
+	 test_cmp expect actual)
+'
+
+test_expect_success 'prune keeps reflog-only objects' '
+	(cd repo &&
+	 orphan=$(echo "reflog only" | $BIT hash-object -w --stdin) &&
+	 zero=0000000000000000000000000000000000000000 &&
+	 mkdir -p .git/logs &&
+	 printf "%s %s Test <t@e.com> 0 +0000\tstore\n" "$zero" "$orphan" >> .git/logs/HEAD &&
+	 $BIT gc --prune -q &&
+	 $BIT cat-file -p $orphan > actual &&
+	 echo "reflog only" > expect &&
+	 test_cmp expect actual)
+'
+
 test_expect_success 'repository is valid for real git after gc' '
 	(cd repo &&
 	 git fsck --strict 2> fsck-err &&

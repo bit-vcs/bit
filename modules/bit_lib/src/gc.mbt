@@ -85,6 +85,9 @@ fn repack_git_dir(
   }
   let objects = collect_reachable_objects_from_commits(db, rfs, roots)
   collect_reachable_tag_objects(db, rfs, ref_ids, objects)
+  // Reflog-referenced objects are roots too (git keeps them); repacking without
+  // them would drop reflog-only objects from the new pack.
+  collect_reflog_referenced_objects(db, rfs, git_dir, objects)
   repack_from_objects(fs, git_dir, objects)
 }
 
@@ -153,6 +156,9 @@ fn prune_git_dir(
   }
   let reachable = collect_reachable_objects_from_commits(db, rfs, roots)
   collect_reachable_tag_objects(db, rfs, ref_ids, reachable)
+  // Match gc_git_dir: reflog-referenced objects are protected roots, so a bare
+  // `bit gc --prune` must not delete reflog-only loose objects.
+  collect_reflog_referenced_objects(db, rfs, git_dir, reachable)
   let reachable_hex : Map[String, Bool] = Map([])
   for obj in reachable {
     let id = @bit.hash_object_content(obj.obj_type, obj.data)
@@ -223,15 +229,16 @@ fn collect_ref_ids(
     Detached(id) => refs["HEAD"] = id
     Branch(_) => ()
   }
-  collect_worktree_heads(fs, git_dir, refs)
+  collect_worktree_roots(fs, git_dir, refs)
   refs.values().to_array()
 }
 
 ///|
-/// Linked worktrees keep their HEAD under worktrees/<name>/HEAD in the common
-/// git dir; a detached worktree HEAD may be the only root keeping its checkout
-/// alive, so treat those ids as roots like git does.
-fn collect_worktree_heads(
+/// Linked worktrees keep per-worktree state under worktrees/<name>/ in the
+/// common git dir. Both the (possibly detached) HEAD and the per-worktree refs
+/// (refs/bisect/*, refs/worktree/*, refs/rewritten/*) are reachability roots
+/// git honors, so collect them all.
+fn collect_worktree_roots(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
   out : Map[String, @bit.ObjectId],
@@ -240,19 +247,34 @@ fn collect_worktree_heads(
   if !fs.is_dir(worktrees_dir) {
     return
   }
-  let entries = fs.readdir(worktrees_dir)
-  for name in entries {
-    let head_path = join_path(join_path(worktrees_dir, name), "HEAD")
-    if !fs.is_file(head_path) {
-      continue
+  for name in fs.readdir(worktrees_dir) {
+    let wt_dir = join_path(worktrees_dir, name)
+    collect_worktree_head(fs, wt_dir, name, out)
+    let wt_refs = join_path(wt_dir, "refs")
+    if fs.is_dir(wt_refs) {
+      collect_loose_refs(fs, wt_refs, "worktrees/" + name + "/refs", out)
     }
-    let line = read_ref_line_gc(fs, head_path) catch { _ => continue }
-    if line.has_prefix("ref: ") {
-      continue
-    }
-    let id = @bit.ObjectId::from_hex(line) catch { _ => continue }
-    out["worktrees/" + name + "/HEAD"] = id
   }
+}
+
+///|
+/// A detached worktree HEAD may be the only root keeping its checkout alive.
+fn collect_worktree_head(
+  fs : &@bit.RepoFileSystem,
+  wt_dir : String,
+  name : String,
+  out : Map[String, @bit.ObjectId],
+) -> Unit {
+  let head_path = join_path(wt_dir, "HEAD")
+  if !fs.is_file(head_path) {
+    return
+  }
+  let line = read_ref_line_gc(fs, head_path) catch { _ => return }
+  if line.has_prefix("ref: ") {
+    return
+  }
+  let id = @bit.ObjectId::from_hex(line) catch { _ => return }
+  out["worktrees/" + name + "/HEAD"] = id
 }
 
 ///|
@@ -391,10 +413,19 @@ fn collect_all_reflog_ids(
 ) -> Array[@bit.ObjectId] raise @bit.GitError {
   let ids : Array[@bit.ObjectId] = []
   let logs_dir = git_dir + "/logs"
-  if !fs.is_dir(logs_dir) {
-    return ids
+  if fs.is_dir(logs_dir) {
+    collect_reflog_ids_recursive(fs, logs_dir, ids)
   }
-  collect_reflog_ids_recursive(fs, logs_dir, ids)
+  // Linked worktrees keep their own reflogs under worktrees/<name>/logs.
+  let worktrees_dir = git_dir + "/worktrees"
+  if fs.is_dir(worktrees_dir) {
+    for name in fs.readdir(worktrees_dir) {
+      let wt_logs = worktrees_dir + "/" + name + "/logs"
+      if fs.is_dir(wt_logs) {
+        collect_reflog_ids_recursive(fs, wt_logs, ids)
+      }
+    }
+  }
   ids
 }
 
