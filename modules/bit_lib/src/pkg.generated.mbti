@@ -61,6 +61,8 @@ pub fn collect_packed_ref_ids(&@bit_types.RepoFileSystem, String, Map[String, @b
 
 pub fn collect_reachable_objects(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId) -> Array[@bit_object.PackObject] raise @bit_object.GitError
 
+pub fn collect_reachable_objects_excluding_commits(ObjectDb, &@bit_types.RepoFileSystem, Array[@bit_object.ObjectId], Array[@bit_object.ObjectId]) -> Array[@bit_object.PackObject] raise @bit_object.GitError
+
 pub fn collect_reachable_objects_from_commits(ObjectDb, &@bit_types.RepoFileSystem, Array[@bit_object.ObjectId]) -> Array[@bit_object.PackObject] raise @bit_object.GitError
 
 pub fn collect_tree_blobs(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId) -> Array[@bit_object.ObjectId] raise @bit_object.GitError
@@ -953,6 +955,10 @@ pub struct ObjectDb {
   pack_cache : Map[String, Bytes]
   pack_cache_order : Array[String]
   pack_cache_limit : Int
+  decoded_cache : Map[String, @bit_object.PackObject]
+  decoded_cache_order : Array[String]
+  mut decoded_cache_bytes : Int
+  decoded_cache_limit : Int
   mut prefer_packed : Bool
   mut saw_corrupt_pack : Bool
   mut skip_verify : Bool

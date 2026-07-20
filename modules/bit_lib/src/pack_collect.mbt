@@ -225,6 +225,64 @@ pub fn collect_reachable_objects_from_commits(
 }
 
 ///|
+/// Collect objects reachable from `commits`, stopping before any commit in
+/// `excluded_commits`. This models upload-pack negotiation: a client's have
+/// commits delimit the history it already owns, so their trees and ancestors
+/// do not need a separate reachability walk.
+pub fn collect_reachable_objects_excluding_commits(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  commits : Array[@bit.ObjectId],
+  excluded_commits : Array[@bit.ObjectId],
+) -> Array[@bit.PackObject] raise @bit.GitError {
+  let excluded : Map[String, Bool] = Map([])
+  for id in excluded_commits {
+    excluded[id.to_hex()] = true
+  }
+  let seen : Map[String, Bool] = Map([])
+  let out : Array[@bit.PackObject] = []
+  for commit_id in commits {
+    collect_commit_objects_until_excluded(
+      db, fs, commit_id, excluded, seen, out,
+    )
+  }
+  out
+}
+
+///|
+fn collect_commit_objects_until_excluded(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
+  excluded : Map[String, Bool],
+  seen : Map[String, Bool],
+  out : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
+  let hex = commit_id.to_hex()
+  if excluded.contains(hex) || seen.contains(hex) {
+    return
+  }
+  seen[hex] = true
+  let obj = db.get(fs, commit_id)
+  match obj {
+    None => raise @bit.GitError::InvalidObject("Missing commit object")
+    Some(o) => {
+      if o.obj_type != @bit.ObjectType::Commit {
+        raise @bit.GitError::InvalidObject("Object is not a commit")
+      }
+      out.push(o)
+      let info = @bit.parse_commit(o.data)
+      collect_tree_objects(db, fs, info.tree, seen, out)
+      for parent in info.parents {
+        collect_commit_objects_until_excluded(
+          db, fs, parent, excluded, seen, out,
+        )
+      }
+    }
+  }
+}
+
+///|
 fn collect_commit_objects(
   db : ObjectDb,
   fs : &@bit.RepoFileSystem,

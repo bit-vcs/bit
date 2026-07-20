@@ -30,6 +30,7 @@ import {
 warnings = "-29"
 
 options(
+  "native-stub": [ "delta_copy_native.c" ],
   targets: {
     "bench_profile_test.mbt": [ "native" ],
     "bench_test.mbt": [ "native" ],

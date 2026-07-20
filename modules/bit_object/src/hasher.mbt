@@ -98,11 +98,17 @@ pub fn hash_object_content_with_algo(
   obj_type : ObjectType,
   content : Bytes,
 ) -> ObjectId {
-  let state = HashState::new(algo)
   let header = "\{obj_type.to_string()} \{content.length()}\u0000"
-  state.update_string(header)
-  state.update(content)
-  state.finish()
+  match algo {
+    Sha1 =>
+      ObjectId::new(@hash.sha1_prefixed_raw(@utf8.encode(header), content))
+    Sha256 => {
+      let state = HashState::new(Sha256)
+      state.update_string(header)
+      state.update(content)
+      state.finish()
+    }
+  }
 }
 
 ///|

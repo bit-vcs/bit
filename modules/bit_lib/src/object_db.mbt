@@ -246,6 +246,10 @@ pub struct ObjectDb {
   pack_cache : Map[String, Bytes]
   pack_cache_order : Array[String]
   pack_cache_limit : Int
+  decoded_cache : Map[String, @bit.PackObject]
+  decoded_cache_order : Array[String]
+  mut decoded_cache_bytes : Int
+  decoded_cache_limit : Int
   mut prefer_packed : Bool
   mut saw_corrupt_pack : Bool
   mut skip_verify : Bool
@@ -262,6 +266,22 @@ fn pack_cache_limit_from_env() -> Int {
         n => if n < 0 { 0 } else { n }
       }
     None => 2
+  }
+}
+
+///|
+/// Limit decoded packed-object cache memory. The cache is bounded by decoded
+/// object bytes rather than entry count because a single large blob should not
+/// crowd out many small delta bases.
+fn decoded_cache_limit_from_env() -> Int {
+  match @bitio.env_get("BIT_DECODED_OBJECT_CACHE_LIMIT") {
+    Some(v) =>
+      try object_db_parse_int(v) catch {
+        _ => 4 * 1024 * 1024
+      } noraise {
+        n => if n < 0 { 0 } else { n }
+      }
+    None => 4 * 1024 * 1024
   }
 }
 
@@ -299,6 +319,79 @@ fn evict_pack_cache(db : ObjectDb) -> Unit {
     let evict = db.pack_cache_order.remove(0)
     db.pack_cache.remove(evict)
   }
+}
+
+///|
+/// Key an object by its immutable pack location, rather than object ID. This
+/// lets OFS_DELTA bases be shared directly by all children that reference them.
+fn decoded_cache_key(pack_path : String, offset : Int64) -> String {
+  pack_path + "\u0000" + offset.to_string()
+}
+
+///|
+fn decoded_cache_entry_size(obj : @bit.PackObject) -> Int {
+  obj.data.length() + 128
+}
+
+///|
+fn touch_decoded_cache(db : ObjectDb, key : String) -> Unit {
+  if db.decoded_cache_order.search(key) is Some(idx) {
+    ignore(db.decoded_cache_order.remove(idx))
+  }
+  db.decoded_cache_order.push(key)
+}
+
+///|
+fn evict_decoded_cache(db : ObjectDb) -> Unit {
+  while db.decoded_cache_bytes > db.decoded_cache_limit &&
+        db.decoded_cache_order.length() > 0 {
+    let evict = db.decoded_cache_order.remove(0)
+    match db.decoded_cache.get(evict) {
+      Some(obj) => {
+        db.decoded_cache_bytes -= decoded_cache_entry_size(obj)
+        db.decoded_cache.remove(evict)
+      }
+      None => ()
+    }
+  }
+}
+
+///|
+fn get_decoded_cache(
+  db : ObjectDb,
+  pack_path : String,
+  offset : Int64,
+) -> @bit.PackObject? {
+  let key = decoded_cache_key(pack_path, offset)
+  match db.decoded_cache.get(key) {
+    Some(obj) => {
+      touch_decoded_cache(db, key)
+      Some(obj)
+    }
+    None => None
+  }
+}
+
+///|
+fn put_decoded_cache(
+  db : ObjectDb,
+  pack_path : String,
+  offset : Int64,
+  obj : @bit.PackObject,
+) -> Unit {
+  if db.decoded_cache_limit <= 0 {
+    return
+  }
+  let key = decoded_cache_key(pack_path, offset)
+  match db.decoded_cache.get(key) {
+    Some(previous) =>
+      db.decoded_cache_bytes -= decoded_cache_entry_size(previous)
+    None => ()
+  }
+  db.decoded_cache[key] = obj
+  db.decoded_cache_bytes += decoded_cache_entry_size(obj)
+  touch_decoded_cache(db, key)
+  evict_decoded_cache(db)
 }
 
 ///|
@@ -351,6 +444,7 @@ pub fn ObjectDb::load_from_objects_dir(
     []
   }
   let pack_cache_limit = pack_cache_limit_from_env()
+  let decoded_cache_limit = decoded_cache_limit_from_env()
   {
     objects_dir,
     loose_paths,
@@ -359,6 +453,10 @@ pub fn ObjectDb::load_from_objects_dir(
     pack_cache: Map([]),
     pack_cache_order: [],
     pack_cache_limit,
+    decoded_cache: Map([]),
+    decoded_cache_order: [],
+    decoded_cache_bytes: 0,
+    decoded_cache_limit,
     prefer_packed: false,
     saw_corrupt_pack: false,
     skip_verify: false,
@@ -397,6 +495,7 @@ pub fn ObjectDb::load_lazy_from_objects_dir(
     []
   }
   let pack_cache_limit = pack_cache_limit_from_env()
+  let decoded_cache_limit = decoded_cache_limit_from_env()
   {
     objects_dir,
     loose_paths: Map([]),
@@ -405,6 +504,10 @@ pub fn ObjectDb::load_lazy_from_objects_dir(
     pack_cache: Map([]),
     pack_cache_order: [],
     pack_cache_limit,
+    decoded_cache: Map([]),
+    decoded_cache_order: [],
+    decoded_cache_bytes: 0,
+    decoded_cache_limit,
     prefer_packed: false,
     saw_corrupt_pack: false,
     skip_verify: false,
@@ -698,6 +801,26 @@ fn get_pack_bytes(
 }
 
 ///|
+/// Return a decoded packed object from the location cache when possible.
+/// Looking here, before reading the pack bytes, also makes repeated top-level
+/// ObjectDb::get calls avoid the pack-file cache entirely.
+fn get_cached_or_read_pack_object(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  pack : PackIndex,
+  offset : Int64,
+  seen : Map[String, Bool],
+) -> @bit.PackObject raise @bit.GitError {
+  match get_decoded_cache(db, pack.pack_path, offset) {
+    Some(obj) => obj
+    None => {
+      let data = get_pack_bytes(db, fs, pack.pack_path)
+      read_pack_object_at(data, pack, offset, db, fs, seen)
+    }
+  }
+}
+
+///|
 fn get_from_packs(
   db : ObjectDb,
   fs : &@bit.RepoFileSystem,
@@ -711,8 +834,7 @@ fn get_from_packs(
       None => ()
       Some(offset) =>
         try {
-          let data = get_pack_bytes(db, fs, pack.pack_path)
-          let obj = read_pack_object_at(data, pack, offset, db, fs, seen)
+          let obj = get_cached_or_read_pack_object(db, fs, pack, offset, seen)
           if !db.skip_verify {
             let computed = obj.id.to_hex()
             if computed != hex {
@@ -736,8 +858,7 @@ fn get_from_packs(
         None => ()
         Some(offset) => {
           let pack = lazy_pack.get(fs) // ensure loaded
-          let data = get_pack_bytes(db, fs, pack.pack_path)
-          let obj = read_pack_object_at(data, pack, offset, db, fs, seen)
+          let obj = get_cached_or_read_pack_object(db, fs, pack, offset, seen)
           if !db.skip_verify {
             let computed = obj.id.to_hex()
             if computed != hex {
@@ -1223,6 +1344,10 @@ fn read_pack_object_at(
   fs : &@bit.RepoFileSystem,
   seen : Map[String, Bool],
 ) -> @bit.PackObject raise @bit.GitError {
+  match get_decoded_cache(db, pack.pack_path, offset) {
+    Some(obj) => return obj
+    None => ()
+  }
   let offset_i = offset_to_int(offset)
   let (type_id, size, next_offset) = @pack.decode_type_and_size_at(
     data, offset_i,
@@ -1230,7 +1355,7 @@ fn read_pack_object_at(
   if size < 0 || size > MAX_LOOSE_OBJECT_SIZE {
     raise @bit.GitError::PackfileError("Pack object size out of range: \{size}")
   }
-  match type_id {
+  let obj = match type_id {
     1 | 2 | 3 | 4 => {
       let obj_type = @pack.packfile_type_to_object_type(type_id)
       let (content, _after) = @zlib.zlib_decompress_at(
@@ -1334,6 +1459,8 @@ fn read_pack_object_at(
         "Unknown packfile object type: \{type_id}",
       )
   }
+  put_decoded_cache(db, pack.pack_path, offset, obj)
+  obj
 }
 
 ///|

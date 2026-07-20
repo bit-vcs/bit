@@ -561,16 +561,16 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     }
   }
   // Resolve exclude commits
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let exclude_ids : Map[String, Bool] = Map([])
   for spec in excludes {
     match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) =>
         // Walk the exclude commit and all its ancestors
-        walk_commits_to_map(fs, git_dir, id, exclude_ids)
+        walk_commits_to_map(db, fs, id, exclude_ids)
       None => ()
     }
   }
-  let db = @bitlib.ObjectDb::load(fs, git_dir)
   for pair in symmetric_ranges {
     match
       (
@@ -586,7 +586,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
         )
         let bases = @bitlib.merge_base_all(db, fs, left_commit, right_commit)
         for base in bases {
-          walk_commits_to_map(fs, git_dir, base, exclude_ids)
+          walk_commits_to_map(db, fs, base, exclude_ids)
         }
       }
       _ => ()
@@ -1087,11 +1087,11 @@ fn rev_list_build_left_right_markers(
         let left_seen : Map[String, Bool] = Map([])
         let right_seen : Map[String, Bool] = Map([])
         let merge_base_seen : Map[String, Bool] = Map([])
-        walk_commits_to_map(fs, git_dir, left_commit, left_seen)
-        walk_commits_to_map(fs, git_dir, right_commit, right_seen)
+        walk_commits_to_map(db, fs, left_commit, left_seen)
+        walk_commits_to_map(db, fs, right_commit, right_seen)
         let bases = @bitlib.merge_base_all(db, fs, left_commit, right_commit)
         for base in bases {
-          walk_commits_to_map(fs, git_dir, base, merge_base_seen)
+          walk_commits_to_map(db, fs, base, merge_base_seen)
         }
         for hex in left_seen.keys() {
           if merge_base_seen.contains(hex) {
@@ -1287,13 +1287,12 @@ fn rev_list_window(
 
 ///|
 fn walk_commits_to_map(
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  git_dir : String,
   start : @bitcore.ObjectId,
   out : Map[String, Bool],
   first_parent? : Bool = false,
 ) -> Unit {
-  let db = @bitlib.ObjectDb::load(fs, git_dir) catch { _ => return () }
   let queue : Array[@bitcore.ObjectId] = [start]
   while queue.length() > 0 {
     let id = queue.unsafe_pop()

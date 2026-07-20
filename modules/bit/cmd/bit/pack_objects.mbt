@@ -2567,7 +2567,8 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           }
         }
         // Create cruft pack(s) — may split if --max-cruft-size
-        let cruft_pack_list : Array[Bytes] = match cruft_size_limit {
+        let cruft_pack_list : Array[(Bytes, Array[@bitcore.PackObject])] = match
+          cruft_size_limit {
           Some(limit) if limit > 0L => {
             let effective_limit = if limit < 1048576L {
               @stdio.stderr.write("warning: minimum pack size limit is 1 MiB\n")
@@ -2575,7 +2576,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             } else {
               limit
             }
-            let (packs, _dc) = @pack.create_packfiles_with_size_limit(
+            let (packs, _dc) = @pack.create_packfiles_with_size_limit_and_metadata(
               cruft_objects,
               cfg.delta_mode,
               pack_compression,
@@ -2590,7 +2591,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           _ =>
             if cruft_objects.length() == 0 {
               // Create an empty pack
-              let (pack, _dc) = @pack.create_packfile_with_delta_stats_compression_reuse(
+              let (pack, _dc, idx_objects) = @pack.create_packfile_with_delta_stats_compression_reuse_and_metadata(
                 [],
                 cfg.delta_mode,
                 pack_compression,
@@ -2599,9 +2600,9 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
                 cfg.window,
                 hash_size~,
               )
-              [pack]
+              [(pack, idx_objects)]
             } else {
-              let (pack, _dc) = @pack.create_packfile_with_delta_stats_compression_reuse(
+              let (pack, _dc, idx_objects) = @pack.create_packfile_with_delta_stats_compression_reuse_and_metadata(
                 cruft_objects,
                 cfg.delta_mode,
                 pack_compression,
@@ -2610,15 +2611,16 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
                 cfg.window,
                 hash_size~,
               )
-              [pack]
+              [(pack, idx_objects)]
             }
         }
-        for pack in cruft_pack_list {
+        for entry in cruft_pack_list {
+          let pack = entry.0
+          let idx_objects = entry.1
           let hash_hex = pack_hash_hex(pack, hash_size~)
           let pack_path = base_name + "-" + hash_hex + ".pack"
           let idx_path = base_name + "-" + hash_hex + ".idx"
           fs.write_file(pack_path, pack)
-          let idx_objects = @pack.parse_packfile(pack, hash_size~)
           @pack.write_pack_index_from_objects_versioned(
             fs,
             idx_path,
@@ -2640,13 +2642,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             // Collect IDs for objects in this specific pack
             let ids : Array[String] = []
             for obj in idx_objects {
-              ids.push(
-                @bitobject.hash_object_content_with_algo(
-                  hash_algo,
-                  obj.obj_type,
-                  obj.data,
-                ).to_hex(),
-              )
+              ids.push(obj.id.to_hex())
             }
             ids.sort_by(fn(a, b) { a.compare(b) })
             ids
@@ -3126,10 +3122,11 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         }
       }
       let mut total_delta_count = 0
-      let pack_list : Array[Bytes] = match effective_limit {
+      let pack_list : Array[(Bytes, Array[@bitcore.PackObject])] = match
+        effective_limit {
         Some(limit) =>
           if limit > 0L {
-            let (packs, dc) = @pack.create_packfiles_with_size_limit(
+            let (packs, dc) = @pack.create_packfiles_with_size_limit_and_metadata(
               objects,
               cfg.delta_mode,
               pack_compression,
@@ -3142,7 +3139,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             total_delta_count += dc
             packs
           } else {
-            let (pack, dc) = @pack.create_packfile_with_delta_stats_compression_reuse(
+            let (pack, dc, idx_objects) = @pack.create_packfile_with_delta_stats_compression_reuse_and_metadata(
               objects,
               cfg.delta_mode,
               pack_compression,
@@ -3152,10 +3149,10 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
               hash_size~,
             )
             total_delta_count += dc
-            [pack]
+            [(pack, idx_objects)]
           }
         _ => {
-          let (pack, dc) = @pack.create_packfile_with_delta_stats_compression_reuse(
+          let (pack, dc, idx_objects) = @pack.create_packfile_with_delta_stats_compression_reuse_and_metadata(
             objects,
             cfg.delta_mode,
             pack_compression,
@@ -3165,10 +3162,12 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             hash_size~,
           )
           total_delta_count += dc
-          [pack]
+          [(pack, idx_objects)]
         }
       }
-      for pack in pack_list {
+      for entry in pack_list {
+        let pack = entry.0
+        let idx_objects = entry.1
         if cfg.stdout {
           @stdio.stdout.write(pack)
         } else {
@@ -3185,9 +3184,6 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           let pack_path = base_name + "-" + hash_hex + ".pack"
           let idx_path = base_name + "-" + hash_hex + ".idx"
           fs.write_file(pack_path, pack)
-          // Always re-parse the newly created pack to compute correct
-          // offsets and CRC32 values for the index.
-          let idx_objects = @pack.parse_packfile(pack, hash_size~)
           @pack.write_pack_index_from_objects_versioned(
             fs,
             idx_path,
@@ -3214,7 +3210,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       if cfg.filter_to is Some(filter_to_prefix) {
         if filtered_out_objects.length() > 0 {
           let deduped = dedup_objects(filtered_out_objects)
-          let (ft_pack, _dc) = @pack.create_packfile_with_delta_stats_compression_reuse(
+          let (ft_pack, _dc, ft_idx_objects) = @pack.create_packfile_with_delta_stats_compression_reuse_and_metadata(
             deduped,
             cfg.delta_mode,
             pack_compression,
@@ -3228,7 +3224,6 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           let ft_pack_path = ft_prefix + "-" + ft_hash + ".pack"
           let ft_idx_path = ft_prefix + "-" + ft_hash + ".idx"
           fs.write_file(ft_pack_path, ft_pack)
-          let ft_idx_objects = @pack.parse_packfile(ft_pack, hash_size~)
           @pack.write_pack_index_from_objects_versioned(
             fs,
             ft_idx_path,

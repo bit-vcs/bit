@@ -364,10 +364,12 @@ test "helpers: get_work_root finds repo root from PWD when shim pwd is absent" {
   fs.mkdir_p(root + "/.git")
   fs.mkdir_p(subdir)
   let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
   let prev_pwd = @sys.get_env_var("PWD")
   let prev_git_dir = @sys.get_env_var("GIT_DIR")
   let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
   @sys.unset_env_var("GIT_SHIM_PWD")
+  @sys.unset_env_var("GIT_SHIM_CWD")
   @sys.set_env_var("PWD", subdir)
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
@@ -375,6 +377,10 @@ test "helpers: get_work_root finds repo root from PWD when shim pwd is absent" {
   match prev_shim_pwd {
     Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
     None => @sys.unset_env_var("GIT_SHIM_PWD")
+  }
+  match prev_shim_cwd {
+    Some(value) => @sys.set_env_var("GIT_SHIM_CWD", value)
+    None => @sys.unset_env_var("GIT_SHIM_CWD")
   }
   match prev_pwd {
     Some(value) => @sys.set_env_var("PWD", value)

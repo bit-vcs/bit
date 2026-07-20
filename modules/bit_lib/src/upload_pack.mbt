@@ -410,28 +410,13 @@ pub fn upload_pack(
   // Collect objects reachable from wants
   let include_pack_objects_died = req.shallow.length() == 0 &&
     req.deepen is None
-  let objects = collect_reachable_objects_from_commits(db, fs, req.wants) catch {
+  let objects = collect_upload_pack_objects(db, fs, req.wants, req.haves) catch {
     err =>
       raise @bit.GitError::ProtocolError(
         upload_pack_error_message(err, include_pack_objects_died),
       )
   }
 
-  // If client has some objects, filter them out
-  if req.haves.length() > 0 {
-    let have_set : Map[String, Bool] = Map([])
-    let have_objects = collect_reachable_objects_from_commits(db, fs, req.haves)
-    for obj in have_objects {
-      have_set[obj.id.to_hex()] = true
-    }
-    let filtered : Array[@bit.PackObject] = []
-    for obj in objects {
-      if !have_set.contains(obj.id.to_hex()) {
-        filtered.push(obj)
-      }
-    }
-    return build_upload_pack_response(filtered, use_side_band, ack_ids)
-  }
   build_upload_pack_response(objects, use_side_band, ack_ids)
 }
 
@@ -469,11 +454,7 @@ fn build_upload_pack_response(
   }
   // NAK (no common commits)
   upload_push_bytes(out, @protocol.pktline_encode("NAK\n"))
-  // Create packfile
-  let pack = @pack.create_packfile_with_delta(
-    objects,
-    @bit.PackDeltaMode::NoDelta,
-  )
+  let pack = build_upload_packfile(objects)
   if use_side_band {
     // Send packfile via side-band-64k (band 1)
     let chunk_size = 65515 // 65520 - 4 (pkt-line header) - 1 (band byte)
@@ -505,6 +486,22 @@ fn build_upload_pack_response(
     }
   }
   Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
+}
+
+///|
+/// Build transfer packs with the same bounded OFS-delta search used by
+/// pack-objects. It reduces bytes-on-wire and the receiver's index-pack work
+/// without allowing unbounded delta chains.
+fn build_upload_packfile(objects : Array[@bit.PackObject]) -> Bytes {
+  let (pack, _) = @pack.create_packfile_with_delta_stats_compression_reuse(
+    objects,
+    @bit.PackDeltaMode::OfsDelta,
+    @bit.PackCompression::Default,
+    false,
+    50,
+    10,
+  )
+  pack
 }
 
 ///|
@@ -541,6 +538,22 @@ fn collect_have_acks_v2(
     }
   }
   out
+}
+
+///|
+/// Walk wants once, using the client's have commits as traversal boundaries.
+/// This avoids materializing and hashing the complete have-side object set.
+fn collect_upload_pack_objects(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  wants : Array[@bit.ObjectId],
+  haves : Array[@bit.ObjectId],
+) -> Array[@bit.PackObject] raise @bit.GitError {
+  if haves.length() == 0 {
+    collect_reachable_objects_from_commits(db, fs, wants)
+  } else {
+    collect_reachable_objects_excluding_commits(db, fs, wants, haves)
+  }
 }
 
 ///|
@@ -760,7 +773,7 @@ pub fn upload_pack_v2(
   }
 
   // Collect objects reachable from wants
-  let objects = collect_reachable_objects_from_commits(db, fs, wants) catch {
+  let objects = collect_upload_pack_objects(db, fs, wants, req.haves) catch {
     err =>
       raise @bit.GitError::ProtocolError(upload_pack_error_message(err, true))
   }
@@ -770,25 +783,7 @@ pub fn upload_pack_v2(
     Some(f) => parse_filter_spec(f)
     None => @protocol.FilterSpec::NoFilter
   }
-  let objects = apply_filter_spec(objects, filter_spec)
-
-  // If client has some objects, filter them out
-  let filtered_objects = if req.haves.length() > 0 {
-    let have_set : Map[String, Bool] = Map([])
-    let have_objects = collect_reachable_objects_from_commits(db, fs, req.haves)
-    for obj in have_objects {
-      have_set[obj.id.to_hex()] = true
-    }
-    let filtered : Array[@bit.PackObject] = []
-    for obj in objects {
-      if !have_set.contains(obj.id.to_hex()) {
-        filtered.push(obj)
-      }
-    }
-    filtered
-  } else {
-    objects
-  }
+  let filtered_objects = apply_filter_spec(objects, filter_spec)
 
   // Build v2 response
   build_upload_pack_response_v2(filtered_objects, ack_ids, wanted_refs)
@@ -921,11 +916,7 @@ fn build_upload_pack_response_v2(
   // Send packfile-section header
   upload_push_bytes(out, @protocol.pktline_encode("packfile\n"))
 
-  // Create packfile
-  let pack = @pack.create_packfile_with_delta(
-    objects,
-    @bit.PackDeltaMode::NoDelta,
-  )
+  let pack = build_upload_packfile(objects)
 
   // Send packfile via side-band-64k (band 1)
   let chunk_size = 65515 // 65520 - 4 (pkt-line header) - 1 (band byte)

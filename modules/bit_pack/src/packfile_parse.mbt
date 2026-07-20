@@ -1205,10 +1205,8 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @bit.GitError {
       if out_pos < 0 || cp_size > result_size - out_pos {
         raise @bit.GitError::PackfileError("Delta copy past result size")
       }
-      for i in 0..<cp_size {
-        out[out_pos] = base[cp_off + i]
-        out_pos += 1
-      }
+      copy_delta_bytes(base, cp_off, out, out_pos, cp_size)
+      out_pos += cp_size
     } else {
       let literal_len = opcode & 0x7f
       if literal_len == 0 {
@@ -1220,10 +1218,8 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @bit.GitError {
       if literal_len > result_size - out_pos {
         raise @bit.GitError::PackfileError("Delta literal past result size")
       }
-      for i in 0..<literal_len {
-        out[out_pos] = delta[offset + i]
-        out_pos += 1
-      }
+      copy_delta_bytes(delta, offset, out, out_pos, literal_len)
+      out_pos += literal_len
       offset += literal_len
     }
   }
