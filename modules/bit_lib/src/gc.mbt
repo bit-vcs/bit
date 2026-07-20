@@ -19,14 +19,33 @@ pub struct PruneResult {
 }
 
 ///|
+/// Resolve the git dir that owns refs and objects for maintenance. Follows a
+/// `.git` gitfile (linked worktree / submodule) and the worktree "commondir"
+/// indirection so gc always sees the shared repository's refs; also accepts a
+/// bare repository root.
+fn gc_resolve_git_dir(fs : &@bit.RepoFileSystem, root : String) -> String {
+  let marker = join_path(root, ".git")
+  if !fs.is_dir(marker) &&
+    !fs.is_file(marker) &&
+    fs.is_dir(join_path(root, "objects")) &&
+    fs.is_dir(join_path(root, "refs")) {
+    return root
+  }
+  let git_dir = resolve_gitdir(fs, marker)
+  match resolve_ref_commondir(fs, git_dir) {
+    Some(common) => common
+    None => git_dir
+  }
+}
+
+///|
 /// Repack reachable objects from refs under the repository root.
 pub fn repack_repo(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> RepackResult? raise @bit.GitError {
-  let git_dir = root + "/.git"
-  repack_git_dir(fs, rfs, git_dir)
+  repack_git_dir(fs, rfs, gc_resolve_git_dir(rfs, root))
 }
 
 ///|
@@ -36,8 +55,7 @@ pub fn gc_repo(
   rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> GcResult raise @bit.GitError {
-  let git_dir = root + "/.git"
-  gc_git_dir(fs, rfs, git_dir)
+  gc_git_dir(fs, rfs, gc_resolve_git_dir(rfs, root))
 }
 
 ///|
@@ -47,8 +65,7 @@ pub fn prune_repo(
   rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> PruneResult raise @bit.GitError {
-  let git_dir = root + "/.git"
-  prune_git_dir(fs, rfs, git_dir)
+  prune_git_dir(fs, rfs, gc_resolve_git_dir(rfs, root))
 }
 
 ///|
@@ -68,6 +85,9 @@ fn repack_git_dir(
   }
   let objects = collect_reachable_objects_from_commits(db, rfs, roots)
   collect_reachable_tag_objects(db, rfs, ref_ids, objects)
+  // Reflog-referenced objects are roots too (git keeps them); repacking without
+  // them would drop reflog-only objects from the new pack.
+  collect_reflog_referenced_objects(db, rfs, git_dir, objects)
   repack_from_objects(fs, git_dir, objects)
 }
 
@@ -136,6 +156,9 @@ fn prune_git_dir(
   }
   let reachable = collect_reachable_objects_from_commits(db, rfs, roots)
   collect_reachable_tag_objects(db, rfs, ref_ids, reachable)
+  // Match gc_git_dir: reflog-referenced objects are protected roots, so a bare
+  // `bit gc --prune` must not delete reflog-only loose objects.
+  collect_reflog_referenced_objects(db, rfs, git_dir, reachable)
   let reachable_hex : Map[String, Bool] = Map([])
   for obj in reachable {
     let id = @bit.hash_object_content(obj.obj_type, obj.data)
@@ -191,17 +214,11 @@ fn collect_ref_ids(
   git_dir : String,
 ) -> Array[@bit.ObjectId] raise @bit.GitError {
   let refs : Map[String, @bit.ObjectId] = Map([])
-  let heads_dir = join_path(git_dir, "refs/heads")
-  if fs.is_dir(heads_dir) {
-    collect_loose_refs(fs, heads_dir, "refs/heads", refs)
-  }
-  let tags_dir = join_path(git_dir, "refs/tags")
-  if fs.is_dir(tags_dir) {
-    collect_loose_refs(fs, tags_dir, "refs/tags", refs)
-  }
-  let remotes_dir = join_path(git_dir, "refs/remotes")
-  if fs.is_dir(remotes_dir) {
-    collect_loose_refs(fs, remotes_dir, "refs/remotes", refs)
+  // Every namespace under refs/ is a reachability root (heads, tags, remotes,
+  // notes, agent, stash, replace, ...). Matching git, which roots ALL refs.
+  let refs_dir = join_path(git_dir, "refs")
+  if fs.is_dir(refs_dir) {
+    collect_loose_refs(fs, refs_dir, "refs", refs)
   }
   let packed_path = join_path(git_dir, "packed-refs")
   if fs.is_file(packed_path) {
@@ -212,7 +229,52 @@ fn collect_ref_ids(
     Detached(id) => refs["HEAD"] = id
     Branch(_) => ()
   }
+  collect_worktree_roots(fs, git_dir, refs)
   refs.values().to_array()
+}
+
+///|
+/// Linked worktrees keep per-worktree state under worktrees/<name>/ in the
+/// common git dir. Both the (possibly detached) HEAD and the per-worktree refs
+/// (refs/bisect/*, refs/worktree/*, refs/rewritten/*) are reachability roots
+/// git honors, so collect them all.
+fn collect_worktree_roots(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+  out : Map[String, @bit.ObjectId],
+) -> Unit raise @bit.GitError {
+  let worktrees_dir = join_path(git_dir, "worktrees")
+  if !fs.is_dir(worktrees_dir) {
+    return
+  }
+  for name in fs.readdir(worktrees_dir) {
+    let wt_dir = join_path(worktrees_dir, name)
+    collect_worktree_head(fs, wt_dir, name, out)
+    let wt_refs = join_path(wt_dir, "refs")
+    if fs.is_dir(wt_refs) {
+      collect_loose_refs(fs, wt_refs, "worktrees/" + name + "/refs", out)
+    }
+  }
+}
+
+///|
+/// A detached worktree HEAD may be the only root keeping its checkout alive.
+fn collect_worktree_head(
+  fs : &@bit.RepoFileSystem,
+  wt_dir : String,
+  name : String,
+  out : Map[String, @bit.ObjectId],
+) -> Unit {
+  let head_path = join_path(wt_dir, "HEAD")
+  if !fs.is_file(head_path) {
+    return
+  }
+  let line = read_ref_line_gc(fs, head_path) catch { _ => return }
+  if line.has_prefix("ref: ") {
+    return
+  }
+  let id = @bit.ObjectId::from_hex(line) catch { _ => return }
+  out["worktrees/" + name + "/HEAD"] = id
 }
 
 ///|
@@ -229,8 +291,15 @@ fn collect_loose_refs(
     if fs.is_dir(path) {
       collect_loose_refs(fs, path, refname, out)
     } else if fs.is_file(path) {
-      let line = read_ref_line_gc(fs, path)
-      out[refname] = @bit.ObjectId::from_hex(line)
+      // Skip symrefs (e.g. refs/remotes/origin/HEAD) — their targets are
+      // walked directly — and tolerate unparseable content instead of
+      // aborting the whole collection.
+      let line = read_ref_line_gc(fs, path) catch { _ => continue }
+      if line.has_prefix("ref: ") {
+        continue
+      }
+      let id = @bit.ObjectId::from_hex(line) catch { _ => continue }
+      out[refname] = id
     }
   }
 }
@@ -241,7 +310,6 @@ fn collect_packed_refs(
   packed_path : String,
   out : Map[String, @bit.ObjectId],
 ) -> Unit raise @bit.GitError {
-  let prefixes : Array[String] = ["refs/heads/", "refs/tags/", "refs/remotes/"]
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
     let line = trim_line_gc(line_view.to_owned())
@@ -264,14 +332,11 @@ fn collect_packed_refs(
           start=idx + 1,
           end=line.length(),
         )
-        let mut matched = false
-        for prefix in prefixes {
-          if refname.has_prefix(prefix) {
-            matched = true
-          }
-        }
-        if matched && !out.contains(refname) {
-          out[refname] = @bit.ObjectId::from_hex(id_hex)
+        // Loose refs win over stale packed entries; accept every refs/
+        // namespace as a root.
+        if refname.has_prefix("refs/") && !out.contains(refname) {
+          let id = @bit.ObjectId::from_hex(id_hex) catch { _ => continue }
+          out[refname] = id
         }
       }
     }
@@ -348,10 +413,19 @@ fn collect_all_reflog_ids(
 ) -> Array[@bit.ObjectId] raise @bit.GitError {
   let ids : Array[@bit.ObjectId] = []
   let logs_dir = git_dir + "/logs"
-  if !fs.is_dir(logs_dir) {
-    return ids
+  if fs.is_dir(logs_dir) {
+    collect_reflog_ids_recursive(fs, logs_dir, ids)
   }
-  collect_reflog_ids_recursive(fs, logs_dir, ids)
+  // Linked worktrees keep their own reflogs under worktrees/<name>/logs.
+  let worktrees_dir = git_dir + "/worktrees"
+  if fs.is_dir(worktrees_dir) {
+    for name in fs.readdir(worktrees_dir) {
+      let wt_logs = worktrees_dir + "/" + name + "/logs"
+      if fs.is_dir(wt_logs) {
+        collect_reflog_ids_recursive(fs, wt_logs, ids)
+      }
+    }
+  }
   ids
 }
 
