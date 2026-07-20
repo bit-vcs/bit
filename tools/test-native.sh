@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# cmd/bit's full whitebox suite exceeds the new backend's layout limit. Use
-# the classic backend with the system C compiler, matching the sharded CI job.
-unset MOONBIT_NEW_NATIVE
+# cmd/bit's debug native whitebox driver exceeds moonc's layout table limit on
+# arm64 macOS. Release-mode native tests use the C backend and avoid that link.
 if [[ "$(uname -s)" == "Darwin" ]]; then
   # Keep the linker target aligned with the SDK used to compile MoonBit C stubs.
   export MACOSX_DEPLOYMENT_TARGET="$(xcrun --sdk macosx --show-sdk-platform-version)"
@@ -39,10 +38,8 @@ moon test --target native -p mizchi/bit/fuzz_tests || true
 moon test --target native -p mizchi/bit/cmd/git-bit
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
-  # moonc currently ICEs while linking cmd/bit's native whitebox driver on
-  # arm64 macOS. The six shards run in Linux CI; the native release build and
-  # all non-CLI native package tests above still run locally.
-  echo "[native] skipping cmd/bit whitebox shards on Darwin (moonc layout ICE)"
+  echo "[native] cmd/bit release suite on Darwin (avoid debug layout ICE)"
+  moon test --target native --release -p mizchi/bit/cmd/bit
 else
   for shard in 0 1 2 3 4 5; do
     # shellcheck disable=SC2012

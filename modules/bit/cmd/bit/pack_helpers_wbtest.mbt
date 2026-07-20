@@ -64,3 +64,19 @@ test "pack helpers: scan_ref_delta_bases supports sha256 ids" {
   assert_eq(bases.length(), 1)
   assert_eq(bases[0], base_hex)
 }
+
+///|
+test "pack helpers: object_hex uses the cached object id" {
+  let cached_id = @bitcore.hash_object_content(
+    @bitcore.ObjectType::Blob,
+    b"cached identity",
+  )
+  let obj = @bitcore.PackObject::with_metadata(
+    @bitcore.ObjectType::Blob,
+    b"different payload",
+    cached_id,
+    -1,
+    0U,
+  )
+  assert_eq(object_hex(obj), cached_id.to_hex())
+}

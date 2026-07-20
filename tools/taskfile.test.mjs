@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const taskInfo = () => {
@@ -24,4 +25,14 @@ test("pkf test task tracks its test specifications and runners", () => {
   ]) {
     assert.ok(inputs.includes(input), `missing test input: ${input}`);
   }
+});
+
+test("Darwin native runner executes the cmd/bit suite in release mode", () => {
+  const script = readFileSync("tools/test-native.sh", "utf8");
+
+  assert.match(
+    script,
+    /moon test --target native --release -p mizchi\/bit\/cmd\/bit/,
+  );
+  assert.doesNotMatch(script, /skipping cmd\/bit whitebox shards/);
 });

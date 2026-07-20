@@ -110,6 +110,64 @@ async test "worktree: add_paths writes cache-tree extension" {
 }
 
 ///|
+async test "worktree: status skips a matching HEAD cache-tree root" {
+  let fs = setup_repo()
+  fs.write_string("/repo/tracked.txt", "tracked\n")
+  add_paths(fs, fs, "/repo", ["tracked.txt"])
+  let commit_id = commit(
+    fs, fs, "/repo", "initial\n", "Test <test@example.com>", 1700000000L,
+  )
+  let db = ObjectDb::load(fs, "/repo/.git")
+  let commit_obj = db.get(fs, commit_id).unwrap()
+  let tree_id = @bit.parse_commit(commit_obj.data).tree
+
+  // A clean index has the same root OID in its TREE extension as HEAD. If
+  // status consults it first, it need not load this tree object at all.
+  fs.remove_file(worktree_test_object_path("/repo/.git", tree_id))
+
+  let st = status(fs, "/repo")
+  assert_true(st.staged_added.length() == 0)
+  assert_true(st.staged_modified.length() == 0)
+  assert_true(st.staged_deleted.length() == 0)
+}
+
+///|
+async test "worktree: status skips unchanged cache-tree subtrees" {
+  let fs = setup_repo()
+  fs.mkdir_p("/repo/clean")
+  fs.mkdir_p("/repo/changed")
+  fs.write_string("/repo/clean/file.txt", "clean\n")
+  fs.write_string("/repo/changed/file.txt", "before\n")
+  add_paths(fs, fs, "/repo", ["clean/file.txt", "changed/file.txt"])
+  let commit_id = commit(
+    fs, fs, "/repo", "initial\n", "Test <test@example.com>", 1700000000L,
+  )
+  let db = ObjectDb::load(fs, "/repo/.git")
+  let commit_obj = db.get(fs, commit_id).unwrap()
+  let root_tree = db.get(fs, @bit.parse_commit(commit_obj.data).tree).unwrap()
+  let mut clean_tree_id = None
+  for entry in @bit.parse_tree(root_tree.data) {
+    if entry.name == "clean" {
+      clean_tree_id = Some(entry.id)
+    }
+  }
+  guard clean_tree_id is Some(clean_tree_id) else {
+    fail("expected clean subtree in HEAD")
+  }
+
+  // Updating the sibling invalidates the root and only that sibling in the
+  // index TREE extension. The clean subtree remains reusable.
+  fs.write_string("/repo/changed/file.txt", "after\n")
+  add_paths(fs, fs, "/repo", ["changed/file.txt"])
+  fs.remove_file(worktree_test_object_path("/repo/.git", clean_tree_id))
+
+  let st = status(fs, "/repo")
+  assert_true(st.staged_modified.contains("changed/file.txt"))
+  assert_true(st.staged_added.length() == 0)
+  assert_true(st.staged_deleted.length() == 0)
+}
+
+///|
 async test "worktree: commit writes HEAD and branch reflogs" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "hello\n")
