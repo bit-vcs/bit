@@ -119,7 +119,7 @@ pub async fn fetch_pack_with_http(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
-  depth : Int,
+  depth? : Int,
   filter : FilterSpec,
   http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
   http_post : async (String, Bytes, Map[String, String]) -> (
@@ -128,6 +128,7 @@ pub async fn fetch_pack_with_http(
   ) raise @bit.GitError,
   haves? : Array[@bit.ObjectId] = [],
   shallow? : Array[@bit.ObjectId] = [],
+  unshallow? : Bool = false,
 ) -> Bytes raise @bit.GitError {
   let (refs, caps, version, _symrefs) = discover_upload_refs_with_http(
     remote, prefer_v2, http_get, http_post,
@@ -146,10 +147,11 @@ pub async fn fetch_pack_with_http(
     let req = build_fetch_request_v2(
       "git/moonbit",
       wants,
-      depth,
+      depth?,
       filter~,
       haves~,
       shallow~,
+      unshallow~,
     )
     let resp = upload_pack_request_with_http(remote, req, true, http_post)
     return extract_pack_from_v2_response(resp)
@@ -158,10 +160,11 @@ pub async fn fetch_pack_with_http(
     "git/moonbit",
     wants,
     caps,
-    depth~,
+    depth?,
     filter~,
     haves~,
     shallow~,
+    unshallow~,
   )
   let resp = upload_pack_request_with_http(remote, req, false, http_post)
   extract_pack_from_v0_response(resp)
@@ -172,7 +175,7 @@ pub async fn fetch_objects_with_http(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
-  depth : Int,
+  depth? : Int,
   filter : FilterSpec,
   http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
   http_post : async (String, Bytes, Map[String, String]) -> (
@@ -181,17 +184,19 @@ pub async fn fetch_objects_with_http(
   ) raise @bit.GitError,
   haves? : Array[@bit.ObjectId] = [],
   shallow? : Array[@bit.ObjectId] = [],
+  unshallow? : Bool = false,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   let pack = fetch_pack_with_http(
     remote,
     wants,
     prefer_v2,
-    depth,
     filter,
     http_get,
     http_post,
+    depth?,
     haves~,
     shallow~,
+    unshallow~,
   )
   @pack.parse_packfile(pack)
 }
@@ -212,8 +217,15 @@ pub async fn clone_with_http(
     remote, prefer_v2, http_get, http_post,
   )
   let wants = select_default_wants(refs, symrefs)
+  let fetch_depth = if depth > 0 { Some(depth) } else { None }
   let pack = fetch_pack_with_http(
-    remote, wants, prefer_v2, depth, filter, http_get, http_post,
+    remote,
+    wants,
+    prefer_v2,
+    filter,
+    http_get,
+    http_post,
+    depth?=fetch_depth,
   )
   let objects = @pack.parse_packfile(pack)
   (refs, objects)
@@ -247,8 +259,15 @@ pub async fn clone_to_fs_with_http(
     return refs
   }
   let objects = {
+    let fetch_depth = if depth > 0 { Some(depth) } else { None }
     let pack = fetch_pack_with_http(
-      remote, wants, prefer_v2, depth, filter, http_get, http_post,
+      remote,
+      wants,
+      prefer_v2,
+      filter,
+      http_get,
+      http_post,
+      depth?=fetch_depth,
     )
     let pack_id = read_pack_trailer_id_http(pack)
     let objects = @pack.parse_packfile(pack)

@@ -3175,29 +3175,29 @@ async fn fetch_from_remote(
         None => []
       }
       let shallow = read_fetch_shallow_boundaries(fs, git_dir)
-      // Git represents --unshallow as an effectively unlimited deepen
-      // request while reporting the repository's current shallow boundary.
-      let request_depth = if unshallow { 0x7fffffff } else { depth }
+      let request_depth = if depth > 0 { Some(depth) } else { None }
       let pack = match transport {
         UploadPackTransport::Http =>
           @bitnative.fetch_pack_http(
             remote_url,
             [commit_id],
             true,
-            depth=request_depth,
+            depth?=request_depth,
             filter~,
             haves~,
             shallow~,
+            unshallow~,
           )
         UploadPackTransport::Process =>
           @bitnative.fetch_pack_process(
             remote_url,
             [commit_id],
             true,
-            depth=request_depth,
+            depth?=request_depth,
             filter~,
             haves~,
             shallow~,
+            unshallow~,
           )
       }
       if pack.length() > 0 {

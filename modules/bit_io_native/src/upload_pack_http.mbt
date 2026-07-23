@@ -10,7 +10,7 @@ fn remote_uses_http_transport(remote : String) -> Bool {
 
 ///|
 fn ensure_process_transport_options(
-  depth : Int,
+  depth : Int?,
   filter : @protocol.FilterSpec,
 ) -> Unit {
   ignore(depth)
@@ -62,26 +62,29 @@ pub async fn discover_upload_refs_http(
 }
 
 ///|
+/// Fetch a pack, optionally deepening or explicitly unshallowing the repository.
 pub async fn fetch_pack_http(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
-  depth? : Int = 0,
+  depth? : Int,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
   haves? : Array[@bit.ObjectId] = [],
   shallow? : Array[@bit.ObjectId] = [],
+  unshallow? : Bool = false,
 ) -> Bytes raise @bit.GitError {
   if remote_uses_http_transport(remote) {
     fetch_pack_with_http(
       remote,
       wants,
       prefer_v2,
-      depth,
       filter,
       native_http_get,
       native_http_post,
+      depth?,
       haves~,
       shallow~,
+      unshallow~,
     )
   } else {
     ensure_process_transport_options(depth, filter)
@@ -89,10 +92,11 @@ pub async fn fetch_pack_http(
       remote,
       wants,
       prefer_v2,
-      depth~,
+      depth?,
       filter~,
       haves~,
       shallow~,
+      unshallow~,
     )
   }
 }
@@ -102,22 +106,24 @@ pub async fn fetch_objects_http(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
-  depth? : Int = 0,
+  depth? : Int,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
   haves? : Array[@bit.ObjectId] = [],
   shallow? : Array[@bit.ObjectId] = [],
+  unshallow? : Bool = false,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   if remote_uses_http_transport(remote) {
     fetch_objects_with_http(
       remote,
       wants,
       prefer_v2,
-      depth,
       filter,
       native_http_get,
       native_http_post,
+      depth?,
       haves~,
       shallow~,
+      unshallow~,
     )
   } else {
     ensure_process_transport_options(depth, filter)
@@ -125,10 +131,11 @@ pub async fn fetch_objects_http(
       remote,
       wants,
       prefer_v2,
-      depth~,
+      depth?,
       filter~,
       haves~,
       shallow~,
+      unshallow~,
     )
   }
 }
@@ -145,7 +152,8 @@ pub async fn clone_http(
       remote, prefer_v2, depth, filter, native_http_get, native_http_post,
     )
   } else {
-    ensure_process_transport_options(depth, filter)
+    let fetch_depth = if depth > 0 { Some(depth) } else { None }
+    ensure_process_transport_options(fetch_depth, filter)
     clone_process(remote, prefer_v2, depth~, filter~)
   }
 }
@@ -176,7 +184,8 @@ pub async fn clone_http_to_fs(
       no_checkout~,
     )
   } else {
-    ensure_process_transport_options(depth, filter)
+    let fetch_depth = if depth > 0 { Some(depth) } else { None }
+    ensure_process_transport_options(fetch_depth, filter)
     clone_process_to_fs(
       remote,
       prefer_v2,

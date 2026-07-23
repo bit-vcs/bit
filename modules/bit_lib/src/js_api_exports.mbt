@@ -2570,11 +2570,11 @@ pub async fn js_clone_remote(
       }
       Some((refname, commit_id)) => {
         if wants.length() > 0 {
+          let fetch_depth = if depth > 0 { Some(depth) } else { None }
           let pack = @bitnative.fetch_pack_with_http(
             remote_url,
             wants,
             prefer_v2,
-            depth,
             @protocol.FilterSpec::NoFilter,
             async fn(
               url : String,
@@ -2589,6 +2589,7 @@ pub async fn js_clone_remote(
             ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
               js_transport_post(transport_id, url, body, headers)
             },
+            depth?=fetch_depth,
           )
           let objects = @pack.parse_packfile(pack)
           let git_dir = join_path(root, ".git")
@@ -2671,11 +2672,11 @@ pub async fn js_fetch_remote(
     match js_select_fetch_target(refs, symrefs, refspec) {
       None => { status: "empty", commit_id: "", refname: "", remote_ref: "" }
       Some((refname, commit_id)) => {
+        let fetch_depth = if depth > 0 { Some(depth) } else { None }
         let pack = @bitnative.fetch_pack_with_http(
           remote_url,
           [commit_id],
           prefer_v2,
-          depth,
           @protocol.FilterSpec::NoFilter,
           async fn(
             url : String,
@@ -2690,6 +2691,7 @@ pub async fn js_fetch_remote(
           ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
             js_transport_post(transport_id, url, body, headers)
           },
+          depth?=fetch_depth,
         )
         let objects = @pack.parse_packfile(pack)
         @bit.FileSystem::mkdir_p(fs, join_path(git_dir, "objects/pack"))
