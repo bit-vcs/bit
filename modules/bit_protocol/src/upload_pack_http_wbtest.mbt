@@ -90,6 +90,7 @@ async test "upload-pack http: fetch-pack works with injected transport" {
     "git@github.com:user/repo.git",
     [@bit.ObjectId::from_hex(upload_pack_http_fixture_commit)],
     true,
+    0,
     FilterSpec::NoFilter,
     async fn(
       url : String,
@@ -128,7 +129,6 @@ async test "upload-pack http: fetch-pack works with injected transport" {
     },
     haves=[have],
     shallow=[shallow],
-    unshallow=true,
   )
   let objects = @pack.parse_packfile(pack)
   let store = @bit.ObjectStore::from_pack(objects)
@@ -147,7 +147,6 @@ async test "upload-pack http: fetch-pack works with injected transport" {
   assert_true(
     fetch_request.contains("have 88e38705fdbd3608cddbe904b67c731f3234c45b\n"),
   )
-  assert_true(fetch_request.contains("deepen 2147483647\n"))
 }
 
 ///|

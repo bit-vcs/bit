@@ -259,23 +259,18 @@ pub fn FilterSpec::is_partial(self : FilterSpec) -> Bool {
 }
 
 ///|
-const GIT_UNSHALLOW_DEPTH : Int = 0x7fff_ffff
-
-///|
 /// Build a fetch request for protocol v2.
-/// - depth: deepen a shallow repository by this many commits
-/// - unshallow: request the complete history
+/// - depth > 0: shallow clone with that depth
 /// - filter: partial clone filter specification
 /// - haves: commit tips already present locally
 /// - shallow: local commits whose parents are not present
 pub fn build_fetch_request_v2(
   agent : String,
   wants : Array[@bit.ObjectId],
-  depth? : Int,
+  depth : Int,
   filter? : FilterSpec = FilterSpec::NoFilter,
   haves? : Array[@bit.ObjectId] = [],
   shallow? : Array[@bit.ObjectId] = [],
-  unshallow? : Bool = false,
 ) -> Bytes {
   let chunks : Array[Bytes] = []
   chunks.push(pktline_encode("command=fetch\n"))
@@ -292,10 +287,8 @@ pub fn build_fetch_request_v2(
   for id in shallow {
     chunks.push(pktline_encode("shallow \{id.to_hex()}\n"))
   }
-  let request_depth = if unshallow { Some(GIT_UNSHALLOW_DEPTH) } else { depth }
-  match request_depth {
-    Some(value) if value > 0 => chunks.push(pktline_encode("deepen \{value}\n"))
-    _ => ()
+  if depth > 0 {
+    chunks.push(pktline_encode("deepen \{depth}\n"))
   }
   // Partial clone filter
   if filter.is_partial() {
@@ -317,26 +310,19 @@ pub fn build_fetch_request_v2(
 ///
 /// Protocol v1 changes reference advertisement, but uses the v0 request
 /// grammar. Capabilities and extension lines are emitted only when advertised.
-/// `depth` requests bounded deepening; `unshallow` requests complete history.
 pub fn build_fetch_request_v0(
   agent : String,
   wants : Array[@bit.ObjectId],
   advertised : Array[String],
-  depth? : Int,
+  depth? : Int = 0,
   filter? : FilterSpec = FilterSpec::NoFilter,
   haves? : Array[@bit.ObjectId] = [],
   shallow? : Array[@bit.ObjectId] = [],
-  unshallow? : Bool = false,
 ) -> Bytes {
   if wants.length() == 0 {
     return pktline_flush()
   }
-  let request_depth = if unshallow { Some(GIT_UNSHALLOW_DEPTH) } else { depth }
-  let has_depth = match request_depth {
-    Some(value) => value > 0
-    None => false
-  }
-  let uses_shallow = shallow.length() > 0 || has_depth
+  let uses_shallow = shallow.length() > 0 || depth > 0
   let caps = select_v0_caps(
     agent,
     advertised,
@@ -358,10 +344,8 @@ pub fn build_fetch_request_v0(
     for id in shallow {
       chunks.push(pktline_encode("shallow \{id.to_hex()}\n"))
     }
-    match request_depth {
-      Some(value) if value > 0 =>
-        chunks.push(pktline_encode("deepen \{value}\n"))
-      _ => ()
+    if depth > 0 {
+      chunks.push(pktline_encode("deepen \{depth}\n"))
     }
   }
   if filter.is_partial() && advertised.contains("filter") {

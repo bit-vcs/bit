@@ -2755,7 +2755,12 @@ async fn fetch_submodule_objects(
     }
     None => ()
   }
-  let pack = @bitnative.fetch_pack_http(url, [target_id], true, depth?)
+  let pack = @bitnative.fetch_pack_http(
+    url,
+    [target_id],
+    true,
+    depth=depth.unwrap_or(0),
+  )
   let objects = @pack.parse_packfile(pack)
   @pack.write_packfile_with_index(fs, modules_dir, pack, objects)
 }

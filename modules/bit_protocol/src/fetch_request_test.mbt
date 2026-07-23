@@ -25,7 +25,7 @@ test "build protocol v2 fetch request with negotiation and shallow state" {
     build_fetch_request_v2(
       "git/moonbit",
       [want],
-      depth=3,
+      3,
       filter=FilterSpec::BlobNone,
       haves=[have],
       shallow=[shallow],
@@ -100,26 +100,4 @@ test "build protocol v0 or v1 fetch request falls back to small sideband" {
     lines[0],
     "want ce013625030ba8dba906f756967f9e9ca394464a side-band\n",
   )
-}
-
-///|
-test "fetch request depth is optional and unshallow is explicit" {
-  let want = @bit.ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
-  let shallow = @bit.ObjectId::from_hex(
-    "cc628ccd10742baea8241c5924df992b5c019f71",
-  )
-  let regular = fetch_request_lines(
-    build_fetch_request_v2("git/moonbit", [want], shallow=[shallow]),
-  )
-  assert_false(regular.any(line => line.has_prefix("deepen ")))
-  let unshallow = fetch_request_lines(
-    build_fetch_request_v0(
-      "git/moonbit",
-      [want],
-      ["shallow"],
-      shallow=[shallow],
-      unshallow=true,
-    ),
-  )
-  assert_true(unshallow.contains("deepen 2147483647\n"))
 }

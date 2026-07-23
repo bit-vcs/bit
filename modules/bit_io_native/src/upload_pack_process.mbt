@@ -1127,16 +1127,14 @@ pub async fn discover_upload_refs_process(
 }
 
 ///|
-/// Fetch a pack, optionally deepening or explicitly unshallowing the repository.
 pub async fn fetch_pack_process(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
-  depth? : Int,
+  depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
   haves? : Array[@bit.ObjectId] = [],
   shallow? : Array[@bit.ObjectId] = [],
-  unshallow? : Bool = false,
 ) -> Bytes raise @bit.GitError {
   let (refs, caps, version, _symrefs) = discover_upload_refs_process(
     remote, prefer_v2,
@@ -1155,11 +1153,10 @@ pub async fn fetch_pack_process(
     let req = @protocol.build_fetch_request_v2(
       "git/moonbit",
       wants,
-      depth?,
+      depth,
       filter~,
       haves~,
       shallow~,
-      unshallow~,
     )
     let resp = upload_pack_request_process(remote, req, true)
     let pack = @protocol.extract_pack_from_v2_response(resp)
@@ -1170,11 +1167,10 @@ pub async fn fetch_pack_process(
     "git/moonbit",
     wants,
     caps,
-    depth?,
+    depth~,
     filter~,
     haves~,
     shallow~,
-    unshallow~,
   )
   let resp = upload_pack_request_process(remote, req, false)
   let pack = @protocol.extract_pack_from_v0_response(resp)
@@ -1187,21 +1183,19 @@ pub async fn fetch_objects_process(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
-  depth? : Int,
+  depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
   haves? : Array[@bit.ObjectId] = [],
   shallow? : Array[@bit.ObjectId] = [],
-  unshallow? : Bool = false,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   let pack = fetch_pack_process(
     remote,
     wants,
     prefer_v2,
-    depth?,
+    depth~,
     filter~,
     haves~,
     shallow~,
-    unshallow~,
   )
   @pack.parse_packfile(pack)
 }
@@ -1217,14 +1211,7 @@ pub async fn clone_process(
     remote, prefer_v2,
   )
   let wants = @protocol.select_default_wants(refs, symrefs)
-  let fetch_depth = if depth > 0 { Some(depth) } else { None }
-  let pack = fetch_pack_process(
-    remote,
-    wants,
-    prefer_v2,
-    depth?=fetch_depth,
-    filter~,
-  )
+  let pack = fetch_pack_process(remote, wants, prefer_v2, depth~, filter~)
   let objects = @pack.parse_packfile(pack)
   (refs, objects)
 }
@@ -1252,14 +1239,7 @@ pub async fn clone_process_to_fs(
   if wants.length() == 0 {
     return refs
   }
-  let fetch_depth = if depth > 0 { Some(depth) } else { None }
-  let pack = fetch_pack_process(
-    remote,
-    wants,
-    prefer_v2,
-    depth?=fetch_depth,
-    filter~,
-  )
+  let pack = fetch_pack_process(remote, wants, prefer_v2, depth~, filter~)
   let objects = @pack.parse_packfile(pack)
   let git_dir = @bit.join_path(root, ".git")
   let pack_id = read_pack_trailer_id(pack)
