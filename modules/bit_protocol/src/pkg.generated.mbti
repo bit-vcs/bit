@@ -7,9 +7,9 @@ import {
 }
 
 // Values
-pub fn build_fetch_request_v0(String, Array[@bit_object.ObjectId], Array[String]) -> Bytes
+pub fn build_fetch_request_v0(String, Array[@bit_object.ObjectId], Array[String], depth? : Int, filter? : FilterSpec, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Bytes
 
-pub fn build_fetch_request_v2(String, Array[@bit_object.ObjectId], Int, filter? : FilterSpec) -> Bytes
+pub fn build_fetch_request_v2(String, Array[@bit_object.ObjectId], Int, filter? : FilterSpec, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Bytes
 
 pub fn build_ls_refs_request(String, Array[String]) -> Bytes
 
@@ -35,9 +35,9 @@ pub fn extract_pack_from_v0_response(Bytes) -> Bytes raise @bit_object.GitError
 
 pub fn extract_pack_from_v2_response(Bytes) -> Bytes raise @bit_object.GitError
 
-pub async fn fetch_objects_with_http(String, Array[@bit_object.ObjectId], Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> Array[@bit_object.PackObject] raise @bit_object.GitError
+pub async fn fetch_objects_with_http(String, Array[@bit_object.ObjectId], Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Array[@bit_object.PackObject] raise @bit_object.GitError
 
-pub async fn fetch_pack_with_http(String, Array[@bit_object.ObjectId], Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> Bytes raise @bit_object.GitError
+pub async fn fetch_pack_with_http(String, Array[@bit_object.ObjectId], Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Bytes raise @bit_object.GitError
 
 pub fn parse_ls_refs_response(Bytes) -> LsRefsResult raise @bit_object.GitError
 

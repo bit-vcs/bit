@@ -1,6 +1,28 @@
 ///| High-level push/pull over HTTP (async, native-only)
 
 ///|
+fn sync_read_shallow_boundaries(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Array[@bit.ObjectId] {
+  let path = sync_join_path(git_dir, "shallow")
+  if !fs.is_file(path) {
+    return []
+  }
+  let data = fs.read_file(path) catch { _ => Bytes::default() }
+  let boundaries : Array[@bit.ObjectId] = []
+  for line_view in @utf8.decode_lossy(data[:]).split("\n") {
+    let line = line_view.trim().to_owned()
+    if line.length() != 40 {
+      continue
+    }
+    let id = @bit.ObjectId::from_hex(line) catch { _ => continue }
+    boundaries.push(id)
+  }
+  boundaries
+}
+
+///|
 /// Clone a remote repository via HTTP.
 pub async fn clone_http(
   fs : &@bit.FileSystem,
@@ -71,12 +93,23 @@ pub async fn pull_http(
   match default_ref {
     None => return None
     Some((refname, commit_id)) => {
-      let pack = @bitnative.fetch_pack_http(remote, [commit_id], prefer_v2)
-      let objects = @pack.parse_packfile(pack)
       let git_dir = sync_join_path(root, ".git")
+      let remote_ref = sync_remote_refname(refname)
+      let haves = match @bitlib.resolve_ref(rfs, git_dir, remote_ref) {
+        Some(id) => [id]
+        None => []
+      }
+      let shallow = sync_read_shallow_boundaries(rfs, git_dir)
+      let pack = @bitnative.fetch_pack_http(
+        remote,
+        [commit_id],
+        prefer_v2,
+        haves~,
+        shallow~,
+      )
+      let objects = @pack.parse_packfile(pack)
       @pack.write_packfile_with_index(fs, git_dir, pack, objects)
       // update remote tracking ref
-      let remote_ref = sync_remote_refname(refname)
       let remote_path = sync_join_path(git_dir, remote_ref)
       let dir = sync_parent_dir(remote_path)
       fs.mkdir_p(dir)

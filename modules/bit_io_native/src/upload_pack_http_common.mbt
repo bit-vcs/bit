@@ -56,9 +56,19 @@ pub async fn fetch_pack_with_http(
     @bit.HttpResponse,
     Bytes,
   ) raise @bit.GitError,
+  haves? : Array[@bit.ObjectId] = [],
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> Bytes raise @bit.GitError {
   @protocol.fetch_pack_with_http(
-    remote, wants, prefer_v2, depth, filter, http_get, http_post,
+    remote,
+    wants,
+    prefer_v2,
+    depth,
+    filter,
+    http_get,
+    http_post,
+    haves~,
+    shallow~,
   )
 }
 
@@ -74,9 +84,19 @@ pub async fn fetch_objects_with_http(
     @bit.HttpResponse,
     Bytes,
   ) raise @bit.GitError,
+  haves? : Array[@bit.ObjectId] = [],
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   @protocol.fetch_objects_with_http(
-    remote, wants, prefer_v2, depth, filter, http_get, http_post,
+    remote,
+    wants,
+    prefer_v2,
+    depth,
+    filter,
+    http_get,
+    http_post,
+    haves~,
+    shallow~,
   )
 }
 

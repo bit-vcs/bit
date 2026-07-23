@@ -178,6 +178,25 @@ test "fetch relay: falls back to repo and then first peer" {
 }
 
 ///|
+test "fetch negotiation: reads shallow boundaries from repository metadata" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git")
+  fs.write_string(
+    "/repo/.git/shallow", "cc628ccd10742baea8241c5924df992b5c019f71\n\ninvalid\n88e38705fdbd3608cddbe904b67c731f3234c45b\n",
+  )
+  let boundaries = read_fetch_shallow_boundaries(fs, "/repo/.git")
+  @test.assert_eq(boundaries.length(), 2)
+  @test.assert_eq(
+    boundaries[0].to_hex(),
+    "cc628ccd10742baea8241c5924df992b5c019f71",
+  )
+  @test.assert_eq(
+    boundaries[1].to_hex(),
+    "88e38705fdbd3608cddbe904b67c731f3234c45b",
+  )
+}
+
+///|
 async test "fetch: depth and unshallow update shallow metadata natively" {
   @bitnative.init_native_io()
   let fs = OsFs::new()

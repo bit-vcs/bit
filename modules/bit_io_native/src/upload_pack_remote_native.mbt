@@ -46,9 +46,11 @@ pub async fn fetch_pack(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
+  haves? : Array[@bit.ObjectId] = [],
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> Bytes raise @bit.GitError {
   ensure_process_remote(remote)
-  fetch_pack_process(remote, wants, prefer_v2)
+  fetch_pack_process(remote, wants, prefer_v2, haves~, shallow~)
 }
 
 ///|
@@ -56,9 +58,11 @@ pub async fn fetch_objects(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
+  haves? : Array[@bit.ObjectId] = [],
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   ensure_process_remote(remote)
-  fetch_objects_process(remote, wants, prefer_v2)
+  fetch_objects_process(remote, wants, prefer_v2, haves~, shallow~)
 }
 
 ///|

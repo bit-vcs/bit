@@ -3064,6 +3064,28 @@ enum UploadPackTransport {
 }
 
 ///|
+fn read_fetch_shallow_boundaries(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> Array[@bitcore.ObjectId] {
+  let path = git_dir + "/shallow"
+  if !fs.is_file(path) {
+    return []
+  }
+  let content = decode_bytes(fs.read_file(path) catch { _ => Bytes::default() })
+  let boundaries : Array[@bitcore.ObjectId] = []
+  for line_view in content.split("\n") {
+    let line = line_view.trim().to_owned()
+    if line.length() != 40 {
+      continue
+    }
+    let id = @bitcore.ObjectId::from_hex(line) catch { _ => continue }
+    boundaries.push(id)
+  }
+  boundaries
+}
+
+///|
 fn resolve_upload_pack_transport(remote_url : String) -> UploadPackTransport {
   let remote_spec = @protocol.parse_remote(remote_url)
   if remote_spec.kind == @protocol.RemoteKind::Http {
@@ -3148,22 +3170,34 @@ async fn fetch_from_remote(
       if !quiet {
         print_line("Fetching from \{remote_url}...")
       }
+      let haves = match prev_id {
+        Some(id) => [id]
+        None => []
+      }
+      let shallow = read_fetch_shallow_boundaries(fs, git_dir)
+      // Git represents --unshallow as an effectively unlimited deepen
+      // request while reporting the repository's current shallow boundary.
+      let request_depth = if unshallow { 0x7fffffff } else { depth }
       let pack = match transport {
         UploadPackTransport::Http =>
           @bitnative.fetch_pack_http(
             remote_url,
             [commit_id],
             true,
-            depth=if unshallow { 0 } else { depth },
+            depth=request_depth,
             filter~,
+            haves~,
+            shallow~,
           )
         UploadPackTransport::Process =>
           @bitnative.fetch_pack_process(
             remote_url,
             [commit_id],
             true,
-            depth=if unshallow { 0 } else { depth },
+            depth=request_depth,
             filter~,
+            haves~,
+            shallow~,
           )
       }
       if pack.length() > 0 {

@@ -79,8 +79,13 @@ async test "upload-pack http: fetch-pack works with injected transport" {
   let adv = upload_pack_http_hex_to_bytes(upload_pack_http_adv_v2_hex)
   let lsrefs = upload_pack_http_hex_to_bytes(upload_pack_http_lsrefs_hex)
   let fetch = upload_pack_http_hex_to_bytes(upload_pack_http_fetch_hex)
+  let have = @bit.ObjectId::from_hex("88e38705fdbd3608cddbe904b67c731f3234c45b")
+  let shallow = @bit.ObjectId::from_hex(
+    "cc628ccd10742baea8241c5924df992b5c019f71",
+  )
   let get_calls : Array[String] = []
   let post_calls : Array[String] = []
+  let mut fetch_request = ""
   let pack = fetch_pack_with_http(
     "git@github.com:user/repo.git",
     [@bit.ObjectId::from_hex(upload_pack_http_fixture_commit)],
@@ -117,10 +122,13 @@ async test "upload-pack http: fetch-pack works with injected transport" {
         return (@bit.HttpResponse::new(200), lsrefs)
       }
       if text.contains("command=fetch") || text.contains("want ") {
+        fetch_request = text
         return (@bit.HttpResponse::new(200), fetch)
       }
       raise @bit.GitError::ProtocolError("unexpected request body")
     },
+    haves=[have],
+    shallow=[shallow],
   )
   let objects = @pack.parse_packfile(pack)
   let store = @bit.ObjectStore::from_pack(objects)
@@ -133,6 +141,12 @@ async test "upload-pack http: fetch-pack works with injected transport" {
   @test.assert_eq(post_calls, [
     "https://github.com/user/repo/git-upload-pack", "https://github.com/user/repo/git-upload-pack",
   ])
+  assert_true(
+    fetch_request.contains("shallow cc628ccd10742baea8241c5924df992b5c019f71\n"),
+  )
+  assert_true(
+    fetch_request.contains("have 88e38705fdbd3608cddbe904b67c731f3234c45b\n"),
+  )
 }
 
 ///|
