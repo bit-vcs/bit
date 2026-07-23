@@ -1,28 +1,6 @@
 ///| High-level push/pull over HTTP (async, native-only)
 
 ///|
-fn sync_read_shallow_boundaries(
-  fs : &@bit.RepoFileSystem,
-  git_dir : String,
-) -> Array[@bit.ObjectId] {
-  let path = sync_join_path(git_dir, "shallow")
-  if !fs.is_file(path) {
-    return []
-  }
-  let data = fs.read_file(path) catch { _ => Bytes::default() }
-  let boundaries : Array[@bit.ObjectId] = []
-  for line_view in @utf8.decode_lossy(data[:]).split("\n") {
-    let line = line_view.trim().to_owned()
-    if line.length() != 40 {
-      continue
-    }
-    let id = @bit.ObjectId::from_hex(line) catch { _ => continue }
-    boundaries.push(id)
-  }
-  boundaries
-}
-
-///|
 /// Clone a remote repository via HTTP.
 pub async fn clone_http(
   fs : &@bit.FileSystem,
@@ -86,6 +64,11 @@ pub async fn pull_http(
   prefer_v2 : Bool,
   rebase? : Bool = false,
 ) -> @bit.ObjectId? raise @bit.GitError {
+  let git_dir = sync_join_path(root, ".git")
+  // Repository access is synchronous by contract, so collect local
+  // negotiation state before starting the asynchronous network exchange.
+  let local_head = @bitlib.resolve_head_commit(rfs, git_dir)
+  let shallow = @repo.read_shallow_boundaries(rfs, git_dir)
   let (refs, _caps, _version, symrefs) = @bitnative.discover_upload_refs_http(
     remote, prefer_v2,
   )
@@ -93,13 +76,15 @@ pub async fn pull_http(
   match default_ref {
     None => return None
     Some((refname, commit_id)) => {
-      let git_dir = sync_join_path(root, ".git")
       let remote_ref = sync_remote_refname(refname)
       let haves = match @bitlib.resolve_ref(rfs, git_dir, remote_ref) {
         Some(id) => [id]
-        None => []
+        None =>
+          match local_head {
+            Some(id) => [id]
+            None => []
+          }
       }
-      let shallow = sync_read_shallow_boundaries(rfs, git_dir)
       let pack = @bitnative.fetch_pack_http(
         remote,
         [commit_id],

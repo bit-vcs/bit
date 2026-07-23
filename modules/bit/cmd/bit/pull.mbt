@@ -405,7 +405,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
                   None => []
                 }
             }
-            let shallow = read_fetch_shallow_boundaries(fs, git_dir)
+            let shallow = @repo.read_shallow_boundaries(fs, git_dir)
             let pack = @bitnative.fetch_pack_http(
               pull_url,
               [id],

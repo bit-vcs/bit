@@ -15,6 +15,17 @@ fn fetch_request_lines(data : Bytes) -> Array[String] raise @bit.GitError {
 }
 
 ///|
+fn fetch_response_concat(chunks : Array[Bytes]) -> Bytes {
+  let bytes : Array[Byte] = []
+  for chunk in chunks {
+    for byte in chunk {
+      bytes.push(byte)
+    }
+  }
+  Bytes::from_array(FixedArray::makei(bytes.length(), i => bytes[i]))
+}
+
+///|
 test "build protocol v2 fetch request with negotiation and shallow state" {
   let want = @bit.ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
   let have = @bit.ObjectId::from_hex("88e38705fdbd3608cddbe904b67c731f3234c45b")
@@ -100,4 +111,45 @@ test "build protocol v0 or v1 fetch request falls back to small sideband" {
     lines[0],
     "want ce013625030ba8dba906f756967f9e9ca394464a side-band\n",
   )
+}
+
+///|
+test "parse protocol v2 fetch response preserves shallow updates" {
+  let shallow = "cc628ccd10742baea8241c5924df992b5c019f71"
+  let unshallow = "88e38705fdbd3608cddbe904b67c731f3234c45b"
+  let response = fetch_response_concat([
+    pktline_encode("shallow-info\n"),
+    pktline_encode("shallow \{shallow}\n"),
+    pktline_encode("unshallow \{unshallow}\n"),
+    pktline_delim(),
+    pktline_encode("packfile\n"),
+    pktline_encode_bytes(Bytes::from_array([b'\x01', b'P', b'A', b'C', b'K'])),
+    pktline_flush(),
+  ])
+  let result = parse_fetch_response_v2(response)
+  @test.assert_eq(result.pack, b"PACK")
+  @test.assert_eq(result.shallow.length(), 1)
+  @test.assert_eq(result.shallow[0].to_hex(), shallow)
+  @test.assert_eq(result.unshallow.length(), 1)
+  @test.assert_eq(result.unshallow[0].to_hex(), unshallow)
+}
+
+///|
+test "parse protocol v0 or v1 fetch response preserves shallow updates" {
+  let shallow = "cc628ccd10742baea8241c5924df992b5c019f71"
+  let unshallow = "88e38705fdbd3608cddbe904b67c731f3234c45b"
+  let response = fetch_response_concat([
+    pktline_encode("shallow \{shallow}\n"),
+    pktline_encode("unshallow \{unshallow}\n"),
+    pktline_flush(),
+    pktline_encode("NAK\n"),
+    pktline_encode_bytes(Bytes::from_array([b'\x01', b'P', b'A', b'C', b'K'])),
+    pktline_flush(),
+  ])
+  let result = parse_fetch_response_v0(response)
+  @test.assert_eq(result.pack, b"PACK")
+  @test.assert_eq(result.shallow.length(), 1)
+  @test.assert_eq(result.shallow[0].to_hex(), shallow)
+  @test.assert_eq(result.unshallow.length(), 1)
+  @test.assert_eq(result.unshallow[0].to_hex(), unshallow)
 }

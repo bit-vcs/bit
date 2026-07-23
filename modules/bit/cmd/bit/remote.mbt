@@ -3064,28 +3064,6 @@ enum UploadPackTransport {
 }
 
 ///|
-fn read_fetch_shallow_boundaries(
-  fs : &@bitcore.RepoFileSystem,
-  git_dir : String,
-) -> Array[@bitcore.ObjectId] {
-  let path = git_dir + "/shallow"
-  if !fs.is_file(path) {
-    return []
-  }
-  let content = decode_bytes(fs.read_file(path) catch { _ => Bytes::default() })
-  let boundaries : Array[@bitcore.ObjectId] = []
-  for line_view in content.split("\n") {
-    let line = line_view.trim().to_owned()
-    if line.length() != 40 {
-      continue
-    }
-    let id = @bitcore.ObjectId::from_hex(line) catch { _ => continue }
-    boundaries.push(id)
-  }
-  boundaries
-}
-
-///|
 fn resolve_upload_pack_transport(remote_url : String) -> UploadPackTransport {
   let remote_spec = @protocol.parse_remote(remote_url)
   if remote_spec.kind == @protocol.RemoteKind::Http {
@@ -3174,13 +3152,13 @@ async fn fetch_from_remote(
         Some(id) => [id]
         None => []
       }
-      let shallow = read_fetch_shallow_boundaries(fs, git_dir)
+      let shallow = @repo.read_shallow_boundaries(fs, git_dir)
       // Git represents --unshallow as an effectively unlimited deepen
       // request while reporting the repository's current shallow boundary.
       let request_depth = if unshallow { 0x7fffffff } else { depth }
-      let pack = match transport {
+      let result = match transport {
         UploadPackTransport::Http =>
-          @bitnative.fetch_pack_http(
+          @bitnative.fetch_pack_http_result(
             remote_url,
             [commit_id],
             true,
@@ -3190,7 +3168,7 @@ async fn fetch_from_remote(
             shallow~,
           )
         UploadPackTransport::Process =>
-          @bitnative.fetch_pack_process(
+          @bitnative.fetch_pack_process_result(
             remote_url,
             [commit_id],
             true,
@@ -3200,6 +3178,7 @@ async fn fetch_from_remote(
             shallow~,
           )
       }
+      let pack = result.pack
       if pack.length() > 0 {
         let objects = @pack.parse_packfile(pack)
         @pack.write_packfile_with_index(fs, git_dir, pack, objects)
@@ -3224,18 +3203,13 @@ async fn fetch_from_remote(
           )
         }
       }
-      if unshallow {
-        fs.remove_file(shallow_path) catch {
-          err => {
-            if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
-              raise err
-            }
-            ()
-          }
-        }
-      } else if depth > 0 {
-        fs.write_string(shallow_path, commit_id.to_hex() + "\n")
-      }
+      @repo.apply_shallow_updates(
+        fs,
+        fs,
+        git_dir,
+        result.shallow,
+        result.unshallow,
+      )
       write_ref_file(fs, git_dir, remote_ref, commit_id)
       if !quiet {
         print_line("From \{remote_url}")

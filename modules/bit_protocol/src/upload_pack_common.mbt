@@ -361,10 +361,21 @@ pub fn build_fetch_request_v0(
 }
 
 ///|
-pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError {
+pub struct FetchPackResult {
+  pack : Bytes
+  shallow : Array[@bit.ObjectId]
+  unshallow : Array[@bit.ObjectId]
+}
+
+///|
+pub fn parse_fetch_response_v2(
+  data : Bytes,
+) -> FetchPackResult raise @bit.GitError {
   let lines = pktline_decode(data)
   let mut in_pack = false
   let chunks : Array[Byte] = []
+  let shallow : Array[@bit.ObjectId] = []
+  let unshallow : Array[@bit.ObjectId] = []
   for item in lines {
     let (line_bytes, is_flush) = item
     if is_flush {
@@ -378,6 +389,7 @@ pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError 
     }
     if !in_pack {
       let line = line_bytes |> bytes_to_string |> trim_newline
+      parse_shallow_response_line(line, shallow, unshallow)
       if line == "packfile" {
         in_pack = true
       }
@@ -403,20 +415,36 @@ pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError 
       raise @bit.GitError::ProtocolError("upload-pack error: \{msg}")
     }
   }
-  Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i]))
+  {
+    pack: Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i])),
+    shallow,
+    unshallow,
+  }
 }
 
 ///|
-pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @bit.GitError {
+pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError {
+  parse_fetch_response_v2(data).pack
+}
+
+///|
+pub fn parse_fetch_response_v0(
+  data : Bytes,
+) -> FetchPackResult raise @bit.GitError {
   let lines = pktline_decode(data)
   let chunks : Array[Byte] = []
+  let shallow : Array[@bit.ObjectId] = []
+  let unshallow : Array[@bit.ObjectId] = []
   for item in lines {
     let (line_bytes, is_flush) = item
     if is_flush || line_bytes.length() == 0 {
       continue
     }
     let channel = line_bytes[0].to_int()
-    if channel == 1 {
+    if channel == 's' || channel == 'u' {
+      let line = line_bytes |> bytes_to_string |> trim_newline
+      parse_shallow_response_line(line, shallow, unshallow)
+    } else if channel == 1 {
       for i in 1..<line_bytes.length() {
         chunks.push(line_bytes[i])
       }
@@ -434,7 +462,48 @@ pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @bit.GitError 
       raise @bit.GitError::ProtocolError("upload-pack error: \{msg}")
     }
   }
-  Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i]))
+  {
+    pack: Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i])),
+    shallow,
+    unshallow,
+  }
+}
+
+///|
+pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @bit.GitError {
+  parse_fetch_response_v0(data).pack
+}
+
+///|
+fn parse_shallow_response_line(
+  line : String,
+  shallow : Array[@bit.ObjectId],
+  unshallow : Array[@bit.ObjectId],
+) -> Unit raise @bit.GitError {
+  let (prefix, output) = if line.has_prefix("shallow ") {
+    ("shallow ", shallow)
+  } else if line.has_prefix("unshallow ") {
+    ("unshallow ", unshallow)
+  } else {
+    return
+  }
+  let hex = String::unsafe_substring(
+    line,
+    start=prefix.length(),
+    end=line.length(),
+  )
+  if hex.length() != 40 {
+    raise @bit.GitError::ProtocolError(
+      "Invalid upload-pack shallow object id: \{hex}",
+    )
+  }
+  let id = @bit.ObjectId::from_hex(hex) catch {
+    _ =>
+      raise @bit.GitError::ProtocolError(
+        "Invalid upload-pack shallow object id: \{hex}",
+      )
+  }
+  output.push(id)
 }
 
 ///|

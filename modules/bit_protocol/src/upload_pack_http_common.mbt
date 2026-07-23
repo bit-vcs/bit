@@ -115,7 +115,7 @@ fn normalize_remote_for_http_transport(
 }
 
 ///|
-pub async fn fetch_pack_with_http(
+pub async fn fetch_pack_with_http_result(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
@@ -128,7 +128,7 @@ pub async fn fetch_pack_with_http(
   ) raise @bit.GitError,
   haves? : Array[@bit.ObjectId] = [],
   shallow? : Array[@bit.ObjectId] = [],
-) -> Bytes raise @bit.GitError {
+) -> FetchPackResult raise @bit.GitError {
   let (refs, caps, version, _symrefs) = discover_upload_refs_with_http(
     remote, prefer_v2, http_get, http_post,
   )
@@ -152,7 +152,7 @@ pub async fn fetch_pack_with_http(
       shallow~,
     )
     let resp = upload_pack_request_with_http(remote, req, true, http_post)
-    return extract_pack_from_v2_response(resp)
+    return parse_fetch_response_v2(resp)
   }
   let req = build_fetch_request_v0(
     "git/moonbit",
@@ -164,7 +164,35 @@ pub async fn fetch_pack_with_http(
     shallow~,
   )
   let resp = upload_pack_request_with_http(remote, req, false, http_post)
-  extract_pack_from_v0_response(resp)
+  parse_fetch_response_v0(resp)
+}
+
+///|
+pub async fn fetch_pack_with_http(
+  remote : String,
+  wants : Array[@bit.ObjectId],
+  prefer_v2 : Bool,
+  depth : Int,
+  filter : FilterSpec,
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
+  http_post : async (String, Bytes, Map[String, String]) -> (
+    @bit.HttpResponse,
+    Bytes,
+  ) raise @bit.GitError,
+  haves? : Array[@bit.ObjectId] = [],
+  shallow? : Array[@bit.ObjectId] = [],
+) -> Bytes raise @bit.GitError {
+  fetch_pack_with_http_result(
+    remote,
+    wants,
+    prefer_v2,
+    depth,
+    filter,
+    http_get,
+    http_post,
+    haves~,
+    shallow~,
+  ).pack
 }
 
 ///|

@@ -1127,7 +1127,7 @@ pub async fn discover_upload_refs_process(
 }
 
 ///|
-pub async fn fetch_pack_process(
+pub async fn fetch_pack_process_result(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
@@ -1135,7 +1135,7 @@ pub async fn fetch_pack_process(
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
   haves? : Array[@bit.ObjectId] = [],
   shallow? : Array[@bit.ObjectId] = [],
-) -> Bytes raise @bit.GitError {
+) -> @protocol.FetchPackResult raise @bit.GitError {
   let (refs, caps, version, _symrefs) = discover_upload_refs_process(
     remote, prefer_v2,
   )
@@ -1159,9 +1159,9 @@ pub async fn fetch_pack_process(
       shallow~,
     )
     let resp = upload_pack_request_process(remote, req, true)
-    let pack = @protocol.extract_pack_from_v2_response(resp)
-    maybe_trace_packfile(pack)
-    return pack
+    let result = @protocol.parse_fetch_response_v2(resp)
+    maybe_trace_packfile(result.pack)
+    return result
   }
   let req = @protocol.build_fetch_request_v0(
     "git/moonbit",
@@ -1173,9 +1173,30 @@ pub async fn fetch_pack_process(
     shallow~,
   )
   let resp = upload_pack_request_process(remote, req, false)
-  let pack = @protocol.extract_pack_from_v0_response(resp)
-  maybe_trace_packfile(pack)
-  pack
+  let result = @protocol.parse_fetch_response_v0(resp)
+  maybe_trace_packfile(result.pack)
+  result
+}
+
+///|
+pub async fn fetch_pack_process(
+  remote : String,
+  wants : Array[@bit.ObjectId],
+  prefer_v2 : Bool,
+  depth? : Int = 0,
+  filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
+  haves? : Array[@bit.ObjectId] = [],
+  shallow? : Array[@bit.ObjectId] = [],
+) -> Bytes raise @bit.GitError {
+  fetch_pack_process_result(
+    remote,
+    wants,
+    prefer_v2,
+    depth~,
+    filter~,
+    haves~,
+    shallow~,
+  ).pack
 }
 
 ///|

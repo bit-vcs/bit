@@ -62,7 +62,7 @@ pub async fn discover_upload_refs_http(
 }
 
 ///|
-pub async fn fetch_pack_http(
+pub async fn fetch_pack_http_result(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
@@ -70,9 +70,9 @@ pub async fn fetch_pack_http(
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
   haves? : Array[@bit.ObjectId] = [],
   shallow? : Array[@bit.ObjectId] = [],
-) -> Bytes raise @bit.GitError {
+) -> @protocol.FetchPackResult raise @bit.GitError {
   if remote_uses_http_transport(remote) {
-    fetch_pack_with_http(
+    fetch_pack_with_http_result(
       remote,
       wants,
       prefer_v2,
@@ -85,7 +85,7 @@ pub async fn fetch_pack_http(
     )
   } else {
     ensure_process_transport_options(depth, filter)
-    fetch_pack_process(
+    fetch_pack_process_result(
       remote,
       wants,
       prefer_v2,
@@ -95,6 +95,27 @@ pub async fn fetch_pack_http(
       shallow~,
     )
   }
+}
+
+///|
+pub async fn fetch_pack_http(
+  remote : String,
+  wants : Array[@bit.ObjectId],
+  prefer_v2 : Bool,
+  depth? : Int = 0,
+  filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
+  haves? : Array[@bit.ObjectId] = [],
+  shallow? : Array[@bit.ObjectId] = [],
+) -> Bytes raise @bit.GitError {
+  fetch_pack_http_result(
+    remote,
+    wants,
+    prefer_v2,
+    depth~,
+    filter~,
+    haves~,
+    shallow~,
+  ).pack
 }
 
 ///|
