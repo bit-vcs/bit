@@ -849,6 +849,29 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         None => false
       }
   }
+  // Require a clean worktree/index before starting a new rebase, unless
+  // --autostash (or rebase.autoStash) will stash the dirty state for us.
+  if !autostash {
+    let pre_status = @bitlib.status(rfs, root)
+    let unstaged_dirty = pre_status.unstaged_modified.length() > 0 ||
+      pre_status.unstaged_deleted.length() > 0
+    let staged_dirty = pre_status.staged_added.length() > 0 ||
+      pre_status.staged_modified.length() > 0 ||
+      pre_status.staged_deleted.length() > 0
+    if unstaged_dirty || staged_dirty {
+      let mut message = "cannot rebase: "
+      if unstaged_dirty {
+        message += "You have unstaged changes.\n"
+        if staged_dirty {
+          message += "additionally, your index contains uncommitted changes.\n"
+        }
+      } else {
+        message += "Your index contains uncommitted changes.\n"
+      }
+      message += "Please commit or stash them."
+      raise @bitcore.GitError::InvalidObject(message)
+    }
+  }
   // Autostash: save dirty state before rebase
   let mut autostash_oid : @bitcore.ObjectId? = None
   if autostash {
