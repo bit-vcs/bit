@@ -64,6 +64,11 @@ pub async fn pull_http(
   prefer_v2 : Bool,
   rebase? : Bool = false,
 ) -> @bit.ObjectId? raise @bit.GitError {
+  let git_dir = sync_join_path(root, ".git")
+  // Repository access is synchronous by contract, so collect local
+  // negotiation state before starting the asynchronous network exchange.
+  let local_head = @bitlib.resolve_head_commit(rfs, git_dir)
+  let shallow = @repo.read_shallow_boundaries(rfs, git_dir)
   let (refs, _caps, _version, symrefs) = @bitnative.discover_upload_refs_http(
     remote, prefer_v2,
   )
@@ -71,12 +76,25 @@ pub async fn pull_http(
   match default_ref {
     None => return None
     Some((refname, commit_id)) => {
-      let pack = @bitnative.fetch_pack_http(remote, [commit_id], prefer_v2)
+      let remote_ref = sync_remote_refname(refname)
+      let haves = match @bitlib.resolve_ref(rfs, git_dir, remote_ref) {
+        Some(id) => [id]
+        None =>
+          match local_head {
+            Some(id) => [id]
+            None => []
+          }
+      }
+      let pack = @bitnative.fetch_pack_http(
+        remote,
+        [commit_id],
+        prefer_v2,
+        haves~,
+        shallow~,
+      )
       let objects = @pack.parse_packfile(pack)
-      let git_dir = sync_join_path(root, ".git")
       @pack.write_packfile_with_index(fs, git_dir, pack, objects)
       // update remote tracking ref
-      let remote_ref = sync_remote_refname(refname)
       let remote_path = sync_join_path(git_dir, remote_ref)
       let dir = sync_parent_dir(remote_path)
       fs.mkdir_p(dir)

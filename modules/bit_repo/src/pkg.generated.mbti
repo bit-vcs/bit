@@ -7,6 +7,8 @@ import {
 }
 
 // Values
+pub fn apply_shallow_updates(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[@bit_object.ObjectId], Array[@bit_object.ObjectId]) -> Unit raise @bit_object.GitError
+
 pub fn checkout_commit(ObjectStore, @bit_object.ObjectId) -> Map[String, Bytes] raise @bit_object.GitError
 
 pub fn checkout_commit_to_fs(ObjectStore, @bit_object.ObjectId, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
@@ -24,6 +26,8 @@ pub fn parent_dir(String) -> String
 pub fn parse_commit(Bytes) -> CommitInfo raise @bit_object.GitError
 
 pub fn parse_tree(Bytes) -> Array[@bit_object.TreeEntry] raise @bit_object.GitError
+
+pub fn read_shallow_boundaries(&@bit_types.RepoFileSystem, String) -> Array[@bit_object.ObjectId]
 
 pub fn verify_tree_entry_name(String) -> Unit raise @bit_object.GitError
 

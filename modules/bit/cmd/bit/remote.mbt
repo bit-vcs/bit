@@ -3148,24 +3148,37 @@ async fn fetch_from_remote(
       if !quiet {
         print_line("Fetching from \{remote_url}...")
       }
-      let pack = match transport {
+      let haves = match prev_id {
+        Some(id) => [id]
+        None => []
+      }
+      let shallow = @repo.read_shallow_boundaries(fs, git_dir)
+      // Git represents --unshallow as an effectively unlimited deepen
+      // request while reporting the repository's current shallow boundary.
+      let request_depth = if unshallow { 0x7fffffff } else { depth }
+      let result = match transport {
         UploadPackTransport::Http =>
-          @bitnative.fetch_pack_http(
+          @bitnative.fetch_pack_http_result(
             remote_url,
             [commit_id],
             true,
-            depth=if unshallow { 0 } else { depth },
+            depth=request_depth,
             filter~,
+            haves~,
+            shallow~,
           )
         UploadPackTransport::Process =>
-          @bitnative.fetch_pack_process(
+          @bitnative.fetch_pack_process_result(
             remote_url,
             [commit_id],
             true,
-            depth=if unshallow { 0 } else { depth },
+            depth=request_depth,
             filter~,
+            haves~,
+            shallow~,
           )
       }
+      let pack = result.pack
       if pack.length() > 0 {
         let objects = @pack.parse_packfile(pack)
         @pack.write_packfile_with_index(fs, git_dir, pack, objects)
@@ -3190,18 +3203,13 @@ async fn fetch_from_remote(
           )
         }
       }
-      if unshallow {
-        fs.remove_file(shallow_path) catch {
-          err => {
-            if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
-              raise err
-            }
-            ()
-          }
-        }
-      } else if depth > 0 {
-        fs.write_string(shallow_path, commit_id.to_hex() + "\n")
-      }
+      @repo.apply_shallow_updates(
+        fs,
+        fs,
+        git_dir,
+        result.shallow,
+        result.unshallow,
+      )
       write_ref_file(fs, git_dir, remote_ref, commit_id)
       if !quiet {
         print_line("From \{remote_url}")

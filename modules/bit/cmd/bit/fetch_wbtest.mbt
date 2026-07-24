@@ -201,6 +201,11 @@ async test "fetch: depth and unshallow update shallow metadata natively" {
   commit_wbtest_run_git(src, ["commit", "-q", "-m", "one"])
   fs.write_string(src + "/file.txt", "two\n")
   commit_wbtest_run_git(src, ["commit", "-q", "-am", "two"])
+  fs.write_string(src + "/file.txt", "three\n")
+  commit_wbtest_run_git(src, ["commit", "-q", "-am", "three"])
+  let expected_boundary = trim_string(
+    add_test_git_stdout(src, ["rev-parse", "HEAD^"]),
+  )
   commit_wbtest_run_git(dst, ["init", "--initial-branch=main", "-q"])
   let remote_url = "file://" + src
   let git_dir = dst + "/.git"
@@ -212,12 +217,14 @@ async test "fetch: depth and unshallow update shallow metadata natively" {
     remote_url,
     [],
     force_transport=true,
-    depth=1,
+    depth=2,
     quiet=true,
   )
   assert_true(fs.is_file(git_dir + "/shallow"))
-  let shallow = decode_bytes(fs.read_file(git_dir + "/shallow"))
-  assert_true(shallow.length() > 0)
+  @test.assert_eq(
+    trim_string(decode_bytes(fs.read_file(git_dir + "/shallow"))),
+    expected_boundary,
+  )
   fetch_from_remote(
     fs,
     git_dir,
@@ -236,7 +243,7 @@ async test "fetch: depth and unshallow update shallow metadata natively" {
         "rev-list", "--count", "refs/remotes/origin/main",
       ]),
     ),
-    "2",
+    "3",
   )
   cleanup_tree(fs, root)
 }

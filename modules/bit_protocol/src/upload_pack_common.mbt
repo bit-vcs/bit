@@ -262,20 +262,31 @@ pub fn FilterSpec::is_partial(self : FilterSpec) -> Bool {
 /// Build a fetch request for protocol v2.
 /// - depth > 0: shallow clone with that depth
 /// - filter: partial clone filter specification
+/// - haves: commit tips already present locally
+/// - shallow: local commits whose parents are not present
 pub fn build_fetch_request_v2(
   agent : String,
   wants : Array[@bit.ObjectId],
   depth : Int,
   filter? : FilterSpec = FilterSpec::NoFilter,
+  haves? : Array[@bit.ObjectId] = [],
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> Bytes {
   let chunks : Array[Bytes] = []
   chunks.push(pktline_encode("command=fetch\n"))
   chunks.push(pktline_encode("agent=\{agent}\n"))
   chunks.push(pktline_encode("object-format=sha1\n"))
   chunks.push(pktline_delim())
-  chunks.push(pktline_encode("thin-pack\n"))
+  // The current pack parser does not preload local objects as external delta
+  // bases, so negotiated fetches must remain self-contained.
+  if haves.length() == 0 {
+    chunks.push(pktline_encode("thin-pack\n"))
+  }
   chunks.push(pktline_encode("no-progress\n"))
   chunks.push(pktline_encode("ofs-delta\n"))
+  for id in shallow {
+    chunks.push(pktline_encode("shallow \{id.to_hex()}\n"))
+  }
   if depth > 0 {
     chunks.push(pktline_encode("deepen \{depth}\n"))
   }
@@ -286,38 +297,85 @@ pub fn build_fetch_request_v2(
   for want in wants {
     chunks.push(pktline_encode("want \{want.to_hex()}\n"))
   }
+  for have in haves {
+    chunks.push(pktline_encode("have \{have.to_hex()}\n"))
+  }
   chunks.push(pktline_encode("done\n"))
   chunks.push(pktline_flush())
   concat_bytes(chunks)
 }
 
 ///|
+/// Build the shared protocol v0/v1 fetch negotiation request.
+///
+/// Protocol v1 changes reference advertisement, but uses the v0 request
+/// grammar. Capabilities and extension lines are emitted only when advertised.
 pub fn build_fetch_request_v0(
   agent : String,
   wants : Array[@bit.ObjectId],
   advertised : Array[String],
+  depth? : Int = 0,
+  filter? : FilterSpec = FilterSpec::NoFilter,
+  haves? : Array[@bit.ObjectId] = [],
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> Bytes {
   if wants.length() == 0 {
     return pktline_flush()
   }
-  let caps = select_v0_caps(agent, advertised)
+  let uses_shallow = shallow.length() > 0 || depth > 0
+  let caps = select_v0_caps(
+    agent,
+    advertised,
+    uses_haves=haves.length() > 0,
+    uses_shallow~,
+    uses_filter=filter.is_partial(),
+  )
   let chunks : Array[Bytes] = []
-  let first = "want \{wants[0].to_hex()} \{caps}\n"
+  let first = if caps.length() > 0 {
+    "want \{wants[0].to_hex()} \{caps}\n"
+  } else {
+    "want \{wants[0].to_hex()}\n"
+  }
   chunks.push(pktline_encode(first))
   for i in 1..<wants.length() {
     chunks.push(pktline_encode("want \{wants[i].to_hex()}\n"))
   }
+  if uses_shallow && advertised.contains("shallow") {
+    for id in shallow {
+      chunks.push(pktline_encode("shallow \{id.to_hex()}\n"))
+    }
+    if depth > 0 {
+      chunks.push(pktline_encode("deepen \{depth}\n"))
+    }
+  }
+  if filter.is_partial() && advertised.contains("filter") {
+    chunks.push(pktline_encode("filter \{filter.to_string()}\n"))
+  }
   chunks.push(pktline_flush())
+  for have in haves {
+    chunks.push(pktline_encode("have \{have.to_hex()}\n"))
+  }
   chunks.push(pktline_encode("done\n"))
   chunks.push(pktline_flush())
   concat_bytes(chunks)
 }
 
 ///|
-pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError {
+pub struct FetchPackResult {
+  pack : Bytes
+  shallow : Array[@bit.ObjectId]
+  unshallow : Array[@bit.ObjectId]
+}
+
+///|
+pub fn parse_fetch_response_v2(
+  data : Bytes,
+) -> FetchPackResult raise @bit.GitError {
   let lines = pktline_decode(data)
   let mut in_pack = false
   let chunks : Array[Byte] = []
+  let shallow : Array[@bit.ObjectId] = []
+  let unshallow : Array[@bit.ObjectId] = []
   for item in lines {
     let (line_bytes, is_flush) = item
     if is_flush {
@@ -331,6 +389,7 @@ pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError 
     }
     if !in_pack {
       let line = line_bytes |> bytes_to_string |> trim_newline
+      parse_shallow_response_line(line, shallow, unshallow)
       if line == "packfile" {
         in_pack = true
       }
@@ -356,20 +415,36 @@ pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError 
       raise @bit.GitError::ProtocolError("upload-pack error: \{msg}")
     }
   }
-  Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i]))
+  {
+    pack: Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i])),
+    shallow,
+    unshallow,
+  }
 }
 
 ///|
-pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @bit.GitError {
+pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError {
+  parse_fetch_response_v2(data).pack
+}
+
+///|
+pub fn parse_fetch_response_v0(
+  data : Bytes,
+) -> FetchPackResult raise @bit.GitError {
   let lines = pktline_decode(data)
   let chunks : Array[Byte] = []
+  let shallow : Array[@bit.ObjectId] = []
+  let unshallow : Array[@bit.ObjectId] = []
   for item in lines {
     let (line_bytes, is_flush) = item
     if is_flush || line_bytes.length() == 0 {
       continue
     }
     let channel = line_bytes[0].to_int()
-    if channel == 1 {
+    if channel == 's' || channel == 'u' {
+      let line = line_bytes |> bytes_to_string |> trim_newline
+      parse_shallow_response_line(line, shallow, unshallow)
+    } else if channel == 1 {
       for i in 1..<line_bytes.length() {
         chunks.push(line_bytes[i])
       }
@@ -387,19 +462,85 @@ pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @bit.GitError 
       raise @bit.GitError::ProtocolError("upload-pack error: \{msg}")
     }
   }
-  Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i]))
+  {
+    pack: Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i])),
+    shallow,
+    unshallow,
+  }
 }
 
 ///|
-fn select_v0_caps(agent : String, advertised : Array[String]) -> String {
-  let wanted = ["side-band-64k", "thin-pack", "ofs-delta"]
+pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @bit.GitError {
+  parse_fetch_response_v0(data).pack
+}
+
+///|
+fn parse_shallow_response_line(
+  line : String,
+  shallow : Array[@bit.ObjectId],
+  unshallow : Array[@bit.ObjectId],
+) -> Unit raise @bit.GitError {
+  let (prefix, output) = if line.has_prefix("shallow ") {
+    ("shallow ", shallow)
+  } else if line.has_prefix("unshallow ") {
+    ("unshallow ", unshallow)
+  } else {
+    return
+  }
+  let hex = String::unsafe_substring(
+    line,
+    start=prefix.length(),
+    end=line.length(),
+  )
+  if hex.length() != 40 {
+    raise @bit.GitError::ProtocolError(
+      "Invalid upload-pack shallow object id: \{hex}",
+    )
+  }
+  let id = @bit.ObjectId::from_hex(hex) catch {
+    _ =>
+      raise @bit.GitError::ProtocolError(
+        "Invalid upload-pack shallow object id: \{hex}",
+      )
+  }
+  output.push(id)
+}
+
+///|
+fn select_v0_caps(
+  agent : String,
+  advertised : Array[String],
+  uses_haves~ : Bool,
+  uses_shallow~ : Bool,
+  uses_filter~ : Bool,
+) -> String {
   let caps : Array[String] = []
+  if advertised.contains("side-band-64k") {
+    caps.push("side-band-64k")
+  } else if advertised.contains("side-band") {
+    caps.push("side-band")
+  }
+  let wanted = ["thin-pack", "ofs-delta", "no-progress", "include-tag"]
   for cap in wanted {
+    if cap == "thin-pack" && uses_haves {
+      continue
+    }
     if advertised.contains(cap) {
       caps.push(cap)
     }
   }
-  caps.push("agent=\{agent}")
+  if uses_shallow && advertised.contains("shallow") {
+    caps.push("shallow")
+  }
+  if uses_filter && advertised.contains("filter") {
+    caps.push("filter")
+  }
+  for cap in advertised {
+    if cap.has_prefix("agent=") {
+      caps.push("agent=\{agent}")
+      break
+    }
+  }
   caps.join(" ")
 }
 

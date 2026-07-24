@@ -397,7 +397,22 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       None =>
         match resolve_remote_ref_id(pull_url, upstream_ref) {
           Some((id, _)) => {
-            let pack = @bitnative.fetch_pack_http(pull_url, [id], true)
+            let haves = match pre_fetch_target_id {
+              Some(have) => [have]
+              None =>
+                match pre_fetch_head {
+                  Some(have) => [have]
+                  None => []
+                }
+            }
+            let shallow = @repo.read_shallow_boundaries(fs, git_dir)
+            let pack = @bitnative.fetch_pack_http(
+              pull_url,
+              [id],
+              true,
+              haves~,
+              shallow~,
+            )
             let objects = @pack.parse_packfile(pack)
             @pack.write_packfile_with_index(fs, git_dir, pack, objects)
             write_ref_file(fs, git_dir, target_ref, id)

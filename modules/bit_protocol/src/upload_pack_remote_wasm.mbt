@@ -81,6 +81,8 @@ pub async fn fetch_pack(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
+  haves? : Array[@bit.ObjectId] = [],
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> Bytes raise @bit.GitError {
   let client = wasm_http_client()
   fetch_pack_with_http(
@@ -91,6 +93,8 @@ pub async fn fetch_pack(
     FilterSpec::NoFilter,
     client.get,
     client.post,
+    haves~,
+    shallow~,
   )
 }
 
@@ -99,6 +103,8 @@ pub async fn fetch_objects(
   remote : String,
   wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
+  haves? : Array[@bit.ObjectId] = [],
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   let client = wasm_http_client()
   fetch_objects_with_http(
@@ -109,6 +115,8 @@ pub async fn fetch_objects(
     FilterSpec::NoFilter,
     client.get,
     client.post,
+    haves~,
+    shallow~,
   )
 }
 
