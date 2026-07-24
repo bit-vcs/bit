@@ -1615,6 +1615,8 @@ fn parse_int64(s : String) -> Int64 {
   for c in s {
     if c >= '0' && c <= '9' {
       result = result * 10L + (c.to_int() - '0'.to_int()).to_int64()
+    } else {
+      break
     }
   }
   result
