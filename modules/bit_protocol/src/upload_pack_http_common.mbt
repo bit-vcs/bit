@@ -260,6 +260,7 @@ pub async fn clone_to_fs_with_http(
     @bit.HttpResponse,
     Bytes,
   ) raise @bit.GitError,
+  rfs : &@bit.RepoFileSystem,
   no_checkout? : Bool = false,
 ) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
   let (refs, _caps, _version, symrefs) = discover_upload_refs_with_http(
@@ -315,7 +316,7 @@ pub async fn clone_to_fs_with_http(
           @bit.write_git_metadata(store, commit_id, refname, remote, fs, root)
         } else {
           @bit.materialize_clone_to_fs(
-            store, commit_id, refname, remote, fs, root,
+            store, commit_id, refname, remote, fs, root, rfs,
           )
         }
     }

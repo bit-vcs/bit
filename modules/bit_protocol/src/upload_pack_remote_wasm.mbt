@@ -142,6 +142,7 @@ pub async fn clone_remote_to_fs(
   prefer_v2 : Bool,
   fs : &@bit.FileSystem,
   root : String,
+  rfs : &@bit.RepoFileSystem,
 ) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
   let client = wasm_http_client()
   clone_to_fs_with_http(
@@ -153,5 +154,6 @@ pub async fn clone_remote_to_fs(
     root,
     client.get,
     client.post,
+    rfs,
   )
 }

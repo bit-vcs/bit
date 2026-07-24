@@ -19,7 +19,7 @@ pub fn build_ref_update(@bit_object.ObjectId, @bit_object.ObjectId, String, Stri
 
 pub fn build_ref_update_simple(@bit_object.ObjectId, @bit_object.ObjectId, String) -> String
 
-pub async fn clone_to_fs_with_http(String, Bool, Int, FilterSpec, &@bit_types.FileSystem, String, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+pub async fn clone_to_fs_with_http(String, Bool, Int, FilterSpec, &@bit_types.FileSystem, String, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, &@bit_types.RepoFileSystem, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
 
 pub async fn clone_with_http(String, Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
 

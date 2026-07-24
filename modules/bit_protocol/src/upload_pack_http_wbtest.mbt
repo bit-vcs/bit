@@ -194,6 +194,7 @@ async test "upload-pack http: clone-to-fs materializes repo with injected transp
       }
       raise @bit.GitError::ProtocolError("unexpected request body")
     },
+    fs,
   )
   assert_true(refs.length() > 0)
   @test.assert_eq(fs.read_string("/repo/hello.txt"), "hello\n")

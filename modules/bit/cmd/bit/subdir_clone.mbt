@@ -127,6 +127,7 @@ async fn subdir_clone(
         true,
         fs,
         temp_clone,
+        fs,
         filter=@protocol.FilterSpec::BlobNone,
       )
       if refs.length() == 0 {

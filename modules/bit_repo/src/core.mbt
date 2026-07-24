@@ -176,11 +176,16 @@ pub fn checkout_commit(
 }
 
 ///|
+/// Materialize `commit_id` under `root`, producing an exact checkout: paths
+/// tracked by a prior checkout that are absent from this commit are removed.
+/// `rfs` must observe the same filesystem as `fs` (callers pass the same
+/// concrete value as both trait views).
 pub fn checkout_commit_to_fs(
   store : ObjectStore,
   commit_id : @object.ObjectId,
   fs : &@types.FileSystem,
   root : String,
+  rfs : &@types.RepoFileSystem,
 ) -> Unit raise @object.GitError {
   let commit_obj = store.get(commit_id)
   match commit_obj {
@@ -190,9 +195,117 @@ pub fn checkout_commit_to_fs(
         raise @object.GitError::InvalidObject("Object is not a commit")
       }
       let info = parse_commit(obj.data)
+      let files : Map[String, Bool] = Map([])
+      let opaque_dirs : Map[String, Bool] = Map([])
+      collect_tree_paths(store, info.tree, "", files, opaque_dirs)
+      remove_stale_worktree_paths(rfs, fs, root, files, opaque_dirs)
       walk_tree_to_fs(store, info.tree, "", fs, root)
     }
   }
+}
+
+///|
+/// Collect the set of blob paths (`files`) and gitlink/submodule mount
+/// points (`opaque_dirs`) a tree will materialize to, without touching disk.
+fn collect_tree_paths(
+  store : ObjectStore,
+  tree_id : @object.ObjectId,
+  prefix : String,
+  files : Map[String, Bool],
+  opaque_dirs : Map[String, Bool],
+) -> Unit raise @object.GitError {
+  let tree_obj = store.get(tree_id)
+  match tree_obj {
+    None => raise @object.GitError::InvalidObject("Missing tree object")
+    Some(obj) => {
+      if obj.obj_type != @object.ObjectType::Tree {
+        raise @object.GitError::InvalidObject("Object is not a tree")
+      }
+      let entries = parse_tree(obj.data)
+      for entry in entries {
+        verify_tree_entry_name(entry.name)
+        let path = if prefix.length() == 0 {
+          entry.name
+        } else {
+          prefix + "/" + entry.name
+        }
+        if is_tree_mode(entry.mode) {
+          collect_tree_paths(store, entry.id, path, files, opaque_dirs)
+        } else if is_gitlink_mode(entry.mode) {
+          opaque_dirs[path] = true
+        } else {
+          files[path] = true
+        }
+      }
+    }
+  }
+}
+
+///|
+/// Remove worktree paths under `root` that are not part of the target tree
+/// (`keep_files`), skipping `.git` and any gitlink/submodule mount point
+/// (`opaque_dirs`) so submodule checkouts are left untouched. Returns
+/// whether the directory ended up with nothing left in it.
+fn remove_stale_worktree_paths(
+  rfs : &@types.RepoFileSystem,
+  fs : &@types.FileSystem,
+  root : String,
+  keep_files : Map[String, Bool],
+  opaque_dirs : Map[String, Bool],
+) -> Unit raise @object.GitError {
+  ignore(remove_stale_dir(rfs, fs, root, "", keep_files, opaque_dirs))
+}
+
+///|
+fn remove_stale_dir(
+  rfs : &@types.RepoFileSystem,
+  fs : &@types.FileSystem,
+  root : String,
+  rel_dir : String,
+  keep_files : Map[String, Bool],
+  opaque_dirs : Map[String, Bool],
+) -> Bool raise @object.GitError {
+  let full_dir = if rel_dir.length() == 0 {
+    root
+  } else {
+    join_path(root, rel_dir)
+  }
+  if !rfs.is_dir(full_dir) {
+    return true
+  }
+  let names = rfs.readdir(full_dir)
+  let mut emptied = true
+  for name in names {
+    if rel_dir.length() == 0 && name == ".git" {
+      emptied = false
+      continue
+    }
+    let rel_path = if rel_dir.length() == 0 {
+      name
+    } else {
+      rel_dir + "/" + name
+    }
+    if opaque_dirs.contains(rel_path) {
+      emptied = false
+      continue
+    }
+    let full_path = join_path(root, rel_path)
+    if rfs.is_dir(full_path) {
+      let child_emptied = remove_stale_dir(
+        rfs, fs, root, rel_path, keep_files, opaque_dirs,
+      )
+      if child_emptied {
+        fs.remove_dir(full_path)
+      } else {
+        emptied = false
+      }
+    } else if keep_files.contains(rel_path) {
+      emptied = false
+    } else {
+      fs.remove_file(full_path)
+    }
+  }
+  emptied
 }
 
 ///|

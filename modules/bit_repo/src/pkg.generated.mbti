@@ -11,7 +11,7 @@ pub fn apply_shallow_updates(&@bit_types.FileSystem, &@bit_types.RepoFileSystem,
 
 pub fn checkout_commit(ObjectStore, @bit_object.ObjectId) -> Map[String, Bytes] raise @bit_object.GitError
 
-pub fn checkout_commit_to_fs(ObjectStore, @bit_object.ObjectId, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
+pub fn checkout_commit_to_fs(ObjectStore, @bit_object.ObjectId, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
 
 pub fn is_gitlink_mode(String) -> Bool
 
@@ -19,7 +19,7 @@ pub fn is_tree_mode(String) -> Bool
 
 pub fn join_path(String, String) -> String
 
-pub fn materialize_clone_to_fs(ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
+pub fn materialize_clone_to_fs(ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
 
 pub fn parent_dir(String) -> String
 

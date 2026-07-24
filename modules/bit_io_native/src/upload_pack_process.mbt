@@ -1244,6 +1244,7 @@ pub async fn clone_process_to_fs(
   prefer_v2 : Bool,
   fs : &@bit.FileSystem,
   root : String,
+  rfs : &@bit.RepoFileSystem,
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
   no_checkout? : Bool = false,
@@ -1283,7 +1284,7 @@ pub async fn clone_process_to_fs(
         @bit.write_git_metadata(store, commit_id, refname, remote, fs, root)
       } else {
         @bit.materialize_clone_to_fs(
-          store, commit_id, refname, remote, fs, root,
+          store, commit_id, refname, remote, fs, root, rfs,
         )
       }
   }

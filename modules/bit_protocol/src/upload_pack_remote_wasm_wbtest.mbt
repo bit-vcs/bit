@@ -53,7 +53,7 @@ async test "upload-pack wasm remote: clone-to-fs uses configured client" {
     },
   )
   let refs = clone_remote_to_fs(
-    "git@github.com:user/repo.git", true, fs, "/repo",
+    "git@github.com:user/repo.git", true, fs, "/repo", fs,
   )
   assert_true(refs.length() > 0)
   assert_eq(fs.read_string("/repo/hello.txt"), "hello\n")

@@ -180,6 +180,7 @@ pub async fn clone_http_to_fs(
   prefer_v2 : Bool,
   fs : &@bit.FileSystem,
   root : String,
+  rfs : &@bit.RepoFileSystem,
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
   no_checkout? : Bool = false,
@@ -194,6 +195,7 @@ pub async fn clone_http_to_fs(
       root,
       native_http_get,
       native_http_post,
+      rfs,
       no_checkout~,
     )
   } else {
@@ -203,6 +205,7 @@ pub async fn clone_http_to_fs(
       prefer_v2,
       fs,
       root,
+      rfs,
       depth~,
       filter~,
       no_checkout~,

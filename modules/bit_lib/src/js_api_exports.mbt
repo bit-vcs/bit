@@ -2596,7 +2596,7 @@ pub async fn js_clone_remote(
           @pack.write_packfile_with_index(fs, git_dir, pack, objects)
           let store = @bit.ObjectStore::from_pack(objects)
           @bit.materialize_clone_to_fs(
-            store, commit_id, refname, remote_url, fs, root,
+            store, commit_id, refname, remote_url, fs, root, fs,
           )
         } else {
           init_repo(
