@@ -446,11 +446,13 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let mut do_continue = false
   let mut do_abort = false
   let mut do_skip = false
+  let mut do_quit = false
   let mut interactive = false
   let mut force_rebase = false
   let mut autosquash = false
   let mut no_autosquash = false
   let mut autostash = false
+  let mut quiet = false
   let mut update_refs : Bool? = None
   let exec_cmds : Array[String] = []
   let mut root_mode = false
@@ -477,6 +479,10 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         do_skip = true
         i += 1
       }
+      "--quit" => {
+        do_quit = true
+        i += 1
+      }
       "-i" | "--interactive" => {
         interactive = true
         i += 1
@@ -497,6 +503,14 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       }
       "--no-autostash" => {
         autostash = false
+        i += 1
+      }
+      "-q" | "--quiet" => {
+        quiet = true
+        i += 1
+      }
+      "--no-quiet" => {
+        quiet = false
         i += 1
       }
       "--keep-empty" | "--no-keep-empty" =>
@@ -642,6 +656,11 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       "--ignore-whitespace" => i += 1
       _ if arg.has_prefix("--whitespace=") => i += 1
       _ if arg.has_prefix("--empty=") => i += 1
+      // Bare "-" is the "previous branch" revision shorthand, not an option.
+      "-" => {
+        upstream = Some(arg)
+        i += 1
+      }
       _ if !arg.has_prefix("-") => {
         upstream = Some(arg)
         i += 1
@@ -652,6 +671,19 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       }
       _ => i += 1
     }
+  }
+  // "-" / "@{-1}" mean "the branch checked out before the current one",
+  // same as `git checkout -`.
+  match upstream {
+    Some(u) if u == "-" || u == "@{-1}" =>
+      match load_previous_checkout_location(rfs, git_dir) {
+        Some(prev) => upstream = Some(prev)
+        None =>
+          raise @bitcore.GitError::InvalidObject(
+            "No previous branch to rebase onto",
+          )
+      }
+    _ => ()
   }
   let (stored_signing, stored_signing_key) = rebase_read_signing_state(
     rfs, git_dir,
@@ -678,6 +710,19 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       e => raise e
     }
     return
+  }
+  // Handle --quit: drop rebase state without restoring the original branch
+  // or working tree (unlike --abort).
+  if do_quit {
+    if @bitlib.is_interactive_rebase_in_progress(rfs, git_dir) ||
+      @bitlib.is_rebase_in_progress(rfs, git_dir) {
+      @bitlib.clear_rebase_state(wfs, rfs, git_dir)
+      rebase_clear_signing_state(wfs, git_dir)
+    } else {
+      eprint_line("fatal: no rebase in progress")
+      @sys.exit(1)
+    }
+    return ()
   }
   // Handle --continue (works for both regular and interactive)
   if do_continue {
@@ -713,7 +758,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       rebase_update_signing_state_for_interactive_result(
         wfs, git_dir, should_sign, effective_signing_key, result,
       )
-      print_interactive_rebase_result(result)
+      print_interactive_rebase_result(result, quiet~)
     } else {
       let state_before = @bitlib.load_rebase_state(rfs, git_dir)
       let result = @bitlib.rebase_continue(fs, fs, root)
@@ -738,7 +783,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       rebase_update_signing_state_for_result(
         wfs, git_dir, should_sign, effective_signing_key, result,
       )
-      print_rebase_result_with_commit(result, signed_id)
+      print_rebase_result_with_commit(result, signed_id, quiet~)
     }
     return ()
   }
@@ -791,7 +836,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       rebase_update_signing_state_for_interactive_result(
         wfs, git_dir, should_sign, effective_signing_key, result,
       )
-      print_interactive_rebase_result(result)
+      print_interactive_rebase_result(result, quiet~)
     } else {
       let state_before = @bitlib.load_rebase_state(rfs, git_dir)
       let result = @bitlib.rebase_skip(fs, fs, root)
@@ -816,7 +861,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       rebase_update_signing_state_for_result(
         wfs, git_dir, should_sign, effective_signing_key, result,
       )
-      print_rebase_result_with_commit(result, signed_id)
+      print_rebase_result_with_commit(result, signed_id, quiet~)
     }
     return ()
   }
@@ -849,6 +894,29 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         None => false
       }
   }
+  // Require a clean worktree/index before starting a new rebase, unless
+  // --autostash (or rebase.autoStash) will stash the dirty state for us.
+  if !autostash {
+    let pre_status = @bitlib.status(rfs, root)
+    let unstaged_dirty = pre_status.unstaged_modified.length() > 0 ||
+      pre_status.unstaged_deleted.length() > 0
+    let staged_dirty = pre_status.staged_added.length() > 0 ||
+      pre_status.staged_modified.length() > 0 ||
+      pre_status.staged_deleted.length() > 0
+    if unstaged_dirty || staged_dirty {
+      let mut message = "cannot rebase: "
+      if unstaged_dirty {
+        message += "You have unstaged changes.\n"
+        if staged_dirty {
+          message += "additionally, your index contains uncommitted changes.\n"
+        }
+      } else {
+        message += "Your index contains uncommitted changes.\n"
+      }
+      message += "Please commit or stash them."
+      raise @bitcore.GitError::InvalidObject(message)
+    }
+  }
   // Autostash: save dirty state before rebase
   let mut autostash_oid : @bitcore.ObjectId? = None
   if autostash {
@@ -875,7 +943,11 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     // Use empty tree OID as a sentinel; actual root handling is in the lib layer
     @bitcore.ObjectId::from_hex("4b825dc642cb6eb9a060e54bf899d15363647a20")
   } else {
-    guard upstream is Some(ref_name) else {
+    let effective_upstream = match upstream {
+      Some(u) => Some(u)
+      None => rebase_resolve_default_upstream(rfs, git_dir)
+    }
+    guard effective_upstream is Some(ref_name) else {
       raise @bitcore.GitError::InvalidObject(
         "usage: git rebase [-i] <upstream>",
       )
@@ -946,7 +1018,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     rebase_update_signing_state_for_interactive_result(
       wfs, git_dir, should_sign, effective_signing_key, result,
     )
-    print_interactive_rebase_result(result)
+    print_interactive_rebase_result(result, quiet~)
     // Autostash pop on success
     if autostash_oid is Some(_) && result.status is @bitlib.IRBComplete {
       rebase_autostash_pop(wfs, rfs, root)
@@ -979,7 +1051,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     rebase_update_signing_state_for_result(
       wfs, git_dir, should_sign, effective_signing_key, result,
     )
-    print_rebase_result_with_commit(result, signed_id)
+    print_rebase_result_with_commit(result, signed_id, quiet~)
     // Autostash pop on success
     if autostash_oid is Some(_) &&
       result.status is @bitlib.RebaseStatus::Complete {
@@ -1086,10 +1158,13 @@ async fn make_exec_runner_callback(root : String) -> async (String) -> Int {
 ///|
 async fn print_interactive_rebase_result(
   result : @bitlib.InteractiveRebaseResult,
+  quiet? : Bool = false,
 ) -> Unit {
   match result.status {
     @bitlib.IRBComplete =>
-      print_line("Successfully rebased and updated refs/heads.")
+      if !quiet {
+        print_line("Successfully rebased and updated refs/heads.")
+      }
     @bitlib.IRBConflict => {
       print_line(result.message)
       print_line("Resolve conflicts, then run \"git rebase --continue\".")
@@ -1114,6 +1189,22 @@ async fn print_interactive_rebase_result(
 ///|
 fn rebase_args_require_standalone_error(_args : Array[String]) -> Bool {
   false
+}
+
+///|
+/// When no `<upstream>` argument is given, git defaults to the current
+/// branch's configured upstream (`branch.<name>.merge`), same as `@{upstream}`.
+fn rebase_resolve_default_upstream(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> String? {
+  let head_ref = @bitlib.read_head_ref(rfs, git_dir) catch { _ => return None }
+  guard head_ref is @bitlib.HeadRef::Branch(branch) else { return None }
+  let (_remotes, branches) = @bitlib.read_repo_config(rfs, git_dir)
+  match branches.get(branch) {
+    Some(cfg) if cfg.merges.length() > 0 => Some(cfg.merges[0])
+    _ => None
+  }
 }
 
 ///|
@@ -1725,9 +1816,13 @@ fn cleanup_rebase_dir(
 async fn print_rebase_result_with_commit(
   result : @bitlib.RebaseResult,
   commit_id_override : @bitcore.ObjectId?,
+  quiet? : Bool = false,
 ) -> Unit {
   match result.status {
     @bitlib.RebaseStatus::Complete => {
+      if quiet {
+        return
+      }
       let display_commit_id = if commit_id_override is Some(id) {
         Some(id)
       } else {
@@ -1742,7 +1837,9 @@ async fn print_rebase_result_with_commit(
       }
     }
     @bitlib.RebaseStatus::NothingToRebase =>
-      print_line("Current branch is up to date.")
+      if !quiet {
+        print_line("Current branch is up to date.")
+      }
     @bitlib.RebaseStatus::Conflict => {
       print_line("CONFLICT: Merge conflict in:")
       for path in result.conflicts {
