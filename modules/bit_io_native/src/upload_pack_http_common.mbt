@@ -158,6 +158,7 @@ pub async fn clone_to_fs_with_http(
     @bit.HttpResponse,
     Bytes,
   ) raise @bit.GitError,
+  rfs : &@bit.RepoFileSystem,
   no_checkout? : Bool = false,
 ) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
   @protocol.clone_to_fs_with_http(
@@ -169,6 +170,7 @@ pub async fn clone_to_fs_with_http(
     root,
     http_get,
     http_post,
+    rfs,
     no_checkout~,
   )
 }

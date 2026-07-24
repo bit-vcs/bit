@@ -11,7 +11,7 @@ import {
 // Values
 pub fn checkout_commit(@bit_repo.ObjectStore, @bit_object.ObjectId) -> Map[String, Bytes] raise @bit_object.GitError
 
-pub fn checkout_commit_to_fs(@bit_repo.ObjectStore, @bit_object.ObjectId, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
+pub fn checkout_commit_to_fs(@bit_repo.ObjectStore, @bit_object.ObjectId, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
 
 pub fn create_blob(Bytes) -> (@bit_object.ObjectId, Bytes)
 
@@ -37,7 +37,7 @@ pub fn hash_prefix(Bytes, Int, hash_size? : Int) -> @bit_object.ObjectId
 
 pub fn join_path(String, String) -> String
 
-pub fn materialize_clone_to_fs(@bit_repo.ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
+pub fn materialize_clone_to_fs(@bit_repo.ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
 
 pub fn parse_commit(Bytes) -> @bit_repo.CommitInfo raise @bit_object.GitError
 

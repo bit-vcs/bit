@@ -8,8 +8,9 @@ pub fn materialize_clone_to_fs(
   remote_url : String,
   fs : &@types.FileSystem,
   root : String,
+  rfs : &@types.RepoFileSystem,
 ) -> Unit raise @object.GitError {
-  checkout_commit_to_fs(store, commit_id, fs, root)
+  checkout_commit_to_fs(store, commit_id, fs, root, rfs)
   write_git_metadata(store, commit_id, refname, remote_url, fs, root)
 }
 

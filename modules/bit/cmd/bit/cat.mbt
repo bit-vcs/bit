@@ -73,6 +73,7 @@ async fn handle_cat(args : Array[String]) -> Unit raise Error {
       true,
       fs,
       temp_dir,
+      fs,
       depth=1,
       filter=@protocol.FilterSpec::BlobNone,
     )

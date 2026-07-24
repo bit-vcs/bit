@@ -127,6 +127,7 @@ test "upload-pack v2: materialize clone to fs" {
   let fs = @bit.TestFs::new()
   @bit.materialize_clone_to_fs(
     store, commit_id, "refs/heads/main", "https://example.com/repo.git", fs, "/repo",
+    fs,
   )
   let data = fs.read_file("/repo/hello.txt")
   let text = @utf8.decode_lossy(data[:])

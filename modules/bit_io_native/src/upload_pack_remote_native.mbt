@@ -80,7 +80,8 @@ pub async fn clone_remote_to_fs(
   prefer_v2 : Bool,
   fs : &@bit.FileSystem,
   root : String,
+  rfs : &@bit.RepoFileSystem,
 ) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
   ensure_process_remote(remote)
-  clone_process_to_fs(remote, prefer_v2, fs, root)
+  clone_process_to_fs(remote, prefer_v2, fs, root, rfs)
 }

@@ -10,17 +10,17 @@ import {
 // Values
 pub async fn clone_http(String, Bool, depth? : Int, filter? : @bit_protocol.FilterSpec) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
 
-pub async fn clone_http_to_fs(String, Bool, &@bit_types.FileSystem, String, depth? : Int, filter? : @bit_protocol.FilterSpec, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+pub async fn clone_http_to_fs(String, Bool, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem, depth? : Int, filter? : @bit_protocol.FilterSpec, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
 
 pub async fn clone_process(String, Bool, depth? : Int, filter? : @bit_protocol.FilterSpec) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
 
-pub async fn clone_process_to_fs(String, Bool, &@bit_types.FileSystem, String, depth? : Int, filter? : @bit_protocol.FilterSpec, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+pub async fn clone_process_to_fs(String, Bool, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem, depth? : Int, filter? : @bit_protocol.FilterSpec, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
 
 pub async fn clone_remote(String, Bool) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
 
-pub async fn clone_remote_to_fs(String, Bool, &@bit_types.FileSystem, String) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+pub async fn clone_remote_to_fs(String, Bool, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
 
-pub async fn clone_to_fs_with_http(String, Bool, Int, @bit_protocol.FilterSpec, &@bit_types.FileSystem, String, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+pub async fn clone_to_fs_with_http(String, Bool, Int, @bit_protocol.FilterSpec, &@bit_types.FileSystem, String, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, &@bit_types.RepoFileSystem, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
 
 pub async fn clone_with_http(String, Bool, Int, @bit_protocol.FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
 
