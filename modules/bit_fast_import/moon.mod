@@ -1,6 +1,6 @@
 name = "mizchi/bit_fast_import"
 
-version = "0.45.3"
+version = "0.45.4"
 
 repository = "https://github.com/mizchi/bit-vcs"
 
