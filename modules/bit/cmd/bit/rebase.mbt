@@ -448,6 +448,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let mut do_skip = false
   let mut do_quit = false
   let mut interactive = false
+  let mut use_apply_backend = false
   let mut force_rebase = false
   let mut autosquash = false
   let mut no_autosquash = false
@@ -548,6 +549,13 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         let stopped_path = git_dir + "/rebase-merge/stopped-sha"
         if rfs.is_file(stopped_path) {
           let hex = trim_string(decode_bytes(rfs.read_file(stopped_path)))
+          if @sys.get_env_var("GIT_TRACE") is Some(v) && v != "" && v != "0" {
+            let backend_path = git_dir + "/rebase-merge/backend"
+            let use_apply = rfs.is_file(backend_path) &&
+              trim_string(decode_bytes(rfs.read_file(backend_path))) == "apply"
+            let show_target = if use_apply { hex } else { "REBASE_HEAD" }
+            eprint_line("trace: run_command: git show \{show_target} --")
+          }
           handle_show([hex])
         } else {
           eprint_line("fatal: No rebase in progress?")
@@ -584,9 +592,17 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       // --stat/--no-stat/--diffstat/--no-diffstat: show diffstat after rebase
       // bit does not yet show diffstats, accept for compatibility
       "--stat" | "--diffstat" | "--no-stat" | "--no-diffstat" => i += 1
-      // Backend selection flags: bit has a single backend so these are accepted
-      // and ignored for git compatibility (e.g. GIT_TEST_REBASE_USE_BUILTIN_BACKEND)
-      "--apply" | "--merge" => i += 1
+      // Backend selection flags: bit runs a single (merge-style) backend
+      // internally; --apply/--merge only affect what --show-current-patch
+      // reports (git show <hex> vs git show REBASE_HEAD) for compatibility.
+      "--apply" => {
+        use_apply_backend = true
+        i += 1
+      }
+      "--merge" => {
+        use_apply_backend = false
+        i += 1
+      }
       _ if arg.has_prefix("--backend=") => i += 1
       "--exec" | "-x" if i + 1 < args.length() => {
         exec_cmds.push(args[i + 1])
@@ -1082,6 +1098,14 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
             fs, fs, root, id, exclude_from, force_rebase~,
           ),
         )
+      }
+    }
+    if result.status is @bitlib.RebaseStatus::Conflict {
+      wfs.write_string(
+        git_dir + "/rebase-merge/backend",
+        if use_apply_backend { "apply" } else { "merge" },
+      ) catch {
+        _ => ()
       }
     }
     let signed_id = if should_sign {
@@ -2080,6 +2104,7 @@ async fn print_rebase_result_with_commit(
         "To abort and return to the original state, run \"git rebase --abort\".",
       )
       print_line("To skip this commit, run \"git rebase --skip\".")
+      @sys.exit(1)
     }
   }
 }

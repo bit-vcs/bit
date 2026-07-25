@@ -319,9 +319,14 @@ fn ranges_overlap(a : ChangeRange, b : ChangeRange) -> Bool {
   if a.base_start == a.base_end && b.base_start == b.base_end {
     a.base_start == b.base_start
   } else if a.base_start == a.base_end {
-    a.base_start >= b.base_start && a.base_start < b.base_end
+    // An insert touching either edge of the other side's changed region is
+    // a conflict too: the insert's context (the lines right around it) was
+    // itself changed by the other side, so there is no unambiguous anchor
+    // to place it against. Matches git's merge behavior of conflicting
+    // rather than silently reordering/dropping content in this case.
+    a.base_start >= b.base_start && a.base_start <= b.base_end
   } else if b.base_start == b.base_end {
-    b.base_start >= a.base_start && b.base_start < a.base_end
+    b.base_start >= a.base_start && b.base_start <= a.base_end
   } else {
     a.base_start < b.base_end && b.base_start < a.base_end
   }
