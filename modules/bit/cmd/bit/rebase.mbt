@@ -461,6 +461,9 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let strategy_options : Array[String] = []
   let mut onto : String? = None
   let mut upstream : String? = None
+  // git rebase [<upstream>] [<branch>]: a second positional arg means
+  // "switch to <branch> first, then rebase it onto <upstream>".
+  let mut switch_to_branch : String? = None
   let mut gpg_sign : Bool? = None
   let mut signing_key : String? = None
   let mut i = 0
@@ -658,11 +661,19 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--empty=") => i += 1
       // Bare "-" is the "previous branch" revision shorthand, not an option.
       "-" => {
-        upstream = Some(arg)
+        if upstream is None {
+          upstream = Some(arg)
+        } else if switch_to_branch is None {
+          switch_to_branch = Some(arg)
+        }
         i += 1
       }
       _ if !arg.has_prefix("-") => {
-        upstream = Some(arg)
+        if upstream is None {
+          upstream = Some(arg)
+        } else if switch_to_branch is None {
+          switch_to_branch = Some(arg)
+        }
         i += 1
       }
       _ if arg.has_prefix("-") => {
@@ -893,6 +904,13 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         Some(v) => v.to_lower() == "true"
         None => false
       }
+  }
+  // A second positional arg: switch to it first (like `bit checkout
+  // <branch>`), so the rebase below operates on it as the current HEAD.
+  // Reuses checkout's own worktree-lock / detached-HEAD / dirty-tree rules.
+  match switch_to_branch {
+    Some(target) => handle_checkout([target])
+    None => ()
   }
   // Require a clean worktree/index before starting a new rebase, unless
   // --autostash (or rebase.autoStash) will stash the dirty state for us.
