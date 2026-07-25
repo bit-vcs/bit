@@ -1,6 +1,6 @@
 ///|
 fn cherry_pick_is_supported_noop_arg(arg : String) -> Bool {
-  arg == "--ff"
+  arg == "--3way" || arg == "--ff"
 }
 
 ///|
