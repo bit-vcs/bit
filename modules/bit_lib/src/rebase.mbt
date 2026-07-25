@@ -284,6 +284,38 @@ fn collect_ancestors(
 }
 
 ///|
+/// Refuse to move HEAD onto `target_map` if doing so would silently
+/// overwrite an untracked file on disk, mirroring the check an ordinary
+/// checkout performs. Only paths `target_map` actually writes are checked
+/// (not a full worktree scan), since those are the only ones about to be
+/// clobbered by `rebase_write_worktree`.
+fn rebase_check_untracked_conflicts(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  root : String,
+  target_map : Map[String, TreeEntryInfo],
+) -> Unit raise @bit.GitError {
+  let index_paths : Map[String, Bool] = Map([])
+  for entry in read_index_entries(rfs, git_dir) {
+    index_paths[entry.path] = true
+  }
+  let conflicts : Array[String] = []
+  for pair in target_map.to_array() {
+    let path = pair.0
+    if !index_paths.contains(path) && rfs.is_file(join_path(root, path)) {
+      conflicts.push(path)
+    }
+  }
+  if conflicts.length() > 0 {
+    conflicts.sort()
+    let listed = conflicts.map(p => "\t" + p).join("\n")
+    raise @bit.GitError::InvalidObject(
+      "The following untracked working tree files would be overwritten by checkout:\n\{listed}\nPlease move or remove them before you switch branches.\nAborting",
+    )
+  }
+}
+
+///|
 fn rebase_tree_map(
   db : ObjectDb,
   fs : &@bit.RepoFileSystem,
@@ -1143,6 +1175,8 @@ pub fn rebase_start_with_onto(
         HeadRef::Branch(name) => "refs/heads/" + name
         HeadRef::Detached(_) => ""
       }
+      let onto_map = rebase_tree_map(db, rfs, onto)
+      rebase_check_untracked_conflicts(rfs, git_dir, root, onto_map)
       // Create initial state
       let state : RebaseState = {
         onto,
@@ -1160,7 +1194,6 @@ pub fn rebase_start_with_onto(
       save_rebase_state(fs, git_dir, state)
       // Move HEAD to the new base before applying commits.
       rebase_update_head(fs, rfs, git_dir, onto)
-      let onto_map = rebase_tree_map(db, rfs, onto)
       rebase_write_worktree(fs, db, rfs, root, git_dir, onto_map)
       let entries = rebase_map_to_index(db, rfs, onto_map)
       write_index_entries(fs, git_dir, entries)
