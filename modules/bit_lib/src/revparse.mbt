@@ -10,6 +10,12 @@ pub fn rev_parse(
     let needle = substring_revparse(spec, 2, spec.length())
     return resolve_commit_message_search_all_refs(fs, git_dir, needle)
   }
+  if spec.has_suffix("}") && spec.find("@{") is Some(_) {
+    match resolve_reflog_numeric_selector(fs, git_dir, spec) {
+      Some(id) => return Some(id)
+      None => ()
+    }
+  }
   match parse_commit_message_search_spec(spec) {
     Some((base_spec, needle)) =>
       return resolve_commit_message_search(fs, git_dir, base_spec, needle)
@@ -790,6 +796,45 @@ pub fn parse_rev_parse_short_length(value : String) -> Int? {
     result = result * 10 + (c.to_int() - '0'.to_int())
   }
   Some(result)
+}
+
+///|
+/// Resolve a reflog numeric selector like `main@{2}` or `@{0}` (`@{2}` counts
+/// backward from the ref's current position: `@{0}` is where it points now,
+/// `@{1}` is its previous position, and so on). Returns None for anything
+/// that isn't this exact numeric form (e.g. `@{upstream}`, `@{2.days.ago}`),
+/// leaving those to their own resolution paths.
+fn resolve_reflog_numeric_selector(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+) -> @bit.ObjectId? raise @bit.GitError {
+  guard parse_reflog_selector(spec) is Some((raw_refname, index)) else {
+    return None
+  }
+  let refname = if raw_refname.length() == 0 {
+    match read_head_ref(fs, git_dir) {
+      HeadRef::Branch(name) => "refs/heads/" + name
+      HeadRef::Detached(_) => return None
+    }
+  } else {
+    raw_refname
+  }
+  let entries = read_reflog(fs, git_dir, refname)
+  let len = entries.length()
+  if index == 0 && len == 0 {
+    return resolve_ref(fs, git_dir, refname)
+  }
+  if index < len {
+    return Some(entries[len - 1 - index].new_id)
+  }
+  if index == len && len > 0 {
+    let old_id = entries[0].old_id
+    if old_id != @bit.ObjectId::zero() {
+      return Some(old_id)
+    }
+  }
+  None
 }
 
 ///|

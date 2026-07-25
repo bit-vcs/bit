@@ -957,13 +957,21 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   }
   // Start new rebase
   // Resolve upstream: --root mode doesn't need an upstream argument
+  // fork_point_ref is set only when the upstream was auto-resolved (no
+  // explicit <upstream> given), matching git's rule that --fork-point
+  // detection only kicks in by default in that case.
+  let mut fork_point_ref : String? = None
   let id : @bitcore.ObjectId = if root_mode {
     // Use empty tree OID as a sentinel; actual root handling is in the lib layer
     @bitcore.ObjectId::from_hex("4b825dc642cb6eb9a060e54bf899d15363647a20")
   } else {
     let effective_upstream = match upstream {
       Some(u) => Some(u)
-      None => rebase_resolve_default_upstream(rfs, git_dir)
+      None => {
+        let resolved = rebase_resolve_default_upstream(rfs, git_dir)
+        fork_point_ref = resolved
+        resolved
+      }
     }
     guard effective_upstream is Some(ref_name) else {
       raise @bitcore.GitError::InvalidObject(
@@ -1053,11 +1061,28 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
           @bitlib.rebase_start_with_onto(fs, fs, root, oid, id, force_rebase~),
         )
       }
-      None =>
+      None => {
+        let exclude_from = match fork_point_ref {
+          Some(ref_name) => {
+            let head_id = @bitrepo.rev_parse(fs, git_dir, "HEAD")
+            match head_id {
+              Some(hid) =>
+                match rebase_fork_point(rfs, git_dir, ref_name, hid) {
+                  Some(fp) => fp
+                  None => id
+                }
+              None => id
+            }
+          }
+          None => id
+        }
         (
           id,
-          @bitlib.rebase_start_with_onto(fs, fs, root, id, id, force_rebase~),
+          @bitlib.rebase_start_with_onto(
+            fs, fs, root, id, exclude_from, force_rebase~,
+          ),
         )
+      }
     }
     let signed_id = if should_sign {
       rebase_sign_complete_result(
@@ -1343,6 +1368,71 @@ fn rebase_resolve_default_upstream(
   match branches.get(branch) {
     Some(cfg) if cfg.merges.length() > 0 => Some(cfg.merges[0])
     _ => None
+  }
+}
+
+///|
+/// git merge-base --fork-point semantics: when no explicit <upstream> is
+/// given, `git rebase` doesn't just exclude commits reachable from
+/// @{upstream}'s *current* tip — it walks @{upstream}'s reflog to find where
+/// the current branch actually forked from it, since @{upstream} may have
+/// since moved (e.g. been reset backward). That reflog-derived commit, not
+/// the live tip, is the correct exclusion baseline for "which commits does
+/// this rebase need to replay" — the target to attach onto is still the
+/// live tip.
+///
+/// Algorithm: collect every commit ever recorded in upstream_ref's reflog
+/// (old + new id per entry), keep the ones that are ancestors of `head_id`,
+/// then keep only the "maximal" ones among those — not themselves an
+/// ancestor of another qualifying candidate. If exactly one remains, that's
+/// the fork point; otherwise (none, or an ambiguous multiple) there's no
+/// unique fork point and the caller should fall back to the plain tip.
+fn rebase_fork_point(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  upstream_ref : String,
+  head_id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId? {
+  let entries = @bitlib.read_reflog(rfs, git_dir, upstream_ref) catch {
+    _ => []
+  }
+  if entries.length() == 0 {
+    return None
+  }
+  let seen : Map[String, Bool] = Map([])
+  let candidates : Array[@bitcore.ObjectId] = []
+  for entry in entries {
+    for id in [entry.old_id, entry.new_id] {
+      let hex = id.to_hex()
+      if !seen.contains(hex) {
+        seen[hex] = true
+        candidates.push(id)
+      }
+    }
+  }
+  let qualifying : Array[@bitcore.ObjectId] = []
+  for candidate in candidates {
+    if @bitlib.is_ancestor_of(rfs, git_dir, candidate, head_id) {
+      qualifying.push(candidate)
+    }
+  }
+  let maximal : Array[@bitcore.ObjectId] = []
+  for a in qualifying {
+    let mut dominated = false
+    for b in qualifying {
+      if a != b && @bitlib.is_ancestor_of(rfs, git_dir, a, b) {
+        dominated = true
+        break
+      }
+    }
+    if !dominated {
+      maximal.push(a)
+    }
+  }
+  if maximal.length() == 1 {
+    Some(maximal[0])
+  } else {
+    None
   }
 }
 
