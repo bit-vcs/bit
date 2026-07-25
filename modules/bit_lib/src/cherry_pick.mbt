@@ -104,7 +104,8 @@ pub fn cherry_pick(
     match parent_files.get(path) {
       None => added_files[path] = file_entry
       Some(parent_entry) =>
-        if parent_entry.id != file_entry.id {
+        if parent_entry.id != file_entry.id ||
+          parent_entry.mode != file_entry.mode {
           modified_files[path] = file_entry
         }
     }
@@ -142,9 +143,10 @@ pub fn cherry_pick(
         // File doesn't exist in head - add it
         result_files[path] = file_entry
       Some(head_entry) =>
-        // Check if head has the same content as parent
+        // Check if head has the same content and mode as parent
         match parent_files.get(path) {
-          Some(parent_entry) if parent_entry.id == head_entry.id =>
+          Some(parent_entry) if parent_entry.id == head_entry.id &&
+            parent_entry.mode == head_entry.mode =>
             // No conflict - head hasn't changed the file
             result_files[path] = file_entry
           _ => {
@@ -160,9 +162,10 @@ pub fn cherry_pick(
   for path in deleted_files {
     match result_files.get(path) {
       Some(head_entry) =>
-        // Check if head has the same content as parent
+        // Check if head has the same content and mode as parent
         match parent_files.get(path) {
-          Some(parent_entry) if parent_entry.id == head_entry.id => {
+          Some(parent_entry) if parent_entry.id == head_entry.id &&
+            parent_entry.mode == head_entry.mode => {
             // No conflict - safe to delete
             let _ = result_files.remove(path)
           }

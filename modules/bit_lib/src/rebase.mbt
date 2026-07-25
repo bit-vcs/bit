@@ -550,6 +550,11 @@ fn rebase_write_worktree(
   git_dir : String,
   map : Map[String, TreeEntryInfo],
 ) -> Unit raise @bit.GitError {
+  let files : Map[String, TreeFileEntry] = Map([])
+  for path, info in map {
+    files[path] = { id: info.id, mode: info.mode }
+  }
+  tree_ops_remove_missing_paths(fs, rfs, root, git_dir, files, false)
   rebase_write_worktree_except(fs, db, rfs, root, git_dir, map, [])
 }
 
@@ -1441,7 +1446,7 @@ fn rebase_get_patch_tree_entries(
             result.push(sub)
           }
         } else {
-          result.push((path, entry.id.to_hex()))
+          result.push((path, entry.id.to_hex() + ":" + entry.mode))
         }
       }
     }

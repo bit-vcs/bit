@@ -423,6 +423,7 @@ fn tree_ops_remove_missing_paths(
   preserve_removed_gitlinks : Bool,
 ) -> Unit raise @bit.GitError {
   let entries = read_index_entries(rfs, git_dir)
+  let emptied_candidates : Array[String] = []
   for entry in entries {
     if files.contains(entry.path) {
       continue
@@ -430,6 +431,7 @@ fn tree_ops_remove_missing_paths(
     let path = join_path(root, entry.path)
     if rfs.is_file(path) {
       fs.remove_file(path)
+      emptied_candidates.push(parent_dir(path))
     } else if is_gitlink_mode_int(entry.mode) && rfs.is_dir(path) {
       let bit_marker = join_path(path, ".git")
       if preserve_removed_gitlinks &&
@@ -437,6 +439,39 @@ fn tree_ops_remove_missing_paths(
         continue
       }
       remove_worktree_path_recursive(fs, rfs, path)
+    }
+  }
+  tree_ops_prune_empty_dirs(fs, rfs, root, emptied_candidates)
+}
+
+///|
+/// Remove directories left empty by tree_ops_remove_missing_paths, walking
+/// upward from each candidate until a non-empty directory or `root` is
+/// reached. Best-effort: any I/O error just stops pruning that branch
+/// rather than failing the checkout that triggered it.
+fn tree_ops_prune_empty_dirs(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  candidate_dirs : Array[String],
+) -> Unit {
+  let normalized_root = normalize_path(root)
+  let visited : Map[String, Bool] = Map([])
+  for start_dir in candidate_dirs {
+    let mut dir = start_dir
+    while dir.length() > 0 &&
+          normalize_path(dir) != normalized_root &&
+          !visited.contains(dir) {
+      visited[dir] = true
+      if !rfs.is_dir(dir) {
+        break
+      }
+      let children = rfs.readdir(dir) catch { _ => [""] }
+      if children.length() > 0 {
+        break
+      }
+      fs.remove_dir(dir) catch { _ => break }
+      dir = parent_dir(dir)
     }
   }
 }
