@@ -1,8 +1,16 @@
 ///|
 test "cherry-pick: 3way flags are accepted without fallback" {
-  assert_true(cherry_pick_is_supported_noop_arg("-3"))
   assert_true(cherry_pick_is_supported_noop_arg("--3way"))
   assert_false(cherry_pick_is_supported_noop_arg("--abort"))
+}
+
+///|
+test "cherry-pick: -<n> is parsed as a pick-count, not a noop flag" {
+  assert_eq(cherry_pick_parse_count_arg("-3"), Some(3))
+  assert_eq(cherry_pick_parse_count_arg("-12"), Some(12))
+  assert_eq(cherry_pick_parse_count_arg("-"), None)
+  assert_eq(cherry_pick_parse_count_arg("--abort"), None)
+  assert_false(cherry_pick_is_supported_noop_arg("-3"))
 }
 
 ///|

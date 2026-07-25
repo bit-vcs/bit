@@ -685,6 +685,10 @@ async fn checkout_with_promisor_retry(
     if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
       @bitlib.sparse_checkout_reapply(fs, fs, root)
     }
+    @bitlibnative.apply_worktree_modes_from_commit(fs, fs, root, git_dir, id) catch {
+      err if @async.is_cancellation_error(err) => raise err
+      _ => ()
+    }
     return id
   }
   raise @bitcore.GitError::InvalidObject(

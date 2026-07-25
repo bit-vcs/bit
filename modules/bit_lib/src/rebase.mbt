@@ -12,6 +12,9 @@ pub struct RebaseState {
   author : String
   author_time : Int64
   author_tz : String
+  // old commit id -> new (rewritten) commit id, in application order.
+  // Mirrors git's .git/rebase-merge/rewritten-list.
+  rewritten : Array[(@bit.ObjectId, @bit.ObjectId)]
 }
 
 ///|
@@ -19,6 +22,10 @@ pub struct RebaseResult {
   status : RebaseStatus
   commit_id : @bit.ObjectId?
   conflicts : Array[String]
+  // old commit id -> new (rewritten) commit id, populated once the rebase
+  // completes. Empty for fast-forward / nothing-to-rebase results, since no
+  // commit ids change in those cases.
+  rewritten : Array[(@bit.ObjectId, @bit.ObjectId)]
 }
 
 ///|
@@ -277,6 +284,38 @@ fn collect_ancestors(
 }
 
 ///|
+/// Refuse to move HEAD onto `target_map` if doing so would silently
+/// overwrite an untracked file on disk, mirroring the check an ordinary
+/// checkout performs. Only paths `target_map` actually writes are checked
+/// (not a full worktree scan), since those are the only ones about to be
+/// clobbered by `rebase_write_worktree`.
+fn rebase_check_untracked_conflicts(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  root : String,
+  target_map : Map[String, TreeEntryInfo],
+) -> Unit raise @bit.GitError {
+  let index_paths : Map[String, Bool] = Map([])
+  for entry in read_index_entries(rfs, git_dir) {
+    index_paths[entry.path] = true
+  }
+  let conflicts : Array[String] = []
+  for pair in target_map.to_array() {
+    let path = pair.0
+    if !index_paths.contains(path) && rfs.is_file(join_path(root, path)) {
+      conflicts.push(path)
+    }
+  }
+  if conflicts.length() > 0 {
+    conflicts.sort()
+    let listed = conflicts.map(p => "\t" + p).join("\n")
+    raise @bit.GitError::InvalidObject(
+      "The following untracked working tree files would be overwritten by checkout:\n\{listed}\nPlease move or remove them before you switch branches.\nAborting",
+    )
+  }
+}
+
+///|
 fn rebase_tree_map(
   db : ObjectDb,
   fs : &@bit.RepoFileSystem,
@@ -511,6 +550,11 @@ fn rebase_write_worktree(
   git_dir : String,
   map : Map[String, TreeEntryInfo],
 ) -> Unit raise @bit.GitError {
+  let files : Map[String, TreeFileEntry] = Map([])
+  for path, info in map {
+    files[path] = { id: info.id, mode: info.mode }
+  }
+  tree_ops_remove_missing_paths(fs, rfs, root, git_dir, files, false)
   rebase_write_worktree_except(fs, db, rfs, root, git_dir, map, [])
 }
 
@@ -892,6 +936,17 @@ fn save_rebase_state(
     }
     None => ()
   }
+  // Write rewritten-list: "<old sha> <new sha>" per line, matching git's
+  // own on-disk format (used to drive notes.rewrite.rebase copying).
+  if state.rewritten.length() > 0 {
+    let rewritten_lines = state.rewritten.map(pair => pair.0.to_hex() +
+      " " +
+      pair.1.to_hex())
+    fs.write_string(
+      join_path(state_dir, "rewritten-list"),
+      rewritten_lines.join("\n") + "\n",
+    )
+  }
 }
 
 ///|
@@ -920,6 +975,36 @@ pub fn load_rebase_state(
   } else {
     ""
   }
+  let rewritten_list_path = join_path(state_dir, "rewritten-list")
+  let rewritten : Array[(@bit.ObjectId, @bit.ObjectId)] = if fs.is_file(
+    rewritten_list_path,
+  ) {
+    let content = @utf8.decode_lossy(fs.read_file(rewritten_list_path)[:])
+    let out : Array[(@bit.ObjectId, @bit.ObjectId)] = []
+    for line_view in content.split("\n") {
+      let line = line_view.to_owned()
+      if line.length() == 0 {
+        continue
+      }
+      match line.find(" ") {
+        Some(idx) => {
+          let old_hex = String::unsafe_substring(line, start=0, end=idx)
+          let new_hex = String::unsafe_substring(
+            line,
+            start=idx + 1,
+            end=line.length(),
+          )
+          out.push(
+            (@bit.ObjectId::from_hex(old_hex), @bit.ObjectId::from_hex(new_hex)),
+          )
+        }
+        None => ()
+      }
+    }
+    out
+  } else {
+    []
+  }
   Some({
     onto: @bit.ObjectId::from_hex(onto_hex),
     orig_head: @bit.ObjectId::from_hex(orig_head_hex),
@@ -931,6 +1016,7 @@ pub fn load_rebase_state(
     author: "",
     author_time: 0L,
     author_tz: "+0000",
+    rewritten,
   })
 }
 
@@ -1056,6 +1142,7 @@ pub fn rebase_start_with_onto(
         status: RebaseStatus::Complete,
         commit_id: Some(onto),
         conflicts: [],
+        rewritten: [],
       }
     }
     Some(h) => {
@@ -1064,6 +1151,7 @@ pub fn rebase_start_with_onto(
           status: RebaseStatus::NothingToRebase,
           commit_id: Some(h),
           conflicts: [],
+          rewritten: [],
         }
       }
       let db = ObjectDb::load(rfs, git_dir)
@@ -1076,12 +1164,14 @@ pub fn rebase_start_with_onto(
               status: RebaseStatus::Complete,
               commit_id: Some(onto),
               conflicts: [],
+              rewritten: [],
             }
           }
           return {
             status: RebaseStatus::NothingToRebase,
             commit_id: Some(h),
             conflicts: [],
+            rewritten: [],
           }
         }
       }
@@ -1090,6 +1180,8 @@ pub fn rebase_start_with_onto(
         HeadRef::Branch(name) => "refs/heads/" + name
         HeadRef::Detached(_) => ""
       }
+      let onto_map = rebase_tree_map(db, rfs, onto)
+      rebase_check_untracked_conflicts(rfs, git_dir, root, onto_map)
       // Create initial state
       let state : RebaseState = {
         onto,
@@ -1102,11 +1194,11 @@ pub fn rebase_start_with_onto(
         author: "",
         author_time: 0L,
         author_tz: "+0000",
+        rewritten: [],
       }
       save_rebase_state(fs, git_dir, state)
       // Move HEAD to the new base before applying commits.
       rebase_update_head(fs, rfs, git_dir, onto)
-      let onto_map = rebase_tree_map(db, rfs, onto)
       rebase_write_worktree(fs, db, rfs, root, git_dir, onto_map)
       let entries = rebase_map_to_index(db, rfs, onto_map)
       write_index_entries(fs, git_dir, entries)
@@ -1164,6 +1256,8 @@ pub fn rebase_continue(
   if new_todo.length() > 0 {
     ignore(new_todo.remove(0))
   }
+  let new_rewritten = s.rewritten.copy()
+  new_rewritten.push((current_id, new_id))
   let new_state : RebaseState = {
     onto: s.onto,
     orig_head: s.orig_head,
@@ -1175,6 +1269,7 @@ pub fn rebase_continue(
     author: "",
     author_time: 0L,
     author_tz: "+0000",
+    rewritten: new_rewritten,
   }
   save_rebase_state(fs, git_dir, new_state)
   // Continue with next commits
@@ -1249,6 +1344,7 @@ pub fn rebase_skip(
     author: "",
     author_time: 0L,
     author_tz: "+0000",
+    rewritten: s.rewritten,
   }
   save_rebase_state(fs, git_dir, new_state)
   // Reset worktree to current HEAD
@@ -1350,7 +1446,7 @@ fn rebase_get_patch_tree_entries(
             result.push(sub)
           }
         } else {
-          result.push((path, entry.id.to_hex()))
+          result.push((path, entry.id.to_hex() + ":" + entry.mode))
         }
       }
     }
@@ -1519,7 +1615,12 @@ fn rebase_apply_next(
       let ref_path = join_path(git_dir, state.head_name)
       fs.write_string(ref_path, final_id.to_hex() + "\n")
     }
-    return { status: RebaseStatus::Complete, commit_id: head, conflicts: [] }
+    return {
+      status: RebaseStatus::Complete,
+      commit_id: head,
+      conflicts: [],
+      rewritten: state.rewritten,
+    }
   }
   let commit_id = state.todo[0]
   let info = rebase_parse_commit_full(db, rfs, commit_id)
@@ -1552,6 +1653,7 @@ fn rebase_apply_next(
       author: "",
       author_time: 0L,
       author_tz: "+0000",
+      rewritten: state.rewritten,
     }
     save_rebase_state(fs, git_dir, new_state)
     return rebase_apply_next(fs, rfs, root, new_state)
@@ -1573,6 +1675,7 @@ fn rebase_apply_next(
       author: info.author,
       author_time: info.author_time,
       author_tz: info.author_tz,
+      rewritten: state.rewritten,
     }
     save_rebase_state(fs, git_dir, new_state)
     // Write partially merged state to worktree and index (skip conflicting files)
@@ -1585,6 +1688,7 @@ fn rebase_apply_next(
       status: RebaseStatus::Conflict,
       commit_id: Some(commit_id),
       conflicts,
+      rewritten: state.rewritten,
     }
   }
   // No conflicts - create new commit
@@ -1608,6 +1712,8 @@ fn rebase_apply_next(
   new_done.push(commit_id)
   let new_todo = state.todo.copy()
   ignore(new_todo.remove(0))
+  let new_rewritten = state.rewritten.copy()
+  new_rewritten.push((commit_id, new_id))
   let new_state : RebaseState = {
     onto: state.onto,
     orig_head: state.orig_head,
@@ -1619,6 +1725,7 @@ fn rebase_apply_next(
     author: "",
     author_time: 0L,
     author_tz: "+0000",
+    rewritten: new_rewritten,
   }
   save_rebase_state(fs, git_dir, new_state)
   // Recursively apply next

@@ -1,11 +1,64 @@
 ///|
 fn cherry_pick_is_supported_noop_arg(arg : String) -> Bool {
-  arg == "-3" || arg == "--3way" || arg == "--ff"
+  arg == "--3way" || arg == "--ff"
 }
 
 ///|
 fn cherry_pick_is_positional_arg(arg : String) -> Bool {
   arg == "-" || !arg.has_prefix("-")
+}
+
+///|
+/// Parses git's `-<n>` shorthand (e.g. `-2`, `-3`) used by `git cherry-pick
+/// -<n> <commit>` to mean "the last n commits (first-parent history) ending
+/// at <commit>". Returns None for anything else, including the bare `-`
+/// (handled separately as a positional arg).
+fn cherry_pick_parse_count_arg(arg : String) -> Int? {
+  if !arg.has_prefix("-") || arg.length() < 2 {
+    return None
+  }
+  let rest = String::unsafe_substring(arg, start=1, end=arg.length())
+  for ch in rest {
+    if ch < '0' || ch > '9' {
+      return None
+    }
+  }
+  let n = @string.parse_int(rest) catch { _ => -1 }
+  if n >= 0 {
+    Some(n)
+  } else {
+    None
+  }
+}
+
+///|
+/// Collects the last `n` commits (first-parent history, oldest first) ending
+/// at `target`, for `git cherry-pick -<n> <commit>`.
+fn cherry_pick_collect_last_n_commits(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  target : @bitcore.ObjectId,
+  n : Int,
+) -> Array[@bitcore.ObjectId] raise Error {
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let commits : Array[@bitcore.ObjectId] = []
+  let mut current : @bitcore.ObjectId? = Some(target)
+  while current is Some(cid) && commits.length() < n {
+    commits.push(cid)
+    current = match db.get(rfs, cid) {
+      Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
+        let info = @bitcore.parse_commit(obj.data)
+        if info.parents.length() > 0 {
+          Some(info.parents[0])
+        } else {
+          None
+        }
+      }
+      _ => None
+    }
+  }
+  commits.rev_in_place()
+  commits
 }
 
 ///|
@@ -60,6 +113,7 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
   let mut signoff = false
   let mut add_cherry_pick_note = false
   let unsupported_args : Array[String] = []
+  let mut pick_count : Int? = None
   // Parse arguments
   let mut commit_spec : String? = None
   for arg in args {
@@ -79,6 +133,8 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
       add_cherry_pick_note = true
     } else if cherry_pick_is_supported_noop_arg(arg) {
       use_threeway = true
+    } else if cherry_pick_parse_count_arg(arg) is Some(n) {
+      pick_count = Some(n)
     } else {
       unsupported_args.push(arg)
     }
@@ -130,7 +186,16 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
     }
   }
   let commit_ids : Array[@bitcore.ObjectId] = []
-  if use_threeway {
+  if pick_count is Some(n) {
+    let replay_commits = cherry_pick_collect_last_n_commits(rfs, git_dir, cid, n)
+    if replay_commits.length() > 0 {
+      for replay_id in replay_commits {
+        commit_ids.push(replay_id)
+      }
+    } else {
+      commit_ids.push(cid)
+    }
+  } else if use_threeway {
     match @bitlib.resolve_head_commit(rfs, git_dir) {
       Some(head_id) =>
         match rev_parse_find_merge_base(rfs, git_dir, head_id, cid) {

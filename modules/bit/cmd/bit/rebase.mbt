@@ -461,6 +461,9 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let strategy_options : Array[String] = []
   let mut onto : String? = None
   let mut upstream : String? = None
+  // git rebase [<upstream>] [<branch>]: a second positional arg means
+  // "switch to <branch> first, then rebase it onto <upstream>".
+  let mut switch_to_branch : String? = None
   let mut gpg_sign : Bool? = None
   let mut signing_key : String? = None
   let mut i = 0
@@ -658,11 +661,19 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--empty=") => i += 1
       // Bare "-" is the "previous branch" revision shorthand, not an option.
       "-" => {
-        upstream = Some(arg)
+        if upstream is None {
+          upstream = Some(arg)
+        } else if switch_to_branch is None {
+          switch_to_branch = Some(arg)
+        }
         i += 1
       }
       _ if !arg.has_prefix("-") => {
-        upstream = Some(arg)
+        if upstream is None {
+          upstream = Some(arg)
+        } else if switch_to_branch is None {
+          switch_to_branch = Some(arg)
+        }
         i += 1
       }
       _ if arg.has_prefix("-") => {
@@ -894,6 +905,13 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         None => false
       }
   }
+  // A second positional arg: switch to it first (like `bit checkout
+  // <branch>`), so the rebase below operates on it as the current HEAD.
+  // Reuses checkout's own worktree-lock / detached-HEAD / dirty-tree rules.
+  match switch_to_branch {
+    Some(target) => handle_checkout([target])
+    None => ()
+  }
   // Require a clean worktree/index before starting a new rebase, unless
   // --autostash (or rebase.autoStash) will stash the dirty state for us.
   if !autostash {
@@ -939,13 +957,21 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   }
   // Start new rebase
   // Resolve upstream: --root mode doesn't need an upstream argument
+  // fork_point_ref is set only when the upstream was auto-resolved (no
+  // explicit <upstream> given), matching git's rule that --fork-point
+  // detection only kicks in by default in that case.
+  let mut fork_point_ref : String? = None
   let id : @bitcore.ObjectId = if root_mode {
     // Use empty tree OID as a sentinel; actual root handling is in the lib layer
     @bitcore.ObjectId::from_hex("4b825dc642cb6eb9a060e54bf899d15363647a20")
   } else {
     let effective_upstream = match upstream {
       Some(u) => Some(u)
-      None => rebase_resolve_default_upstream(rfs, git_dir)
+      None => {
+        let resolved = rebase_resolve_default_upstream(rfs, git_dir)
+        fork_point_ref = resolved
+        resolved
+      }
     }
     guard effective_upstream is Some(ref_name) else {
       raise @bitcore.GitError::InvalidObject(
@@ -1035,11 +1061,28 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
           @bitlib.rebase_start_with_onto(fs, fs, root, oid, id, force_rebase~),
         )
       }
-      None =>
+      None => {
+        let exclude_from = match fork_point_ref {
+          Some(ref_name) => {
+            let head_id = @bitrepo.rev_parse(fs, git_dir, "HEAD")
+            match head_id {
+              Some(hid) =>
+                match rebase_fork_point(rfs, git_dir, ref_name, hid) {
+                  Some(fp) => fp
+                  None => id
+                }
+              None => id
+            }
+          }
+          None => id
+        }
         (
           id,
-          @bitlib.rebase_start_with_onto(fs, fs, root, id, id, force_rebase~),
+          @bitlib.rebase_start_with_onto(
+            fs, fs, root, id, exclude_from, force_rebase~,
+          ),
         )
+      }
     }
     let signed_id = if should_sign {
       rebase_sign_complete_result(
@@ -1052,12 +1095,133 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       wfs, git_dir, should_sign, effective_signing_key, result,
     )
     print_rebase_result_with_commit(result, signed_id, quiet~)
+    if result.status is @bitlib.RebaseStatus::Complete {
+      rebase_copy_notes_after_rewrite(wfs, rfs, git_dir, result.rewritten)
+    }
     // Autostash pop on success
     if autostash_oid is Some(_) &&
       result.status is @bitlib.RebaseStatus::Complete {
       rebase_autostash_pop(wfs, rfs, root)
     }
   }
+}
+
+///|
+/// notes.rewrite.rebase (default true) + notes.rewriteRef: after a
+/// successful rebase, copy each rewritten commit's note (if any) from its
+/// old id to its new id, for every notes ref selected by notes.rewriteRef
+/// (exact ref names, or a "refs/notes/*"-style prefix glob).
+async fn rebase_copy_notes_after_rewrite(
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  rewritten : Array[(@bitcore.ObjectId, @bitcore.ObjectId)],
+) -> Unit raise Error {
+  if rewritten.length() == 0 {
+    return
+  }
+  let enabled = match
+    @bitlib.read_config_value(
+      rfs,
+      git_dir + "/config",
+      "notes",
+      "rewrite.rebase",
+    ) {
+    Some(v) => v.to_lower() != "false"
+    None => true
+  }
+  if !enabled {
+    return
+  }
+  let patterns = @bitlib.read_config_values(
+    rfs,
+    git_dir + "/config",
+    "notes",
+    "rewriteRef",
+  )
+  if patterns.length() == 0 {
+    return
+  }
+  let common_git_dir = notes_resolve_common_git_dir(rfs, git_dir)
+  let target_refs = rebase_resolve_notes_rewrite_refs(
+    rfs, common_git_dir, patterns,
+  )
+  for notes_ref in target_refs {
+    for pair in rewritten {
+      let (old_id, new_id) = pair
+      if rebase_note_exists(rfs, git_dir, common_git_dir, notes_ref, old_id.to_hex()) {
+        // force=true: internal rewrite copying (unlike `git notes copy`) is
+        // not asking the user to confirm, and a rebase can deterministically
+        // reproduce the same new commit id it produced last time (e.g. when
+        // replaying the exact same commit onto the exact same base again),
+        // in which case the destination note already legitimately exists.
+        notes_copy(
+          wfs, rfs, git_dir, common_git_dir, notes_ref, old_id.to_hex(), new_id.to_hex(),
+          true,
+        )
+      }
+    }
+  }
+}
+
+///|
+fn rebase_resolve_notes_rewrite_refs(
+  rfs : &@bitcore.RepoFileSystem,
+  common_git_dir : String,
+  patterns : Array[String],
+) -> Array[String] {
+  let seen : Map[String, Bool] = Map([])
+  let out : Array[String] = []
+  for pattern in patterns {
+    if pattern.has_suffix("/*") {
+      let prefix = String::unsafe_substring(
+        pattern,
+        start=0,
+        end=pattern.length() - 1,
+      )
+      let refs = @bitlib.list_refs_with_ids(rfs, common_git_dir, Some(prefix))
+      for pair in refs.to_array() {
+        let name = pair.0
+        if !seen.contains(name) {
+          seen[name] = true
+          out.push(name)
+        }
+      }
+    } else if !seen.contains(pattern) {
+      seen[pattern] = true
+      out.push(pattern)
+    }
+  }
+  out
+}
+
+///|
+fn rebase_note_exists(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  common_git_dir : String,
+  notes_ref : String,
+  hex : String,
+) -> Bool {
+  let commit_id = @bitlib.resolve_ref(rfs, git_dir, notes_ref) catch {
+    _ => None
+  }
+  guard commit_id is Some(cid) else { return false }
+  let db = @bitlib.ObjectDb::load(rfs, common_git_dir) catch {
+    _ => return false
+  }
+  let obj = db.get(rfs, cid) catch { _ => None }
+  guard obj is Some(o) else { return false }
+  let commit_info = @bitcore.parse_commit(o.data) catch { _ => return false }
+  let collected = notes_collect_all(rfs, db, commit_info.tree) catch {
+    _ => return false
+  }
+  for pair in collected {
+    if pair.0 == hex {
+      return true
+    }
+  }
+  false
 }
 
 ///|
@@ -1204,6 +1368,71 @@ fn rebase_resolve_default_upstream(
   match branches.get(branch) {
     Some(cfg) if cfg.merges.length() > 0 => Some(cfg.merges[0])
     _ => None
+  }
+}
+
+///|
+/// git merge-base --fork-point semantics: when no explicit <upstream> is
+/// given, `git rebase` doesn't just exclude commits reachable from
+/// @{upstream}'s *current* tip — it walks @{upstream}'s reflog to find where
+/// the current branch actually forked from it, since @{upstream} may have
+/// since moved (e.g. been reset backward). That reflog-derived commit, not
+/// the live tip, is the correct exclusion baseline for "which commits does
+/// this rebase need to replay" — the target to attach onto is still the
+/// live tip.
+///
+/// Algorithm: collect every commit ever recorded in upstream_ref's reflog
+/// (old + new id per entry), keep the ones that are ancestors of `head_id`,
+/// then keep only the "maximal" ones among those — not themselves an
+/// ancestor of another qualifying candidate. If exactly one remains, that's
+/// the fork point; otherwise (none, or an ambiguous multiple) there's no
+/// unique fork point and the caller should fall back to the plain tip.
+fn rebase_fork_point(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  upstream_ref : String,
+  head_id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId? {
+  let entries = @bitlib.read_reflog(rfs, git_dir, upstream_ref) catch {
+    _ => []
+  }
+  if entries.length() == 0 {
+    return None
+  }
+  let seen : Map[String, Bool] = Map([])
+  let candidates : Array[@bitcore.ObjectId] = []
+  for entry in entries {
+    for id in [entry.old_id, entry.new_id] {
+      let hex = id.to_hex()
+      if !seen.contains(hex) {
+        seen[hex] = true
+        candidates.push(id)
+      }
+    }
+  }
+  let qualifying : Array[@bitcore.ObjectId] = []
+  for candidate in candidates {
+    if @bitlib.is_ancestor_of(rfs, git_dir, candidate, head_id) {
+      qualifying.push(candidate)
+    }
+  }
+  let maximal : Array[@bitcore.ObjectId] = []
+  for a in qualifying {
+    let mut dominated = false
+    for b in qualifying {
+      if a != b && @bitlib.is_ancestor_of(rfs, git_dir, a, b) {
+        dominated = true
+        break
+      }
+    }
+    if !dominated {
+      maximal.push(a)
+    }
+  }
+  if maximal.length() == 1 {
+    Some(maximal[0])
+  } else {
+    None
   }
 }
 
