@@ -1605,6 +1605,7 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
   let mut rotate_to : String? = None
   let mut skip_to : String? = None
   let mut combined_specs : (String, String, String)? = None
+  let mut blob_pair_spec : (String, String, @bitcore.ObjectId, @bitcore.ObjectId)? = None
   let mut expect_orderfile = false
   let mut expect_output = false
   let mut expect_rotate_to = false
@@ -1858,7 +1859,14 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
       ref_target = Some(revs[0])
       rest
     } else if revs.length() == 2 {
-      range_spec = Some(revs[0] + ".." + revs[1])
+      let blob_db = @bitlib.ObjectDb::load(rfs, repo_git_dir)
+      let blob_a = diff_resolve_blob_id(blob_db, rfs, repo_git_dir, revs[0])
+      let blob_b = diff_resolve_blob_id(blob_db, rfs, repo_git_dir, revs[1])
+      match (blob_a, blob_b) {
+        (Some(a_id), Some(b_id)) =>
+          blob_pair_spec = Some((revs[0], revs[1], a_id, b_id))
+        _ => range_spec = Some(revs[0] + ".." + revs[1])
+      }
       rest
     } else if revs.length() == 3 {
       combined_specs = Some((revs[0], revs[1], revs[2]))
@@ -1958,53 +1966,60 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
     }
     _ => ()
   }
-  let all_files = match combined_specs {
-    Some((base, parent_a, parent_b)) =>
-      diff_combined_against_parents(rfs, repo_git_dir, base, parent_a, parent_b)
+  let all_files = match blob_pair_spec {
+    Some((old_spec, new_spec, old_id, new_id)) =>
+      diff_blob_pair_files(rfs, repo_git_dir, old_spec, new_spec, old_id, new_id)
     None =>
-      match range_spec {
-        Some(spec) => {
-          if submodule_mode {
-            let handled = try_handle_submodule_range_diff(
-              fs, root, git_dir, repo_git_dir, spec,
-            )
-            if handled {
-              return
-            }
-          }
-          let db = @bitlib.ObjectDb::load(rfs, repo_git_dir)
-          match resolve_submodule_diff_range(db, rfs, repo_git_dir, spec) {
-            Some((old_id, new_id)) => {
-              let old_tree = resolve_diff_tree_id(db, rfs, old_id)
-              let new_tree = resolve_diff_tree_id(db, rfs, new_id)
-              match (old_tree, new_tree) {
-                (Some(ot), Some(nt)) =>
-                  @bitdiff.diff_trees(rfs, repo_git_dir, Some(ot), nt, db~)
-                _ =>
+      match combined_specs {
+        Some((base, parent_a, parent_b)) =>
+          diff_combined_against_parents(
+            rfs, repo_git_dir, base, parent_a, parent_b,
+          )
+        None =>
+          match range_spec {
+            Some(spec) => {
+              if submodule_mode {
+                let handled = try_handle_submodule_range_diff(
+                  fs, root, git_dir, repo_git_dir, spec,
+                )
+                if handled {
+                  return
+                }
+              }
+              let db = @bitlib.ObjectDb::load(rfs, repo_git_dir)
+              match resolve_submodule_diff_range(db, rfs, repo_git_dir, spec) {
+                Some((old_id, new_id)) => {
+                  let old_tree = resolve_diff_tree_id(db, rfs, old_id)
+                  let new_tree = resolve_diff_tree_id(db, rfs, new_id)
+                  match (old_tree, new_tree) {
+                    (Some(ot), Some(nt)) =>
+                      @bitdiff.diff_trees(rfs, repo_git_dir, Some(ot), nt, db~)
+                    _ =>
+                      raise @bitcore.GitError::InvalidObject(
+                        "unsupported diff range: " + spec,
+                      )
+                  }
+                }
+                None =>
                   raise @bitcore.GitError::InvalidObject(
                     "unsupported diff range: " + spec,
                   )
               }
             }
             None =>
-              raise @bitcore.GitError::InvalidObject(
-                "unsupported diff range: " + spec,
-              )
-          }
-        }
-        None =>
-          if cached {
-            match ref_target {
-              Some(spec) =>
-                diff_cached_against_ref(fs, rfs, root, git_dir, spec)
-              None => @bitdiff.diff_index(fs, root)
-            }
-          } else {
-            match ref_target {
-              Some(spec) =>
-                diff_worktree_against_ref(fs, rfs, root, git_dir, spec)
-              None => @bitdiff.diff_worktree(fs, root)
-            }
+              if cached {
+                match ref_target {
+                  Some(spec) =>
+                    diff_cached_against_ref(fs, rfs, root, git_dir, spec)
+                  None => @bitdiff.diff_index(fs, root)
+                }
+              } else {
+                match ref_target {
+                  Some(spec) =>
+                    diff_worktree_against_ref(fs, rfs, root, git_dir, spec)
+                  None => @bitdiff.diff_worktree(fs, root)
+                }
+              }
           }
       }
   }
@@ -3054,6 +3069,72 @@ async fn try_handle_submodule_range_diff(
     handled = true
   }
   handled
+}
+
+///|
+/// Resolves `spec` to a blob object id, returning None if it does not
+/// resolve at all or resolves to a non-blob object (commit/tree/tag).
+fn diff_resolve_blob_id(
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+) -> @bitcore.ObjectId? raise Error {
+  guard @bitrepo.rev_parse(rfs, git_dir, spec) is Some(oid) else {
+    return None
+  }
+  guard db.get(rfs, oid) is Some(obj) else { return None }
+  if obj.obj_type == @bitcore.ObjectType::Blob {
+    Some(oid)
+  } else {
+    None
+  }
+}
+
+///|
+/// The path portion of a `<rev>:<path>` blob spec, or the spec itself when
+/// it has no `:` (e.g. a bare blob sha).
+fn diff_blob_spec_display_path(spec : String) -> String {
+  match spec.find(":") {
+    Some(idx) if idx + 1 <= spec.length() =>
+      String::unsafe_substring(spec, start=idx + 1, end=spec.length())
+    _ => spec
+  }
+}
+
+///|
+/// Builds the (at most one entry) file list for `git diff <blob> <blob>`,
+/// the two-blob comparison form (e.g. `git diff a:CR HEAD:CR`).
+fn diff_blob_pair_files(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  old_spec : String,
+  new_spec : String,
+  old_id : @bitcore.ObjectId,
+  new_id : @bitcore.ObjectId,
+) -> Array[@bitdiff.DiffFile] raise Error {
+  if old_id == new_id {
+    return []
+  }
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  guard db.get(rfs, old_id) is Some(old_obj) else { return [] }
+  guard db.get(rfs, new_id) is Some(new_obj) else { return [] }
+  let path = diff_blob_spec_display_path(new_spec)
+  let path = if path.length() > 0 {
+    path
+  } else {
+    diff_blob_spec_display_path(old_spec)
+  }
+  [
+    {
+      path,
+      kind: @bitdiff.DiffKind::Modified,
+      old_content: Some(old_obj.data),
+      new_content: Some(new_obj.data),
+      old_mode: Some(0o100644),
+      new_mode: Some(0o100644),
+    },
+  ]
 }
 
 ///|
