@@ -10,7 +10,7 @@ fn setup_repo_rebase() -> @bit.TestFs {
 }
 
 ///|
-test "rebase: start with onto rebases commits onto new base" {
+async test "rebase: start with onto rebases commits onto new base" {
   let fs = setup_repo_rebase()
   fs.write_string("/repo/a.txt", "A\n")
   add_paths(fs, fs, "/repo", ["a.txt"])
@@ -68,7 +68,7 @@ test "rebase: start with onto rebases commits onto new base" {
 }
 
 ///|
-test "rebase: start fast-forwards when HEAD is behind upstream" {
+async test "rebase: start fast-forwards when HEAD is behind upstream" {
   let fs = setup_repo_rebase()
   fs.write_string("/repo/a.txt", "A\n")
   add_paths(fs, fs, "/repo", ["a.txt"])
@@ -96,7 +96,7 @@ test "rebase: start fast-forwards when HEAD is behind upstream" {
 }
 
 ///|
-test "rebase: start skips commit whose patch already exists upstream" {
+async test "rebase: start skips commit whose patch already exists upstream" {
   let fs = setup_repo_rebase()
   let base_content = "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n"
   fs.write_string("/repo/stuff", base_content)

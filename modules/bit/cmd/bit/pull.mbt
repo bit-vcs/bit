@@ -574,8 +574,9 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         pull_apply_autostash(fs, fs, git_dir, root, autostash_state, quiet)
       }
     } else {
+      let filter_cmd = @bitlib.FilterCmd::{ run: @bitlibnative.run_filter_command }
       let result = @bitlib.rebase_start_with_onto(
-        fs, fs, root, tid, rebase_upstream,
+        fs, fs, root, tid, rebase_upstream, run_filter_cmd=filter_cmd,
       )
       match result.status {
         @bitlib.RebaseStatus::Complete =>

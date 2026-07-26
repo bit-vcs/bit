@@ -408,6 +408,32 @@ pub fn read_filter_commands(
 }
 
 ///|
+/// Apply the external filter driver's smudge command (blob -> worktree),
+/// e.g. from `.gitattributes`' `filter=name`. Returns `content` unchanged
+/// when no filter is configured for the path, the filter is `lfs` (handled
+/// separately by pointer resolution), or no `run_filter_cmd` callback /
+/// smudge command is available.
+pub async fn apply_filter_smudge(
+  rfs : &@bit.RepoFileSystem,
+  content : Bytes,
+  attrs : FileEolAttrs,
+  root : String,
+  git_dir : String,
+  run_filter_cmd : FilterCmd?,
+) -> Bytes raise @bit.GitError {
+  match (attrs.filter, run_filter_cmd) {
+    (Some(name), Some(run_cmd)) if name != "lfs" => {
+      let (_, smudge_cmd) = read_filter_commands(rfs, git_dir, name)
+      match smudge_cmd {
+        Some(cmd) => (run_cmd.run)(root, git_dir, cmd, content)
+        None => content
+      }
+    }
+    _ => content
+  }
+}
+
+///|
 /// Check if .gitattributes has any filter= attributes (for storage runtime bypass).
 pub fn has_any_filter_attributes(
   rfs : &@bit.RepoFileSystem,
