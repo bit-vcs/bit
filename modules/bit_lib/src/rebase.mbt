@@ -36,6 +36,20 @@ pub enum RebaseStatus {
 }
 
 ///|
+/// Resolves the actual `.git` directory for `root`, following the
+/// `gitdir: <path>` pointer file used by linked worktrees (where
+/// `<root>/.git` is a file, not a directory, and the real admin dir lives
+/// under the main repo's `.git/worktrees/<name>`).
+fn rebase_resolve_git_dir(rfs : &@bit.RepoFileSystem, root : String) -> String {
+  let default_git_dir = join_path(root, ".git")
+  if rfs.is_file(default_git_dir) {
+    resolve_gitdir(rfs, default_git_dir)
+  } else {
+    default_git_dir
+  }
+}
+
+///|
 pub async fn fast_forward_to(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -43,7 +57,7 @@ pub async fn fast_forward_to(
   target : @bit.ObjectId,
   run_filter_cmd? : FilterCmd,
 ) -> Unit raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = rebase_resolve_git_dir(rfs, root)
   let db = ObjectDb::load(rfs, git_dir)
   let tree_map = rebase_tree_map(db, rfs, target)
   rebase_update_head(fs, rfs, git_dir, target)
@@ -61,7 +75,7 @@ pub async fn rebase_onto(
   upstream : @bit.ObjectId,
   run_filter_cmd? : FilterCmd,
 ) -> @bit.ObjectId raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = rebase_resolve_git_dir(rfs, root)
   let head = resolve_head_commit(rfs, git_dir)
   match head {
     None => {
@@ -87,7 +101,7 @@ pub async fn rebase_onto(
         let commit_map = rebase_tree_map_from_tree(db, rfs, info.tree)
         let changes = rebase_diff_maps(parent_map, commit_map)
         rebase_apply_changes(base_map, parent_map, changes)
-        let new_tree = rebase_write_tree_from_map(fs, git_dir, base_map)
+        let new_tree = rebase_write_tree_from_map(fs, rfs, git_dir, base_map)
         let new_commit = @bit.Commit::new(
           new_tree,
           [parent],
@@ -100,7 +114,7 @@ pub async fn rebase_onto(
           info.message,
         )
         let (new_id, compressed) = @bit.create_commit(new_commit)
-        rebase_write_object(fs, git_dir, new_id, compressed)
+        rebase_write_object(fs, rfs, git_dir, new_id, compressed)
         parent = new_id
       }
       rebase_update_head(fs, rfs, git_dir, parent)
@@ -460,6 +474,7 @@ fn rebase_apply_changes(
 ///|
 fn rebase_write_tree_from_map(
   fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   map : Map[String, TreeEntryInfo],
 ) -> @bit.ObjectId raise @bit.GitError {
@@ -481,12 +496,13 @@ fn rebase_write_tree_from_map(
   }
   entries.sort_by((a, b) => String::lexical_compare(a.path, b.path))
   let rel_entries = entries.map(e => e)
-  rebase_write_tree_recursive(fs, git_dir, rel_entries)
+  rebase_write_tree_recursive(fs, rfs, git_dir, rel_entries)
 }
 
 ///|
 fn rebase_write_tree_recursive(
   fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   entries : Array[IndexEntry],
 ) -> @bit.ObjectId raise @bit.GitError {
@@ -534,12 +550,12 @@ fn rebase_write_tree_recursive(
     }
   }
   for dir_name, list in dir_map {
-    let sub_id = rebase_write_tree_recursive(fs, git_dir, list)
+    let sub_id = rebase_write_tree_recursive(fs, rfs, git_dir, list)
     file_entries.push(@bit.TreeEntry::new("040000", dir_name, sub_id))
   }
   file_entries.sort_by((a, b) => String::lexical_compare(a.name, b.name))
   let (tree_id, compressed) = @bit.create_tree(file_entries)
-  rebase_write_object(fs, git_dir, tree_id, compressed)
+  rebase_write_object(fs, rfs, git_dir, tree_id, compressed)
   tree_id
 }
 
@@ -882,10 +898,14 @@ fn rebase_parse_int64(s : String) -> Int64 {
 ///|
 fn rebase_write_object(
   fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   id : @bit.ObjectId,
   compressed : Bytes,
 ) -> Unit raise @bit.GitError {
+  // A linked worktree's git dir has no objects/ of its own; write through
+  // to the shared object store (main repo's git dir via "commondir").
+  let git_dir = object_storage_git_dir(rfs, git_dir)
   let hex = id.to_hex()
   let dir = join_path(
     git_dir,
@@ -1210,7 +1230,7 @@ pub async fn rebase_start_with_onto(
   force_rebase? : Bool = false,
   run_filter_cmd? : FilterCmd,
 ) -> RebaseResult raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = rebase_resolve_git_dir(rfs, root)
   // Check if rebase already in progress
   if is_rebase_in_progress(rfs, git_dir) {
     raise @bit.GitError::InvalidObject(
@@ -1299,7 +1319,7 @@ pub async fn rebase_continue(
   root : String,
   run_filter_cmd? : FilterCmd,
 ) -> RebaseResult raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = rebase_resolve_git_dir(rfs, root)
   let state = load_rebase_state(rfs, git_dir)
   guard state is Some(s) else {
     raise @bit.GitError::InvalidObject("No rebase in progress")
@@ -1331,7 +1351,7 @@ pub async fn rebase_continue(
     info.message,
   )
   let (new_id, compressed) = @bit.create_commit(new_commit)
-  rebase_write_object(fs, git_dir, new_id, compressed)
+  rebase_write_object(fs, rfs, git_dir, new_id, compressed)
   rebase_update_head(fs, rfs, git_dir, new_id)
   // Update state: move current to done, clear current
   let new_done = s.done.copy()
@@ -1368,7 +1388,7 @@ pub async fn rebase_abort(
   root : String,
   run_filter_cmd? : FilterCmd,
 ) -> Unit raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = rebase_resolve_git_dir(rfs, root)
   let state = load_rebase_state(rfs, git_dir)
   guard state is Some(s) else {
     raise @bit.GitError::InvalidObject("No rebase in progress")
@@ -1406,7 +1426,7 @@ pub async fn rebase_skip(
   root : String,
   run_filter_cmd? : FilterCmd,
 ) -> RebaseResult raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = rebase_resolve_git_dir(rfs, root)
   let state = load_rebase_state(rfs, git_dir)
   guard state is Some(s) else {
     raise @bit.GitError::InvalidObject("No rebase in progress")
@@ -1682,7 +1702,7 @@ async fn rebase_apply_next(
   state : RebaseState,
   run_filter_cmd? : FilterCmd,
 ) -> RebaseResult raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = rebase_resolve_git_dir(rfs, root)
   let db = ObjectDb::load(rfs, git_dir)
   if state.todo.length() == 0 {
     // All done, finalize rebase
@@ -1779,7 +1799,7 @@ async fn rebase_apply_next(
     }
   }
   // No conflicts - create new commit
-  let new_tree = rebase_write_tree_from_map(fs, git_dir, base_map)
+  let new_tree = rebase_write_tree_from_map(fs, rfs, git_dir, base_map)
   let new_commit = @bit.Commit::new(
     new_tree,
     [base_id],
@@ -1792,7 +1812,7 @@ async fn rebase_apply_next(
     info.message,
   )
   let (new_id, compressed) = @bit.create_commit(new_commit)
-  rebase_write_object(fs, git_dir, new_id, compressed)
+  rebase_write_object(fs, rfs, git_dir, new_id, compressed)
   rebase_update_head(fs, rfs, git_dir, new_id)
   // Update state and continue
   let new_done = state.done.copy()
@@ -1931,7 +1951,8 @@ fn rebase_apply_changes_with_conflicts(
                   let (blob_id, compressed) = @bit.create_blob(content_bytes)
                   rebase_write_object(
                     fs,
-                    join_path(root, ".git"),
+                    rfs,
+                    rebase_resolve_git_dir(rfs, root),
                     blob_id,
                     compressed,
                   )

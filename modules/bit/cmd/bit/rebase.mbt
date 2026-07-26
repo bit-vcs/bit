@@ -925,8 +925,22 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   // A second positional arg: switch to it first (like `bit checkout
   // <branch>`), so the rebase below operates on it as the current HEAD.
   // Reuses checkout's own worktree-lock / detached-HEAD / dirty-tree rules.
+  // Unlike plain checkout, this check is unconditional even when the
+  // target is already the current branch: rebase is about to rewrite the
+  // branch's history, which is unsafe if another worktree also has it
+  // checked out (e.g. via `git worktree add -f`, which lets one branch be
+  // shared by two worktrees).
   match switch_to_branch {
-    Some(target) => handle_checkout([target])
+    Some(target) => {
+      match @bitlib.is_branch_checked_out_elsewhere(rfs, root, target) {
+        Some(path) =>
+          raise @bitcore.GitError::InvalidObject(
+            "'\{target}' is already used by worktree at '\{path}'",
+          )
+        None => ()
+      }
+      handle_checkout([target])
+    }
     None => ()
   }
   // Require a clean worktree/index before starting a new rebase, unless

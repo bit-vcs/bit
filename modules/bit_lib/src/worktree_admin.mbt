@@ -84,6 +84,30 @@ pub fn is_branch_checked_out(
 }
 
 ///|
+/// Check if a branch is checked out in a worktree other than `root` (e.g.
+/// after `git worktree add -f` lets two worktrees share one branch, and the
+/// current worktree happens to be one of them). Returns the other
+/// worktree's path if found, None otherwise.
+pub fn is_branch_checked_out_elsewhere(
+  fs : &@bit.RepoFileSystem,
+  root : String,
+  branch : String,
+) -> String? raise @bit.GitError {
+  let normalized_root = normalize_path(root)
+  let worktrees = list_worktrees(fs, root)
+  for wt in worktrees {
+    match wt.branch {
+      Some(b) =>
+        if b == branch && normalize_path(wt.path) != normalized_root {
+          return Some(wt.path)
+        }
+      None => continue
+    }
+  }
+  None
+}
+
+///|
 /// Create a new linked worktree.
 pub fn create_worktree(
   fs : &@bit.FileSystem,
