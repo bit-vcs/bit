@@ -32,9 +32,12 @@ pub using @repo {
   parse_tree,
   checkout_commit,
   checkout_commit_to_fs,
+  checkout_commit_to_fs_async,
   join_path,
   materialize_clone_to_fs,
+  materialize_clone_to_fs_async,
   write_git_metadata,
+  write_git_metadata_async,
   verify_tree_entry_name,
 }
 

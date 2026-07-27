@@ -75,6 +75,8 @@ pub fn write_pack_index_from_objects_versioned(&@bit_types.FileSystem, String, B
 
 pub fn write_packfile_with_index(&@bit_types.FileSystem, String, Bytes, Array[@bit_object.PackObject]) -> Unit raise @bit_object.GitError
 
+pub async fn[FS : @bit_types.AsyncFileSystem] write_packfile_with_index_async(FS, String, Bytes, Array[@bit_object.PackObject]) -> Unit raise @bit_object.GitError
+
 pub fn write_reverse_index(&@bit_types.FileSystem, String, Bytes, Array[@bit_object.PackObject]) -> Unit raise @bit_object.GitError
 
 // Errors
