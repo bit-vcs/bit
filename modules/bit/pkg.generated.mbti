@@ -102,6 +102,12 @@ pub using @bit_io {type TestFs}
 
 pub using @bit_object {type TreeEntry}
 
+pub using @bit_types {trait AsyncFileSystem}
+
+pub using @bit_types {trait AsyncHttpClient}
+
+pub using @bit_types {trait AsyncRepoFileSystem}
+
 pub using @bit_types {trait FileSystem}
 
 pub using @bit_types {trait HttpClient}
