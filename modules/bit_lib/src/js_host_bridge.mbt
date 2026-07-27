@@ -240,6 +240,38 @@ extern "js" fn lib_js_host_is_file(host_id : Int, path : String) -> Bool =
   #| }
 
 ///|
+extern "js" fn lib_js_host_mtime(host_id : Int, path : String) -> Array[Int]? =
+  #| (hostId, path) => {
+  #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
+  #|   const host = state.hosts.get(hostId);
+  #|   if (!host) {
+  #|     globalThis.__bitGitJsLastError = `bit-git js host ${hostId} not found`;
+  #|     return { $tag: 0 };
+  #|   }
+  #|   if (typeof host.mtime !== 'function') {
+  #|     globalThis.__bitGitJsLastError = 'bit-git js host.mtime(path) is required';
+  #|     return { $tag: 0 };
+  #|   }
+  #|   try {
+  #|     const value = host.mtime(path);
+  #|     if (!Array.isArray(value) || value.length !== 2) {
+  #|       globalThis.__bitGitJsLastError = 'bit-git js host.mtime(path) must return [seconds, nanoseconds]';
+  #|       return { $tag: 0 };
+  #|     }
+  #|     const seconds = Number(value[0]);
+  #|     const nanoseconds = Number(value[1]);
+  #|     if (!Number.isInteger(seconds) || !Number.isInteger(nanoseconds)) {
+  #|       globalThis.__bitGitJsLastError = 'bit-git js host.mtime(path) must return integer seconds and nanoseconds';
+  #|       return { $tag: 0 };
+  #|     }
+  #|     return { $tag: 1, _0: [seconds, nanoseconds] };
+  #|   } catch (error) {
+  #|     globalThis.__bitGitJsLastError = String(error?.message ?? error);
+  #|     return { $tag: 0 };
+  #|   }
+  #| }
+
+///|
 extern "js" fn lib_js_create_memory_host() -> Int =
   #| () => {
   #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
@@ -281,6 +313,7 @@ extern "js" fn lib_js_create_memory_host() -> Int =
   #|   };
   #|   const createHost = () => {
   #|     const files = new Map();
+  #|     const mtimes = new Map();
   #|     const dirs = new Set(['/']);
   #|     return {
   #|       mkdirP(path) {
@@ -290,6 +323,11 @@ extern "js" fn lib_js_create_memory_host() -> Int =
   #|         const normalized = normalizePath(path);
   #|         ensureDirs(dirs, parentDir(normalized));
   #|         files.set(normalized, Uint8Array.from(content));
+  #|         const now = Date.now();
+  #|         mtimes.set(normalized, [
+  #|           Math.floor(now / 1000),
+  #|           (now % 1000) * 1_000_000,
+  #|         ]);
   #|       },
   #|       writeString(path, content) {
   #|         this.writeFile(path, encoder.encode(String(content)));
@@ -299,6 +337,7 @@ extern "js" fn lib_js_create_memory_host() -> Int =
   #|         if (!files.delete(normalized)) {
   #|           throw new Error(`File not found: ${normalized}`);
   #|         }
+  #|         mtimes.delete(normalized);
   #|       },
   #|       removeDir(path) {
   #|         const normalized = normalizePath(path);
@@ -348,6 +387,14 @@ extern "js" fn lib_js_create_memory_host() -> Int =
   #|       },
   #|       isFile(path) {
   #|         return files.has(normalizePath(path));
+  #|       },
+  #|       mtime(path) {
+  #|         const normalized = normalizePath(path);
+  #|         const value = mtimes.get(normalized);
+  #|         if (!value) {
+  #|           throw new Error(`File not found: ${normalized}`);
+  #|         }
+  #|         return value;
   #|       },
   #|       readString(path) {
   #|         return decoder.decode(this.readFile(path));
@@ -463,4 +510,12 @@ impl @bit.RepoFileSystem for LibJsHostFs with fn is_dir(self, path) {
 ///|
 impl @bit.RepoFileSystem for LibJsHostFs with fn is_file(self, path) {
   lib_js_host_is_file(self.host_id, path)
+}
+
+///|
+impl @bit.RepoFileSystem for LibJsHostFs with fn mtime(self, path) {
+  match lib_js_host_mtime(self.host_id, path) {
+    Some(value) => (value[0], value[1])
+    None => raise @bit.GitError::IoError(js_host_error_message())
+  }
 }

@@ -106,3 +106,11 @@ pub impl @bit.RepoFileSystem for OsFs with fn is_file(_self, path) {
     _ => false
   }
 }
+
+///|
+pub impl @bit.RepoFileSystem for OsFs with fn mtime(self, path) {
+  match @io.worktree_entry_meta_sync(self, path) {
+    Some(meta) => meta.mtime()
+    None => raise @bit.GitError::IoError("Unable to stat path: \{path}")
+  }
+}

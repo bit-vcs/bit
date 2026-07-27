@@ -61,7 +61,7 @@ pub fn sha256_prefix(Bytes, Int) -> @bit_object.ObjectId
 
 pub fn verify_tree_entry_name(String) -> Unit raise @bit_object.GitError
 
-pub fn write_git_metadata(@bit_repo.ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
+pub fn write_git_metadata(@bit_repo.ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
 
 // Errors
 

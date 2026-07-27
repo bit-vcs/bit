@@ -15,6 +15,8 @@ pub(open) trait RepoFileSystem {
   fn readdir(Self, String) -> Array[String] raise GitError
   fn is_dir(Self, String) -> Bool
   fn is_file(Self, String) -> Bool
+  /// Return the modification time as `(seconds, nanoseconds)`.
+  fn mtime(Self, String) -> (Int, Int) raise GitError
 }
 
 ///|

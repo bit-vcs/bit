@@ -31,7 +31,7 @@ pub fn read_shallow_boundaries(&@bit_types.RepoFileSystem, String) -> Array[@bit
 
 pub fn verify_tree_entry_name(String) -> Unit raise @bit_object.GitError
 
-pub fn write_git_metadata(ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
+pub fn write_git_metadata(ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
 
 // Errors
 

@@ -125,6 +125,7 @@ const snapshotToSummary = (snapshot) => {
 
 export const createSnapshotHost = () => {
   const files = new Map();
+  const mtimes = new Map();
   const dirs = new Set(["/"]);
 
   const host = {
@@ -135,6 +136,11 @@ export const createSnapshotHost = () => {
       const normalized = normalizePath(path);
       ensureDirectoryChain(dirs, parentDir(normalized));
       files.set(normalized, cloneBytes(content));
+      const now = Date.now();
+      mtimes.set(normalized, [
+        Math.floor(now / 1000),
+        (now % 1000) * 1_000_000,
+      ]);
     },
     writeString(path, content) {
       host.writeFile(path, encoder.encode(String(content)));
@@ -144,6 +150,7 @@ export const createSnapshotHost = () => {
       if (!files.delete(normalized)) {
         throw new Error(`File not found: ${normalized}`);
       }
+      mtimes.delete(normalized);
     },
     removeDir(path) {
       const normalized = normalizePath(path);
@@ -197,8 +204,17 @@ export const createSnapshotHost = () => {
     isFile(path) {
       return files.has(normalizePath(path));
     },
+    mtime(path) {
+      const normalized = normalizePath(path);
+      const value = mtimes.get(normalized);
+      if (!value) {
+        throw new Error(`File not found: ${normalized}`);
+      }
+      return value;
+    },
     reset() {
       files.clear();
+      mtimes.clear();
       dirs.clear();
       dirs.add("/");
     },
@@ -211,6 +227,11 @@ export const createSnapshotHost = () => {
         const normalized = normalizePath(file.path);
         ensureDirectoryChain(dirs, parentDir(normalized));
         files.set(normalized, cloneBytes(file.data));
+        const now = Date.now();
+        mtimes.set(normalized, [
+          Math.floor(now / 1000),
+          (now % 1000) * 1_000_000,
+        ]);
       }
     },
     exportSnapshot() {

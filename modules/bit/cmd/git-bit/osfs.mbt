@@ -70,3 +70,11 @@ pub impl @bitcore.RepoFileSystem for OsFs with fn is_file(_self, path) {
     _ => false
   }
 }
+
+///|
+pub impl @bitcore.RepoFileSystem for OsFs with fn mtime(self, path) {
+  match @bitio.worktree_entry_meta_sync(self, path) {
+    Some(meta) => meta.mtime()
+    None => raise @bitcore.GitError::IoError("Unable to stat path: \{path}")
+  }
+}

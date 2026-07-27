@@ -1,10 +1,98 @@
 ///| Reproduction test for hq clone index ordering bug.
 
 ///|
+priv struct IndexMtimeFs {
+  inner : @io.TestFs
+  mtime : (Int, Int)?
+}
+
+///|
+impl @types.RepoFileSystem for IndexMtimeFs with fn read_file(self, path) {
+  self.inner.read_file(path)
+}
+
+///|
+impl @types.RepoFileSystem for IndexMtimeFs with fn readdir(self, path) {
+  self.inner.readdir(path)
+}
+
+///|
+impl @types.RepoFileSystem for IndexMtimeFs with fn is_dir(self, path) {
+  self.inner.is_dir(path)
+}
+
+///|
+impl @types.RepoFileSystem for IndexMtimeFs with fn is_file(self, path) {
+  self.inner.is_file(path)
+}
+
+///|
+impl @types.RepoFileSystem for IndexMtimeFs with fn mtime(self, _path) {
+  match self.mtime {
+    Some(value) => value
+    None => raise @object.GitError::IoError("mtime must not be queried")
+  }
+}
+
+///|
+test "write_index_v2 obtains mtimes from the repository filesystem" {
+  let (store, commit_id) = build_commit_for_prefix_like_paths_wbtest()
+  let fs = @io.TestFs::new()
+  let rfs : IndexMtimeFs = { inner: fs, mtime: Some((0x01020304, 0x05060708)) }
+  write_index_v2(store, fs, rfs, "/repo/.git", commit_id, "/repo")
+  let index = fs.read_file("/repo/.git/index")
+  @test.assert_eq(read_u32_be_wbtest(index, 12), 0x01020304)
+  @test.assert_eq(read_u32_be_wbtest(index, 16), 0x05060708)
+  @test.assert_eq(read_u32_be_wbtest(index, 20), 0x01020304)
+  @test.assert_eq(read_u32_be_wbtest(index, 24), 0x05060708)
+}
+
+///|
+test "write_index_v2 keeps zero mtimes for gitlinks" {
+  let store = ObjectStore::new()
+  let gitlink_id = @object.hash_object_content(
+    @object.ObjectType::Commit,
+    @utf8.encode("submodule"),
+  )
+  let tree_raw = @object.serialize_tree([
+    @object.TreeEntry::new("160000", "submodule", gitlink_id),
+  ])
+  let tree_id = @object.hash_object_content(@object.ObjectType::Tree, tree_raw)
+  let commit = @object.Commit::new(
+    tree_id,
+    [],
+    "Test <test@example.com>",
+    1700000000L,
+    "+0000",
+    "Test <test@example.com>",
+    1700000000L,
+    "+0000",
+    "gitlink\n",
+  )
+  let commit_raw = @object.serialize_commit_content(commit)
+  let commit_id = @object.hash_object_content(
+    @object.ObjectType::Commit,
+    commit_raw,
+  )
+  store.add_objects([
+    @object.PackObject::new(@object.ObjectType::Tree, tree_raw),
+    @object.PackObject::new(@object.ObjectType::Commit, commit_raw),
+  ])
+  let fs = @io.TestFs::new()
+  let rfs : IndexMtimeFs = { inner: fs, mtime: None }
+  write_index_v2(store, fs, rfs, "/repo/.git", commit_id, "/repo")
+  let index = fs.read_file("/repo/.git/index")
+  @test.assert_eq(read_u32_be_wbtest(index, 12), 0)
+  @test.assert_eq(read_u32_be_wbtest(index, 16), 0)
+  @test.assert_eq(read_u32_be_wbtest(index, 20), 0)
+  @test.assert_eq(read_u32_be_wbtest(index, 24), 0)
+}
+
+///|
 test "write_index_v2 writes Git lexical path order" {
   let (store, commit_id) = build_commit_for_index_order_wbtest()
   let fs = @io.TestFs::new()
-  write_index_v2(store, fs, "/repo/.git", commit_id, "/repo") catch {
+  write_index_v2(store, fs, fs, "/repo/.git", commit_id, "/repo") catch {
     err => fail("write_index_v2 failed: \{err}")
   }
   let index_bytes = fs.read_file("/repo/.git/index") catch {
@@ -20,7 +108,7 @@ test "write_index_v2 writes Git lexical path order" {
 test "write_index_v2 keeps lexical order for prefix-like paths" {
   let (store, commit_id) = build_commit_for_prefix_like_paths_wbtest()
   let fs = @io.TestFs::new()
-  write_index_v2(store, fs, "/repo/.git", commit_id, "/repo") catch {
+  write_index_v2(store, fs, fs, "/repo/.git", commit_id, "/repo") catch {
     err => fail("write_index_v2 failed: \{err}")
   }
   let index_bytes = fs.read_file("/repo/.git/index") catch {

@@ -31,6 +31,7 @@ function createVirtualHost() {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const files = new Map();
+  const mtimes = new Map();
   const dirs = new Set(["/"]);
 
   const normalizePath = (path) => {
@@ -79,6 +80,11 @@ function createVirtualHost() {
       const normalized = normalizePath(path);
       ensureDirs(parentDir(normalized));
       files.set(normalized, Uint8Array.from(content));
+      const now = Date.now();
+      mtimes.set(normalized, [
+        Math.floor(now / 1000),
+        (now % 1000) * 1_000_000,
+      ]);
     },
     writeString(path, content) {
       this.writeFile(path, encoder.encode(String(content)));
@@ -88,6 +94,7 @@ function createVirtualHost() {
       if (!files.delete(normalized)) {
         throw new Error(`File not found: ${normalized}`);
       }
+      mtimes.delete(normalized);
     },
     removeDir(path) {
       const normalized = normalizePath(path);
@@ -137,6 +144,14 @@ function createVirtualHost() {
     },
     isFile(path) {
       return files.has(normalizePath(path));
+    },
+    mtime(path) {
+      const normalized = normalizePath(path);
+      const value = mtimes.get(normalized);
+      if (!value) {
+        throw new Error(`File not found: ${normalized}`);
+      }
+      return value;
     },
     readString(path) {
       return decoder.decode(this.readFile(path));

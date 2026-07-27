@@ -12,7 +12,10 @@ import {
   relayPollUrl,
   relayPublishUrl,
 } from "../docs/demo/relay_state.js";
-import { readStorageProfileFromSearch } from "../docs/demo/storage.js";
+import {
+  createSnapshotHost,
+  readStorageProfileFromSearch,
+} from "../docs/demo/storage.js";
 
 test("shareable search params preserve relay target, editor label, and session", () => {
   const draft = readRelayDraftFromSearch(
@@ -34,6 +37,22 @@ test("storage profile stays deterministic and browser-safe", () => {
   assert.equal(readStorageProfileFromSearch(""), "default");
   assert.equal(readStorageProfileFromSearch("?profile=Host Tab"), "host-tab");
   assert.equal(readStorageProfileFromSearch("?profile=../Client"), "client");
+});
+
+test("snapshot host exposes file modification times", () => {
+  const host = createSnapshotHost();
+  host.writeString("/repo/file.txt", "content");
+
+  const [seconds, nanoseconds] = host.mtime("/repo/file.txt");
+  assert.ok(seconds > 0);
+  assert.ok(nanoseconds >= 0 && nanoseconds < 1_000_000_000);
+
+  const snapshot = host.exportSnapshot();
+  host.removeFile("/repo/file.txt");
+  assert.throws(() => host.mtime("/repo/file.txt"), /File not found/);
+
+  host.replaceSnapshot(snapshot);
+  assert.equal(host.mtime("/repo/file.txt").length, 2);
 });
 
 test("relay URL helpers derive base, room, publish, and poll endpoints", () => {
