@@ -99,6 +99,7 @@ pub struct NativeHttpClient {
   dummy : Int
 }
 pub fn NativeHttpClient::new() -> Self
+pub impl @bit_types.AsyncHttpClient for NativeHttpClient
 
 // Type aliases
 
