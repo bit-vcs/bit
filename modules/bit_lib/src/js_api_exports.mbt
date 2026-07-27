@@ -1920,27 +1920,27 @@ pub fn js_tag_create_annotated(
 }
 
 ///|
-pub fn js_rebase_start(
+pub async fn js_rebase_start(
   host_id : Int,
   root : String,
   upstream : String,
 ) -> Result[JsRebaseResult, String] {
   let fs = js_make_host_fs(host_id)
-  js_wrap_error(() => {
+  js_wrap_error_async(async fn() -> JsRebaseResult raise @bit.GitError {
     let upstream_id = js_resolve_revision(fs, root, upstream)
     js_convert_rebase_result(rebase_start(fs, fs, root, upstream_id))
   })
 }
 
 ///|
-pub fn js_rebase_start_with_onto(
+pub async fn js_rebase_start_with_onto(
   host_id : Int,
   root : String,
   onto : String,
   upstream : String,
 ) -> Result[JsRebaseResult, String] {
   let fs = js_make_host_fs(host_id)
-  js_wrap_error(() => {
+  js_wrap_error_async(async fn() -> JsRebaseResult raise @bit.GitError {
     let onto_id = js_resolve_revision(fs, root, onto)
     let upstream_id = js_resolve_revision(fs, root, upstream)
     js_convert_rebase_result(
@@ -1950,27 +1950,36 @@ pub fn js_rebase_start_with_onto(
 }
 
 ///|
-pub fn js_rebase_continue(
+pub async fn js_rebase_continue(
   host_id : Int,
   root : String,
 ) -> Result[JsRebaseResult, String] {
   let fs = js_make_host_fs(host_id)
-  js_wrap_error(() => js_convert_rebase_result(rebase_continue(fs, fs, root)))
+  js_wrap_error_async(async fn() -> JsRebaseResult raise @bit.GitError {
+    js_convert_rebase_result(rebase_continue(fs, fs, root))
+  })
 }
 
 ///|
-pub fn js_rebase_abort(host_id : Int, root : String) -> Result[Unit, String] {
+pub async fn js_rebase_abort(
+  host_id : Int,
+  root : String,
+) -> Result[Unit, String] {
   let fs = js_make_host_fs(host_id)
-  js_wrap_error(() => rebase_abort(fs, fs, root))
+  js_wrap_error_async(async fn() -> Unit raise @bit.GitError {
+    rebase_abort(fs, fs, root)
+  })
 }
 
 ///|
-pub fn js_rebase_skip(
+pub async fn js_rebase_skip(
   host_id : Int,
   root : String,
 ) -> Result[JsRebaseResult, String] {
   let fs = js_make_host_fs(host_id)
-  js_wrap_error(() => js_convert_rebase_result(rebase_skip(fs, fs, root)))
+  js_wrap_error_async(async fn() -> JsRebaseResult raise @bit.GitError {
+    js_convert_rebase_result(rebase_skip(fs, fs, root))
+  })
 }
 
 ///|
