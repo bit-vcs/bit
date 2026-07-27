@@ -10,6 +10,16 @@ pub(open) trait FileSystem {
 }
 
 ///|
+/// Asynchronous counterpart to `FileSystem`.
+pub(open) trait AsyncFileSystem {
+  async fn mkdir_p(Self, String) -> Unit raise GitError
+  async fn write_file(Self, String, Bytes) -> Unit raise GitError
+  async fn write_string(Self, String, String) -> Unit raise GitError
+  async fn remove_file(Self, String) -> Unit raise GitError
+  async fn remove_dir(Self, String) -> Unit raise GitError
+}
+
+///|
 pub(open) trait RepoFileSystem {
   fn read_file(Self, String) -> Bytes raise GitError
   fn readdir(Self, String) -> Array[String] raise GitError
@@ -17,6 +27,16 @@ pub(open) trait RepoFileSystem {
   fn is_file(Self, String) -> Bool
   /// Return the modification time as `(seconds, nanoseconds)`.
   fn mtime(Self, String) -> (Int, Int) raise GitError
+}
+
+///|
+/// Asynchronous counterpart to `RepoFileSystem`.
+pub(open) trait AsyncRepoFileSystem {
+  async fn read_file(Self, String) -> Bytes raise GitError
+  async fn readdir(Self, String) -> Array[String] raise GitError
+  async fn is_dir(Self, String) -> Bool raise GitError
+  async fn is_file(Self, String) -> Bool raise GitError
+  async fn mtime(Self, String) -> (Int, Int) raise GitError
 }
 
 ///|
@@ -42,6 +62,16 @@ pub fn HttpResponse::with_headers(
 pub(open) trait HttpClient {
   fn get(Self, String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError
   fn post(Self, String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise GitError
+}
+
+///|
+/// Asynchronous counterpart to `HttpClient`.
+pub(open) trait AsyncHttpClient {
+  async fn get(Self, String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError
+  async fn post(Self, String, Bytes, Map[String, String]) -> (
+    HttpResponse,
+    Bytes,
+  ) raise GitError
 }
 
 ///|
@@ -78,4 +108,19 @@ pub impl HttpClient for MockHttpClient with fn post(self, url, _body, _headers) 
     Some((code, body)) => (HttpResponse::new(code), body)
     None => raise GitError::IoError("Mock: No response for URL: " + url)
   }
+}
+
+///|
+pub impl AsyncHttpClient for MockHttpClient with fn get(self, url, headers) {
+  HttpClient::get(self, url, headers)
+}
+
+///|
+pub impl AsyncHttpClient for MockHttpClient with fn post(
+  self,
+  url,
+  body,
+  headers,
+) {
+  HttpClient::post(self, url, body, headers)
 }

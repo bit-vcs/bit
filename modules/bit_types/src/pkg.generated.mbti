@@ -22,6 +22,7 @@ pub struct MockHttpClient {
 }
 pub fn MockHttpClient::add_response(Self, String, Int, Bytes) -> Unit
 pub fn MockHttpClient::new() -> Self
+pub impl AsyncHttpClient for MockHttpClient
 pub impl HttpClient for MockHttpClient
 
 // Type aliases
@@ -50,6 +51,27 @@ pub using @bit_object {type Sha256State}
 pub using @bit_object {type TreeEntry}
 
 // Traits
+pub(open) trait AsyncFileSystem {
+  async fn mkdir_p(Self, String) -> Unit raise @bit_object.GitError
+  async fn write_file(Self, String, Bytes) -> Unit raise @bit_object.GitError
+  async fn write_string(Self, String, String) -> Unit raise @bit_object.GitError
+  async fn remove_file(Self, String) -> Unit raise @bit_object.GitError
+  async fn remove_dir(Self, String) -> Unit raise @bit_object.GitError
+}
+
+pub(open) trait AsyncHttpClient {
+  async fn get(Self, String, Map[String, String]) -> (HttpResponse, Bytes) raise @bit_object.GitError
+  async fn post(Self, String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise @bit_object.GitError
+}
+
+pub(open) trait AsyncRepoFileSystem {
+  async fn read_file(Self, String) -> Bytes raise @bit_object.GitError
+  async fn readdir(Self, String) -> Array[String] raise @bit_object.GitError
+  async fn is_dir(Self, String) -> Bool raise @bit_object.GitError
+  async fn is_file(Self, String) -> Bool raise @bit_object.GitError
+  async fn mtime(Self, String) -> (Int, Int) raise @bit_object.GitError
+}
+
 pub(open) trait FileSystem {
   fn mkdir_p(Self, String) -> Unit raise @bit_object.GitError
   fn write_file(Self, String, Bytes) -> Unit raise @bit_object.GitError
