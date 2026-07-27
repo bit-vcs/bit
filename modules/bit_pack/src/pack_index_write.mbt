@@ -520,6 +520,29 @@ pub fn write_packfile_with_index(
 }
 
 ///|
+/// Asynchronous counterpart to `write_packfile_with_index`.
+pub async fn[FS : @bit.AsyncFileSystem] write_packfile_with_index_async(
+  fs : FS,
+  git_dir : String,
+  pack : Bytes,
+  objects : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
+  if pack.length() < 20 {
+    raise @bit.GitError::PackfileError("Packfile too short")
+  }
+  let pack_dir = @bit.join_path(git_dir, "objects/pack")
+  fs.mkdir_p(pack_dir)
+  let trailer_offset = pack.length() - 20
+  let pack_id = read_trailer_id(pack, trailer_offset)
+  let base = "pack-\{pack_id.to_hex()}"
+  let pack_path = @bit.join_path(pack_dir, base + ".pack")
+  let idx_path = @bit.join_path(pack_dir, base + ".idx")
+  fs.write_file(pack_path, pack)
+  let idx = build_pack_index_from_objects(pack, objects)
+  fs.write_file(idx_path, idx)
+}
+
+///|
 /// Build a reverse index (RIDX version 1) from packfile bytes and parsed objects.
 /// Format: magic("RIDX") + version(1) + hash_id(1) + position_table + pack_checksum + file_checksum
 /// The position_table maps from pack offset order to index position.
