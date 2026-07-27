@@ -204,3 +204,62 @@ async test "upload-pack http: clone-to-fs materializes repo with injected transp
     upload_pack_http_fixture_commit + "\n",
   )
 }
+
+///|
+priv struct AsyncCloneFixtureClient {
+  advertisement : Bytes
+  ls_refs : Bytes
+  fetch : Bytes
+}
+
+///|
+impl @types.AsyncHttpClient for AsyncCloneFixtureClient with fn get(
+  self,
+  _url,
+  _headers,
+) {
+  (@bit.HttpResponse::new(200), self.advertisement)
+}
+
+///|
+impl @types.AsyncHttpClient for AsyncCloneFixtureClient with fn post(
+  self,
+  _url,
+  body,
+  _headers,
+) {
+  let text = upload_pack_http_bytes_to_string(body)
+  if text.contains("command=ls-refs") {
+    return (@bit.HttpResponse::new(200), self.ls_refs)
+  }
+  if text.contains("command=fetch") || text.contains("want ") {
+    return (@bit.HttpResponse::new(200), self.fetch)
+  }
+  raise @bit.GitError::ProtocolError("unexpected request body")
+}
+
+///|
+async test "upload-pack http: generic async clone materializes repo" {
+  let client : AsyncCloneFixtureClient = {
+    advertisement: upload_pack_http_hex_to_bytes(upload_pack_http_adv_v2_hex),
+    ls_refs: upload_pack_http_hex_to_bytes(upload_pack_http_lsrefs_hex),
+    fetch: upload_pack_http_hex_to_bytes(upload_pack_http_fetch_hex),
+  }
+  let fs = @bit.TestFs::new()
+  let refs = clone_to_async_fs_with_http(
+    "git@github.com:user/repo.git",
+    true,
+    0,
+    FilterSpec::NoFilter,
+    fs,
+    "/repo",
+    client,
+  )
+  assert_true(refs.length() > 0)
+  @test.assert_eq(fs.read_string("/repo/hello.txt"), "hello\n")
+  @test.assert_eq(fs.read_string("/repo/.git/HEAD"), "ref: refs/heads/main\n")
+  @test.assert_eq(
+    fs.read_string("/repo/.git/refs/heads/main"),
+    upload_pack_http_fixture_commit + "\n",
+  )
+}
