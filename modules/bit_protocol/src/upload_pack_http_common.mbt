@@ -313,7 +313,9 @@ pub async fn clone_to_fs_with_http(
       None => ()
       Some((refname, commit_id)) =>
         if no_checkout {
-          @bit.write_git_metadata(store, commit_id, refname, remote, fs, root)
+          @bit.write_git_metadata(
+            store, commit_id, refname, remote, fs, root, rfs,
+          )
         } else {
           @bit.materialize_clone_to_fs(
             store, commit_id, refname, remote, fs, root, rfs,

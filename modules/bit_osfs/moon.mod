@@ -4,6 +4,7 @@ version = "0.45.5"
 
 import {
   "mizchi/bit_core@0.45.5",
+  "mizchi/bit_io@0.45.5",
   "mizchi/bit_object@0.45.5",
   "mizchi/bit_types@0.45.5",
   "moonbitlang/x@0.4.40",

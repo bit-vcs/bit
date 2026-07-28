@@ -68,5 +68,6 @@ pub(open) trait RepoFileSystem {
   fn readdir(Self, String) -> Array[String] raise @bit_object.GitError
   fn is_dir(Self, String) -> Bool
   fn is_file(Self, String) -> Bool
+  fn mtime(Self, String) -> (Int, Int) raise @bit_object.GitError
 }
 

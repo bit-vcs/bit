@@ -381,6 +381,20 @@ test "js exports: memory host supports local git flow" {
 }
 
 ///|
+test "js exports: memory host exposes file mtime" {
+  let host_id = js_create_memory_host()
+  js_exports_unwrap_ok(
+    "hostWriteString",
+    js_host_write_string(host_id, "/file.txt", "content"),
+  )
+  let fs = js_make_host_fs(host_id)
+  let (seconds, nanoseconds) = @bit.RepoFileSystem::mtime(fs, "/file.txt")
+  assert_true(seconds > 0)
+  assert_true(nanoseconds >= 0 && nanoseconds < 1_000_000_000)
+  js_destroy_host(host_id)
+}
+
+///|
 test "js exports: signed commit stores gpgsig header" {
   let host_id = js_create_memory_host()
 

@@ -69,6 +69,11 @@ impl @bit.RepoFileSystem for CountingFs with fn is_file(self, path) {
 }
 
 ///|
+impl @bit.RepoFileSystem for CountingFs with fn mtime(self, path) {
+  self.fs.mtime(path)
+}
+
+///|
 impl @bit.FileSystem for CountingFs with fn mkdir_p(self, path) {
   self.fs.mkdir_p(path)
 }

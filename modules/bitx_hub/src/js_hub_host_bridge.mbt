@@ -105,6 +105,38 @@ extern "js" fn hub_js_host_is_file(host_id : Int, path : String) -> Bool =
   #|   return host?.isFile?.(path) ?? false;
   #| }
 
+///|
+extern "js" fn hub_js_host_mtime(host_id : Int, path : String) -> Array[Int]? =
+  #| (hostId, path) => {
+  #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
+  #|   const host = state.hosts.get(hostId);
+  #|   if (!host) {
+  #|     globalThis.__bitGitJsLastError = `host ${hostId} not found`;
+  #|     return { $tag: 0 };
+  #|   }
+  #|   if (typeof host.mtime !== 'function') {
+  #|     globalThis.__bitGitJsLastError = 'host.mtime(path) is required';
+  #|     return { $tag: 0 };
+  #|   }
+  #|   try {
+  #|     const value = host.mtime(path);
+  #|     if (!Array.isArray(value) || value.length !== 2) {
+  #|       globalThis.__bitGitJsLastError = 'host.mtime(path) must return [seconds, nanoseconds]';
+  #|       return { $tag: 0 };
+  #|     }
+  #|     const seconds = Number(value[0]);
+  #|     const nanoseconds = Number(value[1]);
+  #|     if (!Number.isInteger(seconds) || !Number.isInteger(nanoseconds)) {
+  #|       globalThis.__bitGitJsLastError = 'host.mtime(path) must return integer seconds and nanoseconds';
+  #|       return { $tag: 0 };
+  #|     }
+  #|     return { $tag: 1, _0: [seconds, nanoseconds] };
+  #|   } catch (error) {
+  #|     globalThis.__bitGitJsLastError = String(error?.message ?? error);
+  #|     return { $tag: 0 };
+  #|   }
+  #| }
+
 // --- Trait implementations ---
 
 ///|
@@ -174,4 +206,12 @@ impl @bit.RepoFileSystem for HubJsHostFs with fn is_dir(self, path) {
 ///|
 impl @bit.RepoFileSystem for HubJsHostFs with fn is_file(self, path) {
   hub_js_host_is_file(self.host_id, path)
+}
+
+///|
+impl @bit.RepoFileSystem for HubJsHostFs with fn mtime(self, path) {
+  match hub_js_host_mtime(self.host_id, path) {
+    Some(value) => (value[0], value[1])
+    None => raise @bit.GitError::IoError(hub_js_host_last_error())
+  }
 }

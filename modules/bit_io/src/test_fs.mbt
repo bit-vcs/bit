@@ -180,6 +180,11 @@ pub impl RepoFileSystem for TestFs with fn is_file(self, path) {
 }
 
 ///|
+pub impl RepoFileSystem for TestFs with fn mtime(_self, _path) {
+  (0, 0)
+}
+
+///|
 fn string_to_bytes(s : String) -> Bytes {
   let out : Array[Byte] = []
   for c in s {

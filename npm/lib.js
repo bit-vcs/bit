@@ -131,7 +131,8 @@ const isBackendObject = (value) => (
   typeof value.readFile === "function" &&
   typeof value.readdir === "function" &&
   typeof value.isDir === "function" &&
-  typeof value.isFile === "function"
+  typeof value.isFile === "function" &&
+  typeof value.mtime === "function"
 );
 
 const isTransportObject = (value) => (
@@ -509,6 +510,7 @@ const createMemoryBackendImpl = () => {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const files = new Map();
+  const mtimes = new Map();
   const dirs = new Set(["/"]);
 
   const normalizePath = (path) => {
@@ -557,6 +559,11 @@ const createMemoryBackendImpl = () => {
       const normalized = normalizePath(path);
       ensureDirs(parentDir(normalized));
       files.set(normalized, Uint8Array.from(content));
+      const now = Date.now();
+      mtimes.set(normalized, [
+        Math.floor(now / 1000),
+        (now % 1000) * 1_000_000,
+      ]);
     },
     writeString(path, content) {
       this.writeFile(path, encoder.encode(String(content)));
@@ -566,6 +573,7 @@ const createMemoryBackendImpl = () => {
       if (!files.delete(normalized)) {
         throw new Error(`File not found: ${normalized}`);
       }
+      mtimes.delete(normalized);
     },
     removeDir(path) {
       const normalized = normalizePath(path);
@@ -615,6 +623,14 @@ const createMemoryBackendImpl = () => {
     },
     isFile(path) {
       return files.has(normalizePath(path));
+    },
+    mtime(path) {
+      const normalized = normalizePath(path);
+      const value = mtimes.get(normalized);
+      if (!value) {
+        throw new Error(`File not found: ${normalized}`);
+      }
+      return value;
     },
     readString(path) {
       return decoder.decode(this.readFile(path));

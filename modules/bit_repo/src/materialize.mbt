@@ -11,7 +11,7 @@ pub fn materialize_clone_to_fs(
   rfs : &@types.RepoFileSystem,
 ) -> Unit raise @object.GitError {
   checkout_commit_to_fs(store, commit_id, fs, root, rfs)
-  write_git_metadata(store, commit_id, refname, remote_url, fs, root)
+  write_git_metadata(store, commit_id, refname, remote_url, fs, root, rfs)
 }
 
 ///|
@@ -22,6 +22,7 @@ pub fn write_git_metadata(
   remote_url : String,
   fs : &@types.FileSystem,
   root : String,
+  rfs : &@types.RepoFileSystem,
 ) -> Unit raise @object.GitError {
   let git_dir = join_path(root, ".git")
   fs.mkdir_p(git_dir)
@@ -35,7 +36,7 @@ pub fn write_git_metadata(
   write_config(fs, git_dir, remote_url)
   write_packed_refs(fs, git_dir)
   write_alternates(fs, git_dir)
-  write_index_v2(store, fs, git_dir, commit_id, root)
+  write_index_v2(store, fs, rfs, git_dir, commit_id, root)
 }
 
 ///|
@@ -105,6 +106,7 @@ fn write_alternates(
 fn write_index_v2(
   store : ObjectStore,
   fs : &@types.FileSystem,
+  rfs : &@types.RepoFileSystem,
   git_dir : String,
   commit_id : @object.ObjectId,
   root : String,
@@ -121,11 +123,11 @@ fn write_index_v2(
   push_u32_be(out, 2)
   push_u32_be(out, entries.length())
   for e in entries {
-    // Stat the file to get actual mtime
-    let full_path = join_path(root, e.path)
-    let (mtime_sec, mtime_nsec) = match @io.lstat_entry_meta(full_path) {
-      Some(meta) => meta.mtime()
-      None => (0, 0)
+    // Gitlinks represent submodule directories, not files we can stat here.
+    let (mtime_sec, mtime_nsec) = if e.mode == 0o160000 {
+      (0, 0)
+    } else {
+      rfs.mtime(join_path(root, e.path))
     }
     // Git index v2 entry format (62 bytes fixed + variable name):
     // ctime_sec (4) + ctime_nsec (4)
