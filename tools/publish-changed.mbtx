@@ -1,0 +1,504 @@
+// Lerna-style selective publish for the bit workspace's many `modules/*`
+// packages: diff each package's directory against the last "Release vX.Y.Z"
+// commit and only `moon publish` the ones that actually changed, in
+// dependency order.
+//
+// Usage (from repo root):
+//   moon run --target native tools/publish-changed.mbtx
+//     -- report which modules changed since the last release (dry run)
+//   moon run --target native tools/publish-changed.mbtx -- --apply
+//     -- actually run `moon publish` for the changed modules
+//   moon run --target native tools/publish-changed.mbtx -- --since <git-ref> [--apply]
+//     -- compare against an explicit ref instead of the last Release commit
+
+import {
+  "moonbitlang/async@0.19.4",
+  "moonbitlang/async@0.19.4/process",
+  "moonbitlang/x@0.4.40/fs",
+  "moonbitlang/x@0.4.40/sys",
+  "moonbitlang/core/json",
+}
+
+///|
+pub(all) suberror ScriptError {
+  Fail(String)
+} derive(Debug)
+
+///|
+pub impl Show for ScriptError with fn output(self, logger) {
+  match self {
+    Fail(message) => logger.write_string(message)
+  }
+}
+
+///|
+struct ModuleInfo {
+  name : String
+  version : String
+  dir : String
+  dir_basename : String
+  deps : Array[String]
+}
+
+// -- tiny moon.mod parsing -------------------------------------------------
+
+///|
+fn extract_quoted_strings(text : String) -> Array[String] {
+  let result : Array[String] = []
+  let mut in_quote = false
+  let mut quote_start = 0
+  for i, c in text {
+    if c == '"' {
+      if in_quote {
+        result.push(String::unsafe_substring(text, start=quote_start + 1, end=i))
+        in_quote = false
+      } else {
+        quote_start = i
+        in_quote = true
+      }
+    }
+  }
+  result
+}
+
+///|
+fn quoted_field(content : String, field : String) -> String? {
+  for raw_line in content.split("\n") {
+    let line = raw_line.trim().to_owned()
+    if !line.has_prefix(field) {
+      continue
+    }
+    let after_field = String::unsafe_substring(
+      line,
+      start=field.length(),
+      end=line.length(),
+    )
+    let after_ws = after_field.trim_start(chars=" \t").to_owned()
+    if !after_ws.has_prefix("=") {
+      continue
+    }
+    let after_eq = String::unsafe_substring(
+      after_ws,
+      start=1,
+      end=after_ws.length(),
+    )
+    let value_part = after_eq.trim_start(chars=" \t").to_owned()
+    if !value_part.has_prefix("\"") {
+      continue
+    }
+    let rest = String::unsafe_substring(value_part, start=1, end=value_part.length())
+    match rest.find("\"") {
+      Some(idx) => return Some(String::unsafe_substring(rest, start=0, end=idx))
+      None => continue
+    }
+  }
+  None
+}
+
+///|
+fn internal_dep_names(content : String) -> Array[String] {
+  let marker = "import {"
+  let after = match content.find(marker) {
+    Some(idx) =>
+      String::unsafe_substring(
+        content,
+        start=idx + marker.length(),
+        end=content.length(),
+      )
+    None => ""
+  }
+  let block = match after.find("}") {
+    Some(idx2) => String::unsafe_substring(after, start=0, end=idx2)
+    None => after
+  }
+  let result : Array[String] = []
+  for entry in extract_quoted_strings(block) {
+    match entry.find("@") {
+      Some(at_idx) =>
+        result.push(String::unsafe_substring(entry, start=0, end=at_idx))
+      None => result.push(entry)
+    }
+  }
+  result
+}
+
+///|
+fn load_workspace_modules(root : String) -> Array[ModuleInfo] raise ScriptError {
+  let modules_dir = root + "/modules"
+  let entries = try @fs.read_dir(modules_dir) catch {
+    err => raise ScriptError::Fail("cannot read \{modules_dir}: \{err}")
+  }
+  entries.sort()
+  let result : Array[ModuleInfo] = []
+  for entry in entries {
+    let dir = modules_dir + "/" + entry
+    let is_dir = try @fs.is_dir(dir) catch { _ => false }
+    if !is_dir {
+      continue
+    }
+    let manifest_path = dir + "/moon.mod"
+    if !@fs.path_exists(manifest_path) {
+      continue
+    }
+    let content = try @fs.read_file_to_string(manifest_path) catch {
+      err => raise ScriptError::Fail("cannot read \{manifest_path}: \{err}")
+    }
+    let name = match quoted_field(content, "name") {
+      Some(v) => v
+      None => raise ScriptError::Fail("\{manifest_path}: missing name field")
+    }
+    let version = match quoted_field(content, "version") {
+      Some(v) => v
+      None => raise ScriptError::Fail("\{manifest_path}: missing version field")
+    }
+    result.push({
+      name,
+      version,
+      dir,
+      dir_basename: entry,
+      deps: internal_dep_names(content),
+    })
+  }
+  result
+}
+
+// -- dependency ordering ----------------------------------------------------
+
+///|
+fn topological_layers(
+  modules : Array[ModuleInfo],
+) -> Array[Array[ModuleInfo]] raise ScriptError {
+  let by_name : Map[String, ModuleInfo] = Map::new()
+  for m in modules {
+    by_name.set(m.name, m)
+  }
+  let mut remaining = modules.copy()
+  let published : Array[String] = []
+  let layers : Array[Array[ModuleInfo]] = []
+  while remaining.length() > 0 {
+    let ready : Array[ModuleInfo] = []
+    let still : Array[ModuleInfo] = []
+    for m in remaining {
+      let mut ok = true
+      for d in m.deps {
+        if by_name.contains(d) && !published.contains(d) {
+          ok = false
+        }
+      }
+      if ok {
+        ready.push(m)
+      } else {
+        still.push(m)
+      }
+    }
+    if ready.length() == 0 {
+      let names : Array[String] = []
+      for m in remaining {
+        names.push(m.name)
+      }
+      raise ScriptError::Fail("workspace module dependency cycle: \{names}")
+    }
+    ready.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+    for m in ready {
+      published.push(m.name)
+    }
+    layers.push(ready)
+    remaining = still
+  }
+  layers
+}
+
+// -- git helpers --------------------------------------------------------
+
+///|
+async fn git_output(args : Array[String]) -> String raise ScriptError {
+  let (code, stdout, stderr) = try @process.collect_output("git", args) catch {
+    err => raise ScriptError::Fail("failed to spawn git \{args}: \{err}")
+  }
+  let out = try stdout.text() catch { _ => "" }
+  if code != 0 {
+    let err_text = try stderr.text() catch { _ => "" }
+    raise ScriptError::Fail(
+      "git \{args} failed (\{code}): \{err_text.trim().to_owned()}",
+    )
+  }
+  out
+}
+
+///|
+fn first_line(s : String) -> String {
+  match s.find("\n") {
+    Some(i) => String::unsafe_substring(s, start=0, end=i)
+    None => s
+  }
+}
+
+///|
+/// Returns (sha, subject) of the last commit that looks like a release, or
+/// the repo's root commit if no such commit exists yet.
+async fn find_anchor_commit() -> (String, String) raise ScriptError {
+  let out = git_output([
+    "log", "-n", "1", "--format=%H\t%s", "--grep=^Release v", "-i", "HEAD",
+  ])
+  let trimmed = out.trim().to_owned()
+  if trimmed.length() > 0 {
+    match trimmed.find("\t") {
+      Some(i) =>
+        return (
+          String::unsafe_substring(trimmed, start=0, end=i),
+          String::unsafe_substring(trimmed, start=i + 1, end=trimmed.length()),
+        )
+      None => return (trimmed, "")
+    }
+  }
+  let root_out = git_output(["rev-list", "--max-parents=0", "HEAD"])
+  let root_sha = first_line(root_out.trim().to_owned())
+  (root_sha, "(root commit, no prior release found)")
+}
+
+///|
+/// Names of `modules/*` directories with content changes (excluding the
+/// `moon.mod` file itself, since a release commit bumps every module's
+/// `moon.mod` in lockstep regardless of whether that module's own code
+/// changed).
+async fn changed_module_dirs(anchor : String) -> Array[String] raise ScriptError {
+  let out = git_output(["diff", "--name-only", anchor, "HEAD", "--", "modules"])
+  let changed : Array[String] = []
+  for raw_line in out.split("\n") {
+    let path = raw_line.trim().to_owned()
+    if path.length() == 0 || !path.has_prefix("modules/") {
+      continue
+    }
+    let rest = String::unsafe_substring(path, start=8, end=path.length())
+    match rest.find("/") {
+      None => continue
+      Some(si) => {
+        let mod_dir = String::unsafe_substring(rest, start=0, end=si)
+        let sub = String::unsafe_substring(rest, start=si + 1, end=rest.length())
+        if sub != "moon.mod" && !changed.contains(mod_dir) {
+          changed.push(mod_dir)
+        }
+      }
+    }
+  }
+  changed
+}
+
+// -- mooncakes registry (used only under --apply) ------------------------
+
+///|
+fn registry_index_path(name : String) -> String {
+  let home = match @sys.get_env_var("HOME") {
+    Some(h) => h
+    None => "/root"
+  }
+  home + "/.moon/registry/index/user/" + name + ".index"
+}
+
+///|
+fn registry_has_version(m : ModuleInfo) -> Bool {
+  let path = registry_index_path(m.name)
+  if !@fs.path_exists(path) {
+    return false
+  }
+  let content = try @fs.read_file_to_string(path) catch { _ => "" }
+  for raw_line in content.split("\n") {
+    let line = raw_line.trim().to_owned()
+    if line.length() == 0 {
+      continue
+    }
+    let parsed = try @json.parse(line) catch { _ => Json::null() }
+    match parsed {
+      Json::Object(obj) =>
+        match obj.get("version") {
+          Some(Json::String(v)) =>
+            if v == m.version {
+              return true
+            }
+          _ => ()
+        }
+      _ => ()
+    }
+  }
+  false
+}
+
+///|
+async fn refresh_registry() -> Unit raise ScriptError {
+  let code = try @process.run("moon", ["update"], inherit_env=true) catch {
+    err => raise ScriptError::Fail("failed to spawn moon update: \{err}")
+  }
+  if code != 0 {
+    raise ScriptError::Fail("moon update failed (\{code})")
+  }
+}
+
+///|
+async fn wait_for_layer(layer : Array[ModuleInfo]) -> Unit raise ScriptError {
+  let mut attempt = 0
+  while attempt < 10 {
+    refresh_registry()
+    let mut all_present = true
+    for m in layer {
+      if !registry_has_version(m) {
+        all_present = false
+      }
+    }
+    if all_present {
+      return
+    }
+    try @async.sleep(1000 * (attempt + 1)) catch {
+      err => raise ScriptError::Fail("interrupted while waiting: \{err}")
+    }
+    attempt += 1
+  }
+  let missing : Array[String] = []
+  for m in layer {
+    if !registry_has_version(m) {
+      missing.push(m.name)
+    }
+  }
+  raise ScriptError::Fail(
+    "published modules did not reach the registry index: \{missing}",
+  )
+}
+
+// -- reporting + publish --------------------------------------------------
+
+///|
+fn arg_value_after(args : Array[String], flag : String) -> String? {
+  let mut i = 0
+  while i < args.length() {
+    if args[i] == flag && i + 1 < args.length() {
+      return Some(args[i + 1])
+    }
+    i += 1
+  }
+  None
+}
+
+///|
+async fn main_async() -> Unit {
+  let args = @sys.get_cli_args()
+  let apply = args.contains("--apply")
+  let root = "."
+  let modules = try load_workspace_modules(root) catch {
+    err => {
+      println("error: \{err}")
+      @sys.exit(1)
+      return
+    }
+  }
+  let (anchor_sha, anchor_subject) = try (
+    match arg_value_after(args, "--since") {
+      Some(refname) => (refname, "(explicit --since ref)")
+      None => find_anchor_commit()
+    }
+  ) catch {
+    err => {
+      println("error: \{err}")
+      @sys.exit(1)
+      return
+    }
+  }
+  let changed_dirs = try changed_module_dirs(anchor_sha) catch {
+    err => {
+      println("error: \{err}")
+      @sys.exit(1)
+      return
+    }
+  }
+  println("comparing against \{anchor_sha} \{anchor_subject}")
+  println("")
+  let layers = try topological_layers(modules) catch {
+    err => {
+      println("error: \{err}")
+      @sys.exit(1)
+      return
+    }
+  }
+  let publish_layers : Array[Array[ModuleInfo]] = []
+  for layer in layers {
+    let changed_in_layer : Array[ModuleInfo] = []
+    for m in layer {
+      let changed = changed_dirs.contains(m.dir_basename)
+      let mark = if changed { "changed  " } else { "unchanged" }
+      println("  [\{mark}] \{m.name}@\{m.version}")
+      if changed {
+        changed_in_layer.push(m)
+      }
+    }
+    if changed_in_layer.length() > 0 {
+      publish_layers.push(changed_in_layer)
+    }
+  }
+  println("")
+  let total_changed = changed_dirs.length()
+  if total_changed == 0 {
+    println("no modules changed since \{anchor_sha} — nothing to publish")
+    return
+  }
+  println("\{total_changed} module(s) changed; publish order:")
+  let mut n = 0
+  for layer in publish_layers {
+    for m in layer {
+      n += 1
+      println("  \{n}. \{m.name}@\{m.version}")
+    }
+  }
+  if !apply {
+    println("")
+    println("(dry run — pass --apply to actually run `moon publish`)")
+    return
+  }
+  println("")
+  let dirty = try git_output(["status", "--porcelain"]) catch {
+    err => {
+      println("error: \{err}")
+      @sys.exit(1)
+      return
+    }
+  }
+  if dirty.trim().to_owned().length() > 0 {
+    println("error: refusing to publish from a dirty worktree")
+    @sys.exit(1)
+    return
+  }
+  let whoami_code = @process.run("moon", ["whoami"], inherit_env=true)
+  if whoami_code != 0 {
+    println("error: `moon whoami` failed (\{whoami_code}); are you logged in?")
+    @sys.exit(1)
+    return
+  }
+  try {
+    refresh_registry()
+    for layer in publish_layers {
+      let newly_published : Array[ModuleInfo] = []
+      for m in layer {
+        if registry_has_version(m) {
+          println("\{m.name}@\{m.version} already published, skipping")
+          continue
+        }
+        println("publishing \{m.name}@\{m.version}")
+        let code = @process.run("moon", ["-C", m.dir, "publish"], inherit_env=true)
+        if code != 0 {
+          raise ScriptError::Fail("moon -C \{m.dir} publish failed (\{code})")
+        }
+        newly_published.push(m)
+      }
+      if newly_published.length() > 0 {
+        wait_for_layer(newly_published)
+      }
+    }
+  } catch {
+    err => {
+      println("error: \{err}")
+      @sys.exit(1)
+    }
+  }
+}
+
+///|
+fn main {
+  @async.run_async_main(main_async)
+}
