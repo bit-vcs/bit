@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BIT_BIN="${BIT_BIN:-$ROOT_DIR/_build/native/release/build/cmd/bit/bit.exe}"
+BIT_BIN="${BIT_BIN:-$ROOT_DIR/_build/native/release/build/mizchi/bit/bit.exe}"
 DEBUG_ROOT="${DEBUG_ROOT:-$ROOT_DIR/tmp}"
 DEBUG_REPO="${DEBUG_REPO:-}"
 TEST_AI_SKIP_DEMO="${TEST_AI_SKIP_DEMO:-0}"

@@ -648,6 +648,21 @@ local publishMoon: Task = new {
   deps { releaseCheck }
 }
 
+local publishChanged: Task = new {
+  name = "publish-changed"
+  description = "Report which Moon modules changed since the last release (dry run)"
+  cmd = "moon run --target native tools/publish-changed.mbtx"
+  cache = false
+}
+
+local publishChangedApply: Task = new {
+  name = "publish-changed-apply"
+  description = "Publish only the Moon modules that changed since the last release"
+  cmd = "moon run --target native tools/publish-changed.mbtx -- --apply"
+  cache = false
+  deps { releaseCheck }
+}
+
 // -- default ------------------------------------------------------------
 
 local default: Task = new {
@@ -743,6 +758,8 @@ tasks {
 
   releaseCheck
   publishMoon
+  publishChanged
+  publishChangedApply
   releaseNpm
   releaseNpmDryRun
 }

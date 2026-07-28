@@ -21,7 +21,11 @@ fi
 BIT_BUILD_DIR="${TEST_DIRECTORY%/t}"
 
 # Find bit binary
-if test -x "$BIT_BUILD_DIR/target/release/build/cmd/bit/bit"; then
+if test -x "$BIT_BUILD_DIR/_build/native/release/build/mizchi/bit/bit.exe"; then
+	BIT="$BIT_BUILD_DIR/_build/native/release/build/mizchi/bit/bit.exe"
+elif test -x "$BIT_BUILD_DIR/target/native/release/build/mizchi/bit/bit.exe"; then
+	BIT="$BIT_BUILD_DIR/target/native/release/build/mizchi/bit/bit.exe"
+elif test -x "$BIT_BUILD_DIR/target/release/build/cmd/bit/bit"; then
 	BIT="$BIT_BUILD_DIR/target/release/build/cmd/bit/bit"
 elif test -x "$BIT_BUILD_DIR/target/release/build/cmd/bit/bit.exe"; then
 	BIT="$BIT_BUILD_DIR/target/release/build/cmd/bit/bit.exe"

@@ -57,6 +57,10 @@ tests {
     cmd = "node --test tools/module-publish-graph.test.mjs"
   }
   new {
+    name = "publish-changed"
+    cmd = "node --test tools/publish-changed.test.mjs"
+  }
+  new {
     name = "pkfire-test-inputs"
     cmd = "node --test tools/taskfile.test.mjs"
   }

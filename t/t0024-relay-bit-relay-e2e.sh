@@ -4,7 +4,9 @@
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT_CANDIDATE="$(cd "$SCRIPT_DIR/.." && pwd)"
-if [ -z "${MOONGIT:-}" ] && [ -f "$PROJECT_ROOT_CANDIDATE/_build/native/release/build/cmd/bit/bit.exe" ]; then
+if [ -z "${MOONGIT:-}" ] && [ -f "$PROJECT_ROOT_CANDIDATE/_build/native/release/build/mizchi/bit/bit.exe" ]; then
+    export MOONGIT="$PROJECT_ROOT_CANDIDATE/_build/native/release/build/mizchi/bit/bit.exe"
+elif [ -z "${MOONGIT:-}" ] && [ -f "$PROJECT_ROOT_CANDIDATE/_build/native/release/build/cmd/bit/bit.exe" ]; then
     export MOONGIT="$PROJECT_ROOT_CANDIDATE/_build/native/release/build/cmd/bit/bit.exe"
 fi
 
