@@ -3,11 +3,13 @@ import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-// Rebase's gitattributes filter-driver support requires the rebase JS
-// exports to be async (js_wrap_error_async), which pulls in more of the
-// async plumbing even for the minimal bundle. Raised from 161_000 to give
-// headroom above the current actual size (~162_215 bytes).
-const MAX_MINIMAL_RAW_BYTES = 163_000;
+// Raised from 161_000 -> 163_000 in #162 for async-rebase export plumbing
+// that isn't fully tree-shaken out of the minimal bundle. Raised again here
+// for the AsyncFileSystem/AsyncRepoFileSystem/AsyncHttpClient types, which
+// hit the same tree-shaking limitation. Current actual size is ~163_500
+// bytes; headroom is intentional so small future additions don't require
+// another guardrail bump.
+const MAX_MINIMAL_RAW_BYTES = 165_000;
 const MAX_MINIMAL_GZIP_BYTES = 40_000;
 const MAX_MINIMAL_RATIO = 0.70;
 

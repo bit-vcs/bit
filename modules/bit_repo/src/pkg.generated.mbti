@@ -13,6 +13,8 @@ pub fn checkout_commit(ObjectStore, @bit_object.ObjectId) -> Map[String, Bytes] 
 
 pub fn checkout_commit_to_fs(ObjectStore, @bit_object.ObjectId, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
 
+pub async fn[FS : @bit_types.AsyncFileSystem + @bit_types.AsyncRepoFileSystem] checkout_commit_to_fs_async(ObjectStore, @bit_object.ObjectId, FS, String) -> Unit raise @bit_object.GitError
+
 pub fn is_gitlink_mode(String) -> Bool
 
 pub fn is_tree_mode(String) -> Bool
@@ -20,6 +22,8 @@ pub fn is_tree_mode(String) -> Bool
 pub fn join_path(String, String) -> String
 
 pub fn materialize_clone_to_fs(ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
+
+pub async fn[FS : @bit_types.AsyncFileSystem + @bit_types.AsyncRepoFileSystem] materialize_clone_to_fs_async(ObjectStore, @bit_object.ObjectId, String, String, FS, String) -> Unit raise @bit_object.GitError
 
 pub fn parent_dir(String) -> String
 
@@ -32,6 +36,8 @@ pub fn read_shallow_boundaries(&@bit_types.RepoFileSystem, String) -> Array[@bit
 pub fn verify_tree_entry_name(String) -> Unit raise @bit_object.GitError
 
 pub fn write_git_metadata(ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
+
+pub async fn[FS : @bit_types.AsyncFileSystem + @bit_types.AsyncRepoFileSystem] write_git_metadata_async(ObjectStore, @bit_object.ObjectId, String, String, FS, String) -> Unit raise @bit_object.GitError
 
 // Errors
 

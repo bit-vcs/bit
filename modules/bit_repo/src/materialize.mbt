@@ -65,6 +65,11 @@ fn write_config(
   remote_url : String,
 ) -> Unit raise @object.GitError {
   let config_path = join_path(git_dir, "config")
+  write_text(fs, config_path, git_config_text(remote_url))
+}
+
+///|
+fn git_config_text(remote_url : String) -> String {
   let base =
     #|[core]
     #|	repositoryformatversion = 0
@@ -81,7 +86,7 @@ fn write_config(
   } else {
     base + "\n" + remote_block
   }
-  write_text(fs, config_path, config)
+  config
 }
 
 ///|
@@ -114,6 +119,20 @@ fn write_index_v2(
   let entries = collect_commit_entries(store, commit_id)
   // Git index entries must be in lexical path order.
   entries.sort_by((a, b) => String::lexical_compare(a.path, b.path))
+  let entries_with_mtime = entries.map(entry => {
+    let mtime = if entry.mode == 0o160000 {
+      (0, 0)
+    } else {
+      rfs.mtime(join_path(root, entry.path))
+    }
+    (entry, mtime)
+  })
+  let index_path = join_path(git_dir, "index")
+  fs.write_file(index_path, build_index_v2(entries_with_mtime))
+}
+
+///|
+fn build_index_v2(entries : Array[(IndexEntryInfo, (Int, Int))]) -> Bytes {
   let out : Array[Byte] = []
   // Header: "DIRC" + version(2) + count
   out.push(b'D')
@@ -122,13 +141,8 @@ fn write_index_v2(
   out.push(b'C')
   push_u32_be(out, 2)
   push_u32_be(out, entries.length())
-  for e in entries {
-    // Gitlinks represent submodule directories, not files we can stat here.
-    let (mtime_sec, mtime_nsec) = if e.mode == 0o160000 {
-      (0, 0)
-    } else {
-      rfs.mtime(join_path(root, e.path))
-    }
+  for entry in entries {
+    let (e, (mtime_sec, mtime_nsec)) = entry
     // Git index v2 entry format (62 bytes fixed + variable name):
     // ctime_sec (4) + ctime_nsec (4)
     push_u32_be(out, mtime_sec)
@@ -174,11 +188,7 @@ fn write_index_v2(
   for b in checksum.bytes {
     out.push(b)
   }
-  let index_bytes = Bytes::from_array(
-    FixedArray::makei(out.length(), i => out[i]),
-  )
-  let index_path = join_path(git_dir, "index")
-  fs.write_file(index_path, index_bytes)
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|

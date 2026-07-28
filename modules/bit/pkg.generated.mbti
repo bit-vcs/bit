@@ -13,6 +13,8 @@ pub fn checkout_commit(@bit_repo.ObjectStore, @bit_object.ObjectId) -> Map[Strin
 
 pub fn checkout_commit_to_fs(@bit_repo.ObjectStore, @bit_object.ObjectId, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
 
+pub async fn[FS : @bit_types.AsyncFileSystem + @bit_types.AsyncRepoFileSystem] checkout_commit_to_fs_async(@bit_repo.ObjectStore, @bit_object.ObjectId, FS, String) -> Unit raise @bit_object.GitError
+
 pub fn create_blob(Bytes) -> (@bit_object.ObjectId, Bytes)
 
 pub fn create_blob_string(String) -> (@bit_object.ObjectId, Bytes)
@@ -39,6 +41,8 @@ pub fn join_path(String, String) -> String
 
 pub fn materialize_clone_to_fs(@bit_repo.ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
 
+pub async fn[FS : @bit_types.AsyncFileSystem + @bit_types.AsyncRepoFileSystem] materialize_clone_to_fs_async(@bit_repo.ObjectStore, @bit_object.ObjectId, String, String, FS, String) -> Unit raise @bit_object.GitError
+
 pub fn parse_commit(Bytes) -> @bit_repo.CommitInfo raise @bit_object.GitError
 
 pub fn parse_tree(Bytes) -> Array[@bit_object.TreeEntry] raise @bit_object.GitError
@@ -62,6 +66,8 @@ pub fn sha256_prefix(Bytes, Int) -> @bit_object.ObjectId
 pub fn verify_tree_entry_name(String) -> Unit raise @bit_object.GitError
 
 pub fn write_git_metadata(@bit_repo.ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
+
+pub async fn[FS : @bit_types.AsyncFileSystem + @bit_types.AsyncRepoFileSystem] write_git_metadata_async(@bit_repo.ObjectStore, @bit_object.ObjectId, String, String, FS, String) -> Unit raise @bit_object.GitError
 
 // Errors
 
@@ -101,6 +107,12 @@ pub using @bit_object {type Sha256State}
 pub using @bit_io {type TestFs}
 
 pub using @bit_object {type TreeEntry}
+
+pub using @bit_types {trait AsyncFileSystem}
+
+pub using @bit_types {trait AsyncHttpClient}
+
+pub using @bit_types {trait AsyncRepoFileSystem}
 
 pub using @bit_types {trait FileSystem}
 

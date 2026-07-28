@@ -289,6 +289,25 @@ pub async fn native_http_post(
 }
 
 ///|
+pub impl @types.AsyncHttpClient for NativeHttpClient with fn get(
+  _self,
+  url,
+  headers,
+) {
+  native_http_get(url, headers)
+}
+
+///|
+pub impl @types.AsyncHttpClient for NativeHttpClient with fn post(
+  _self,
+  url,
+  body,
+  headers,
+) {
+  native_http_post(url, body, headers)
+}
+
+///|
 pub async fn native_http_put(
   url : String,
   body : Bytes,

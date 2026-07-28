@@ -53,6 +53,8 @@ pub fn TestFs::remove_dir(Self, String) -> Unit raise @bit_object.GitError
 pub fn TestFs::remove_file(Self, String) -> Unit raise @bit_object.GitError
 pub fn TestFs::write_file(Self, String, Bytes) -> Unit
 pub fn TestFs::write_string(Self, String, String) -> Unit
+pub impl @bit_types.AsyncFileSystem for TestFs
+pub impl @bit_types.AsyncRepoFileSystem for TestFs
 pub impl @bit_types.FileSystem for TestFs
 pub impl @bit_types.RepoFileSystem for TestFs
 
@@ -104,6 +106,12 @@ pub fn WorktreeProbeProvider::none() -> Self
 pub using @bit_types {type HttpResponse}
 
 pub using @bit_types {type MockHttpClient}
+
+pub using @bit_types {trait AsyncFileSystem}
+
+pub using @bit_types {trait AsyncHttpClient}
+
+pub using @bit_types {trait AsyncRepoFileSystem}
 
 pub using @bit_types {trait FileSystem}
 

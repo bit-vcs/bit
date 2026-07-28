@@ -44,6 +44,21 @@ fn wasm_http_client() -> WasmHttpClient raise @bit.GitError {
 }
 
 ///|
+impl @types.AsyncHttpClient for WasmHttpClient with fn get(self, url, headers) {
+  (self.get)(url, headers)
+}
+
+///|
+impl @types.AsyncHttpClient for WasmHttpClient with fn post(
+  self,
+  url,
+  body,
+  headers,
+) {
+  (self.post)(url, body, headers)
+}
+
+///|
 pub async fn upload_pack_info_refs(
   remote : String,
   prefer_v2 : Bool,
@@ -155,5 +170,23 @@ pub async fn clone_remote_to_fs(
     client.get,
     client.post,
     rfs,
+  )
+}
+
+///|
+pub async fn[FS : @types.AsyncFileSystem + @types.AsyncRepoFileSystem] clone_remote_to_async_fs(
+  remote : String,
+  prefer_v2 : Bool,
+  fs : FS,
+  root : String,
+) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
+  clone_to_async_fs_with_http(
+    remote,
+    prefer_v2,
+    0,
+    FilterSpec::NoFilter,
+    fs,
+    root,
+    wasm_http_client(),
   )
 }

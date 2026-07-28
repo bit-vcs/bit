@@ -70,7 +70,7 @@ impl @bit.RepoFileSystem for CountingFs with fn is_file(self, path) {
 
 ///|
 impl @bit.RepoFileSystem for CountingFs with fn mtime(self, path) {
-  self.fs.mtime(path)
+  @bit.RepoFileSystem::mtime(self.fs, path)
 }
 
 ///|

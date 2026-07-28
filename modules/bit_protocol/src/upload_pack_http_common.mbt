@@ -248,6 +248,49 @@ pub async fn clone_with_http(
 }
 
 ///|
+priv struct PreparedClone {
+  default_ref : (String, @bit.ObjectId)
+  pack : Bytes
+  pack_id : @bit.ObjectId
+  objects : Array[@bit.PackObject]
+}
+
+///|
+/// Keep protocol negotiation shared by sync and async filesystem adapters.
+async fn prepare_clone_with_http(
+  remote : String,
+  prefer_v2 : Bool,
+  depth : Int,
+  filter : FilterSpec,
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
+  http_post : async (String, Bytes, Map[String, String]) -> (
+    @bit.HttpResponse,
+    Bytes,
+  ) raise @bit.GitError,
+) -> (Array[(@bit.ObjectId, String)], PreparedClone?) raise @bit.GitError {
+  let (refs, _caps, _version, symrefs) = discover_upload_refs_with_http(
+    remote, prefer_v2, http_get, http_post,
+  )
+  let wants = select_default_wants(refs, symrefs)
+  let default_ref = select_default_ref(refs, symrefs)
+  if default_ref is None || wants.length() == 0 {
+    return (refs, None)
+  }
+  let pack = fetch_pack_with_http(
+    remote, wants, prefer_v2, depth, filter, http_get, http_post,
+  )
+  (
+    refs,
+    Some({
+      default_ref: default_ref.unwrap(),
+      pack,
+      pack_id: read_pack_trailer_id_http(pack),
+      objects: @pack.parse_packfile(pack),
+    }),
+  )
+}
+
+///|
 pub async fn clone_to_fs_with_http(
   remote : String,
   prefer_v2 : Bool,
@@ -263,67 +306,221 @@ pub async fn clone_to_fs_with_http(
   rfs : &@bit.RepoFileSystem,
   no_checkout? : Bool = false,
 ) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
-  let (refs, _caps, _version, symrefs) = discover_upload_refs_with_http(
-    remote, prefer_v2, http_get, http_post,
+  let (refs, prepared) = prepare_clone_with_http(
+    remote, prefer_v2, depth, filter, http_get, http_post,
   )
-  let wants = select_default_wants(refs, symrefs)
-  let default_ref = select_default_ref(refs, symrefs)
-  match default_ref {
+  let prepared = match prepared {
     None => return refs
-    Some(_) => ()
+    Some(value) => value
   }
-  if wants.length() == 0 {
-    return refs
-  }
-  let objects = {
-    let pack = fetch_pack_with_http(
-      remote, wants, prefer_v2, depth, filter, http_get, http_post,
-    )
-    let pack_id = read_pack_trailer_id_http(pack)
-    let objects = @pack.parse_packfile(pack)
-    match default_ref {
-      Some(_) => {
-        let git_dir = @bit.join_path(root, ".git")
-        fs.mkdir_p(@bit.join_path(git_dir, "objects/pack"))
-        @pack.write_packfile_with_index(fs, git_dir, pack, objects)
-        if filter.is_partial() {
-          write_promisor_file(fs, git_dir, remote)
-          write_pack_promisor_marker_http(
-            fs, git_dir, pack_id, refs, default_ref,
-          )
-        }
-      }
-      None => ()
-    }
-    objects
-  }
+  let git_dir = @bit.join_path(root, ".git")
+  fs.mkdir_p(@bit.join_path(git_dir, "objects/pack"))
+  @pack.write_packfile_with_index(fs, git_dir, prepared.pack, prepared.objects)
   if filter.is_partial() {
-    match default_ref {
-      Some((refname, commit_id)) => {
-        let git_dir = @bit.join_path(root, ".git")
-        write_partial_clone_refs(
-          fs, git_dir, refname, commit_id, remote, filter,
-        )
-      }
-      None => ()
-    }
+    write_promisor_file(fs, git_dir, remote)
+    write_pack_promisor_marker_http(
+      fs,
+      git_dir,
+      prepared.pack_id,
+      refs,
+      Some(prepared.default_ref),
+    )
+    let (refname, commit_id) = prepared.default_ref
+    write_partial_clone_refs(fs, git_dir, refname, commit_id, remote, filter)
   } else {
-    let store = @bit.ObjectStore::from_pack(objects)
-    match default_ref {
-      None => ()
-      Some((refname, commit_id)) =>
-        if no_checkout {
-          @bit.write_git_metadata(
-            store, commit_id, refname, remote, fs, root, rfs,
-          )
-        } else {
-          @bit.materialize_clone_to_fs(
-            store, commit_id, refname, remote, fs, root, rfs,
-          )
-        }
+    let store = @bit.ObjectStore::from_pack(prepared.objects)
+    let (refname, commit_id) = prepared.default_ref
+    if no_checkout {
+      @bit.write_git_metadata(store, commit_id, refname, remote, fs, root, rfs)
+    } else {
+      @bit.materialize_clone_to_fs(
+        store, commit_id, refname, remote, fs, root, rfs,
+      )
     }
   }
   refs
+}
+
+///|
+/// Clone through asynchronous HTTP and filesystem implementations.
+pub async fn[
+  FS : @types.AsyncFileSystem + @types.AsyncRepoFileSystem,
+  Client : @types.AsyncHttpClient,
+] clone_to_async_fs_with_http(
+  remote : String,
+  prefer_v2 : Bool,
+  depth : Int,
+  filter : FilterSpec,
+  fs : FS,
+  root : String,
+  client : Client,
+  no_checkout? : Bool = false,
+) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
+  let http_get = async fn(
+    url : String,
+    headers : Map[String, String],
+  ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+    @types.AsyncHttpClient::get(client, url, headers)
+  }
+  let http_post = async fn(
+    url : String,
+    body : Bytes,
+    headers : Map[String, String],
+  ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+    @types.AsyncHttpClient::post(client, url, body, headers)
+  }
+  let (refs, prepared) = prepare_clone_with_http(
+    remote, prefer_v2, depth, filter, http_get, http_post,
+  )
+  let prepared = match prepared {
+    None => return refs
+    Some(value) => value
+  }
+  let git_dir = @bit.join_path(root, ".git")
+  @types.AsyncFileSystem::mkdir_p(fs, @bit.join_path(git_dir, "objects/pack"))
+  @pack.write_packfile_with_index_async(
+    fs,
+    git_dir,
+    prepared.pack,
+    prepared.objects,
+  )
+  if filter.is_partial() {
+    write_promisor_file_async(fs, git_dir, remote)
+    write_pack_promisor_marker_http_async(
+      fs,
+      git_dir,
+      prepared.pack_id,
+      refs,
+      Some(prepared.default_ref),
+    )
+    let (refname, commit_id) = prepared.default_ref
+    write_partial_clone_refs_async(
+      fs, git_dir, refname, commit_id, remote, filter,
+    )
+  } else {
+    let store = @bit.ObjectStore::from_pack(prepared.objects)
+    let (refname, commit_id) = prepared.default_ref
+    if no_checkout {
+      @repo.write_git_metadata_async(
+        store, commit_id, refname, remote, fs, root,
+      )
+    } else {
+      @repo.materialize_clone_to_fs_async(
+        store, commit_id, refname, remote, fs, root,
+      )
+    }
+  }
+  refs
+}
+
+///|
+async fn[FS : @types.AsyncFileSystem] write_promisor_file_async(
+  fs : FS,
+  git_dir : String,
+  remote : String,
+) -> Unit raise @bit.GitError {
+  let promisor_dir = @bit.join_path(git_dir, "objects/info")
+  @types.AsyncFileSystem::mkdir_p(fs, promisor_dir)
+  @types.AsyncFileSystem::write_string(
+    fs,
+    @bit.join_path(promisor_dir, "promisor"),
+    remote + "\n",
+  )
+}
+
+///|
+async fn[FS : @types.AsyncFileSystem] write_pack_promisor_marker_http_async(
+  fs : FS,
+  git_dir : String,
+  pack_id : @bit.ObjectId,
+  refs : Array[(@bit.ObjectId, String)],
+  default_ref : (String, @bit.ObjectId)?,
+) -> Unit raise @bit.GitError {
+  let pack_dir = @bit.join_path(git_dir, "objects/pack")
+  @types.AsyncFileSystem::mkdir_p(fs, pack_dir)
+  let marker_lines : Array[String] = []
+  let seen : Map[String, Bool] = Map([])
+  for item in refs {
+    let (id, name) = item
+    if name.length() == 0 {
+      continue
+    }
+    let line = id.to_hex() + " " + name
+    if seen.contains(line) {
+      continue
+    }
+    seen[line] = true
+    marker_lines.push(line)
+  }
+  match default_ref {
+    Some((_, head_id)) => {
+      let head_line = head_id.to_hex() + " HEAD"
+      if !seen.contains(head_line) {
+        seen[head_line] = true
+        marker_lines.push(head_line)
+      }
+    }
+    None => ()
+  }
+  if marker_lines.length() == 0 {
+    return
+  }
+  let marker_path = @bit.join_path(
+    pack_dir,
+    "pack-\{pack_id.to_hex()}.promisor",
+  )
+  @types.AsyncFileSystem::write_string(
+    fs,
+    marker_path,
+    marker_lines.join("\n") + "\n",
+  )
+}
+
+///|
+async fn[FS : @types.AsyncFileSystem] write_partial_clone_refs_async(
+  fs : FS,
+  git_dir : String,
+  refname : String,
+  commit_id : @bit.ObjectId,
+  remote : String,
+  filter : FilterSpec,
+) -> Unit raise @bit.GitError {
+  let head_path = @bit.join_path(git_dir, "HEAD")
+  if refname == "HEAD" {
+    @types.AsyncFileSystem::write_string(
+      fs,
+      head_path,
+      commit_id.to_hex() + "\n",
+    )
+  } else {
+    @types.AsyncFileSystem::write_string(fs, head_path, "ref: \{refname}\n")
+    let ref_path = @bit.join_path(git_dir, refname)
+    let ref_dir = {
+      let mut last_slash = -1
+      for i, c in ref_path {
+        if c == '/' {
+          last_slash = i
+        }
+      }
+      if last_slash > 0 {
+        String::unsafe_substring(ref_path, start=0, end=last_slash)
+      } else {
+        git_dir
+      }
+    }
+    @types.AsyncFileSystem::mkdir_p(fs, ref_dir)
+    @types.AsyncFileSystem::write_string(
+      fs,
+      ref_path,
+      commit_id.to_hex() + "\n",
+    )
+  }
+  let config = "[core]\n\trepositoryformatversion = 1\n\tfilemode = true\n\tbare = false\n\tlogallaliases = false\n[extensions]\n\tpartialclone = origin\n[remote \"origin\"]\n\turl = \{remote}\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n\tpromisor = true\n\tpartialclonefilter = \{filter.to_string()}\n"
+  @types.AsyncFileSystem::write_string(
+    fs,
+    @bit.join_path(git_dir, "config"),
+    config,
+  )
 }
 
 ///|
