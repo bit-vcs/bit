@@ -17,6 +17,8 @@ pub fn append_reflog(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String,
 
 pub fn apply_config_overrides(Map[String, RemoteConfig], Map[String, BranchConfig], Array[(String, String)]) -> Unit
 
+pub async fn apply_filter_smudge(&@bit_types.RepoFileSystem, Bytes, FileEolAttrs, String, String, FilterCmd?) -> Bytes raise @bit_object.GitError
+
 pub fn apply_receive_pack(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, ReceivePackRequest, skip_connectivity_check? : Bool, git_dir_override? : String) -> ReceivePackResult raise @bit_object.GitError
 
 pub fn apply_template(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit raise @bit_object.GitError
@@ -147,7 +149,7 @@ pub fn expand_sparse_index_entries(&@bit_types.RepoFileSystem, String, Array[Ind
 
 pub fn expand_sparse_skip_worktree_paths(&@bit_types.RepoFileSystem, String, Array[IndexEntry], Map[String, Bool]) -> Map[String, Bool] raise @bit_object.GitError
 
-pub fn fast_forward_to(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId) -> Unit raise @bit_object.GitError
+pub async fn fast_forward_to(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, run_filter_cmd? : FilterCmd) -> Unit raise @bit_object.GitError
 
 pub fn find_tree_entry(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String) -> @bit_object.TreeEntry? raise @bit_object.GitError
 
@@ -210,6 +212,8 @@ pub fn is_bare_git_dir(String) -> Bool
 pub fn is_binary_bytes(Bytes) -> Bool
 
 pub fn is_branch_checked_out(&@bit_types.RepoFileSystem, String, String) -> String? raise @bit_object.GitError
+
+pub fn is_branch_checked_out_elsewhere(&@bit_types.RepoFileSystem, String, String) -> String? raise @bit_object.GitError
 
 pub fn is_ignored_path(&@bit_types.RepoFileSystem, String, String, Bool) -> Bool raise @bit_object.GitError
 
@@ -437,17 +441,17 @@ pub fn read_subdir_attributes(&@bit_types.RepoFileSystem, String) -> (String, St
 
 pub fn read_unmerged_paths(&@bit_types.RepoFileSystem, String) -> Map[String, Bool]
 
-pub fn rebase_abort(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit raise @bit_object.GitError
+pub async fn rebase_abort(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> Unit raise @bit_object.GitError
 
-pub fn rebase_continue(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> RebaseResult raise @bit_object.GitError
+pub async fn rebase_continue(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> RebaseResult raise @bit_object.GitError
 
-pub fn rebase_onto(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId) -> @bit_object.ObjectId raise @bit_object.GitError
+pub async fn rebase_onto(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, run_filter_cmd? : FilterCmd) -> @bit_object.ObjectId raise @bit_object.GitError
 
-pub fn rebase_skip(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> RebaseResult raise @bit_object.GitError
+pub async fn rebase_skip(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> RebaseResult raise @bit_object.GitError
 
-pub fn rebase_start(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId) -> RebaseResult raise @bit_object.GitError
+pub async fn rebase_start(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, run_filter_cmd? : FilterCmd) -> RebaseResult raise @bit_object.GitError
 
-pub fn rebase_start_with_onto(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId, force_rebase? : Bool) -> RebaseResult raise @bit_object.GitError
+pub async fn rebase_start_with_onto(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId, force_rebase? : Bool, run_filter_cmd? : FilterCmd) -> RebaseResult raise @bit_object.GitError
 
 pub fn receive_build_status_response(ReceivePackResult) -> Bytes
 
@@ -1036,6 +1040,7 @@ pub struct RebaseResult {
   status : RebaseStatus
   commit_id : @bit_object.ObjectId?
   conflicts : Array[String]
+  rewritten : Array[(@bit_object.ObjectId, @bit_object.ObjectId)]
 }
 
 pub struct RebaseState {
@@ -1049,6 +1054,7 @@ pub struct RebaseState {
   author : String
   author_time : Int64
   author_tz : String
+  rewritten : Array[(@bit_object.ObjectId, @bit_object.ObjectId)]
 }
 
 pub enum RebaseStatus {

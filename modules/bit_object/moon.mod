@@ -1,9 +1,9 @@
 name = "mizchi/bit_object"
 
-version = "0.45.5"
+version = "0.45.6"
 
 import {
-  "mizchi/bit_hash@0.45.5",
+  "mizchi/bit_hash@0.45.6",
   "mizchi/zlib@0.4.8",
 }
 

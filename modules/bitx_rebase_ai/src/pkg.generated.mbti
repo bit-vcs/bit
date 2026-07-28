@@ -11,13 +11,13 @@ import {
 // Values
 pub fn ai_generate_commit_message(&@bit_types.RepoFileSystem, String, String, String, options? : AiRebaseOptions) -> String raise @bit_object.GitError
 
-pub fn ai_rebase_abort(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit raise @bit_object.GitError
+pub async fn ai_rebase_abort(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit raise @bit_object.GitError
 
-pub fn ai_rebase_continue(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, options? : AiRebaseOptions) -> @bit_lib.RebaseResult raise @bit_object.GitError
+pub async fn ai_rebase_continue(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, options? : AiRebaseOptions) -> @bit_lib.RebaseResult raise @bit_object.GitError
 
-pub fn ai_rebase_skip(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, options? : AiRebaseOptions) -> @bit_lib.RebaseResult raise @bit_object.GitError
+pub async fn ai_rebase_skip(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, options? : AiRebaseOptions) -> @bit_lib.RebaseResult raise @bit_object.GitError
 
-pub fn ai_rebase_start(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, options? : AiRebaseOptions) -> @bit_lib.RebaseResult raise @bit_object.GitError
+pub async fn ai_rebase_start(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, options? : AiRebaseOptions) -> @bit_lib.RebaseResult raise @bit_object.GitError
 
 pub fn ai_resolve_conflict_paths(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[String], AiRebaseOptions, String) -> AiConflictResolution raise @bit_object.GitError
 
