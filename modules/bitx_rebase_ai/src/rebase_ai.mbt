@@ -780,7 +780,7 @@ fn normalized_round_limit(options : AiRebaseOptions) -> Int {
 }
 
 ///|
-fn continue_until_non_conflict(
+async fn continue_until_non_conflict(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
@@ -820,7 +820,7 @@ fn continue_until_non_conflict(
 }
 
 ///|
-pub fn ai_rebase_start(
+pub async fn ai_rebase_start(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
@@ -835,7 +835,7 @@ pub fn ai_rebase_start(
 }
 
 ///|
-pub fn ai_rebase_continue(
+pub async fn ai_rebase_continue(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
@@ -858,7 +858,7 @@ pub fn ai_rebase_continue(
 }
 
 ///|
-pub fn ai_rebase_skip(
+pub async fn ai_rebase_skip(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
@@ -870,7 +870,7 @@ pub fn ai_rebase_skip(
 }
 
 ///|
-pub fn ai_rebase_abort(
+pub async fn ai_rebase_abort(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,

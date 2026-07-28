@@ -1751,7 +1751,7 @@ fn interactive_cherry_pick(
         info.message,
       )
       let (new_id, compressed) = @bit.create_commit(new_commit)
-      rebase_write_object(fs, git_dir, new_id, compressed)
+      rebase_write_object(fs, rfs, git_dir, new_id, compressed)
       rebase_update_head(fs, rfs, git_dir, new_id)
       let tree_map = rebase_tree_map_from_tree(db, rfs, info.tree)
       rebase_write_worktree(fs, db, rfs, root, git_dir, tree_map)
@@ -1801,7 +1801,7 @@ fn interactive_cherry_pick(
     }
   }
   // Create new commit
-  let new_tree = rebase_write_tree_from_map(fs, git_dir, base_map)
+  let new_tree = rebase_write_tree_from_map(fs, rfs, git_dir, base_map)
   let new_commit = @bit.Commit::new(
     new_tree,
     [base_id],
@@ -1814,7 +1814,7 @@ fn interactive_cherry_pick(
     info.message,
   )
   let (new_id, compressed) = @bit.create_commit(new_commit)
-  rebase_write_object(fs, git_dir, new_id, compressed)
+  rebase_write_object(fs, rfs, git_dir, new_id, compressed)
   rebase_update_head(fs, rfs, git_dir, new_id)
   // Update worktree + index
   rebase_write_worktree(fs, db, rfs, root, git_dir, base_map)
@@ -1853,7 +1853,7 @@ fn interactive_amend_head_message(
     new_message,
   )
   let (new_id, compressed) = @bit.create_commit(new_commit)
-  rebase_write_object(fs, git_dir, new_id, compressed)
+  rebase_write_object(fs, rfs, git_dir, new_id, compressed)
   rebase_update_head(fs, rfs, git_dir, new_id)
 }
 
@@ -1927,7 +1927,7 @@ async fn interactive_squash_into_head(
     }
   }
   // Create new commit replacing HEAD with squashed tree
-  let new_tree = rebase_write_tree_from_map(fs, git_dir, base_map)
+  let new_tree = rebase_write_tree_from_map(fs, rfs, git_dir, base_map)
   let new_commit = @bit.Commit::new(
     new_tree,
     head_info.parents,
@@ -1940,7 +1940,7 @@ async fn interactive_squash_into_head(
     final_msg,
   )
   let (new_id, compressed) = @bit.create_commit(new_commit)
-  rebase_write_object(fs, git_dir, new_id, compressed)
+  rebase_write_object(fs, rfs, git_dir, new_id, compressed)
   rebase_update_head(fs, rfs, git_dir, new_id)
   // Update worktree + index
   rebase_write_worktree(fs, db, rfs, root, git_dir, base_map)
@@ -1996,7 +1996,7 @@ pub async fn interactive_rebase_continue_impl(
         head_info.message,
       )
       let (new_id, compressed) = @bit.create_commit(new_commit)
-      rebase_write_object(fs, git_dir, new_id, compressed)
+      rebase_write_object(fs, rfs, git_dir, new_id, compressed)
       rebase_update_head(fs, rfs, git_dir, new_id)
     }
     // Record commit mapping for update-refs after amend
@@ -2044,7 +2044,7 @@ pub async fn interactive_rebase_continue_impl(
       info.message,
     )
     let (new_id, compressed) = @bit.create_commit(new_commit)
-    rebase_write_object(fs, git_dir, new_id, compressed)
+    rebase_write_object(fs, rfs, git_dir, new_id, compressed)
     rebase_update_head(fs, rfs, git_dir, new_id)
     // Record commit mapping for update-refs
     if s.update_refs.length() > 0 {

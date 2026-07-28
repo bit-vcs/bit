@@ -442,6 +442,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   check_and_exit_unsupported_attrs(root)
   let wfs : &@bitcore.FileSystem = fs
   let rfs : &@bitcore.RepoFileSystem = fs
+  let filter_cmd = @bitlib.FilterCmd::{ run: @bitlibnative.run_filter_command }
   // Parse arguments
   let mut do_continue = false
   let mut do_abort = false
@@ -788,7 +789,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       print_interactive_rebase_result(result, quiet~)
     } else {
       let state_before = @bitlib.load_rebase_state(rfs, git_dir)
-      let result = @bitlib.rebase_continue(fs, fs, root)
+      let result = @bitlib.rebase_continue(fs, fs, root, run_filter_cmd=filter_cmd)
       let signed_id = if should_sign {
         match state_before {
           Some(state) =>
@@ -821,7 +822,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       rebase_clear_signing_state(wfs, git_dir)
       print_line("Rebase aborted")
     } else {
-      @bitlib.rebase_abort(fs, fs, root) catch {
+      @bitlib.rebase_abort(fs, fs, root, run_filter_cmd=filter_cmd) catch {
         _ => @bitlib.clear_rebase_state(fs, fs, git_dir)
       }
       rebase_clear_signing_state(wfs, git_dir)
@@ -866,7 +867,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       print_interactive_rebase_result(result, quiet~)
     } else {
       let state_before = @bitlib.load_rebase_state(rfs, git_dir)
-      let result = @bitlib.rebase_skip(fs, fs, root)
+      let result = @bitlib.rebase_skip(fs, fs, root, run_filter_cmd=filter_cmd)
       let signed_id = if should_sign {
         match state_before {
           Some(state) =>
@@ -924,8 +925,22 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   // A second positional arg: switch to it first (like `bit checkout
   // <branch>`), so the rebase below operates on it as the current HEAD.
   // Reuses checkout's own worktree-lock / detached-HEAD / dirty-tree rules.
+  // Unlike plain checkout, this check is unconditional even when the
+  // target is already the current branch: rebase is about to rewrite the
+  // branch's history, which is unsafe if another worktree also has it
+  // checked out (e.g. via `git worktree add -f`, which lets one branch be
+  // shared by two worktrees).
   match switch_to_branch {
-    Some(target) => handle_checkout([target])
+    Some(target) => {
+      match @bitlib.is_branch_checked_out_elsewhere(rfs, root, target) {
+        Some(path) =>
+          raise @bitcore.GitError::InvalidObject(
+            "'\{target}' is already used by worktree at '\{path}'",
+          )
+        None => ()
+      }
+      handle_checkout([target])
+    }
     None => ()
   }
   // Require a clean worktree/index before starting a new rebase, unless
@@ -1074,7 +1089,9 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         }
         (
           oid,
-          @bitlib.rebase_start_with_onto(fs, fs, root, oid, id, force_rebase~),
+          @bitlib.rebase_start_with_onto(
+            fs, fs, root, oid, id, force_rebase~, run_filter_cmd=filter_cmd,
+          ),
         )
       }
       None => {
@@ -1096,6 +1113,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
           id,
           @bitlib.rebase_start_with_onto(
             fs, fs, root, id, exclude_from, force_rebase~,
+            run_filter_cmd=filter_cmd,
           ),
         )
       }

@@ -333,20 +333,11 @@ fn checkout_branch_in_use_path(
   root : String,
   branch : String,
 ) -> String? raise Error {
-  let git_dir = resolve_git_dir(fs, root)
-  match @bitlib.read_head_ref(fs, git_dir) {
-    Branch(current) if current == branch => return None
-    _ => ()
-  }
-  match @bitlib.is_branch_checked_out(fs, root, branch) {
-    Some(path) =>
-      if normalize_path(path) == normalize_path(root) {
-        None
-      } else {
-        Some(path)
-      }
-    None => None
-  }
+  // Checks every worktree, not just the "current branch" shortcut: `git
+  // worktree add -f` can force two worktrees to share one branch, so the
+  // current worktree already being on `branch` doesn't rule out a conflict
+  // with a different worktree that also has it checked out.
+  @bitlib.is_branch_checked_out_elsewhere(fs, root, branch)
 }
 
 ///|

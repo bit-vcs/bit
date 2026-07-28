@@ -852,7 +852,7 @@ test "js exports: merge merges another branch by refname" {
 }
 
 ///|
-test "js exports: rebase start rebases current branch onto upstream refname" {
+async test "js exports: rebase start rebases current branch onto upstream refname" {
   let host_id = js_create_memory_host()
 
   js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))

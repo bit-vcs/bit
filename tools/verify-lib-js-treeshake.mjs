@@ -3,7 +3,11 @@ import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const MAX_MINIMAL_RAW_BYTES = 161_000;
+// Rebase's gitattributes filter-driver support requires the rebase JS
+// exports to be async (js_wrap_error_async), which pulls in more of the
+// async plumbing even for the minimal bundle. Raised from 161_000 to give
+// headroom above the current actual size (~162_215 bytes).
+const MAX_MINIMAL_RAW_BYTES = 163_000;
 const MAX_MINIMAL_GZIP_BYTES = 40_000;
 const MAX_MINIMAL_RATIO = 0.70;
 
