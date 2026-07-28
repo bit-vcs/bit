@@ -152,6 +152,8 @@ set +e
 
   bin_path=""
   for candidate in \
+    "_build/native/release/build/mizchi/bit/bit.exe" \
+    "_build/native/debug/build/mizchi/bit/bit.exe" \
     "_build/native/release/build/cmd/bit/bit.exe" \
     "_build/native/debug/build/cmd/bit/bit.exe"; do
     if [ -f "$candidate" ]; then
@@ -160,7 +162,7 @@ set +e
     fi
   done
   if [ -z "$bin_path" ]; then
-    echo "bit binary not found in _build/native/*/build/cmd/bit/bit.exe" >&2
+    echo "bit binary not found in _build/native/*/build/{mizchi,cmd}/bit/bit.exe" >&2
     exit 1
   fi
   cp "$bin_path" tools/git-shim/moon

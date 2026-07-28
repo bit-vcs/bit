@@ -81,7 +81,7 @@ function ensurePrepared() {
   const shimMoon = join(root, "tools/git-shim/moon");
   const builtBit = join(
     root,
-    "_build/native/release/build/cmd/bit/bit.exe",
+    "_build/native/release/build/mizchi/bit/bit.exe",
   );
   const action = resolveShimRefreshAction({
     shimExists: existsSync(shimMoon),

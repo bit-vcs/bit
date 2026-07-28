@@ -7,9 +7,15 @@ set -e
 
 TEST_DIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_ROOT=$(cd "$TEST_DIR/.." && pwd)
-BIT="${MOONGIT:-$PROJECT_ROOT/target/native/release/build/cmd/bit/bit.exe}"
+BIT="${MOONGIT:-$PROJECT_ROOT/_build/native/release/build/mizchi/bit/bit.exe}"
+if [ ! -f "$BIT" ] && [ -f "$PROJECT_ROOT/target/native/release/build/mizchi/bit/bit.exe" ]; then
+    BIT="$PROJECT_ROOT/target/native/release/build/mizchi/bit/bit.exe"
+fi
 if [ ! -f "$BIT" ] && [ -f "$PROJECT_ROOT/_build/native/release/build/cmd/bit/bit.exe" ]; then
     BIT="$PROJECT_ROOT/_build/native/release/build/cmd/bit/bit.exe"
+fi
+if [ ! -f "$BIT" ] && [ -f "$PROJECT_ROOT/target/native/release/build/cmd/bit/bit.exe" ]; then
+    BIT="$PROJECT_ROOT/target/native/release/build/cmd/bit/bit.exe"
 fi
 if [ ! -f "$BIT" ] && [ -f "$PROJECT_ROOT/tools/git-shim/moon" ]; then
     BIT="$PROJECT_ROOT/tools/git-shim/moon"
@@ -18,6 +24,9 @@ fi
 if [ ! -f "$BIT" ]; then
     echo "Building bit..."
     (cd "$PROJECT_ROOT" && moon build --target native --release)
+fi
+if [ ! -f "$BIT" ] && [ -f "$PROJECT_ROOT/_build/native/release/build/mizchi/bit/bit.exe" ]; then
+    BIT="$PROJECT_ROOT/_build/native/release/build/mizchi/bit/bit.exe"
 fi
 
 # Colors

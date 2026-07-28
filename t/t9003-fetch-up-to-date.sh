@@ -8,7 +8,11 @@ test_description='bit fetch is quiet when up to date'
 TEST_DIRECTORY=$(cd "$(dirname "$0")" && pwd)
 . "$TEST_DIRECTORY/test-lib.sh"
 
-if test -x "$BIT_BUILD_DIR/target/native/release/build/cmd/bit/bit.exe"; then
+if test -x "$BIT_BUILD_DIR/_build/native/release/build/mizchi/bit/bit.exe"; then
+	BIT="$BIT_BUILD_DIR/_build/native/release/build/mizchi/bit/bit.exe"
+elif test -x "$BIT_BUILD_DIR/target/native/release/build/mizchi/bit/bit.exe"; then
+	BIT="$BIT_BUILD_DIR/target/native/release/build/mizchi/bit/bit.exe"
+elif test -x "$BIT_BUILD_DIR/target/native/release/build/cmd/bit/bit.exe"; then
 	BIT="$BIT_BUILD_DIR/target/native/release/build/cmd/bit/bit.exe"
 elif test -x "$BIT_BUILD_DIR/_build/native/release/build/cmd/bit/bit.exe"; then
 	BIT="$BIT_BUILD_DIR/_build/native/release/build/cmd/bit/bit.exe"
