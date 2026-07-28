@@ -475,6 +475,45 @@ pub fn Hub::link_pr_to_issue(
 }
 
 ///|
+/// Returns true if `to_id` is reachable from `from_id` by following
+/// `blocked_by` edges, i.e. `from_id` already (transitively) depends on
+/// `to_id`. Used to reject dependency edges that would close a cycle.
+fn Hub::dependency_path_exists(
+  self : Hub,
+  objects : &@lib.ObjectStore,
+  from_id : String,
+  to_id : String,
+) -> Bool raise @bit.GitError {
+  if from_id == to_id {
+    return true
+  }
+  let visited : Array[String] = []
+  let queue : Array[String] = [from_id]
+  let mut head = 0
+  while head < queue.length() {
+    let current = queue[head]
+    head += 1
+    if visited.contains(current) {
+      continue
+    }
+    visited.push(current)
+    match self.get_issue(objects, current) {
+      Some(issue) =>
+        for dep in issue.blocked_by() {
+          if dep == to_id {
+            return true
+          }
+          if !visited.contains(dep) {
+            queue.push(dep)
+          }
+        }
+      None => ()
+    }
+  }
+  false
+}
+
+///|
 /// Add a dependency relationship between two issues.
 /// `source_id` is blocked by `target_id`.
 /// Both issues are updated in separate put_record calls.
@@ -486,6 +525,11 @@ pub fn Hub::add_dep(
   source_id : String,
   target_id : String,
 ) -> Unit raise @bit.GitError {
+  if source_id == target_id {
+    raise @bit.GitError::InvalidObject(
+      "Issue cannot depend on itself: \{source_id}",
+    )
+  }
   let source = self.get_issue(objects, source_id)
   guard source is Some(src) else {
     raise @bit.GitError::InvalidObject("Issue not found: \{source_id}")
@@ -493,6 +537,13 @@ pub fn Hub::add_dep(
   let target = self.get_issue(objects, target_id)
   guard target is Some(tgt) else {
     raise @bit.GitError::InvalidObject("Issue not found: \{target_id}")
+  }
+  if
+    !src.blocked_by.contains(target_id) &&
+    self.dependency_path_exists(objects, target_id, source_id) {
+    raise @bit.GitError::InvalidObject(
+      "Adding this dependency would create a cycle: #\{target_id} already depends on #\{source_id}",
+    )
   }
   if !src.blocked_by.contains(target_id) {
     let new_blocked_by = src.blocked_by.copy()

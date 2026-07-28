@@ -1184,6 +1184,109 @@ test "issue: update issue labels and assignees" {
 }
 
 ///|
+test "issue: add_dep sets blocked_by and blocking on both issues" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let hub = Hub::init(objects, refs)
+  let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
+  let b = hub.create_issue(objects, refs, clock, "B", "Body", "alice@example.com")
+  hub.add_dep(objects, refs, clock, a.id(), b.id())
+  let updated_a = hub.get_issue(objects, a.id())
+  guard updated_a is Some(ua) else { panic() }
+  @test.assert_eq(ua.blocked_by(), [b.id()])
+  let updated_b = hub.get_issue(objects, b.id())
+  guard updated_b is Some(ub) else { panic() }
+  @test.assert_eq(ub.blocking(), [a.id()])
+}
+
+///|
+test "issue: add_dep is idempotent when called twice" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let hub = Hub::init(objects, refs)
+  let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
+  let b = hub.create_issue(objects, refs, clock, "B", "Body", "alice@example.com")
+  hub.add_dep(objects, refs, clock, a.id(), b.id())
+  hub.add_dep(objects, refs, clock, a.id(), b.id())
+  let updated_a = hub.get_issue(objects, a.id())
+  guard updated_a is Some(ua) else { panic() }
+  @test.assert_eq(ua.blocked_by().length(), 1)
+}
+
+///|
+test "issue: remove_dep clears blocked_by and blocking on both issues" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let hub = Hub::init(objects, refs)
+  let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
+  let b = hub.create_issue(objects, refs, clock, "B", "Body", "alice@example.com")
+  hub.add_dep(objects, refs, clock, a.id(), b.id())
+  hub.remove_dep(objects, refs, clock, a.id(), b.id())
+  let updated_a = hub.get_issue(objects, a.id())
+  guard updated_a is Some(ua) else { panic() }
+  @test.assert_eq(ua.blocked_by(), [])
+  let updated_b = hub.get_issue(objects, b.id())
+  guard updated_b is Some(ub) else { panic() }
+  @test.assert_eq(ub.blocking(), [])
+}
+
+///|
+test "issue: add_dep rejects an issue depending on itself" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let hub = Hub::init(objects, refs)
+  let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
+  ignore(
+    hub.add_dep(objects, refs, clock, a.id(), a.id()) catch {
+      @bit.GitError::InvalidObject(message) => {
+        assert_true(message.contains("depend on itself"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
+}
+
+///|
+test "issue: add_dep rejects a direct cycle" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let hub = Hub::init(objects, refs)
+  let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
+  let b = hub.create_issue(objects, refs, clock, "B", "Body", "alice@example.com")
+  hub.add_dep(objects, refs, clock, a.id(), b.id())
+  ignore(
+    hub.add_dep(objects, refs, clock, b.id(), a.id()) catch {
+      @bit.GitError::InvalidObject(message) => {
+        assert_true(message.contains("cycle"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
+}
+
+///|
+test "issue: add_dep rejects a transitive cycle" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let hub = Hub::init(objects, refs)
+  let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
+  let b = hub.create_issue(objects, refs, clock, "B", "Body", "alice@example.com")
+  let c = hub.create_issue(objects, refs, clock, "C", "Body", "alice@example.com")
+  // a is blocked by b, b is blocked by c: a -> b -> c
+  hub.add_dep(objects, refs, clock, a.id(), b.id())
+  hub.add_dep(objects, refs, clock, b.id(), c.id())
+  // c depending on a would close the loop: a -> b -> c -> a
+  ignore(
+    hub.add_dep(objects, refs, clock, c.id(), a.id()) catch {
+      @bit.GitError::InvalidObject(message) => {
+        assert_true(message.contains("cycle"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
+}
+
+///|
 test "work item: get returns unified issue/pr view" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
   let hub = Hub::init(objects, refs)
