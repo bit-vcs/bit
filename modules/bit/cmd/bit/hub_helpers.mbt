@@ -373,6 +373,10 @@ fn format_issue_summary(
       None => ()
     }
   }
+  let blocked_by = issue.blocked_by()
+  if blocked_by.length() > 0 {
+    detail_parts.push("blocked by: " + blocked_by.join(","))
+  }
   if detail_parts.length() > 0 {
     sb.write_string(" (" + detail_parts.join(", ") + ")")
   }
@@ -401,6 +405,11 @@ fn format_issue_json(issue : @hub.Issue) -> String {
   for b in blocked_by {
     blocked_by_parts.push(json_escape_string(b))
   }
+  let blocking = issue.blocking()
+  let blocking_parts : Array[String] = []
+  for b in blocking {
+    blocking_parts.push(json_escape_string(b))
+  }
   let parent = match issue.parent_id {
     Some(pid) => json_escape_string(pid)
     None => "null"
@@ -420,6 +429,7 @@ fn format_issue_json(issue : @hub.Issue) -> String {
   buf.write_string(",\"assignees\":[" + assignee_parts.join(",") + "]")
   buf.write_string(",\"linked_prs\":[" + linked_parts.join(",") + "]")
   buf.write_string(",\"blocked_by\":[" + blocked_by_parts.join(",") + "]")
+  buf.write_string(",\"blocking\":[" + blocking_parts.join(",") + "]")
   buf.write_string(",\"parent_id\":" + parent)
   buf.write_string("}")
   buf.to_string()
