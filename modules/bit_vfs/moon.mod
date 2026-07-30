@@ -1,6 +1,6 @@
 name = "mizchi/bit_vfs"
 
-version = "0.45.6"
+version = "0.45.7"
 
 import {
   "mizchi/bit_core@0.45.6",

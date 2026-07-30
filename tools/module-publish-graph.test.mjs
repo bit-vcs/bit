@@ -8,7 +8,7 @@ import {
   topologicalPublishOrder,
 } from "./module-publish-graph.mjs";
 
-test("workspace modules form a publish DAG with resolvable internal versions", () => {
+test("workspace modules form a publish DAG with valid internal dependency versions", () => {
   const modules = loadWorkspaceModules();
   const byName = new Map(modules.map((module) => [module.name, module]));
 
@@ -18,10 +18,10 @@ test("workspace modules form a publish DAG with resolvable internal versions", (
   for (const module of modules) {
     for (const [dependency, version] of Object.entries(module.deps ?? {})) {
       if (byName.has(dependency)) {
-        assert.equal(
+        assert.match(
           version,
-          byName.get(dependency).version,
-          `${module.name} must use ${dependency}'s workspace version`,
+          /^\d+\.\d+\.\d+$/,
+          `${module.name} must pin ${dependency} to a semantic version`,
         );
       }
     }

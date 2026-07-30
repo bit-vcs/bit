@@ -1,6 +1,6 @@
 name = "mizchi/bitx_hub"
 
-version = "0.45.6"
+version = "0.46.1"
 
 import {
   "mizchi/bit_core@0.45.6",
