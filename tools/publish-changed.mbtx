@@ -1,5 +1,5 @@
 // Lerna-style selective publish for the bit workspace's many `modules/*`
-// packages: diff each package's directory against the last "Release vX.Y.Z"
+// packages: diff each package's directory against the last "Release" marker
 // commit and only `moon publish` the ones that actually changed, in
 // dependency order.
 //
@@ -9,7 +9,14 @@
 //   moon run --target native tools/publish-changed.mbtx -- --apply
 //     -- actually run `moon publish` for the changed modules
 //   moon run --target native tools/publish-changed.mbtx -- --since <git-ref> [--apply]
-//     -- compare against an explicit ref instead of the last Release commit
+//     -- compare against an explicit ref instead of the last Release marker
+//   moon run --target native tools/publish-changed.mbtx -- patch
+//   moon run --target native tools/publish-changed.mbtx -- minor
+//     -- prepare independent releases by updating only packages with changes
+//        since the last release. npm and the CLI version update only when the
+//        installable `mizchi/bit` package itself changed. Commit the resulting
+//        metadata with a subject beginning `Release`, then tag/push it and run
+//        the script again with `--apply` to publish the changed packages.
 
 import {
   "moonbitlang/async@0.19.4",
@@ -38,6 +45,27 @@ struct ModuleInfo {
   dir : String
   dir_basename : String
   deps : Array[String]
+}
+
+///|
+enum ReleaseBump {
+  Patch
+  Minor
+}
+
+///|
+struct AnchorInfo {
+  sha : String
+  subject : String
+}
+
+///|
+struct VersionUpdate {
+  name : String
+  current : String
+  next : String
+  manifest_path : String
+  manifest_content : String
 }
 
 // -- tiny moon.mod parsing -------------------------------------------------
@@ -162,13 +190,146 @@ fn load_workspace_modules(root : String) -> Array[ModuleInfo] raise ScriptError 
   result
 }
 
+// -- version updates -------------------------------------------------------
+
+///|
+fn parse_decimal_component(value : String) -> Int? {
+  if value.length() == 0 {
+    return None
+  }
+  let mut result = 0
+  for c in value {
+    if c < '0' || c > '9' {
+      return None
+    }
+    result = result * 10 + c.to_int() - '0'.to_int()
+  }
+  Some(result)
+}
+
+///|
+fn next_version(current : String, bump : ReleaseBump) -> String raise ScriptError {
+  let parts : Array[String] = []
+  for part in current.split(".") {
+    parts.push(part.to_owned())
+  }
+  if parts.length() != 3 {
+    raise ScriptError::Fail("expected MAJOR.MINOR.PATCH version, got \{current}")
+  }
+  let major = match parse_decimal_component(parts[0]) {
+    Some(value) => value
+    None => raise ScriptError::Fail("invalid major version in \{current}")
+  }
+  let minor = match parse_decimal_component(parts[1]) {
+    Some(value) => value
+    None => raise ScriptError::Fail("invalid minor version in \{current}")
+  }
+  let patch = match parse_decimal_component(parts[2]) {
+    Some(value) => value
+    None => raise ScriptError::Fail("invalid patch version in \{current}")
+  }
+  match bump {
+    Patch => "\{major}.\{minor}.\{patch + 1}"
+    Minor => "\{major}.\{minor + 1}.0"
+  }
+}
+
+///|
+fn replace_required(
+  content : String,
+  old : String,
+  new : String,
+  path : String,
+) -> String raise ScriptError {
+  match content.find(old) {
+    Some(_) => content.replace(old=old, new=new)
+    None => raise ScriptError::Fail("\{path}: expected to find \{old}")
+  }
+}
+
+///|
+fn read_text(path : String) -> String raise ScriptError {
+  try @fs.read_file_to_string(path) catch {
+    err => raise ScriptError::Fail("cannot read \{path}: \{err}")
+  }
+}
+
+///|
+fn write_text(path : String, content : String) -> Unit raise ScriptError {
+  try @fs.write_string_to_file(path, content) catch {
+    err => raise ScriptError::Fail("cannot write \{path}: \{err}")
+  }
+}
+
+///|
+fn prepare_release_versions(
+  root : String,
+  modules : Array[ModuleInfo],
+  changed_dirs : Array[String],
+  bump : ReleaseBump,
+) -> Array[VersionUpdate] raise ScriptError {
+  // Build and validate every change before writing any file.
+  let updates : Array[VersionUpdate] = []
+  let mut npm_updated : String? = None
+  let mut cli_version_updated : String? = None
+  for m in modules {
+    if !changed_dirs.contains(m.dir_basename) {
+      continue
+    }
+    let current = m.version
+    let next = next_version(current, bump)
+    let manifest_path = m.dir + "/moon.mod"
+    let manifest_content = replace_required(
+      read_text(manifest_path),
+      "version = \"\{current}\"",
+      "version = \"\{next}\"",
+      manifest_path,
+    )
+    updates.push({
+      name: m.name,
+      current,
+      next,
+      manifest_path,
+      manifest_content,
+    })
+    if m.dir_basename == "bit" {
+      let npm_path = root + "/npm/package.json"
+      npm_updated = Some(replace_required(
+        read_text(npm_path),
+        "\"version\": \"\{current}\"",
+        "\"version\": \"\{next}\"",
+        npm_path,
+      ))
+      let cli_version_path = root + "/modules/bit/cmd/bit/version.mbt"
+      cli_version_updated = Some(replace_required(
+        read_text(cli_version_path),
+        "bit v\{current}",
+        "bit v\{next}",
+        cli_version_path,
+      ))
+    }
+  }
+  for update in updates {
+    write_text(update.manifest_path, update.manifest_content)
+  }
+  match npm_updated {
+    Some(content) => write_text(root + "/npm/package.json", content)
+    None => ()
+  }
+  match cli_version_updated {
+    Some(content) => write_text(root + "/modules/bit/cmd/bit/version.mbt", content)
+    None => ()
+  }
+  updates
+}
+
 // -- dependency ordering ----------------------------------------------------
 
 ///|
 fn topological_layers(
   modules : Array[ModuleInfo],
 ) -> Array[Array[ModuleInfo]] raise ScriptError {
-  let by_name : Map[String, ModuleInfo] = Map::new()
+  let by_name : Map[String, ModuleInfo] = Map([], capacity=modules.length())
   for m in modules {
     by_name.set(m.name, m)
   }
@@ -196,7 +357,7 @@ fn topological_layers(
       for m in remaining {
         names.push(m.name)
       }
-      raise ScriptError::Fail("workspace module dependency cycle: \{names}")
+      raise ScriptError::Fail("workspace module dependency cycle: \{Repr(names)}")
     }
     ready.sort_by(fn(a, b) { String::compare(a.name, b.name) })
     for m in ready {
@@ -213,13 +374,13 @@ fn topological_layers(
 ///|
 async fn git_output(args : Array[String]) -> String raise ScriptError {
   let (code, stdout, stderr) = try @process.collect_output("git", args) catch {
-    err => raise ScriptError::Fail("failed to spawn git \{args}: \{err}")
+    err => raise ScriptError::Fail("failed to spawn git \{Repr(args)}: \{err}")
   }
   let out = try stdout.text() catch { _ => "" }
   if code != 0 {
     let err_text = try stderr.text() catch { _ => "" }
     raise ScriptError::Fail(
-      "git \{args} failed (\{code}): \{err_text.trim().to_owned()}",
+      "git \{Repr(args)} failed (\{code}): \{err_text.trim().to_owned()}",
     )
   }
   out
@@ -234,33 +395,63 @@ fn first_line(s : String) -> String {
 }
 
 ///|
-/// Returns (sha, subject) of the last commit that looks like a release, or
-/// the repo's root commit if no such commit exists yet.
-async fn find_anchor_commit() -> (String, String) raise ScriptError {
-  let out = git_output([
-    "log", "-n", "1", "--format=%H\t%s", "--grep=^Release v", "-i", "HEAD",
-  ])
-  let trimmed = out.trim().to_owned()
-  if trimmed.length() > 0 {
-    match trimmed.find("\t") {
-      Some(i) =>
-        return (
-          String::unsafe_substring(trimmed, start=0, end=i),
-          String::unsafe_substring(trimmed, start=i + 1, end=trimmed.length()),
-        )
-      None => return (trimmed, "")
-    }
+fn parse_release_log_line(output : String) -> (String, String)? {
+  let trimmed = output.trim().to_owned()
+  if trimmed.length() == 0 {
+    return None
   }
-  let root_out = git_output(["rev-list", "--max-parents=0", "HEAD"])
-  let root_sha = first_line(root_out.trim().to_owned())
-  (root_sha, "(root commit, no prior release found)")
+  match trimmed.find("\t") {
+    Some(i) =>
+      Some((
+        String::unsafe_substring(trimmed, start=0, end=i),
+        String::unsafe_substring(trimmed, start=i + 1, end=trimmed.length()),
+      ))
+    None => Some((trimmed, ""))
+  }
 }
 
 ///|
-/// Names of `modules/*` directories with content changes (excluding the
-/// `moon.mod` file itself, since a release commit bumps every module's
-/// `moon.mod` in lockstep regardless of whether that module's own code
-/// changed).
+/// Returns the release anchor. When HEAD itself is a Release commit, use its
+/// predecessor so `--apply` sees the feature diff contained by that release.
+async fn find_anchor_commit() -> AnchorInfo raise ScriptError {
+  let out = git_output([
+    "log", "-n", "1", "--format=%H\t%s", "--grep=^Release", "-i", "HEAD",
+  ])
+  match parse_release_log_line(out) {
+    Some((latest_sha, latest_subject)) => {
+      let head_sha = first_line(git_output(["rev-parse", "HEAD"]).trim().to_owned())
+      if latest_sha != head_sha {
+        return {
+          sha: latest_sha,
+          subject: latest_subject,
+        }
+      }
+      let previous = git_output([
+        "log", "-n", "1", "--skip=1", "--format=%H\t%s", "--grep=^Release", "-i", "HEAD",
+      ])
+      match parse_release_log_line(previous) {
+        Some((sha, subject)) =>
+          return {
+            sha,
+            subject: "\{subject} (previous release for current HEAD)",
+          }
+        None => ()
+      }
+    }
+    None => ()
+  }
+  let root_out = git_output(["rev-list", "--max-parents=0", "HEAD"])
+  let root_sha = first_line(root_out.trim().to_owned())
+  {
+    sha: root_sha,
+    subject: "(root commit, no prior release found)",
+  }
+}
+
+///|
+/// Names of `modules/*` directories with changes. A `moon.mod` dependency
+/// update is a package change too, while independently versioned release
+/// metadata only touches the modules selected for that release.
 async fn changed_module_dirs(anchor : String) -> Array[String] raise ScriptError {
   let out = git_output(["diff", "--name-only", anchor, "HEAD", "--", "modules"])
   let changed : Array[String] = []
@@ -274,8 +465,7 @@ async fn changed_module_dirs(anchor : String) -> Array[String] raise ScriptError
       None => continue
       Some(si) => {
         let mod_dir = String::unsafe_substring(rest, start=0, end=si)
-        let sub = String::unsafe_substring(rest, start=si + 1, end=rest.length())
-        if sub != "moon.mod" && !changed.contains(mod_dir) {
+        if !changed.contains(mod_dir) {
           changed.push(mod_dir)
         }
       }
@@ -359,7 +549,7 @@ async fn wait_for_layer(layer : Array[ModuleInfo]) -> Unit raise ScriptError {
     }
   }
   raise ScriptError::Fail(
-    "published modules did not reach the registry index: \{missing}",
+    "published modules did not reach the registry index: \{Repr(missing)}",
   )
 }
 
@@ -378,9 +568,55 @@ fn arg_value_after(args : Array[String], flag : String) -> String? {
 }
 
 ///|
+fn release_bump_from_args(args : Array[String]) -> ReleaseBump? raise ScriptError {
+  let mut bump : ReleaseBump? = None
+  // get_cli_args includes the executable path at index zero.
+  let mut i = 1
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--apply" {
+      i += 1
+      continue
+    }
+    if arg == "--since" {
+      if i + 1 >= args.length() {
+        raise ScriptError::Fail("--since requires a git ref")
+      }
+      i += 2
+      continue
+    }
+    let requested = match arg {
+      "patch" => Patch
+      "minor" => Minor
+      _ => raise ScriptError::Fail(
+        "unknown argument `\{arg}`; expected `patch` or `minor`",
+      )
+    }
+    match bump {
+      Some(_) => raise ScriptError::Fail("only one of `patch` or `minor` may be given")
+      None => bump = Some(requested)
+    }
+    i += 1
+  }
+  bump
+}
+
+///|
 async fn main_async() -> Unit {
   let args = @sys.get_cli_args()
   let apply = args.contains("--apply")
+  let bump = try release_bump_from_args(args) catch {
+    err => {
+      println("error: \{err}")
+      @sys.exit(1)
+      return
+    }
+  }
+  if apply && bump is Some(_) {
+    println("error: `patch`/`minor` prepares release metadata; commit and tag it before --apply")
+    @sys.exit(1)
+    return
+  }
   let root = "."
   let modules = try load_workspace_modules(root) catch {
     err => {
@@ -389,9 +625,12 @@ async fn main_async() -> Unit {
       return
     }
   }
-  let (anchor_sha, anchor_subject) = try (
+  let anchor = try (
     match arg_value_after(args, "--since") {
-      Some(refname) => (refname, "(explicit --since ref)")
+      Some(refname) => {
+        sha: refname,
+        subject: "(explicit --since ref)",
+      }
       None => find_anchor_commit()
     }
   ) catch {
@@ -401,15 +640,52 @@ async fn main_async() -> Unit {
       return
     }
   }
-  let changed_dirs = try changed_module_dirs(anchor_sha) catch {
+  let changed_dirs = try changed_module_dirs(anchor.sha) catch {
     err => {
       println("error: \{err}")
       @sys.exit(1)
       return
     }
   }
-  println("comparing against \{anchor_sha} \{anchor_subject}")
+  println("comparing against \{anchor.sha} \{anchor.subject}")
   println("")
+  if bump is Some(_) {
+    if changed_dirs.length() == 0 {
+      println("no modules changed since \{anchor.sha} — release metadata was not updated")
+      return
+    }
+    let dirty = try git_output(["status", "--porcelain"]) catch {
+      err => {
+        println("error: \{err}")
+        @sys.exit(1)
+        return
+      }
+    }
+    if dirty.trim().to_owned().length() > 0 {
+      println("error: refusing to bump a dirty worktree; commit source changes first")
+      @sys.exit(1)
+      return
+    }
+    let updates = try (
+      match bump {
+        Some(kind) => prepare_release_versions(root, modules, changed_dirs, kind)
+        None => raise ScriptError::Fail("unreachable: missing release bump")
+      }
+    ) catch {
+      err => {
+        println("error: \{err}")
+        @sys.exit(1)
+        return
+      }
+    }
+    println("prepared \{updates.length()} independent release(s):")
+    for update in updates {
+      println("  \{update.name}: v\{update.current} -> v\{update.next}")
+    }
+    println("updated only changed module manifests (and npm/CLI if mizchi/bit changed)")
+    println("next: commit the release metadata, tag/push it, then run with --apply")
+    return
+  }
   let layers = try topological_layers(modules) catch {
     err => {
       println("error: \{err}")
@@ -435,7 +711,7 @@ async fn main_async() -> Unit {
   println("")
   let total_changed = changed_dirs.length()
   if total_changed == 0 {
-    println("no modules changed since \{anchor_sha} — nothing to publish")
+    println("no modules changed since \{anchor.sha} — nothing to publish")
     return
   }
   println("\{total_changed} module(s) changed; publish order:")

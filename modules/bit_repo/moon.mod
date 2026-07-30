@@ -1,6 +1,6 @@
 name = "mizchi/bit_repo"
 
-version = "0.45.6"
+version = "0.45.7"
 
 import {
   "mizchi/bit_io@0.45.6",

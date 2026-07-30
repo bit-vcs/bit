@@ -1,6 +1,6 @@
 name = "mizchi/bit"
 
-version = "0.45.6"
+version = "0.46.1"
 
 import {
   "moonbitlang/async@0.19.4",
