@@ -42,5 +42,6 @@ members = [
   "./modules/bitx_kv",
   "./modules/bitx_rebase_ai",
   "./modules/bitx_subdir",
+  "./modules/bitx_wal",
   "./modules/bitx_workspace",
 ]
