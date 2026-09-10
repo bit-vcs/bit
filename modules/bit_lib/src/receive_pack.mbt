@@ -398,7 +398,47 @@ pub fn receive_pack(
     skip_connectivity_check~,
     git_dir_override~,
   )
-  receive_build_status_response(result)
+  let status = receive_build_status_response(result)
+  // The advertisement offers side-band-64k, so a client that selected it
+  // expects the report multiplexed. Sending it unframed makes git fail with
+  // "protocol error: bad band", which is what real pushes hit.
+  receive_apply_side_band(status, req.capabilities)
+}
+
+///|
+/// Wrap a report-status in side-band band 1 when the client selected
+/// `side-band-64k`, leaving it untouched otherwise.
+///
+/// Mirrors what `upload_pack` already does for the packfile it sends.
+pub fn receive_apply_side_band(
+  status : Bytes,
+  capabilities : Array[String],
+) -> Bytes {
+  if !capabilities.contains("side-band-64k") {
+    return status
+  }
+  let out : Array[Byte] = []
+  // 65520 minus the 4-byte pkt-line header and the 1-byte band marker.
+  let chunk_size = 65515
+  let mut offset = 0
+  while offset < status.length() {
+    let end = if offset + chunk_size > status.length() {
+      status.length()
+    } else {
+      offset + chunk_size
+    }
+    let len_hex = @bithash.int_to_hex4(end - offset + 5)
+    for c in len_hex {
+      out.push(c.to_int().to_byte())
+    }
+    out.push(b'\x01') // band 1 = payload
+    for i in offset..<end {
+      out.push(status[i])
+    }
+    offset = end
+  }
+  receive_push_bytes(out, @protocol.pktline_flush())
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
