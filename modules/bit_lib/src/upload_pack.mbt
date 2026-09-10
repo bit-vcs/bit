@@ -969,9 +969,9 @@ pub fn upload_pack_v2(
       wants.push(id)
     }
   }
-  let ack_ids = collect_have_acks_v2(db, fs, req.haves)
   if !req.done {
-    return build_upload_pack_response_v2_ack(ack_ids, wanted_refs)
+    let ack_ids = collect_have_acks_v2(db, fs, req.haves)
+    return build_upload_pack_response_v2_ack(ack_ids)
   }
 
   // Collect objects reachable from wants
@@ -988,7 +988,7 @@ pub fn upload_pack_v2(
   let filtered_objects = apply_filter_spec(objects, filter_spec)
 
   // Build v2 response
-  build_upload_pack_response_v2(filtered_objects, ack_ids, wanted_refs)
+  build_upload_pack_response_v2(filtered_objects, wanted_refs)
 }
 
 ///|
@@ -1056,53 +1056,44 @@ fn apply_filter_spec(
 }
 
 ///|
+/// Negotiation round of a v2 fetch: the client sent `have` lines but not
+/// `done`, so the server reports what it recognised and stops there.
+///
+/// The section always appears and always carries either ACKs or a NAK. No
+/// `ready` is sent, because this server does not build the pack until the
+/// client says `done` — and the protocol forbids any further section once
+/// `ready` was withheld, which is exactly the rule the previous version
+/// broke by following ACKs with a packfile.
 fn build_upload_pack_response_v2_ack(
   ack_ids : Array[@bit.ObjectId],
-  wanted_refs : Array[(String, @bit.ObjectId)],
 ) -> Bytes {
   let out : Array[Byte] = []
-  if ack_ids.length() > 0 {
-    upload_push_bytes(out, @protocol.pktline_encode("acknowledgments\n"))
+  upload_push_bytes(out, @protocol.pktline_encode("acknowledgments\n"))
+  if ack_ids.length() == 0 {
+    upload_push_bytes(out, @protocol.pktline_encode("NAK\n"))
+  } else {
     for id in ack_ids {
       upload_push_bytes(
         out,
         @protocol.pktline_encode("ACK " + id.to_hex() + "\n"),
       )
     }
-    upload_push_bytes(out, @protocol.pktline_delim())
-  }
-  if wanted_refs.length() > 0 {
-    upload_push_bytes(out, @protocol.pktline_encode("wanted-refs\n"))
-    for item in wanted_refs {
-      let (name, id) = item
-      upload_push_bytes(
-        out,
-        @protocol.pktline_encode("\{id.to_hex()} \{name}\n"),
-      )
-    }
-    upload_push_bytes(out, @protocol.pktline_delim())
   }
   upload_push_bytes(out, @protocol.pktline_flush())
   Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
+/// Final round of a v2 fetch: the client sent `done`, so the pack follows.
+///
+/// No acknowledgments section appears here. The protocol omits it once the
+/// client is finished negotiating, and sending one without `ready` in front
+/// of a packfile is what made git reject this response.
 fn build_upload_pack_response_v2(
   objects : Array[@bit.PackObject],
-  ack_ids : Array[@bit.ObjectId],
   wanted_refs : Array[(String, @bit.ObjectId)],
 ) -> Bytes {
   let out : Array[Byte] = []
-  if ack_ids.length() > 0 {
-    upload_push_bytes(out, @protocol.pktline_encode("acknowledgments\n"))
-    for id in ack_ids {
-      upload_push_bytes(
-        out,
-        @protocol.pktline_encode("ACK " + id.to_hex() + "\n"),
-      )
-    }
-    upload_push_bytes(out, @protocol.pktline_delim())
-  }
   if wanted_refs.length() > 0 {
     upload_push_bytes(out, @protocol.pktline_encode("wanted-refs\n"))
     for item in wanted_refs {
