@@ -90,3 +90,19 @@ pub fn int_to_hex4(n : Int) -> String {
   }
   result
 }
+
+///|
+/// Lowercase hex encoding of a raw digest.
+///
+/// Hash outputs are `FixedArray[Byte]`; anything that has to travel as text
+/// (an ETag, a SigV4 signature, a pack name) needs this.
+pub fn hex_encode(raw : FixedArray[Byte]) -> String {
+  let digits = "0123456789abcdef"
+  let out = StringBuilder::new()
+  for b in raw {
+    let v = b.to_int()
+    out.write_char(digits[v / 16].to_int().unsafe_to_char())
+    out.write_char(digits[v % 16].to_int().unsafe_to_char())
+  }
+  out.to_string()
+}
