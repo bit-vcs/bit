@@ -185,6 +185,21 @@ pub fn parse_upload_pack_request_v2(
 }
 
 ///|
+/// Locate the git directory for an upload-pack request.
+///
+/// Defaults to `<root>/.git`, preserving the behaviour every existing caller
+/// relies on. A server passes the directory explicitly, because a bare
+/// repository keeps `refs/` and `objects/` at its top level and has no
+/// `.git` inside it.
+fn resolve_upload_pack_git_dir(root : String, override_ : String) -> String {
+  if override_.length() > 0 {
+    override_
+  } else {
+    join_path(root, ".git")
+  }
+}
+
+///|
 /// Build upload-pack advertisement (info/refs payload).
 pub fn build_upload_pack_advertisement(
   fs : &@bit.RepoFileSystem,

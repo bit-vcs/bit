@@ -275,10 +275,19 @@ fn http_serve_dispatch(
     if verb != "GET" {
       return http_text_reply(405, "Method Not Allowed", "method not allowed\n")
     }
+    // The advertisement must answer in the version the client asked for.
+    // Advertising v0 to a client that sent `Git-Protocol: version=2` makes it
+    // downgrade, and any client that does not downgrade would then POST a v2
+    // body that the v0 parser cannot read.
     let payload = if service == "git-receive-pack" {
       @bitlib.build_receive_pack_advertisement(fs, root, git_dir_override=git_dir)
     } else {
-      @bitlib.build_upload_pack_advertisement(fs, root, git_dir_override=git_dir)
+      @bitlib.build_upload_pack_advertisement(
+        fs,
+        root,
+        protocol_version~,
+        git_dir_override=git_dir,
+      )
     }
     return {
       status: 200,
