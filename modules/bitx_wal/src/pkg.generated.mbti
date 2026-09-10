@@ -1,0 +1,86 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bitx_wal"
+
+import {
+  "mizchi/bit_object",
+  "mizchi/bit_objstore",
+}
+
+// Values
+pub const DEFAULT_MAX_ATTEMPTS : Int = 8
+
+pub const DEFAULT_MAX_IMAGE_BYTES : Int = 67108864
+
+pub const WAL_FORMAT_VERSION : Int = 1
+
+pub fn content_id(Bytes) -> String
+
+pub fn decode_image(Bytes) -> WalImage raise @bit_object.GitError
+
+pub fn encode_image(WalImage) -> Bytes
+
+// Errors
+
+// Types and methods
+pub(all) enum CommitOutcome {
+  Committed(Int64)
+  Contended
+} derive(Eq)
+pub impl Show for CommitOutcome
+
+pub(all) struct Fold {
+  body : Bytes
+  retained_payloads : Array[String]
+}
+
+pub struct Wal[S] {
+  store : S
+  prefix : String
+  mut image : WalImage
+  mut etag : String
+  mut loaded : Bool
+  max_attempts : Int
+  max_image_bytes : Int
+}
+pub async fn[S : @bit_objstore.ObjectStore] Wal::append(Self[S], Array[WalEntry]) -> CommitOutcome raise @bit_object.GitError
+pub async fn[S : @bit_objstore.ObjectStore] Wal::compact(Self[S], Int64, async (Bytes, Array[WalEntry]) -> Fold raise @bit_object.GitError) -> CommitOutcome raise @bit_object.GitError
+pub fn[S] Wal::entries(Self[S]) -> Array[WalEntry]
+pub async fn[S : @bit_objstore.ObjectStore] Wal::get_payload(Self[S], String) -> Bytes raise @bit_object.GitError
+pub fn[S] Wal::head_seq(Self[S]) -> Int64
+pub fn[S] Wal::image_key(Self[S]) -> String
+pub fn[S] Wal::new(S, String, max_attempts? : Int, max_image_bytes? : Int) -> Self[S]
+pub fn[S] Wal::payload_key(Self[S], String) -> String
+pub async fn[S : @bit_objstore.ObjectStore] Wal::put_payload(Self[S], Bytes) -> String raise @bit_object.GitError
+pub async fn[S : @bit_objstore.ObjectStore] Wal::read_snapshot(Self[S]) -> Bytes raise @bit_object.GitError
+pub async fn[S : @bit_objstore.ObjectStore] Wal::set_settings(Self[S], String) -> CommitOutcome raise @bit_object.GitError
+pub fn[S] Wal::settings(Self[S]) -> String
+pub fn[S] Wal::snapshot(Self[S]) -> String
+pub fn[S] Wal::snapshot_key(Self[S], String) -> String
+pub async fn[S : @bit_objstore.ObjectStore] Wal::sweep_offline(Self[S]) -> Array[String] raise @bit_object.GitError
+pub async fn[S : @bit_objstore.ObjectStore] Wal::sync(Self[S]) -> Unit raise @bit_object.GitError
+pub async fn[S : @bit_objstore.ObjectStore] Wal::unreferenced_keys(Self[S]) -> Array[String] raise @bit_object.GitError
+
+pub(all) struct WalEntry {
+  seq : Int64
+  kind : String
+  payload_keys : Array[String]
+  data : String
+  idempotency_key : String
+} derive(Eq)
+pub fn WalEntry::new(String, String, payload_keys? : Array[String], idempotency_key? : String) -> Self
+
+pub(all) struct WalImage {
+  version : Int
+  snapshot : String
+  snapshot_seq : Int64
+  snapshot_payloads : Array[String]
+  entries : Array[WalEntry]
+  settings : String
+} derive(Eq)
+pub fn WalImage::empty() -> Self
+pub fn WalImage::head_seq(Self) -> Int64
+pub fn WalImage::live_payloads(Self) -> Array[String]
+
+// Type aliases
+
+// Traits

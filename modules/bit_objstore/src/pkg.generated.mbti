@@ -8,7 +8,11 @@ import {
 }
 
 // Values
+pub fn civil_from_days(Int64) -> (Int, Int, Int)
+
 pub fn endpoint_host(String) -> String raise @bit_object.GitError
+
+pub fn format_amz_date(Int64) -> String
 
 pub fn hex_sha256(Bytes) -> String
 
