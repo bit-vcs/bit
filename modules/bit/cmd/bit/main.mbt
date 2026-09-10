@@ -53,6 +53,7 @@ async fn show_help() -> Unit {
     #|
     #|relay
     #|   relay        Relay-based repository sharing (serve, sync)
+    #|   serve        Serve repositories over the Git smart HTTP protocol
     #|
     #|collaboration
     #|   pr           Manage pull requests
@@ -610,6 +611,12 @@ async fn show_command_help(cmd : String, silent? : Bool = false) -> Bool {
       }
       true
     }
+    "serve" => {
+      if !silent {
+        print_serve_usage()
+      }
+      true
+    }
     "pr" => {
       if !silent {
         print_hub_pr_usage()
@@ -1021,6 +1028,7 @@ fn is_bit_only_command(cmd : String) -> Bool {
     | "pr"
     | "issue"
     | "relay"
+    | "serve"
     | "workspace"
     | "repo"
     | "hq"
@@ -1343,6 +1351,7 @@ async fn dispatch_known_command(
     "subdir-clone" => handle_subdir_clone(rest)
     "hub" => handle_hub(rest)
     "relay" => handle_relay(rest)
+    "serve" => handle_serve(rest)
     "pr" => handle_hub_pr(rest)
     "issue" => handle_hub_issue(rest)
     "debug" => handle_debug(rest)

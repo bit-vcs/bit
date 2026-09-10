@@ -1,10 +1,16 @@
 # Scalable Git Server — Design Study
 
-> **Status**: design study / not implemented. This document evaluates what it
-> would take to give `bit` a horizontally scalable Git server, using
-> [tobi/walgit](https://github.com/tobi/walgit) and
+> **Status**: phases 0–2 implemented, phases 3–7 not started. This document
+> evaluates what it would take to give `bit` a horizontally scalable Git
+> server, using [tobi/walgit](https://github.com/tobi/walgit) and
 > [danthegoodman1/waltier](https://github.com/danthegoodman1/waltier) as
-> reference architectures. Nothing here is committed to a release yet.
+> reference architectures, and tracks how far that has been built. Nothing
+> here is in a release yet.
+>
+> Shipped so far: `bit serve --http` (a real listener, local disk),
+> `mizchi/bit_objstore` (object storage with compare-and-swap) and
+> `mizchi/bitx_wal` (the WAL engine). What remains is the Git-specific layer
+> that puts a repository on top of them — see §11.
 
 ## 1. Motivation
 
@@ -17,10 +23,14 @@ single machine with a local POSIX filesystem:
 | SSH | `bit shell` (`modules/bit/cmd/bit/shell.mbt`) | one host, local disk, local ref locks |
 | Relay tunnel | `bit relay serve` (`modules/bit/cmd/bit/serve.mbt`) | the local process *is* the server; the relay only forwards HTTP |
 | Embedded HTTP helpers | `modules/bit_lib/src/smart_http.mbt` | caller supplies its own server and its own filesystem |
+| HTTP listener | `bit serve --http` (`modules/bit/cmd/bit/serve_http.mbt`) | **added by this work** — many repositories, still one host and one disk |
 
-There is no path where two processes can serve the same repository, and no path
-where repository size can exceed one machine's disk. The question this document
-answers is: what is the smallest set of changes that removes both limits?
+There was no path where two processes could serve the same repository, and none
+where repository size could exceed one machine's disk. The question this
+document answers is: what is the smallest set of changes that removes both
+limits? `bit serve --http` closes the "there is no server at all" gap; the
+storage work below is what removes the two ceilings, and it is not yet
+connected to the serving path.
 
 ## 2. Reference architectures
 
@@ -117,15 +127,18 @@ storage and coordination half does not exist.
 
 | ID | Gap | Evidence |
 |----|-----|----------|
-| **G1** | No object-store abstraction (S3 / R2 / GCS). No SigV4 signing; `bit_hash` has SHA-256 but no HMAC. | `modules/bit_hash/src/` |
-| **G2** | The native HTTP client **discards response headers**, so ETags are invisible — CAS is impossible today. | `modules/bit_io_native/src/http_client_native.mbt:250,288,345` return `HttpResponse::new(response.code)` while `@http.Response` does carry `headers` |
-| **G3** | No `DELETE`, and no helper for conditional request headers (`If-Match`, `If-None-Match`). | same file: only `get`/`post`/`put` |
+| ~~**G1**~~ | ~~No object-store abstraction (S3 / R2 / GCS). No SigV4 signing; `bit_hash` has SHA-256 but no HMAC.~~ **Closed** by `mizchi/bit_objstore` and `@hash.hmac_sha256_raw`. | `modules/bit_objstore/src/` |
+| ~~**G2**~~ | ~~The native HTTP client **discards response headers**, so ETags are invisible — CAS is impossible today.~~ **Closed**: responses now carry their headers. | `modules/bit_io_native/src/http_client_native.mbt` (`http_response_of`) |
+| ~~**G3**~~ | ~~No `DELETE`, and no helper for conditional request headers (`If-Match`, `If-None-Match`).~~ **Closed** by `native_http_delete` and `native_objstore_send`. | same file |
 | **G4** | `RepoFileSystem::read_file` is whole-file only, and `ObjectDb` loads **entire packs into memory**. Repo size is therefore capped by RAM; walgit's `serve`/`objects` sync levels are unreachable. | `modules/bit_lib/src/object_db.mbt:780,788`; `modules/bit_types/src/contracts.mbt:24` |
 | **G5** | The serving path is built on the **sync** traits. A Workers/R2 deployment needs the async traits end to end. | `upload_pack`/`receive_pack` take `&@bit.FileSystem` |
-| **G6** | No HTTP listener. `http_serve_native.mbt` is a *client* wrapper; `serve.mbt` only speaks the relay long-poll protocol. | `modules/bit/cmd/bit/http_serve_native.mbt` |
-| **G7** | No multi-repository routing (`/<owner>/<repo>.git/...`), no per-repo policy at the HTTP layer, no auth beyond a single shared bearer token. | `smart_http.mbt:11` takes one `token : String` |
+| ~~**G6**~~ | ~~No HTTP listener. `http_serve_native.mbt` is a *client* wrapper; `serve.mbt` only speaks the relay long-poll protocol.~~ **Closed** by `bit serve --http`. | `modules/bit/cmd/bit/serve_http.mbt` |
+| **G7** | ~~No multi-repository routing (`/<owner>/<repo>.git/...`)~~ — closed by `bit serve --http`. Per-repository policy and per-user auth are still missing; the listener has one shared bearer token. | `modules/bit/cmd/bit/serve_http.mbt` |
 
-G2 and G3 are small and mechanical. G4 and G5 are the structural ones.
+G2 and G3 were small and mechanical, and are done. **G4 and G5 remain, and
+they are the structural ones**: until `ObjectDb` can range-read a pack, and
+until the serving path can run on the async traits, repository size is capped
+by RAM and the Workers deployment is out of reach.
 
 ## 5. Proposed architecture
 
@@ -210,13 +223,36 @@ The Git-specific layer over `bitx_wal`:
   live pack set from the manifest, then call the existing `upload_pack` /
   `upload_pack_v2` unchanged.
 
-### 5.4 `bit serve --http` (cmd)
+### 5.4 `bit serve --http` (cmd) — built
 
 A `moonbitlang/async/http.Server` listener that routes
-`/<owner>/<repo>.git/{info/refs,git-upload-pack,git-receive-pack,info/lfs/*}`
-into the handlers already factored out in `serve_handle_git_request`
-(`serve.mbt:804`). Storage backend selected by flag: local dir (today's
-behaviour) or bucket.
+`/<owner>/<repo>.git/{info/refs,git-upload-pack,git-receive-pack}` straight to
+`bit_lib`'s `upload_pack`, `upload_pack_v2` and `receive_pack`.
+
+It deliberately does **not** reuse `serve_handle_git_request` (`serve.mbt:804`).
+That handler rewrites incoming refs into `refs/relay/incoming/*`, which is
+right for a tunnel that exposes someone's working repository and wrong for a
+server, where a push must land on the ref the client named. The reusable part
+turned out to be the `bit_lib` entry points, not the relay's wrapper around
+them.
+
+Two things had to be added underneath:
+
+- `upload_pack`, `upload_pack_v2` and `build_upload_pack_advertisement` derived
+  their git directory as `<root>/.git` with no way to override it, so a bare
+  repository — the normal server layout — advertised no refs at all rather than
+  failing. They now take an optional `git_dir_override`, the same escape hatch
+  `receive_pack` already had. Defaults are unchanged, so no existing caller
+  moves.
+- The listener resolves each request's git directory itself, accepting both a
+  bare repository and a working copy, and answering 404 when it is neither
+  rather than serving an empty one.
+
+Repository paths are used verbatim, never percent-decoded. That keeps
+`%2e%2e` from becoming `..`; the cost is that a repository whose name needs
+escaping is unreachable, which is the right way round.
+
+LFS and a bucket backend are not wired in yet.
 
 ## 6. Bucket layout
 
@@ -338,27 +374,49 @@ needed packs into memory before calling the sync path (viable only for the
 
 Each phase is independently useful and independently shippable.
 
-| Phase | Deliverable | Unblocks |
-|-------|-------------|----------|
-| **0** | `bit serve --http` over local disk, multi-repo routing, reusing `serve_handle_git_request` | Immediately useful standalone server; no object store; closes G6, G7 |
-| **1** | `bit_objstore` + `FsStore`/`MemStore`/`S3Store`; expose response headers, add `DELETE` and conditional headers; HMAC-SHA256 for SigV4 | Closes G1, G2, G3 |
-| **2** | `bitx_wal` engine + group commit + snapshots, tested entirely against `MemStore` | The reusable substrate |
-| **3** | `bitx_gitwal`: push publishes to the WAL; read path at `Refs` + `Full`. Two instances serve one bucket | The actual scalability claim |
-| **4** | Checkpoints, compaction, maintainer loop, leases | Cold start and long-lived repos |
-| **5** | Range reads: `read_file_range` on the FS traits, range-aware `ObjectDb` | Closes G4 ⇒ `Serve` + `Objects` levels |
-| **6** | Bundle-URI slots and lists | Clone cost |
-| **7** | LFS on bucket, per-repo auth (OIDC / static tokens), events cursor | Production shape |
+| Phase | Deliverable | Status |
+|-------|-------------|--------|
+| **0** | `bit serve --http` over local disk, multi-repo routing | **Done** — `modules/bit/cmd/bit/serve_http.mbt` |
+| **1** | `bit_objstore` + `MemStore`/`FsStore`/`S3Store`; response headers, `DELETE`, conditional headers; HMAC-SHA256 for SigV4 | **Done** — `modules/bit_objstore/`, `modules/bit_hash/src/hmac_sha256.mbt` |
+| **2** | `bitx_wal` engine + group commit + snapshots, tested against `MemStore` | **Done** — `modules/bitx_wal/` |
+| **3** | `bitx_gitwal`: push publishes to the WAL; read path at `Refs` + `Full`. Two instances serve one bucket | Not started — this is where the scalability claim becomes real |
+| **4** | Checkpoints, maintainer loop, leases | Not started (the WAL's own compaction and offline sweep exist) |
+| **5** | Range reads: `read_file_range` on the FS traits, range-aware `ObjectDb` | Not started ⇒ **G4 still open** |
+| **6** | Bundle-URI slots and lists | Not started |
+| **7** | LFS on bucket, per-repo auth (OIDC / static tokens), events cursor | Not started |
 
-Phase 0 is worth doing regardless of whether the rest proceeds — it is a real
-gap (`bit` cannot currently listen on a port) and it is the harness every later
-phase tests against.
+### What phases 0–2 actually deliver
+
+A working standalone Git server, and a tested storage substrate underneath it
+that nothing yet uses. `bit serve --http` serves and accepts pushes over the
+smart protocol from local disk; `bit_objstore` and `bitx_wal` are complete and
+tested but are not yet on the serving path. **Phase 3 is what connects them**,
+and until it lands the server is single-node.
+
+### Notes from building phases 0–2
+
+- The WAL does not keep one object per sequence number, as walgit's `log/<seq>`
+  does. It keeps waltier's shape instead: the live entries sit *inside* the
+  compare-and-swapped image. The single-object-per-entry design has to answer
+  what an entry that was written but never committed means, and both answers
+  are wrong — skipping it lets a later writer commit a range that contains it,
+  and waiting for it deadlocks on a writer that died. With entries inside the
+  image the state cannot arise.
+- `PutOutcome::Unknown` earned its place immediately. `MemStore` can commit a
+  write and *then* report `Unknown`, and the test that exercises it
+  (`wal: a commit that lands but reports Unknown is not applied twice`) fails
+  against any implementation that treats indeterminate as failure.
+- MoonBit's `String::compare` orders by length before content, so it answers
+  that `"b"` sorts before `"aa"`. SigV4 canonical headers, S3 key listings and
+  Git ref order are all byte-ordered, so `bit_objstore` carries its own
+  `lex_compare`. The AWS test vector failed until the header sort used it.
 
 ## 12. Risks and open questions
 
-- **G4 is the real ceiling.** Until `ObjectDb` can read a pack by range,
-  "scalable" means "repos that fit in RAM." Phases 0–4 give horizontal
-  scalability of *serving*, not of *repository size*. These should not be
-  conflated when describing the result.
+- **G4 is the real ceiling, and it is still open.** Until `ObjectDb` can read a
+  pack by range, "scalable" means "repos that fit in RAM." Phases 0–4 give
+  horizontal scalability of *serving*, not of *repository size*. These should
+  not be conflated when describing the result.
 - **CAS semantics are not uniform.** S3 exposes `If-Match`/`If-None-Match` on
   PUT; R2 supports the same and additionally accepts weak and wildcard ETags;
   GCS uses `ifGenerationMatch`. The `ObjectStore` trait must model all three
@@ -368,12 +426,32 @@ phase tests against.
 - **SigV4 cost.** Needs HMAC-SHA256 (not currently in `bit_hash`) plus canonical
   request construction. Non-trivial but well-specified. On Workers the R2
   binding avoids it entirely.
-- **MoonBit async HTTP server maturity.** `moonbitlang/async/http.Server` is a
-  dependency already but `bit` has never used the server half of it. Phase 0
-  exists partly to find out what is missing there.
+- **MoonBit async HTTP server maturity.** `moonbitlang/async/http.Server` works
+  for this purpose — `bit serve --http` is built on it. It offers no TLS
+  termination, so a public deployment needs a reverse proxy in front.
 - **`Unknown` outcomes must be reconciled, not retried blindly.** A blind retry
-  after a timed-out CAS can double-apply a group commit. Every entry needs an
-  idempotency key so a replay is detectable.
+  after a timed-out CAS can double-apply a group commit. Handled: every
+  `WalEntry` carries an idempotency key, and `append` looks for its own key
+  after an indeterminate write instead of guessing. Entries may opt out by
+  leaving the key empty, and then two identical appends really are two
+  entries — which is tested, so the trade-off is explicit rather than
+  accidental.
+- **The shared HTTP client can still truncate a body silently.** Its read loop
+  treats any read error as end of body, because some servers close abruptly
+  once a response is complete. That is tolerable for a clone, which verifies
+  its pack, and not for an object-store read, so `native_objstore_send` and
+  `native_http_delete` use a strict drain that raises instead. The lenient
+  path under `native_http_get`/`post`/`put` is unchanged and remains a latent
+  source of silent truncation for clone and fetch; tightening it needs
+  testing against real servers that this change did not have.
+
+- **`bit serve --http` buffers whole request and response bodies in memory,**
+  with no size cap. A hostile client can therefore make it allocate as much as
+  it is willing to send. That is the same ceiling as G4 rather than a separate
+  one — the pack handling underneath already holds whole packs in memory — but
+  it does mean the listener defaults to loopback and should carry `--token`
+  or sit behind an authenticating proxy before it faces a network.
+
 - **Push latency now includes bucket round trips.** walgit's own framing is that
   round trips to object storage drive the design. A push that must PUT a pack,
   PUT a log entry and CAS a manifest is at least three sequential round trips;

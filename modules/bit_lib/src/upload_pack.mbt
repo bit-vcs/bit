@@ -191,8 +191,9 @@ pub fn build_upload_pack_advertisement(
   root : String,
   agent? : String = "git/moonbit",
   protocol_version? : Int = 0,
+  git_dir_override? : String = "",
 ) -> Bytes raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_upload_pack_git_dir(root, git_dir_override)
   let out : Array[Byte] = []
   // Protocol v2: output capabilities instead of refs
   if protocol_version == 2 {
@@ -376,8 +377,9 @@ pub fn upload_pack(
   fs : &@bit.RepoFileSystem,
   root : String,
   req : UploadPackRequest,
+  git_dir_override? : String = "",
 ) -> Bytes raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_upload_pack_git_dir(root, git_dir_override)
   let db = ObjectDb::load(fs, git_dir)
 
   // Validate wants (must be commit objects)
@@ -712,6 +714,7 @@ pub fn upload_pack_v2(
   root : String,
   req : UploadPackRequestV2,
   config : UploadPackConfig,
+  git_dir_override? : String = "",
 ) -> Bytes raise @bit.GitError {
   // Validate request against config
   if req.filter is Some(_) && !config.allow_filter {
@@ -731,7 +734,7 @@ pub fn upload_pack_v2(
       "unsupported command: '" + req.command + "'",
     )
   }
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_upload_pack_git_dir(root, git_dir_override)
   let db = ObjectDb::load(fs, git_dir)
   let refs = show_ref(fs, git_dir)
   let ref_map : Map[String, @bit.ObjectId] = Map([])
