@@ -376,7 +376,7 @@ Each phase is independently useful and independently shippable.
 
 | Phase | Deliverable | Status |
 |-------|-------------|--------|
-| **0** | `bit serve --http` over local disk, multi-repo routing | **Done** — `modules/bit/cmd/bit/serve_http.mbt` |
+| **0** | `bit serve --http` over local disk, multi-repo routing | **Done** — `modules/bit/cmd/bit/serve_http.mbt`, verified end to end against git 2.43 |
 | **1** | `bit_objstore` + `MemStore`/`FsStore`/`S3Store`; response headers, `DELETE`, conditional headers; HMAC-SHA256 for SigV4 | **Done** — `modules/bit_objstore/`, `modules/bit_hash/src/hmac_sha256.mbt` |
 | **2** | `bitx_wal` engine + group commit + snapshots, tested against `MemStore` | **Done** — `modules/bitx_wal/` |
 | **3** | `bitx_gitwal`: push publishes to the WAL; read path at `Refs` + `Full`. Two instances serve one bucket | Not started — this is where the scalability claim becomes real |
@@ -392,6 +392,31 @@ that nothing yet uses. `bit serve --http` serves and accepts pushes over the
 smart protocol from local disk; `bit_objstore` and `bitx_wal` are complete and
 tested but are not yet on the serving path. **Phase 3 is what connects them**,
 and until it lands the server is single-node.
+
+### Three protocol bugs the end-to-end run found
+
+Unit tests and a clean type-check said the listener worked. Pointing real
+`git` at it said otherwise, three times, and each defect was in `bit_lib`
+rather than in the new code — they affect SSH and the relay just as much.
+
+1. **`ls-refs` was not implemented.** `upload_pack_v2` answered only `fetch`,
+   so v2 ref discovery — the step before any fetch — returned an error. A
+   default `git clone` has used v2 since git 2.26, so it failed while a v0
+   clone succeeded.
+2. **`side-band-64k` was advertised and not implemented.** `receive-pack`
+   offered the capability and then wrote its report-status unframed, so every
+   push died with `protocol error: bad band #117` — 117 being the `u` of
+   `unpack ok`. `upload_pack` had been framing its packfile correctly all
+   along.
+3. **The v2 fetch response put its sections in an illegal order.** Both
+   builders emitted acknowledgements and then a packfile, which the protocol
+   forbids without an intervening `ready`, and omits entirely once the client
+   has sent `done`. Clone was unaffected — with no `have` lines there are no
+   acknowledgements to mis-order — so only fetch failed.
+
+The pattern is worth naming: all three are cases of advertising a capability
+the server does not honour. A capability list is a promise, and nothing in
+the test suite was checking that the promises were kept.
 
 ### Notes from building phases 0–2
 
