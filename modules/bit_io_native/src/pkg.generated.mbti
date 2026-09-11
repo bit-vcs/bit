@@ -3,11 +3,14 @@ package "mizchi/bit_io_native"
 
 import {
   "mizchi/bit_object",
+  "mizchi/bit_objstore",
   "mizchi/bit_protocol",
   "mizchi/bit_types",
 }
 
 // Values
+pub fn amz_date_now() -> String
+
 pub async fn clone_http(String, Bool, depth? : Int, filter? : @bit_protocol.FilterSpec) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
 
 pub async fn clone_http_to_fs(String, Bool, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem, depth? : Int, filter? : @bit_protocol.FilterSpec, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
@@ -64,13 +67,19 @@ pub fn init_native_io() -> Unit
 
 pub fn init_worktree_probe() -> Unit
 
+pub async fn native_http_delete(String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError
+
 pub async fn native_http_get(String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError
 
 pub async fn native_http_post(String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError
 
 pub async fn native_http_put(String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError
 
+pub async fn native_objstore_send(String, String, Map[String, String], Bytes) -> @bit_objstore.HttpReply raise @bit_object.GitError
+
 pub fn native_readdir_typed(String) -> Array[(String, Int)]?
+
+pub fn native_s3_store(@bit_objstore.S3Config, page_size? : Int) -> @bit_objstore.S3Store
 
 pub async fn push(@bit_protocol.Remote, @bit_protocol.PushRequest) -> String raise @bit_object.GitError
 
@@ -104,4 +113,3 @@ pub impl @bit_types.AsyncHttpClient for NativeHttpClient
 // Type aliases
 
 // Traits
-

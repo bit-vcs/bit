@@ -35,7 +35,7 @@ pub fn bisect_steps(Int) -> Int
 
 pub fn build_receive_pack_advertisement(&@bit_types.RepoFileSystem, String, agent? : String, protocol_version? : Int, extra_haves? : Array[@bit_object.ObjectId], git_dir_override? : String, advertise_push_options? : Bool, cert_nonce? : String) -> Bytes raise @bit_object.GitError
 
-pub fn build_upload_pack_advertisement(&@bit_types.RepoFileSystem, String, agent? : String, protocol_version? : Int) -> Bytes raise @bit_object.GitError
+pub fn build_upload_pack_advertisement(&@bit_types.RepoFileSystem, String, agent? : String, protocol_version? : Int, git_dir_override? : String) -> Bytes raise @bit_object.GitError
 
 pub fn build_upload_pack_config_with_overrides(&@bit_types.RepoFileSystem, String, Map[String, String]) -> UploadPackConfig
 
@@ -299,6 +299,8 @@ pub fn log_head(&@bit_types.RepoFileSystem, String, max_count? : Int, since? : I
 
 pub fn log_head_oneline(&@bit_types.RepoFileSystem, String, max_count? : Int, since? : Int64, until? : Int64) -> Array[String] raise @bit_object.GitError
 
+pub fn ls_refs_v2(&@bit_types.RepoFileSystem, String, UploadPackRequestV2, git_dir_override? : String) -> Bytes raise @bit_object.GitError
+
 pub fn match_url_pattern(String, String) -> Bool
 
 pub fn matches_sparse_pattern(String, Array[String]) -> Bool
@@ -454,6 +456,8 @@ pub async fn rebase_skip(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, Str
 pub async fn rebase_start(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, run_filter_cmd? : FilterCmd) -> RebaseResult raise @bit_object.GitError
 
 pub async fn rebase_start_with_onto(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId, force_rebase? : Bool, run_filter_cmd? : FilterCmd) -> RebaseResult raise @bit_object.GitError
+
+pub fn receive_apply_side_band(Bytes, Array[String]) -> Bytes
 
 pub fn receive_build_status_response(ReceivePackResult) -> Bytes
 
@@ -647,9 +651,9 @@ pub fn update_head_ref(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, Strin
 
 pub fn update_subdir_base(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit
 
-pub fn upload_pack(&@bit_types.RepoFileSystem, String, UploadPackRequest) -> Bytes raise @bit_object.GitError
+pub fn upload_pack(&@bit_types.RepoFileSystem, String, UploadPackRequest, git_dir_override? : String) -> Bytes raise @bit_object.GitError
 
-pub fn upload_pack_v2(&@bit_types.RepoFileSystem, String, UploadPackRequestV2, UploadPackConfig) -> Bytes raise @bit_object.GitError
+pub fn upload_pack_v2(&@bit_types.RepoFileSystem, String, UploadPackRequestV2, UploadPackConfig, git_dir_override? : String) -> Bytes raise @bit_object.GitError
 
 pub fn working_files_cache(String) -> Array[String]?
 
@@ -1223,6 +1227,10 @@ pub struct UploadPackRequestV2 {
   done : Bool
   filter : String?
   packfile_uris : String?
+  ref_prefixes : Array[String]
+  symrefs : Bool
+  peel : Bool
+  unborn : Bool
 }
 
 pub(all) struct WorktreeInfo {

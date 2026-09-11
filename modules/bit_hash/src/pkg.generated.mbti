@@ -4,6 +4,12 @@ package "mizchi/bit_hash"
 // Values
 pub fn hex_char_to_int(Char) -> Int raise
 
+pub fn hex_encode(FixedArray[Byte]) -> String
+
+pub fn hmac_sha256_bytes(Bytes, Bytes) -> Bytes
+
+pub fn hmac_sha256_raw(Bytes, Bytes) -> FixedArray[Byte]
+
 pub fn int_to_hex4(Int) -> String
 
 pub fn is_hex_char(Char) -> Bool

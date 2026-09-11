@@ -108,6 +108,10 @@ type GrepColorSpec
 
 type GrepFunctionContextSpec
 
+type HttpServeOptions
+
+type HttpServeReply
+
 type HubDumpOptions
 
 type HubOriginSyncPlan
@@ -239,4 +243,3 @@ type WorktreeRemoteGuess
 // Type aliases
 
 // Traits
-

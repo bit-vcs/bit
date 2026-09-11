@@ -1,0 +1,14 @@
+import {
+  "mizchi/bit_hash" @hash,
+  "mizchi/bit_object" @bit,
+  "mizchi/bit_objstore" @objstore,
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
+}
+
+warnings = "-29"
+
+import {
+  "moonbitlang/async",
+  "moonbitlang/core/test",
+} for "test"

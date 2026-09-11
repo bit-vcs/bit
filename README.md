@@ -195,6 +195,26 @@ bit hq list mizchi
 bit hq root
 ```
 
+### bit serve
+
+Serve repositories over the Git smart HTTP protocol. Any repository under
+`--root` is addressed by its path, bare or not.
+
+```bash
+# Serve ~/repos read-only on http://127.0.0.1:8420
+bit serve --http --root ~/repos
+
+# Accept pushes, and require a bearer token
+bit serve --http --root ~/repos --allow-push --token "$TOKEN"
+
+# git clone http://127.0.0.1:8420/acme/app.git
+```
+
+Defaults to loopback. It has no TLS and buffers whole requests in memory, so
+put it behind a reverse proxy before exposing it to a network. This is
+distinct from `bit relay serve`, which tunnels a single local repository
+through a relay rather than listening itself.
+
 ## Agent Storage Runtime
 
 `bit` core operations can run against any storage backend that implements:

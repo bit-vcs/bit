@@ -6,6 +6,7 @@ import {
   "mizchi/bit_core@0.46.4",
   "mizchi/bit_io@0.46.4",
   "mizchi/bit_object@0.46.4",
+  "mizchi/bit_objstore@0.46.4",
   "mizchi/bit_pack@0.46.4",
   "mizchi/bit_protocol@0.46.4",
   "mizchi/bit_repo@0.46.4",

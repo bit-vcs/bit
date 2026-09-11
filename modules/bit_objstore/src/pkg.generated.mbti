@@ -1,0 +1,147 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit_objstore"
+
+import {
+  "mizchi/bit_object",
+  "mizchi/bit_types",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn civil_from_days(Int64) -> (Int, Int, Int)
+
+pub fn endpoint_host(String) -> String raise @bit_object.GitError
+
+pub fn format_amz_date(Int64) -> String
+
+pub fn hex_sha256(Bytes) -> String
+
+pub fn lex_compare(String, String) -> Int
+
+pub fn lex_lt(String, String) -> Bool
+
+pub async fn[S : ObjectStore] list_all(S, String) -> Array[ObjEntry] raise @bit_object.GitError
+
+pub fn mem_etag(Bytes) -> String
+
+pub fn parse_list_objects_v2(String) -> ObjListing
+
+pub async fn[S : ObjectStore] put_immutable(S, String, Bytes) -> PutOutcome raise @bit_object.GitError
+
+pub fn s3_canonical_request(S3Config, String, String, Array[(String, String)], Map[String, String], Bytes, String) -> String raise @bit_object.GitError
+
+pub fn sign_s3_request(S3Config, String, String, Array[(String, String)], Map[String, String], Bytes, String) -> SignedRequest raise @bit_object.GitError
+
+pub fn strip_etag_quotes(String) -> String
+
+pub fn uri_encode(String, Bool) -> String
+
+pub fn xml_unescape(String) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct ByteRange {
+  start : Int64
+  end : Int64
+} derive(Eq, @debug.Debug)
+
+pub struct FsStore {
+  fs : &@bit_types.FileSystem
+  rfs : &@bit_types.RepoFileSystem
+  root : String
+}
+pub fn FsStore::new(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Self
+pub impl ObjectStore for FsStore
+
+pub(all) enum GetOutcome {
+  Found(Bytes, String)
+  NotModified
+  Missing
+} derive(Eq, @debug.Debug)
+pub fn GetOutcome::unwrap(Self, String) -> (Bytes, String) raise @bit_object.GitError
+pub impl Show for GetOutcome
+
+pub(all) struct HttpReply {
+  status : Int
+  headers : Map[String, String]
+  body : Bytes
+}
+
+pub struct MemStore {
+  objects : Map[String, Bytes]
+  mut fail_puts_unknown : Int
+  mut silent_puts : Int
+  mut page_size : Int
+}
+pub fn MemStore::fail_next_puts(Self, Int) -> Unit
+pub fn MemStore::len(Self) -> Int
+pub fn MemStore::new() -> Self
+pub fn MemStore::set_page_size(Self, Int) -> Unit
+pub fn MemStore::silence_next_puts(Self, Int) -> Unit
+pub impl ObjectStore for MemStore
+
+pub(all) struct ObjEntry {
+  key : String
+  size : Int64
+  etag : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ObjListing {
+  entries : Array[ObjEntry]
+  next : String?
+} derive(Eq, @debug.Debug)
+
+pub(all) enum PutCondition {
+  Unconditional
+  IfNotExists
+  IfMatch(String)
+} derive(Eq, @debug.Debug)
+pub impl Show for PutCondition
+
+pub(all) enum PutOutcome {
+  Applied(String)
+  NotApplied
+  Unknown
+} derive(Eq, @debug.Debug)
+pub fn PutOutcome::is_applied(Self) -> Bool
+pub impl Show for PutOutcome
+
+pub(all) struct S3Config {
+  endpoint : String
+  region : String
+  bucket : String
+  access_key_id : String
+  secret_access_key : String
+  session_token : String?
+  path_style : Bool
+}
+
+pub struct S3Store {
+  config : S3Config
+  send : async (String, String, Map[String, String], Bytes) -> HttpReply raise @bit_object.GitError
+  now : () -> String
+  page_size : Int
+}
+pub fn S3Store::new(S3Config, async (String, String, Map[String, String], Bytes) -> HttpReply raise @bit_object.GitError, () -> String, page_size? : Int) -> Self
+pub impl ObjectStore for S3Store
+
+pub(all) struct SignedRequest {
+  verb : String
+  url : String
+  headers : Map[String, String]
+  body : Bytes
+}
+
+// Type aliases
+
+// Traits
+pub(open) trait ObjectStore {
+  async fn get(Self, String) -> GetOutcome raise @bit_object.GitError
+  async fn get_range(Self, String, ByteRange) -> GetOutcome raise @bit_object.GitError
+  async fn get_if_none_match(Self, String, String) -> GetOutcome raise @bit_object.GitError
+  async fn put(Self, String, Bytes, PutCondition) -> PutOutcome raise @bit_object.GitError
+  async fn delete(Self, String) -> Unit raise @bit_object.GitError
+  async fn list(Self, String, String) -> ObjListing raise @bit_object.GitError
+  fn supports_cas(Self) -> Bool
+}

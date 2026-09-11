@@ -34,6 +34,11 @@ pub struct UploadPackRequestV2 {
   // v2-specific capabilities
   filter : String? // e.g., "blob:none"
   packfile_uris : String? // e.g., "https"
+  // ls-refs arguments
+  ref_prefixes : Array[String] // restrict the listing; empty means all refs
+  symrefs : Bool // report what a symbolic ref points at
+  peel : Bool // report the commit an annotated tag resolves to
+  unborn : Bool // report HEAD even when its branch has no commits yet
 }
 
 ///|
@@ -96,6 +101,10 @@ pub fn parse_upload_pack_request_v2(
   let mut done = false
   let mut filter : String? = None
   let mut packfile_uris : String? = None
+  let ref_prefixes : Array[String] = []
+  let mut symrefs = false
+  let mut peel = false
+  let mut unborn = false
   let mut i = 0
   let mut in_args = false // After delimiter (0001)
   let mut saw_flush_after_args = false
@@ -170,6 +179,19 @@ pub fn parse_upload_pack_request_v2(
       packfile_uris = Some(
         String::unsafe_substring(line, start=14, end=line.length()),
       )
+    } else if line.has_prefix("ref-prefix ") {
+      let prefix = upload_trim_line(
+        String::unsafe_substring(line, start=11, end=line.length()),
+      )
+      if prefix.length() > 0 {
+        ref_prefixes.push(prefix)
+      }
+    } else if line == "symrefs" {
+      symrefs = true
+    } else if line == "peel" {
+      peel = true
+    } else if line == "unborn" {
+      unborn = true
     }
   }
   {
@@ -179,8 +201,27 @@ pub fn parse_upload_pack_request_v2(
     want_refs,
     haves,
     done,
+    ref_prefixes,
+    symrefs,
+    peel,
+    unborn,
     filter,
     packfile_uris,
+  }
+}
+
+///|
+/// Locate the git directory for an upload-pack request.
+///
+/// Defaults to `<root>/.git`, preserving the behaviour every existing caller
+/// relies on. A server passes the directory explicitly, because a bare
+/// repository keeps `refs/` and `objects/` at its top level and has no
+/// `.git` inside it.
+fn resolve_upload_pack_git_dir(root : String, override_ : String) -> String {
+  if override_.length() > 0 {
+    override_
+  } else {
+    join_path(root, ".git")
   }
 }
 
@@ -191,8 +232,9 @@ pub fn build_upload_pack_advertisement(
   root : String,
   agent? : String = "git/moonbit",
   protocol_version? : Int = 0,
+  git_dir_override? : String = "",
 ) -> Bytes raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_upload_pack_git_dir(root, git_dir_override)
   let out : Array[Byte] = []
   // Protocol v2: output capabilities instead of refs
   if protocol_version == 2 {
@@ -376,8 +418,9 @@ pub fn upload_pack(
   fs : &@bit.RepoFileSystem,
   root : String,
   req : UploadPackRequest,
+  git_dir_override? : String = "",
 ) -> Bytes raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_upload_pack_git_dir(root, git_dir_override)
   let db = ObjectDb::load(fs, git_dir)
 
   // Validate wants (must be commit objects)
@@ -706,12 +749,165 @@ pub fn UploadPackConfig::default() -> UploadPackConfig {
 }
 
 ///|
+/// Does `refname` match any of the client's `ref-prefix` arguments?
+///
+/// No prefixes at all means "everything", which is what the protocol
+/// specifies for a client that sent none.
+fn ls_refs_matches(refname : String, prefixes : Array[String]) -> Bool {
+  if prefixes.length() == 0 {
+    return true
+  }
+  for prefix in prefixes {
+    if refname.has_prefix(prefix) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// Target of a tag object, read from its `object` header.
+fn ls_refs_tag_target(data : Bytes) -> @bit.ObjectId? {
+  let text = @utf8.decode_lossy(data[:])
+  for line_view in text.split("\n") {
+    let line = line_view.to_owned()
+    if line.length() == 0 {
+      break
+    }
+    if line.has_prefix("object ") {
+      let hex = upload_trim_line(
+        String::unsafe_substring(line, start=7, end=line.length()),
+      )
+      let id = @bit.ObjectId::from_hex(hex) catch { _ => return None }
+      return Some(id)
+    }
+  }
+  None
+}
+
+///|
+/// The object an annotated tag resolves to, or None for anything else.
+///
+/// Chases nested tags with a bound, so a tag cycle in a corrupt repository
+/// cannot hang the server.
+fn ls_refs_peel(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  id : @bit.ObjectId,
+) -> @bit.ObjectId? {
+  let mut current = id
+  for _ in 0..<8 {
+    let obj = db.get(fs, current) catch { _ => return None }
+    guard obj is Some(o) else { return None }
+    if o.obj_type != @bit.ObjectType::Tag {
+      return if current == id { None } else { Some(current) }
+    }
+    guard ls_refs_tag_target(o.data) is Some(next) else { return None }
+    current = next
+  }
+  None
+}
+
+///|
+/// Answer a protocol v2 `ls-refs` command.
+///
+/// Each line is `<oid> <refname>`, followed by `symref-target:<target>` and
+/// `peeled:<oid>` when the client asked for them, terminated by a flush.
+pub fn ls_refs_v2(
+  fs : &@bit.RepoFileSystem,
+  root : String,
+  req : UploadPackRequestV2,
+  git_dir_override? : String = "",
+) -> Bytes raise @bit.GitError {
+  let git_dir = resolve_upload_pack_git_dir(root, git_dir_override)
+  let out : Array[Byte] = []
+  let refs = show_ref(fs, git_dir)
+  refs.sort_by((a, b) => String::compare(a.0, b.0))
+  let head_symref : String? = try {
+    match read_head_ref(fs, git_dir) {
+      HeadRef::Branch(name) =>
+        if name.has_prefix("refs/") {
+          Some(name)
+        } else {
+          Some("refs/heads/" + name)
+        }
+      HeadRef::Detached(_) => None
+    }
+  } catch {
+    _ => None
+  }
+  let listing : Array[(String, @bit.ObjectId)] = []
+  match resolve_ref(fs, git_dir, "HEAD") {
+    Some(id) =>
+      if ls_refs_matches("HEAD", req.ref_prefixes) {
+        listing.push(("HEAD", id))
+      }
+    None => ()
+  }
+  for item in refs {
+    if ls_refs_matches(item.0, req.ref_prefixes) {
+      listing.push(item)
+    }
+  }
+  // Only open the object database when peeling was actually asked for.
+  let db = if req.peel { Some(ObjectDb::load(fs, git_dir)) } else { None }
+  for entry in listing {
+    let (name, id) = entry
+    let line = StringBuilder::new()
+    line.write_string(id.to_hex())
+    line.write_char(' ')
+    line.write_string(name)
+    if req.symrefs && name == "HEAD" {
+      match head_symref {
+        Some(target) => {
+          line.write_string(" symref-target:")
+          line.write_string(target)
+        }
+        None => ()
+      }
+    }
+    if req.peel {
+      match db {
+        Some(database) =>
+          match ls_refs_peel(database, fs, id) {
+            Some(peeled) => {
+              line.write_string(" peeled:")
+              line.write_string(peeled.to_hex())
+            }
+            None => ()
+          }
+        None => ()
+      }
+    }
+    line.write_char('\n')
+    upload_push_bytes(out, @protocol.pktline_encode(line.to_string()))
+  }
+  // An unborn HEAD has no object to report, so it is named on its own. A
+  // client without the capability expects an empty listing instead.
+  if req.unborn && listing.length() == 0 {
+    match head_symref {
+      Some(target) =>
+        if ls_refs_matches("HEAD", req.ref_prefixes) {
+          upload_push_bytes(
+            out,
+            @protocol.pktline_encode("unborn HEAD symref-target:\{target}\n"),
+          )
+        }
+      None => ()
+    }
+  }
+  upload_push_bytes(out, @protocol.pktline_flush())
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
+}
+
+///|
 /// Handle protocol v2 upload-pack request
 pub fn upload_pack_v2(
   fs : &@bit.RepoFileSystem,
   root : String,
   req : UploadPackRequestV2,
   config : UploadPackConfig,
+  git_dir_override? : String = "",
 ) -> Bytes raise @bit.GitError {
   // Validate request against config
   if req.filter is Some(_) && !config.allow_filter {
@@ -725,13 +921,19 @@ pub fn upload_pack_v2(
     )
   }
 
+  // Protocol v2 multiplexes several commands over one endpoint; ls-refs is
+  // how a v2 client discovers refs, so a server that only answers fetch
+  // cannot complete a default `git clone`.
+  if req.command == "ls-refs" {
+    return ls_refs_v2(fs, root, req, git_dir_override~)
+  }
   // Process the fetch command
   if req.command != "fetch" {
     raise @bit.GitError::ProtocolError(
       "unsupported command: '" + req.command + "'",
     )
   }
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_upload_pack_git_dir(root, git_dir_override)
   let db = ObjectDb::load(fs, git_dir)
   let refs = show_ref(fs, git_dir)
   let ref_map : Map[String, @bit.ObjectId] = Map([])
@@ -767,9 +969,9 @@ pub fn upload_pack_v2(
       wants.push(id)
     }
   }
-  let ack_ids = collect_have_acks_v2(db, fs, req.haves)
   if !req.done {
-    return build_upload_pack_response_v2_ack(ack_ids, wanted_refs)
+    let ack_ids = collect_have_acks_v2(db, fs, req.haves)
+    return build_upload_pack_response_v2_ack(ack_ids)
   }
 
   // Collect objects reachable from wants
@@ -786,7 +988,7 @@ pub fn upload_pack_v2(
   let filtered_objects = apply_filter_spec(objects, filter_spec)
 
   // Build v2 response
-  build_upload_pack_response_v2(filtered_objects, ack_ids, wanted_refs)
+  build_upload_pack_response_v2(filtered_objects, wanted_refs)
 }
 
 ///|
@@ -854,53 +1056,44 @@ fn apply_filter_spec(
 }
 
 ///|
+/// Negotiation round of a v2 fetch: the client sent `have` lines but not
+/// `done`, so the server reports what it recognised and stops there.
+///
+/// The section always appears and always carries either ACKs or a NAK. No
+/// `ready` is sent, because this server does not build the pack until the
+/// client says `done` — and the protocol forbids any further section once
+/// `ready` was withheld, which is exactly the rule the previous version
+/// broke by following ACKs with a packfile.
 fn build_upload_pack_response_v2_ack(
   ack_ids : Array[@bit.ObjectId],
-  wanted_refs : Array[(String, @bit.ObjectId)],
 ) -> Bytes {
   let out : Array[Byte] = []
-  if ack_ids.length() > 0 {
-    upload_push_bytes(out, @protocol.pktline_encode("acknowledgments\n"))
+  upload_push_bytes(out, @protocol.pktline_encode("acknowledgments\n"))
+  if ack_ids.length() == 0 {
+    upload_push_bytes(out, @protocol.pktline_encode("NAK\n"))
+  } else {
     for id in ack_ids {
       upload_push_bytes(
         out,
         @protocol.pktline_encode("ACK " + id.to_hex() + "\n"),
       )
     }
-    upload_push_bytes(out, @protocol.pktline_delim())
-  }
-  if wanted_refs.length() > 0 {
-    upload_push_bytes(out, @protocol.pktline_encode("wanted-refs\n"))
-    for item in wanted_refs {
-      let (name, id) = item
-      upload_push_bytes(
-        out,
-        @protocol.pktline_encode("\{id.to_hex()} \{name}\n"),
-      )
-    }
-    upload_push_bytes(out, @protocol.pktline_delim())
   }
   upload_push_bytes(out, @protocol.pktline_flush())
   Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
+/// Final round of a v2 fetch: the client sent `done`, so the pack follows.
+///
+/// No acknowledgments section appears here. The protocol omits it once the
+/// client is finished negotiating, and sending one without `ready` in front
+/// of a packfile is what made git reject this response.
 fn build_upload_pack_response_v2(
   objects : Array[@bit.PackObject],
-  ack_ids : Array[@bit.ObjectId],
   wanted_refs : Array[(String, @bit.ObjectId)],
 ) -> Bytes {
   let out : Array[Byte] = []
-  if ack_ids.length() > 0 {
-    upload_push_bytes(out, @protocol.pktline_encode("acknowledgments\n"))
-    for id in ack_ids {
-      upload_push_bytes(
-        out,
-        @protocol.pktline_encode("ACK " + id.to_hex() + "\n"),
-      )
-    }
-    upload_push_bytes(out, @protocol.pktline_delim())
-  }
   if wanted_refs.length() > 0 {
     upload_push_bytes(out, @protocol.pktline_encode("wanted-refs\n"))
     for item in wanted_refs {

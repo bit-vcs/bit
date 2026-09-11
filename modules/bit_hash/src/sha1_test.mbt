@@ -1,13 +1,6 @@
 ///|
 fn raw_to_hex(raw : FixedArray[Byte]) -> String {
-  let digits = "0123456789abcdef"
-  let out = StringBuilder::new()
-  for b in raw {
-    let v = b.to_int()
-    out.write_char(digits[v / 16].to_int().unsafe_to_char())
-    out.write_char(digits[v % 16].to_int().unsafe_to_char())
-  }
-  out.to_string()
+  hex_encode(raw)
 }
 
 ///|
