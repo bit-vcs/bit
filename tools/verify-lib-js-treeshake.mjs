@@ -4,13 +4,14 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 // Raised from 161_000 -> 163_000 in #162 for async-rebase export plumbing
-// that isn't fully tree-shaken out of the minimal bundle. Raised again here
+// that isn't fully tree-shaken out of the minimal bundle. Raised to 165_000
 // for the AsyncFileSystem/AsyncRepoFileSystem/AsyncHttpClient types, which
-// hit the same tree-shaking limitation. Current actual size is ~163_500
-// bytes; headroom is intentional so small future additions don't require
-// another guardrail bump.
-const MAX_MINIMAL_RAW_BYTES = 165_000;
-const MAX_MINIMAL_GZIP_BYTES = 40_000;
+// hit the same tree-shaking limitation. Rebaselined again in #179 when the
+// toolchain moved to moonc 0.10.13 with moonbitlang/x 0.5 / async 0.22: the
+// same exports now emit ~174_500 raw / ~40_300 gzip bytes. Headroom is
+// intentional so small future additions don't require another bump.
+const MAX_MINIMAL_RAW_BYTES = 180_000;
+const MAX_MINIMAL_GZIP_BYTES = 44_000;
 const MAX_MINIMAL_RATIO = 0.70;
 
 function readSize(path) {
