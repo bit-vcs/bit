@@ -2418,7 +2418,6 @@ async fn try_reuse_single_stdin_pack(
     None => return false
   }
   let pack = fs.read_file(pack_path) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => return false
   }
   if cfg.stdout {
@@ -2427,7 +2426,6 @@ async fn try_reuse_single_stdin_pack(
   }
   let idx_path = pack_idx_path(pack_path)
   let idx = fs.read_file(idx_path) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => return false
   }
   let hash_hex = pack_hash_hex(pack, hash_size~)
@@ -2672,7 +2670,6 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         )
       } else if cfg.all {
         let refs = @bitrepo.show_ref(fs, git_dir) catch {
-          err if @async.is_cancellation_error(err) => raise err
           _ => []
         }
         // Sort refs: branch refs (refs/heads/) first, then others.
@@ -2873,7 +2870,6 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             @bitlib.collect_reachable_objects_from_commits(
               db, fs, include_commits,
             ) catch {
-              err if @async.is_cancellation_error(err) => raise err
               err => {
                 report_collect_error(err)
                 []

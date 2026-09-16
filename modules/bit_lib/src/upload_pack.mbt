@@ -3,13 +3,13 @@
 ///|
 #warnings("-deprecated")
 fn upload_pack_parse_int(value : StringView) -> Int raise {
-  @strconv.parse_int(value)
+  @string.parse_int(value)
 }
 
 ///|
 #warnings("-deprecated")
 fn upload_pack_parse_int64(value : StringView) -> Int64 raise {
-  @strconv.parse_int64(value)
+  @string.parse_int64(value)
 }
 
 ///|

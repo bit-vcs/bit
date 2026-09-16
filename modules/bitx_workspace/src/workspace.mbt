@@ -2124,7 +2124,7 @@ async fn handle_workspace_run(args : Array[String]) -> Unit raise Error {
           cwd=workspace_task_run_cwd(node_root, task_spec),
         ) catch {
           err =>
-            if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+            if @async.is_being_cancelled() {
               raise err
             } else {
               1
@@ -2524,7 +2524,7 @@ async fn handle_workspace_flow(
         cwd=workspace_star_task_run_cwd(workspace_root, node_map, task_spec),
       ) catch {
         err =>
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           } else {
             1
@@ -2766,7 +2766,7 @@ async fn handle_workspace_flow(
           cwd=workspace_task_run_cwd(node_root, task_spec),
         ) catch {
           err =>
-            if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+            if @async.is_being_cancelled() {
               raise err
             } else {
               1

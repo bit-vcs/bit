@@ -21,7 +21,6 @@ import {
   "moonbitlang/core/bench",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/string",
-  "moonbitlang/core/strconv",
 }
 
 import {

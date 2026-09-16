@@ -87,7 +87,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
       let depth_str = args[i + 1]
       depth = @string.parse_int(depth_str) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           0
@@ -100,7 +100,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
       let depth_str = String::unsafe_substring(arg, start=8, end=arg.length())
       depth = @string.parse_int(depth_str) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           0
@@ -785,8 +785,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
               Some(name) => {
                 fs.mkdir_p(clone_git_dir + "/refs/heads") catch {
                   err => {
-                    if @async.is_being_cancelled() ||
-                      @async.is_cancellation_error(err) {
+                    if @async.is_being_cancelled() {
                       raise err
                     }
                     ()
@@ -797,8 +796,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
                   commit_id.to_hex() + "\n",
                 ) catch {
                   err => {
-                    if @async.is_being_cancelled() ||
-                      @async.is_cancellation_error(err) {
+                    if @async.is_being_cancelled() {
                       raise err
                     }
                     ()

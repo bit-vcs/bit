@@ -356,7 +356,6 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
           expr_tokens,
           use_expr,
         ) catch {
-          err if @async.is_cancellation_error(err) => raise err
           err => raise err
         }
         i += 2
@@ -367,7 +366,6 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
         grep_append_patterns_from_file(
           fs, root, file, patterns, expr_tokens, use_expr,
         ) catch {
-          err if @async.is_cancellation_error(err) => raise err
           err => raise err
         }
         i += 1

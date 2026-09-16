@@ -259,7 +259,7 @@ async fn subdir_clone(
   let head_path = git_dir + "/HEAD"
   fs.write_file(head_path, string_to_bytes("ref: refs/heads/main\n")) catch {
     err => {
-      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+      if @async.is_being_cancelled() {
         raise err
       }
       ()
@@ -268,7 +268,7 @@ async fn subdir_clone(
   let ref_path = git_dir + "/refs/heads/main"
   fs.mkdir_p(git_dir + "/refs/heads") catch {
     err => {
-      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+      if @async.is_being_cancelled() {
         raise err
       }
       ()
@@ -276,7 +276,7 @@ async fn subdir_clone(
   }
   fs.write_file(ref_path, string_to_bytes(new_commit_id.to_hex() + "\n")) catch {
     err => {
-      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+      if @async.is_being_cancelled() {
         raise err
       }
       ()

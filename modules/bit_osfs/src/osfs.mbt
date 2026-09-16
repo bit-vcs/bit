@@ -88,7 +88,7 @@ pub impl @bit.RepoFileSystem for OsFs with fn read_file(_self, path) {
 
 ///|
 pub impl @bit.RepoFileSystem for OsFs with fn readdir(_self, path) {
-  @fs.read_dir(path) catch {
+  @fs.read_dir(path).to_array() catch {
     err => raise io_error(err)
   }
 }

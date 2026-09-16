@@ -392,7 +392,7 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
       if progress {
         emit_trace_region("progress", "Renaming remote references") catch {
           err => {
-            if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+            if @async.is_being_cancelled() {
               raise err
             }
             ()
@@ -828,7 +828,7 @@ async fn remote_remove(
     let msg = @bitlib.format_remove_warning(warn_branches)
     @stdio.stderr.write(str_to_bytes(msg)) catch {
       err => {
-        if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        if @async.is_being_cancelled() {
           raise err
         }
         ()
@@ -1071,7 +1071,7 @@ async fn remote_rename(
         })
         fs.remove_file(legacy_remotes) catch {
           err => {
-            if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+            if @async.is_being_cancelled() {
               raise err
             }
             ()
@@ -1112,7 +1112,7 @@ async fn remote_rename(
       })
       fs.remove_file(legacy_branches) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           ()
@@ -1155,7 +1155,7 @@ async fn remote_rename(
     if has_conflict {
       eprint_line("error: renaming remote references failed") catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           ()
@@ -1165,7 +1165,7 @@ async fn remote_rename(
         "error: The remote you are trying to rename has conflicting references",
       ) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           ()
@@ -2835,7 +2835,7 @@ async fn fetch_local_repo(
     }
     let object_id = @bitcore.ObjectId::from_hex(spec.src) catch {
       err => {
-        if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        if @async.is_being_cancelled() {
           raise err
         }
         continue

@@ -49,7 +49,6 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
         let val = String::unsafe_substring(arg, start=8, end=arg.length())
         count = Some(
           @string.parse_int(val) catch {
-            err if @async.is_cancellation_error(err) => raise err
             _ => 0
           },
         )
@@ -163,7 +162,6 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
           i += 1
           count = Some(
             @string.parse_int(args[i]) catch {
-              err if @async.is_cancellation_error(err) => raise err
               _ => 0
             },
           )

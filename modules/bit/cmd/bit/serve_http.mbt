@@ -178,13 +178,21 @@ fn http_token_ok(header : String?, expected : String?) -> Bool {
 }
 
 ///|
-fn http_header(headers : Map[String, String], name : String) -> String? {
-  for key, value in headers {
-    if key.to_lower() == name {
-      return Some(value)
-    }
+fn http_header(headers : @http.Headers, name : String) -> String? {
+  // `@http` keys headers by `CaseInsensitiveString`, so the lookup itself
+  // is already case-insensitive.
+  headers.get(@http.CaseInsensitiveString(name))
+}
+
+///|
+/// bit's replies carry plain `String` header names; `@http` wants
+/// `CaseInsensitiveString` keys.
+fn http_reply_headers(headers : Map[String, String]) -> @http.Headers {
+  let out : @http.Headers = Map([])
+  for name, value in headers {
+    out[@http.CaseInsensitiveString(name)] = value
   }
-  None
+  out
 }
 
 ///|
@@ -400,7 +408,11 @@ async fn http_serve_run(options : HttpServeOptions) -> Unit raise Error {
           http_text_reply(500, "Internal Server Error", "internal error\n")
         }
       }
-      conn.send_response(reply.status, reply.reason, extra_headers=reply.headers)
+      conn.send_response(
+        reply.status,
+        reply.reason,
+        extra_headers=http_reply_headers(reply.headers),
+      )
       if reply.body.length() > 0 {
         conn.write(reply.body)
       }

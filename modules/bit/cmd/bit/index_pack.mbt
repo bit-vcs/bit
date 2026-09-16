@@ -791,7 +791,6 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           }
         }
         let pack = @fs.read_file_to_bytes(pack_path) catch {
-          err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write(
               "fatal: " + @debug.render(Repr(err)) + "\n",
@@ -801,7 +800,6 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           }
         }
         let max_depth = @pack.max_delta_chain_length(pack) catch {
-          err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write(
               "fatal: " + @debug.render(Repr(err)) + "\n",
@@ -825,7 +823,6 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           }
         }
         let pack = @fs.read_file_to_bytes(pack_path) catch {
-          err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write(
               "fatal: " + @debug.render(Repr(err)) + "\n",
@@ -841,7 +838,6 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           pack_path + ".idx"
         }
         let idx = @fs.read_file_to_bytes(idx_path) catch {
-          err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write(
               "fatal: " + @debug.render(Repr(err)) + "\n",
@@ -865,7 +861,6 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
                 pack_path + ".rev"
               }
               let rev = @fs.read_file_to_bytes(rev_path) catch {
-                err if @async.is_cancellation_error(err) => raise err
                 err => {
                   @stdio.stderr.write(
                     "error: could not read reverse index: " +
@@ -937,7 +932,6 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         }
         let bases = if cfg.fix_thin {
           @bitlib.load_all_objects_from_fs(fs, git_dir) catch {
-            err if @async.is_cancellation_error(err) => raise err
             _ => []
           }
         } else {
@@ -1091,7 +1085,6 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
       }
       let pack_path = resolve_in_cwd(pack_path)
       let pack = @fs.read_file_to_bytes(pack_path) catch {
-        err if @async.is_cancellation_error(err) => raise err
         err => {
           @stdio.stderr.write(
             "fatal: " + @debug.render(Repr(err)) + "\n",

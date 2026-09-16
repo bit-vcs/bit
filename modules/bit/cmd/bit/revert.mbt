@@ -52,17 +52,14 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
       // Reset to ORIG_HEAD
       ignore(@bitlib.reset(wfs, rfs, root, orig_hex, @bitlib.ResetMode::Hard))
       wfs.remove_file(orig_head_path) catch {
-        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
     }
     // Clean up state files
     wfs.remove_file(revert_head_path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(merge_msg_path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     print_line("Revert aborted.")
@@ -76,11 +73,9 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     }
     // Clean up state files (skip current revert)
     wfs.remove_file(revert_head_path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(merge_msg_path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     // Reset index to HEAD
@@ -112,15 +107,12 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     print_line("[\{short_id}] \{first_line}")
     // Clean up state files
     wfs.remove_file(revert_head_path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(merge_msg_path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(orig_head_path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     return
@@ -227,7 +219,6 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
             let abs_path = root + "/" + path
             // Check if current file matches commit version (clean revert)
             let current_content = rfs.read_file(abs_path) catch {
-              err if @async.is_cancellation_error(err) => raise err
               _ => b""
             }
             let current_id = @bitcore.hash_blob(current_content)
@@ -284,7 +275,6 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   }
   // Clean up ORIG_HEAD on success
   wfs.remove_file(orig_head_path) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => ()
   }
 }

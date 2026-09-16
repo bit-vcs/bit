@@ -168,8 +168,6 @@ async fn bit_credential_fill(
     return None
   }
   let text = stdout.text() catch {
-    err if @async.is_cancellation_error(err) =>
-      raise @bit.GitError::IoError(err.to_string())
     _ => ""
   }
   let mut user : String? = None
@@ -259,8 +257,6 @@ async fn collect_response(
   let chunks : Array[Byte] = []
   while true {
     let chunk = client.read_some() catch {
-      err if @async.is_cancellation_error(err) =>
-        raise @bit.GitError::IoError(err.to_string())
       err =>
         if strict {
           raise @bit.GitError::IoError("HTTP response body truncated: \{err}")
@@ -287,9 +283,20 @@ async fn collect_response(
 fn http_response_of(response : @http.Response) -> @bit.HttpResponse {
   let headers : Map[String, String] = Map([])
   for name, value in response.headers {
-    headers[name] = value
+    headers[name.0] = value
   }
   @bit.HttpResponse::with_headers(response.code, headers)
+}
+
+///|
+/// `@http` keys request headers by `CaseInsensitiveString` (async 0.22+);
+/// bit's transport-neutral interfaces keep plain `String` keys.
+fn to_http_headers(headers : Map[String, String]) -> @http.Headers {
+  let out : @http.Headers = Map([])
+  for name, value in headers {
+    out[@http.CaseInsensitiveString(name)] = value
+  }
+  out
 }
 
 ///|
@@ -317,7 +324,7 @@ pub async fn native_http_get(
   headers : Map[String, String],
 ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
-  let (response, client) = @http.get_stream(url, headers=auth_headers) catch {
+  let (response, client) = @http.get_stream(url, headers=to_http_headers(auth_headers)) catch {
     e => raise @bit.GitError::IoError("HTTP GET failed: \{e}")
   }
   let data = drain_response(client)
@@ -331,7 +338,7 @@ pub async fn native_http_post(
   headers : Map[String, String],
 ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
-  let client = @http.post_stream(url, headers=auth_headers) catch {
+  let client = @http.post_stream(url, headers=to_http_headers(auth_headers)) catch {
     e => raise @bit.GitError::IoError("HTTP POST failed: \{e}")
   }
   client.write(body) catch {
@@ -370,7 +377,7 @@ pub async fn native_http_put(
   headers : Map[String, String],
 ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
-  let client = @http.put_stream(url, headers=auth_headers) catch {
+  let client = @http.put_stream(url, headers=to_http_headers(auth_headers)) catch {
     e => raise @bit.GitError::IoError("HTTP PUT failed: \{e}")
   }
   client.write(body) catch {
@@ -399,7 +406,11 @@ pub async fn native_http_delete(
     e => raise @bit.GitError::IoError("HTTP DELETE connect failed: \{e}")
   }
   let response = try {
-    client.request(@http.RequestMethod::Delete, path, extra_headers=auth_headers)
+    client.request(
+      @http.RequestMethod::Delete,
+      path,
+      extra_headers=to_http_headers(auth_headers),
+    )
     client.end_request()
   } catch {
     e => {
@@ -442,7 +453,7 @@ pub async fn native_objstore_send(
     e => raise @bit.GitError::IoError("connect to \{origin} failed: \{e}")
   }
   let response = try {
-    client.request(request_method, path, extra_headers=headers)
+    client.request(request_method, path, extra_headers=to_http_headers(headers))
     if body.length() > 0 {
       client.write(body)
     }
@@ -456,7 +467,7 @@ pub async fn native_objstore_send(
   let data = drain_response_strict(client)
   let out_headers : Map[String, String] = Map([])
   for name, value in response.headers {
-    out_headers[name] = value
+    out_headers[name.0] = value
   }
   { status: response.code, headers: out_headers, body: data }
 }

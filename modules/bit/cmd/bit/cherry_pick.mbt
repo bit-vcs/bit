@@ -307,7 +307,6 @@ async fn handle_subdir_cherry_pick(
   let commit_info = @bitcore.parse_commit(co.data) catch { err => raise err }
   let parent_tree = if commit_info.parents.length() > 0 {
     get_subdir_tree_from_commit(db, fs, commit_info.parents[0], subdir_path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => None
     }
   } else {

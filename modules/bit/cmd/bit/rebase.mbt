@@ -2159,7 +2159,7 @@ async fn handle_subdir_rebase(
   let upstream_path = git_dir + "/refs/remotes/" + target_ref
   let upstream_bytes = fs.read_file(upstream_path) catch {
     err => {
-      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+      if @async.is_being_cancelled() {
         raise err
       }
       print_line("Error: cannot resolve ref: \{target_ref}")

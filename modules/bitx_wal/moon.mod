@@ -6,7 +6,7 @@ import {
   "mizchi/bit_hash@0.46.4",
   "mizchi/bit_object@0.46.4",
   "mizchi/bit_objstore@0.46.4",
-  "moonbitlang/async@0.19.4",
+  "moonbitlang/async@0.22.1",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"

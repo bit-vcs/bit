@@ -11,9 +11,9 @@ import {
   "mizchi/bit_types@0.46.4",
   "mizchi/bit_vfs@0.46.4",
   "mizchi/bit_osfs@0.46.4",
-  "moonbitlang/async@0.19.4",
-  "moonbitlang/x@0.4.40",
-  "mizchi/x@0.2.0",
+  "moonbitlang/async@0.22.1",
+  "moonbitlang/x@0.5.5",
+  "mizchi/x@0.6.1",
 }
 
 readme = "src/README.md"
