@@ -43,11 +43,9 @@ pub fn init_subdir(
   }
   // git ラッパースクリプトを生成
   if config.create_wrapper {
-    create_wrapper_script(fs, subdir_abs, normalized_path) catch {
-      e => raise e
-    }
+    create_wrapper_script(fs, subdir_abs, normalized_path)
   }
-  { path: normalized_path, git_dir, config_path, initialized: true }
+  { path: normalized_path, git_dir, config_path, initialized: true, }
 }
 
 ///|
@@ -75,7 +73,7 @@ pub fn get_subdir_info(
   let config_dir = git_dir + "/subdir/" + path_to_safe_name(normalized_path)
   let config_path = config_dir + "/config"
   if rfs.is_file(config_path) {
-    Some({ path: normalized_path, git_dir, config_path, initialized: true })
+    Some({ path: normalized_path, git_dir, config_path, initialized: true, })
   } else {
     None
   }

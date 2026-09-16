@@ -158,9 +158,7 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
   }
   match subdir_info {
     Some((_, subdir_path, _)) => {
-      handle_subdir_cherry_pick(fs, root, git_dir, spec, subdir_path) catch {
-        err => raise err
-      }
+      handle_subdir_cherry_pick(fs, root, git_dir, spec, subdir_path)
       return
     }
     None => ()
@@ -282,18 +280,14 @@ async fn handle_subdir_cherry_pick(
 ) -> Unit raise Error {
   print_line("Cherry-picking from upstream (subdir: \{subdir_path})...")
   // Resolve commit
-  let commit_id = resolve_ref_for_subdir(fs, git_dir, spec) catch {
-    err => raise err
-  }
+  let commit_id = resolve_ref_for_subdir(fs, git_dir, spec)
   guard commit_id is Some(cid) else {
     raise @bitcore.GitError::InvalidObject("unknown revision: \{spec}")
   }
   // Load object database
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   // Get upstream commit's subdir tree
-  let upstream_tree = get_subdir_tree_from_commit(db, fs, cid, subdir_path) catch {
-    err => raise err
-  }
+  let upstream_tree = get_subdir_tree_from_commit(db, fs, cid, subdir_path)
   guard upstream_tree is Some(utree) else {
     raise @bitcore.GitError::InvalidObject(
       "Subdirectory not found in commit: \{subdir_path}",
@@ -304,7 +298,7 @@ async fn handle_subdir_cherry_pick(
   guard commit_obj is Some(co) else {
     raise @bitcore.GitError::InvalidObject("Cannot read commit")
   }
-  let commit_info = @bitcore.parse_commit(co.data) catch { err => raise err }
+  let commit_info = @bitcore.parse_commit(co.data)
   let parent_tree = if commit_info.parents.length() > 0 {
     get_subdir_tree_from_commit(db, fs, commit_info.parents[0], subdir_path) catch {
       _ => None
@@ -329,8 +323,6 @@ async fn handle_subdir_cherry_pick(
     message,
     author,
   }
-  apply_subdir_change(fs, db, root, git_dir, change_info) catch {
-    err => raise err
-  }
+  apply_subdir_change(fs, db, root, git_dir, change_info)
   print_line("Cherry-picked: \{message}")
 }

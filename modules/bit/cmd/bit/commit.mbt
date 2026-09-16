@@ -1144,7 +1144,7 @@ async fn commit_with_merge_heads(
 fn cleanup_merge_state_files(
   fs : &@bitcore.FileSystem,
   git_dir : String,
-) -> Unit raise Error {
+) -> Unit {
   let files = ["MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "SQUASH_MSG"]
   for file in files {
     fs.remove_file(git_dir + "/" + file) catch {

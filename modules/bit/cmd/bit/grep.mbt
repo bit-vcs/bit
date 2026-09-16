@@ -355,9 +355,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
           patterns,
           expr_tokens,
           use_expr,
-        ) catch {
-          err => raise err
-        }
+        )
         i += 2
       }
       "-f" => raise @bitcore.GitError::InvalidObject("fatal: no pattern given")
@@ -365,9 +363,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
         let file = String::unsafe_substring(arg, start=2, end=arg.length())
         grep_append_patterns_from_file(
           fs, root, file, patterns, expr_tokens, use_expr,
-        ) catch {
-          err => raise err
-        }
+        )
         i += 1
       }
       "--threads" if i + 1 < args.length() => i += 2
@@ -750,7 +746,7 @@ fn grep_limit_file_matches(
     for i in 0..<max_count {
       truncated.push(file_match.matches[i])
     }
-    limited.push({ path: file_match.path, matches: truncated })
+    limited.push({ path: file_match.path, matches: truncated, })
   }
   limited
 }
@@ -1445,16 +1441,19 @@ fn grep_resolve_function_context_spec(
       )
       match xfuncname {
         Some(pattern) =>
-          { header_pattern: Some(pattern), include_leading_comments: true }
+          { header_pattern: Some(pattern), include_leading_comments: true, }
         None =>
           match funcname {
             Some(pattern) =>
-              { header_pattern: Some(pattern), include_leading_comments: false }
-            None => { header_pattern: None, include_leading_comments: false }
+              {
+                header_pattern: Some(pattern),
+                include_leading_comments: false,
+              }
+            None => { header_pattern: None, include_leading_comments: false, }
           }
       }
     }
-    None => { header_pattern: None, include_leading_comments: false }
+    None => { header_pattern: None, include_leading_comments: false, }
   }
 }
 
@@ -2061,7 +2060,7 @@ fn grep_prefix_file_matches(
   let prefixed : Array[@bitgrep.GrepFileMatch] = []
   for item in matches {
     let path = if item.path == "" { prefix } else { prefix + "/" + item.path }
-    prefixed.push({ path, matches: item.matches })
+    prefixed.push({ path, matches: item.matches, })
   }
   prefixed
 }

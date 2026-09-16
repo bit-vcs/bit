@@ -79,13 +79,9 @@ pub fn init_module(
     _ => ()
   }
   // 7. filter driver スクリプトを作成
-  setup_filter_script(fs, rfs, git_dir, normalized_path) catch {
-    e => raise e
-  }
+  setup_filter_script(fs, rfs, git_dir, normalized_path)
   // 8. .gitattributes に filter パターンを追加
-  setup_gitattributes_filter(fs, rfs, repo_root, normalized_path) catch {
-    e => raise e
-  }
+  setup_gitattributes_filter(fs, rfs, repo_root, normalized_path)
   ignore(head_commit_id)
 }
 
@@ -121,9 +117,7 @@ fn setup_filter_script(
   // .git/config に filter 設定を追加
   setup_filter_config(
     fs, rfs, git_dir, filter_name, clean_script, smudge_script,
-  ) catch {
-    e => raise e
-  }
+  )
 }
 
 ///|
@@ -307,13 +301,9 @@ fn _setup_filter_driver(
 ) -> Unit raise SubdirError {
   let filter_name = "moongit-subdir-" + path_to_module_name(subdir_path)
   // 1. .git/config に filter を追加
-  add_filter_to_config(fs, rfs, git_dir, filter_name, subdir_path) catch {
-    e => raise e
-  }
+  add_filter_to_config(fs, rfs, git_dir, filter_name, subdir_path)
   // 2. .gitattributes にパターンを追加
-  add_filter_to_gitattributes(fs, rfs, repo_root, filter_name, subdir_path) catch {
-    e => raise e
-  }
+  add_filter_to_gitattributes(fs, rfs, repo_root, filter_name, subdir_path)
 }
 
 ///|

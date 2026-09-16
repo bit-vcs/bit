@@ -10,7 +10,7 @@ pub struct NativeHttpClient {
 
 ///|
 pub fn NativeHttpClient::new() -> NativeHttpClient {
-  { dummy: 0 }
+  { dummy: 0, }
 }
 
 ///|
@@ -167,9 +167,7 @@ async fn bit_credential_fill(
     ignore(stderr)
     return None
   }
-  let text = stdout.text() catch {
-    _ => ""
-  }
+  let text = stdout.text() catch { _ => "" }
   let mut user : String? = None
   let mut pass : String? = None
   for line_view in text.split("\n") {
@@ -237,14 +235,8 @@ async fn drain_response(client : @http.Client) -> Bytes raise @bit.GitError {
 async fn drain_response_strict(
   client : @http.Client,
 ) -> Bytes raise @bit.GitError {
-  let data = try {
-    collect_response(client, true)
-  } catch {
-    e => {
-      client.close()
-      raise e
-    }
-  }
+  errdefer client.close()
+  let data = collect_response(client, true)
   client.close()
   data
 }
@@ -305,15 +297,15 @@ fn to_http_headers(headers : Map[String, String]) -> @http.Headers {
 fn split_url_origin(url : String) -> (String, String) raise @bit.GitError {
   let scheme_end = match url.find("://") {
     Some(i) => i + 3
-    None =>
-      raise @bit.GitError::IoError("URL has no scheme: \{url}")
+    None => raise @bit.GitError::IoError("URL has no scheme: \{url}")
   }
   let rest = String::unsafe_substring(url, start=scheme_end, end=url.length())
   match rest.find("/") {
-    Some(i) => (
-      String::unsafe_substring(url, start=0, end=scheme_end + i),
-      String::unsafe_substring(url, start=scheme_end + i, end=url.length()),
-    )
+    Some(i) =>
+      (
+        String::unsafe_substring(url, start=0, end=scheme_end + i),
+        String::unsafe_substring(url, start=scheme_end + i, end=url.length()),
+      )
     None => (url, "/")
   }
 }
@@ -324,7 +316,10 @@ pub async fn native_http_get(
   headers : Map[String, String],
 ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
-  let (response, client) = @http.get_stream(url, headers=to_http_headers(auth_headers)) catch {
+  let (response, client) = @http.get_stream(
+    url,
+    headers=to_http_headers(auth_headers),
+  ) catch {
     e => raise @bit.GitError::IoError("HTTP GET failed: \{e}")
   }
   let data = drain_response(client)
@@ -469,7 +464,7 @@ pub async fn native_objstore_send(
   for name, value in response.headers {
     out_headers[name.0] = value
   }
-  { status: response.code, headers: out_headers, body: data }
+  { status: response.code, headers: out_headers, body: data, }
 }
 
 ///|

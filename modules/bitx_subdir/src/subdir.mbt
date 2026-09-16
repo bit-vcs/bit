@@ -171,9 +171,7 @@ pub fn SubdirRepo::from_commit(
     _ => raise IoError("failed to load object db")
   }
   // サブディレクトリのツリーを抽出
-  let tree_id = extract_subdir_tree(db, rfs, commit_id, normalized_path) catch {
-    e => raise e
-  }
+  let tree_id = extract_subdir_tree(db, rfs, commit_id, normalized_path)
   // サブディレクトリのツリーをベースとした Fs を作成
   let bitfs = @fs.Fs::from_tree(git_dir, tree_id)
   {
@@ -213,9 +211,7 @@ pub fn SubdirRepo::from_head(
       _ => raise IoError("invalid commit id in HEAD")
     }
   }
-  SubdirRepo::from_commit(rfs, git_dir, head_id, subdir_path, config~) catch {
-    e => raise e
-  }
+  SubdirRepo::from_commit(rfs, git_dir, head_id, subdir_path, config~)
 }
 
 ///|
@@ -237,9 +233,7 @@ pub fn SubdirRepo::from_branch(
   ) catch {
     _ => raise IoError("invalid commit id in branch ref")
   }
-  SubdirRepo::from_commit(rfs, git_dir, commit_id, subdir_path, config~) catch {
-    e => raise e
-  }
+  SubdirRepo::from_commit(rfs, git_dir, commit_id, subdir_path, config~)
 }
 
 ///|

@@ -384,9 +384,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   // Check if subdir-clone and handle specially
   match get_subdir_info(fs, git_dir) {
     Some((_, subdir_path, _)) => {
-      handle_subdir_merge(fs, root, git_dir, refspec, subdir_path, message) catch {
-        err => raise err
-      }
+      handle_subdir_merge(fs, root, git_dir, refspec, subdir_path, message)
       return
     }
     None => ()

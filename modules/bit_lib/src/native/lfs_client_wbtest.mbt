@@ -206,9 +206,7 @@ async test "lfs_upload_pack_objects_with_http: uploads cached pointer content" {
     body : Bytes,
     headers : Map[String, String],
   ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
-    @async.sleep(0) catch {
-      err => raise @bit.GitError::IoError(err.to_string())
-    }
+    @async.sleep(0)
     if url.length() == -1 {
       raise @bit.GitError::IoError("unreachable")
     }
@@ -225,9 +223,7 @@ async test "lfs_upload_pack_objects_with_http: uploads cached pointer content" {
     body : Bytes,
     headers : Map[String, String],
   ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
-    @async.sleep(0) catch {
-      err => raise @bit.GitError::IoError(err.to_string())
-    }
+    @async.sleep(0)
     if url.length() == -1 {
       raise @bit.GitError::IoError("unreachable")
     }

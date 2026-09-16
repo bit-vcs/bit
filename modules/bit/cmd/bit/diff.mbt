@@ -1605,7 +1605,12 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
   let mut rotate_to : String? = None
   let mut skip_to : String? = None
   let mut combined_specs : (String, String, String)? = None
-  let mut blob_pair_spec : (String, String, @bitcore.ObjectId, @bitcore.ObjectId)? = None
+  let mut blob_pair_spec : (
+    String,
+    String,
+    @bitcore.ObjectId,
+    @bitcore.ObjectId,
+  )? = None
   let mut expect_orderfile = false
   let mut expect_output = false
   let mut expect_rotate_to = false
@@ -1948,9 +1953,7 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
         output.stat || output.shortstat || output.dirstat || output.summary,
         output.name_only,
         output.name_status,
-      ) catch {
-        err => raise err
-      }
+      )
       if exit_code {
         // `handle_subdir_diff` writes output directly; use diff result as conservative signal.
         let files = if cached {
@@ -1968,7 +1971,9 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
   }
   let all_files = match blob_pair_spec {
     Some((old_spec, new_spec, old_id, new_id)) =>
-      diff_blob_pair_files(rfs, repo_git_dir, old_spec, new_spec, old_id, new_id)
+      diff_blob_pair_files(
+        rfs, repo_git_dir, old_spec, new_spec, old_id, new_id,
+      )
     None =>
       match combined_specs {
         Some((base, parent_a, parent_b)) =>
@@ -2526,7 +2531,7 @@ async fn diff_observe_worktree_path(
   if rm_has_symlink_leading_path(path, root_abs, fn(abs : String) {
       @bitio.read_symlink_target_path(abs) is Some(_)
     }) {
-    return { mode: None, id: None }
+    return { mode: None, id: None, }
   }
   let abs = root + "/" + path
   let autocrlf = @bitlib.read_autocrlf_setting(fs, git_dir)
@@ -2567,10 +2572,10 @@ async fn diff_observe_worktree_path(
             id: @bitlib.resolve_head_commit(fs, sub_git_dir),
           }
         } else {
-          { mode: None, id: None }
+          { mode: None, id: None, }
         }
       } else {
-        { mode: None, id: None }
+        { mode: None, id: None, }
       }
   }
 }
@@ -3080,9 +3085,7 @@ fn diff_resolve_blob_id(
   git_dir : String,
   spec : String,
 ) -> @bitcore.ObjectId? raise Error {
-  guard @bitrepo.rev_parse(rfs, git_dir, spec) is Some(oid) else {
-    return None
-  }
+  guard @bitrepo.rev_parse(rfs, git_dir, spec) is Some(oid) else { return None }
   guard db.get(rfs, oid) is Some(obj) else { return None }
   if obj.obj_type == @bitcore.ObjectType::Blob {
     Some(oid)

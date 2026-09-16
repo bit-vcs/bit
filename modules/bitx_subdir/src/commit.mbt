@@ -58,9 +58,7 @@ pub fn SubdirRepo::commit(
     parent_info.tree,
     self.subdir_path,
     new_subdir_tree,
-  ) catch {
-    e => raise e
-  }
+  )
   // 新しいコミットを作成
   let new_commit_id = create_commit_object(
     fs,
@@ -70,17 +68,11 @@ pub fn SubdirRepo::commit(
     message,
     author,
     timestamp,
-  ) catch {
-    e => raise e
-  }
+  )
   // HEAD（またはブランチ参照）を更新
-  update_head_ref(fs, rfs, self.git_dir, new_commit_id) catch {
-    e => raise e
-  }
+  update_head_ref(fs, rfs, self.git_dir, new_commit_id)
   // インデックスを新しいコミットに合わせて更新
-  update_index_from_commit(fs, rfs, self.git_dir, new_commit_id) catch {
-    e => raise e
-  }
+  update_index_from_commit(fs, rfs, self.git_dir, new_commit_id)
   // ワーキング層をクリア
   self.bitfs.discard_changes()
   new_commit_id
@@ -154,9 +146,7 @@ fn replace_tree_recursive(
           path_parts,
           depth + 1,
           new_leaf_tree,
-        ) catch {
-          e => raise e
-        }
+        )
         new_entries.push(
           @bit.TreeEntry::new(entry.mode, entry.name, new_child_tree),
         )

@@ -77,7 +77,7 @@ async fn handle_interpret_trailers(args : Array[String]) -> Unit raise Error {
   // Read input
   let fs = OsFs::new()
   let input = if positional.length() > 0 {
-    let file_bytes = fs.read_file(positional[0]) catch { err => raise err }
+    let file_bytes = fs.read_file(positional[0])
     decode_bytes(file_bytes)
   } else {
     decode_bytes(read_all_stdin())
@@ -118,9 +118,7 @@ async fn handle_interpret_trailers(args : Array[String]) -> Unit raise Error {
     }
   }
   if in_place && positional.length() > 0 {
-    fs.write_file(positional[0], str_to_bytes(output)) catch {
-      err => raise err
-    }
+    fs.write_file(positional[0], str_to_bytes(output))
   } else {
     print_str(output)
   }

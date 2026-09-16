@@ -2070,7 +2070,7 @@ fn rev_parse_read_bisect_refs(
     let ref_path = bisect_dir + "/" + name
     let is_file = @fs.is_file(ref_path) catch { _ => false }
     if is_file {
-      let content = decode_bytes(fs.read_file(ref_path) catch { e => raise e })
+      let content = decode_bytes(fs.read_file(ref_path))
       let oid_hex = trim_string(content)
       result.push(("refs/bisect/" + name, oid_hex))
     }
@@ -2079,7 +2079,7 @@ fn rev_parse_read_bisect_refs(
   let packed_path = git_dir + "/packed-refs"
   let packed_exists = @fs.is_file(packed_path) catch { _ => false }
   if packed_exists {
-    let content = decode_bytes(fs.read_file(packed_path) catch { e => raise e })
+    let content = decode_bytes(fs.read_file(packed_path))
     for line_view in content.split("\n") {
       let line = trim_string(line_view.to_owned())
       if line.length() == 0 || line.has_prefix("#") || line.has_prefix("^") {

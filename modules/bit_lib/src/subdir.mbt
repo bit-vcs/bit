@@ -118,10 +118,8 @@ pub fn get_subdir_tree_from_commit(
 ) -> @bit.ObjectId? raise @bit.GitError {
   let obj = db.get(fs, commit_id)
   guard obj is Some(o) else { return None }
-  let info = @bit.parse_commit(o.data) catch { err => raise err }
-  find_subtree(db, fs, info.tree, subdir_path) catch {
-    err => raise err
-  }
+  let info = @bit.parse_commit(o.data)
+  find_subtree(db, fs, info.tree, subdir_path)
 }
 
 ///|
@@ -163,7 +161,7 @@ fn find_subtree(
   for part in parts {
     let obj = db.get(rfs, current)
     guard obj is Some(tree_obj) else { return None }
-    let entries = @bit.parse_tree(tree_obj.data) catch { err => raise err }
+    let entries = @bit.parse_tree(tree_obj.data)
     let mut found = false
     for entry in entries {
       if entry.name == part {
@@ -191,12 +189,10 @@ pub fn collect_tree_blobs(
   let blobs : Array[@bit.ObjectId] = []
   let obj = db.get(rfs, tree_id)
   guard obj is Some(tree_obj) else { return blobs }
-  let entries = @bit.parse_tree(tree_obj.data) catch { err => raise err }
+  let entries = @bit.parse_tree(tree_obj.data)
   for entry in entries {
     if entry.mode == "40000" || entry.mode == "040000" {
-      let sub_blobs = collect_tree_blobs(db, rfs, entry.id) catch {
-        err => raise err
-      }
+      let sub_blobs = collect_tree_blobs(db, rfs, entry.id)
       for b in sub_blobs {
         blobs.push(b)
       }
@@ -217,16 +213,14 @@ pub fn write_tree_to_worktree(
 ) -> Unit raise @bit.GitError {
   let obj = db.get(rfs, tree_id)
   guard obj is Some(tree_obj) else { return }
-  let entries = @bit.parse_tree(tree_obj.data) catch { err => raise err }
+  let entries = @bit.parse_tree(tree_obj.data)
   for entry in entries {
     let path = dir + "/" + entry.name
     if entry.mode == "40000" || entry.mode == "040000" {
       wfs.mkdir_p(path) catch {
         _ => ()
       }
-      write_tree_to_worktree(db, rfs, wfs, entry.id, path) catch {
-        err => raise err
-      }
+      write_tree_to_worktree(db, rfs, wfs, entry.id, path)
     } else {
       let blob_obj = db.get(rfs, entry.id)
       guard blob_obj is Some(blob) else { continue }
