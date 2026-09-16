@@ -110,19 +110,19 @@ local syncNpmLibRaw: Task = new {
   outputs { "npm/lib.raw.js" }
 }
 
-local syncNpmBitCjs: Task = new {
-  name = "sync-npm-bit-cjs"
-  description = "Copy the JS CLI payload into the checked-in npm wrapper"
-  cmd = "cp _build/js/release/build/mizchi/bit/bit.js npm/bit.cjs"
+local syncNpmBitMjs: Task = new {
+  name = "sync-npm-bit-mjs"
+  description = "Copy the JS CLI payload (ES module) into the checked-in npm wrapper"
+  cmd = "cp _build/js/release/build/mizchi/bit/bit.js npm/bit.mjs"
   deps { buildJsCli }
   inputs { "_build/js/release/build/mizchi/bit/bit.js" }
-  outputs { "npm/bit.cjs" }
+  outputs { "npm/bit.mjs" }
 }
 
 local buildNpm: Task = new {
   name = "build-npm"
   description = "Build the JS lib + CLI and stage them into npm/ for publish"
-  deps { syncNpmLibRaw; syncNpmBitCjs }
+  deps { syncNpmLibRaw; syncNpmBitMjs }
 }
 
 local bundleJsLibMinimal: Task = new {
@@ -295,7 +295,7 @@ local test: Task = new {
   deps {
     build
     syncNpmLibRaw
-    syncNpmBitCjs
+    syncNpmBitMjs
     bundleJsLibMinimal
     bundleJsLibGitOps
   }
@@ -316,7 +316,7 @@ local testJsBuild: Task = new {
   cmd = "node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/npm-cli.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs tools/playground-commands.test.mjs tools/playground-view.test.mjs tools/flaker-affected-rules.test.mjs tools/select-affected-tests.test.mjs"
   deps {
     syncNpmLibRaw
-    syncNpmBitCjs
+    syncNpmBitMjs
     bundleJsLibMinimal
     bundleJsLibGitOps
   }
@@ -686,7 +686,7 @@ tasks {
   buildJsLib
   buildJsCli
   syncNpmLibRaw
-  syncNpmBitCjs
+  syncNpmBitMjs
   buildNpm
   bundleJsLibMinimal
   bundleJsLibGitOps
