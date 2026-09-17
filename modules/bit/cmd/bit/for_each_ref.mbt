@@ -617,9 +617,7 @@ async fn for_each_ref_collect_refs_safe(
       }
     }
   }
-  let result : Array[(String, @bitcore.ObjectId)] = Array::new(
-    capacity=out.length(),
-  )
+  let result : Array[(String, @bitcore.ObjectId)] = Array(capacity=out.length())
   for name, id in out {
     result.push((name, id))
   }

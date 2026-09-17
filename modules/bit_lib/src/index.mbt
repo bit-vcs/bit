@@ -147,7 +147,7 @@ fn index_entries_from_stage_entries(
         None => selected[entry.path] = (prio, entry)
       }
     }
-    let deduped : Array[IndexEntry] = Array::new(capacity=selected.length())
+    let deduped : Array[IndexEntry] = Array(capacity=selected.length())
     for _, value in selected {
       deduped.push(value.1)
     }
@@ -365,7 +365,7 @@ fn index_read_stage_entries_from_bytes(
   }
   let count = index_read_u32_be(data, 8)
   let mut offset = 12
-  let entries : Array[IndexStageEntry] = Array::new(capacity=count)
+  let entries : Array[IndexStageEntry] = Array(capacity=count)
   for _ in 0..<count {
     let entry_start = offset
     if offset + 40 + hash_size + 2 > data.length() {

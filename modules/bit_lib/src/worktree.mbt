@@ -118,7 +118,7 @@ pub fn status_porcelain_from(s : Status) -> Array[String] {
     ymap[p] = 'D'
   }
   // xmap.keys() ∪ ymap.keys() — paths touched by either side.
-  let list : Array[String] = Array::new(capacity=tracked_count)
+  let list : Array[String] = Array(capacity=tracked_count)
   for p in xmap.keys() {
     list.push(p)
   }
@@ -128,9 +128,7 @@ pub fn status_porcelain_from(s : Status) -> Array[String] {
     }
   }
   list.sort()
-  let out : Array[String] = Array::new(
-    capacity=list.length() + s.untracked.length(),
-  )
+  let out : Array[String] = Array(capacity=list.length() + s.untracked.length())
   for p in list {
     let x = xmap.get(p).unwrap_or(' ')
     let y = ymap.get(p).unwrap_or(' ')
@@ -1855,7 +1853,7 @@ pub fn rm_paths(
       }
     }
   }
-  let out : Array[IndexEntry] = Array::new(capacity=map.length())
+  let out : Array[IndexEntry] = Array(capacity=map.length())
   let remaining_skip_worktree_paths : Map[String, Bool] = Map([])
   let remaining_skip_paths : Array[String] = []
   for path, entry in map {

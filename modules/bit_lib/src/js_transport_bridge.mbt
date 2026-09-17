@@ -2,7 +2,7 @@
 
 ///|
 fn js_transport_bytes_to_array(bytes : Bytes) -> Array[Byte] {
-  let out : Array[Byte] = Array::new(capacity=bytes.length())
+  let out : Array[Byte] = Array(capacity=bytes.length())
   for i in 0..<bytes.length() {
     out.push(bytes[i])
   }

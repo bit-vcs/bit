@@ -692,7 +692,7 @@ fn commit_relay_notes(
   message : String,
   timestamp : Int64,
 ) -> @bit.ObjectId raise @bit.GitError {
-  let tree_entries : Array[@bit.TreeEntry] = Array::new(
+  let tree_entries : Array[@bit.TreeEntry] = Array(
     capacity=store.entries.length(),
   )
   for name, blob_id in store.entries {

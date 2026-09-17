@@ -93,7 +93,7 @@ test "bench profile: Array[Byte] collect 500x200B" (b : @bench.T) {
       parts.push(obj.data)
       total += obj.data.length()
     }
-    let arr : Array[Byte] = Array::new(capacity=total)
+    let arr : Array[Byte] = Array(capacity=total)
     for part in parts {
       for i in 0..<part.length() {
         arr.push(part[i])

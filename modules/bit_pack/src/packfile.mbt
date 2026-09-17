@@ -459,7 +459,7 @@ fn build_delta_with_index(
   let base_len = base.length()
   let target_len = target.length()
   // Pre-allocate output buffer: delta is typically smaller than target
-  let out : Array[Byte] = Array::new(capacity=target_len / 2 + 32)
+  let out : Array[Byte] = Array(capacity=target_len / 2 + 32)
   encode_delta_size(base_len, out)
   encode_delta_size(target_len, out)
   if target_len == 0 {

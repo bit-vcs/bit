@@ -665,9 +665,7 @@ pub fn show_ref(
   if fs.is_file(packed) {
     ref_collect_packed(fs, packed, out)
   }
-  let result : Array[(String, @bit.ObjectId)] = Array::new(
-    capacity=out.length(),
-  )
+  let result : Array[(String, @bit.ObjectId)] = Array(capacity=out.length())
   for name, id in out {
     result.push((name, id))
   }

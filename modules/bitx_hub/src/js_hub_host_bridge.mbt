@@ -154,7 +154,7 @@ impl @bit.FileSystem for HubJsHostFs with fn mkdir_p(self, path) {
 
 ///|
 impl @bit.FileSystem for HubJsHostFs with fn write_file(self, path, content) {
-  let arr = Array::new(capacity=content.length())
+  let arr = Array(capacity=content.length())
   for i in 0..<content.length() {
     arr.push(content[i])
   }

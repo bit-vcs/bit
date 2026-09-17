@@ -17,7 +17,7 @@ fn js_make_host_fs(host_id : Int) -> LibJsHostFs {
 
 ///|
 fn js_bytes_to_array(bytes : Bytes) -> Array[Byte] {
-  let out : Array[Byte] = Array::new(capacity=bytes.length())
+  let out : Array[Byte] = Array(capacity=bytes.length())
   for i in 0..<bytes.length() {
     out.push(bytes[i])
   }

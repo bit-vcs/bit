@@ -750,7 +750,7 @@ fn commit_notes(
   timestamp : Int64,
 ) -> @bit.ObjectId raise @bit.GitError {
   // Build tree from entries
-  let tree_entries : Array[@bit.TreeEntry] = Array::new(
+  let tree_entries : Array[@bit.TreeEntry] = Array(
     capacity=store.entries.length(),
   )
   for name, blob_id in store.entries {

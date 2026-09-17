@@ -9,7 +9,7 @@ test "interactive: detect add patch mode" {
 
 ///|
 async test "interactive: add patch default runner rejects with error" {
-  let runner_called = Array::new(capacity=1)
+  let runner_called = Array(capacity=1)
   let runner = Some(async fn(_args : Array[String]) -> Int noraise {
     runner_called.push(true)
     0
