@@ -2,7 +2,11 @@
 
 ///|
 async fn main_js_async() -> Unit {
-  let args = @sys.get_cli_args()
+  // `@env.args()` keeps `process.argv[0]`, the JavaScript runtime
+  // executable, which the deprecated `@sys.get_cli_args()` dropped. The
+  // dispatch below indexes from the script path, so drop it here instead
+  // of shifting every index.
+  let args = @env.args()[1:].to_owned()
   if args.length() >= 2 {
     match args[1] {
       "-v" | "--version" | "version" => {
