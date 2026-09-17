@@ -288,7 +288,7 @@ fn push_append_upstream_config_update(
     branch_name_from_head_ref(source_ref)
   }
   match branch_name {
-    Some(name) => updates.push({ branch_name: name, merge_ref: dest_ref })
+    Some(name) => updates.push({ branch_name: name, merge_ref: dest_ref, })
     None => ()
   }
 }
@@ -962,9 +962,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
       }
       handle_subdir_push(
         fs, root, git_dir, remote_url, subdir_path, base_hex, first_refname, force,
-      ) catch {
-        err => raise err
-      }
+      )
       if porcelain {
         let (flag, status) = classify_push_porcelain_success(
           @bitcore.ObjectId::zero(),
@@ -2162,7 +2160,6 @@ async fn handle_subdir_push(
 ) -> Unit raise Error {
   // Step 1: Get local HEAD commit
   let local_head_opt = @bitrepo.rev_parse(fs, git_dir, "HEAD") catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => raise @bitcore.GitError::InvalidObject("Cannot resolve HEAD")
   }
   guard local_head_opt is Some(local_head) else {
@@ -2171,16 +2168,13 @@ async fn handle_subdir_push(
   print_line("  Local HEAD: \{local_head.to_hex()}")
   // Step 2: Get the initial commit (first commit in the subdir-clone)
   let initial_commit = find_initial_subdir_commit(fs, git_dir) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => raise @bitcore.GitError::InvalidObject("Cannot find initial commit")
   }
   print_line("  Initial commit: \{initial_commit.to_hex()}")
   // Step 3: Collect local commits since initial
   let local_commits = collect_commits_since(
     fs, git_dir, initial_commit, local_head,
-  ) catch {
-    err => raise err
-  }
+  )
   if local_commits.length() == 0 {
     print_line("Nothing to push.")
     return
@@ -2188,7 +2182,6 @@ async fn handle_subdir_push(
   print_line("  Found \{local_commits.length()} local commits to transform")
   // Step 4: Get upstream base commit
   let upstream_base = @bitcore.ObjectId::from_hex(base_hex) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => raise @bitcore.GitError::InvalidObject("Cannot parse base commit")
   }
   print_line("  Upstream base: \{upstream_base.to_hex()}")
@@ -2204,9 +2197,7 @@ async fn handle_subdir_push(
   for commit_id in local_commits {
     let new_commit = transform_subdir_commit(
       fs, db, git_dir, commit_id, parent, subdir_path,
-    ) catch {
-      err => raise err
-    }
+    )
     print_line("  Transformed: \{commit_id.to_hex()} -> \{new_commit.to_hex()}")
     parent = new_commit
   }
@@ -2298,14 +2289,14 @@ fn transform_subdir_commit(
   guard local_obj is Some(lo) else {
     raise @bitcore.GitError::InvalidObject("Cannot find local commit")
   }
-  let local_info = @bitcore.parse_commit(lo.data) catch { err => raise err }
+  let local_info = @bitcore.parse_commit(lo.data)
   let (author, message) = parse_commit_author_message(lo.data)
   // Get upstream parent's tree
   let upstream_obj = db.get(fs, upstream_parent)
   guard upstream_obj is Some(uo) else {
     raise @bitcore.GitError::InvalidObject("Cannot find upstream commit")
   }
-  let upstream_info = @bitcore.parse_commit(uo.data) catch { err => raise err }
+  let upstream_info = @bitcore.parse_commit(uo.data)
   // The local commit's tree IS the subdirectory content
   let new_subdir_tree = local_info.tree
   // Replace the subdirectory in the upstream tree
@@ -2316,9 +2307,7 @@ fn transform_subdir_commit(
     upstream_info.tree,
     subdir_path,
     new_subdir_tree,
-  ) catch {
-    err => raise err
-  }
+  )
   // Create new commit with the transformed tree
   let timestamp = get_current_timestamp()
   let new_commit = @subdir.create_commit_in_repo(
@@ -2367,7 +2356,7 @@ fn replace_tree_recursive_push(
   guard tree_obj is Some(to) else {
     raise @bitcore.GitError::InvalidObject("Cannot find tree")
   }
-  let entries = @bitcore.parse_tree(to.data) catch { err => raise err }
+  let entries = @bitcore.parse_tree(to.data)
   // Build new entries
   let new_entries : Array[@bitcore.TreeEntry] = []
   let target_name = path_parts[depth]
@@ -2389,9 +2378,7 @@ fn replace_tree_recursive_push(
           path_parts,
           depth + 1,
           new_leaf,
-        ) catch {
-          err => raise err
-        }
+        )
         new_entries.push(
           @bitcore.TreeEntry::new(entry.mode, entry.name, new_child),
         )

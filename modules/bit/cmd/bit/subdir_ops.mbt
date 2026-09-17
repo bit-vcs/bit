@@ -25,9 +25,7 @@ async fn handle_subdir_diff(
   // Load object database
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   // Get upstream subdir tree
-  let upstream_tree = get_subdir_tree_from_commit(db, fs, uid, subdir_path) catch {
-    err => raise err
-  }
+  let upstream_tree = get_subdir_tree_from_commit(db, fs, uid, subdir_path)
   guard upstream_tree is Some(utree) else {
     raise @bitcore.GitError::InvalidObject(
       "Subdirectory not found in upstream: \{subdir_path}",
@@ -38,7 +36,7 @@ async fn handle_subdir_diff(
   guard local_obj is Some(lo) else {
     raise @bitcore.GitError::InvalidObject("Cannot read local HEAD")
   }
-  let local_info = @bitcore.parse_commit(lo.data) catch { err => raise err }
+  let local_info = @bitcore.parse_commit(lo.data)
   let local_tree = local_info.tree
   // Compare trees
   let diffs = compare_trees(db, rfs, utree, local_tree, "")
@@ -129,7 +127,7 @@ fn compare_trees(
           result.push(s)
         }
       } else {
-        result.push({ path, kind: SubdirDiffKind::Deleted })
+        result.push({ path, kind: SubdirDiffKind::Deleted, })
       }
     }
   }
@@ -145,7 +143,7 @@ fn compare_trees(
             result.push(s)
           }
         } else {
-          result.push({ path, kind: SubdirDiffKind::Added })
+          result.push({ path, kind: SubdirDiffKind::Added, })
         }
       Some(ea) =>
         if e.id.to_hex() != ea.id.to_hex() {
@@ -157,7 +155,7 @@ fn compare_trees(
               result.push(s)
             }
           } else {
-            result.push({ path, kind: SubdirDiffKind::Modified })
+            result.push({ path, kind: SubdirDiffKind::Modified, })
           }
         }
     }
@@ -182,7 +180,7 @@ fn compare_trees_deleted(
         result.push(s)
       }
     } else {
-      result.push({ path, kind: SubdirDiffKind::Deleted })
+      result.push({ path, kind: SubdirDiffKind::Deleted, })
     }
   }
   result
@@ -205,7 +203,7 @@ fn compare_trees_added(
         result.push(s)
       }
     } else {
-      result.push({ path, kind: SubdirDiffKind::Added })
+      result.push({ path, kind: SubdirDiffKind::Added, })
     }
   }
   result
@@ -223,18 +221,14 @@ async fn handle_subdir_merge(
 ) -> Unit raise Error {
   print_line("Merging from upstream (subdir: \{subdir_path})...")
   // Resolve upstream ref
-  let upstream_id = resolve_ref_for_subdir(fs, git_dir, refspec) catch {
-    err => raise err
-  }
+  let upstream_id = resolve_ref_for_subdir(fs, git_dir, refspec)
   guard upstream_id is Some(uid) else {
     raise @bitcore.GitError::InvalidObject("unknown revision: \{refspec}")
   }
   // Load object database
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   // Get upstream subdir tree
-  let upstream_tree = get_subdir_tree_from_commit(db, fs, uid, subdir_path) catch {
-    err => raise err
-  }
+  let upstream_tree = get_subdir_tree_from_commit(db, fs, uid, subdir_path)
   guard upstream_tree is Some(utree) else {
     raise @bitcore.GitError::InvalidObject(
       "Subdirectory not found in upstream: \{subdir_path}",
@@ -250,7 +244,7 @@ async fn handle_subdir_merge(
   guard local_obj is Some(lo) else {
     raise @bitcore.GitError::InvalidObject("Cannot read local HEAD")
   }
-  let local_info = @bitcore.parse_commit(lo.data) catch { err => raise err }
+  let local_info = @bitcore.parse_commit(lo.data)
   let local_tree = local_info.tree
   // Check if already up to date
   if local_tree.to_hex() == utree.to_hex() {

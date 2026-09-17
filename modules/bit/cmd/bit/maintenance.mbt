@@ -151,7 +151,7 @@ fn get_config_value_simple(
 async fn stage_all_changes(fs : OsFs, root : String) -> Unit raise Error {
   let status = @bitlib.status(fs, root) catch {
     err => {
-      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+      if @async.is_being_cancelled() {
         raise err
       }
       return
@@ -170,7 +170,7 @@ async fn stage_all_changes(fs : OsFs, root : String) -> Unit raise Error {
   if all_paths.length() > 0 {
     let _ = @bitlib.add_paths_async(fs, fs, root, all_paths) catch {
       err => {
-        if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        if @async.is_being_cancelled() {
           raise err
         }
         ()

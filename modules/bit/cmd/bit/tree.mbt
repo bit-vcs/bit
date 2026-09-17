@@ -140,66 +140,60 @@ async fn handle_tree(args : Array[String]) -> Unit raise Error {
   }
   let normalized_filters = normalize_ls_tree_filters(path_filters, "")
   let temp_dir = make_temp_dir(fs, "bit-tree")
-  try {
-    let _ = @bitnative.clone_http_to_fs(
-      remote_url,
-      true,
-      fs,
-      temp_dir,
-      fs,
-      depth=1,
-      filter=@protocol.FilterSpec::BlobNone,
-    )
-    let git_dir = temp_dir + "/.git"
-    let commit_id = match ref_spec {
-      Some(refname) => {
-        let resolved = resolve_remote_ref_id(remote_url, refname)
-        guard resolved is Some((id, _)) else {
-          raise @bitcore.GitError::InvalidObject("Unknown ref: " + refname)
-        }
-        id
+  errdefer remove_dir_recursive(fs, temp_dir)
+  let _ = @bitnative.clone_http_to_fs(
+    remote_url,
+    true,
+    fs,
+    temp_dir,
+    fs,
+    depth=1,
+    filter=@protocol.FilterSpec::BlobNone,
+  )
+  let git_dir = temp_dir + "/.git"
+  let commit_id = match ref_spec {
+    Some(refname) => {
+      let resolved = resolve_remote_ref_id(remote_url, refname)
+      guard resolved is Some((id, _)) else {
+        raise @bitcore.GitError::InvalidObject("Unknown ref: " + refname)
       }
-      None => {
-        let head_id = @bitrepo.rev_parse(fs, git_dir, "HEAD")
-        guard head_id is Some(id) else {
-          raise @bitcore.GitError::InvalidObject("HEAD not found")
-        }
-        id
+      id
+    }
+    None => {
+      let head_id = @bitrepo.rev_parse(fs, git_dir, "HEAD")
+      guard head_id is Some(id) else {
+        raise @bitcore.GitError::InvalidObject("HEAD not found")
       }
-    }
-    let mut db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
-    if db.get(fs, commit_id) is None {
-      let pack = @bitnative.fetch_pack_http(remote_url, [commit_id], true)
-      let objects = @pack.parse_packfile(pack)
-      @pack.write_packfile_with_index(fs, git_dir, pack, objects)
-      db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
-    }
-    let tree_id = resolve_to_tree(db, fs, commit_id)
-    print_tree_entries(
-      db,
-      fs,
-      tree_id,
-      "",
-      recursive,
-      show_trees,
-      only_trees,
-      name_only,
-      false,
-      "",
-      [],
-      "",
-      normalized_filters,
-      None,
-      false,
-      false,
-      None,
-    )
-  } catch {
-    err => {
-      remove_dir_recursive(fs, temp_dir)
-      raise err
+      id
     }
   }
+  let mut db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  if db.get(fs, commit_id) is None {
+    let pack = @bitnative.fetch_pack_http(remote_url, [commit_id], true)
+    let objects = @pack.parse_packfile(pack)
+    @pack.write_packfile_with_index(fs, git_dir, pack, objects)
+    db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  }
+  let tree_id = resolve_to_tree(db, fs, commit_id)
+  print_tree_entries(
+    db,
+    fs,
+    tree_id,
+    "",
+    recursive,
+    show_trees,
+    only_trees,
+    name_only,
+    false,
+    "",
+    [],
+    "",
+    normalized_filters,
+    None,
+    false,
+    false,
+    None,
+  )
   remove_dir_recursive(fs, temp_dir)
 }
 

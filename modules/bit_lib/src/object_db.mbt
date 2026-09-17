@@ -3,7 +3,7 @@
 ///|
 #warnings("-deprecated")
 fn object_db_parse_int(value : StringView) -> Int raise {
-  @strconv.parse_int(value)
+  @string.parse_int(value)
 }
 
 ///|

@@ -1378,7 +1378,7 @@ pub async fn hub_push(
     None =>
       hub_push_git_http(rfs, git_dir, remote_url) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           if should_fallback_to_relay(err, remote_url) {
@@ -1490,7 +1490,7 @@ pub async fn hub_fetch(
         conflict_policy=effective_conflict_policy,
       ) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           if should_fallback_to_relay(err, remote_url) {

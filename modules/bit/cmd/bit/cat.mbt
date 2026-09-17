@@ -67,71 +67,65 @@ async fn handle_cat(args : Array[String]) -> Unit raise Error {
   }
   let path = @bitlib.normalize_repo_path(raw_path)
   let temp_dir = make_temp_dir(fs, "bit-cat")
-  try {
-    let _ = @bitnative.clone_http_to_fs(
-      remote_url,
-      true,
-      fs,
-      temp_dir,
-      fs,
-      depth=1,
-      filter=@protocol.FilterSpec::BlobNone,
-    )
-    let git_dir = temp_dir + "/.git"
-    let commit_id = match ref_spec {
-      Some(refname) => {
-        let resolved = resolve_remote_ref_id(remote_url, refname)
-        guard resolved is Some((id, _)) else {
-          raise @bitcore.GitError::InvalidObject("Unknown ref: " + refname)
-        }
-        id
+  errdefer remove_dir_recursive(fs, temp_dir)
+  let _ = @bitnative.clone_http_to_fs(
+    remote_url,
+    true,
+    fs,
+    temp_dir,
+    fs,
+    depth=1,
+    filter=@protocol.FilterSpec::BlobNone,
+  )
+  let git_dir = temp_dir + "/.git"
+  let commit_id = match ref_spec {
+    Some(refname) => {
+      let resolved = resolve_remote_ref_id(remote_url, refname)
+      guard resolved is Some((id, _)) else {
+        raise @bitcore.GitError::InvalidObject("Unknown ref: " + refname)
       }
-      None => {
-        let head_id = @bitrepo.rev_parse(fs, git_dir, "HEAD")
-        guard head_id is Some(id) else {
-          raise @bitcore.GitError::InvalidObject("HEAD not found")
-        }
-        id
+      id
+    }
+    None => {
+      let head_id = @bitrepo.rev_parse(fs, git_dir, "HEAD")
+      guard head_id is Some(id) else {
+        raise @bitcore.GitError::InvalidObject("HEAD not found")
       }
-    }
-    let mut db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
-    if db.get(fs, commit_id) is None {
-      let pack = @bitnative.fetch_pack_http(remote_url, [commit_id], true)
-      let objects = @pack.parse_packfile(pack)
-      @pack.write_packfile_with_index(fs, git_dir, pack, objects)
-      db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
-    }
-    let tree_id = resolve_to_tree(db, fs, commit_id)
-    let entry = @bitlib.find_tree_entry(db, fs, tree_id, path)
-    guard entry is Some(found) else {
-      raise @bitcore.GitError::InvalidObject("path not found: " + path)
-    }
-    let is_tree = found.mode == "40000" || found.mode == "040000"
-    let is_submodule = found.mode == "160000"
-    if is_tree {
-      raise @bitcore.GitError::InvalidObject("path is a tree: " + path)
-    }
-    if is_submodule {
-      raise @bitcore.GitError::InvalidObject("path is a submodule: " + path)
-    }
-    let mut obj = db.get(fs, found.id)
-    if obj is None {
-      let wants : Array[@bitcore.ObjectId] = [found.id]
-      let pack = @bitnative.fetch_pack_http(remote_url, wants, true)
-      let objects = @pack.parse_packfile(pack)
-      @pack.write_packfile_with_index(fs, git_dir, pack, objects)
-      let db2 = @bitlib.ObjectDb::load_lazy(fs, git_dir)
-      obj = db2.get(fs, found.id)
-    }
-    guard obj is Some(blob) else {
-      raise @bitcore.GitError::InvalidObject("blob not found: " + path)
-    }
-    @stdio.stdout.write(blob.data)
-  } catch {
-    err => {
-      remove_dir_recursive(fs, temp_dir)
-      raise err
+      id
     }
   }
+  let mut db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  if db.get(fs, commit_id) is None {
+    let pack = @bitnative.fetch_pack_http(remote_url, [commit_id], true)
+    let objects = @pack.parse_packfile(pack)
+    @pack.write_packfile_with_index(fs, git_dir, pack, objects)
+    db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  }
+  let tree_id = resolve_to_tree(db, fs, commit_id)
+  let entry = @bitlib.find_tree_entry(db, fs, tree_id, path)
+  guard entry is Some(found) else {
+    raise @bitcore.GitError::InvalidObject("path not found: " + path)
+  }
+  let is_tree = found.mode == "40000" || found.mode == "040000"
+  let is_submodule = found.mode == "160000"
+  if is_tree {
+    raise @bitcore.GitError::InvalidObject("path is a tree: " + path)
+  }
+  if is_submodule {
+    raise @bitcore.GitError::InvalidObject("path is a submodule: " + path)
+  }
+  let mut obj = db.get(fs, found.id)
+  if obj is None {
+    let wants : Array[@bitcore.ObjectId] = [found.id]
+    let pack = @bitnative.fetch_pack_http(remote_url, wants, true)
+    let objects = @pack.parse_packfile(pack)
+    @pack.write_packfile_with_index(fs, git_dir, pack, objects)
+    let db2 = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+    obj = db2.get(fs, found.id)
+  }
+  guard obj is Some(blob) else {
+    raise @bitcore.GitError::InvalidObject("blob not found: " + path)
+  }
+  @stdio.stdout.write(blob.data)
   remove_dir_recursive(fs, temp_dir)
 }

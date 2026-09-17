@@ -72,7 +72,6 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
     if fs.is_file(next_file) {
       let next = fs.read_file(next_file) |> decode_bytes |> trim_string
       let n = @string.parse_int(next) catch {
-        err if @async.is_cancellation_error(err) => raise err
         _ => 1
       }
       fs.write_string(next_file, (n + 1).to_string())
@@ -278,11 +277,9 @@ async fn apply_remaining_patches(
   let last_str = fs.read_file(am_dir + "/last") |> decode_bytes |> trim_string
   let next_str = fs.read_file(am_dir + "/next") |> decode_bytes |> trim_string
   let last = @string.parse_int(last_str) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => 0
   }
   let mut next = @string.parse_int(next_str) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => 1
   }
   while next <= last {

@@ -1144,11 +1144,10 @@ async fn commit_with_merge_heads(
 fn cleanup_merge_state_files(
   fs : &@bitcore.FileSystem,
   git_dir : String,
-) -> Unit raise Error {
+) -> Unit {
   let files = ["MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "SQUASH_MSG"]
   for file in files {
     fs.remove_file(git_dir + "/" + file) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
   }
@@ -1504,7 +1503,6 @@ fn commit_restore_index_backup(fs : OsFs, git_dir : String) -> Unit raise Error 
     let data = (fs : &@bitcore.RepoFileSystem).read_file(backup_path)
     (fs : &@bitcore.FileSystem).write_file(index_path, data)
     (fs : &@bitcore.FileSystem).remove_file(backup_path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
   }

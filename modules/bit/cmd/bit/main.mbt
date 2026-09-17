@@ -845,7 +845,7 @@ async fn run_main_for_args(args : Array[String]) -> Unit {
   )
   dispatch_command(dispatch_cmd, dispatch_rest) catch {
     err => {
-      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+      if @async.is_being_cancelled() {
         raise err
       }
       exit_with_error("dispatch", err)
@@ -1245,7 +1245,7 @@ async fn dispatch_command(
   }
   dispatch_known_command(normalized_cmd, rest) catch {
     err => {
-      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+      if @async.is_being_cancelled() {
         raise err
       }
       exit_with_error(command_error_name(normalized_cmd), err)

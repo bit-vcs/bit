@@ -1267,7 +1267,6 @@ fn rev_list_is_long_numeric_option(arg : String) -> Bool {
 ///|
 async fn rev_list_parse_int_or_die(value : String) -> Int raise Error {
   @string.parse_int(value) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => {
       eprint_line("fatal: not an integer: " + value)
       @sys.exit(128)

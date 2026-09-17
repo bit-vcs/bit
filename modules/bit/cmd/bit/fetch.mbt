@@ -192,7 +192,7 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
     if arg == "--depth" && i + 1 < args.length() {
       depth = @string.parse_int(args[i + 1]) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           0
@@ -205,7 +205,7 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
       let depth_str = String::unsafe_substring(arg, start=8, end=arg.length())
       depth = @string.parse_int(depth_str) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           0

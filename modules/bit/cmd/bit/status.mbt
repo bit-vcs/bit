@@ -115,7 +115,6 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
   if porcelain || short {
     if show_branch {
       let head = @bitlib.read_head_ref(fs, git_dir) catch {
-        err if @async.is_cancellation_error(err) => raise err
         _ => return ()
       }
       match head {

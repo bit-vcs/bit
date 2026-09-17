@@ -1179,7 +1179,7 @@ async fn handle_hub_serve(args : Array[String]) -> Unit raise Error {
       session_token~,
     ) catch {
       err => {
-        if @async.is_cancellation_error(err) {
+        if @async.is_being_cancelled() {
           break
         }
         eprint_line("Poll error: \{err}, retrying...")
@@ -1232,7 +1232,7 @@ async fn handle_hub_serve(args : Array[String]) -> Unit raise Error {
         incoming_refs~,
       ) catch {
         err => {
-          if @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             break
           }
           eprint_line("Respond error: \{err}")

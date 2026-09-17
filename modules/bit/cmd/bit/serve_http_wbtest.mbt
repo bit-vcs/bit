@@ -39,9 +39,18 @@ fn resolved(root : String, repo : String) -> String {
 
 ///|
 test "serve --http: a repository resolves under the root" {
-  @test.assert_eq(resolved("/srv/git", "/acme/app.git"), "/srv/git/acme/app")
+  // The path is used as it arrives: a bare repository is the directory
+  // `<name>.git`, so stripping the suffix would make the normal server
+  // layout unreachable. `bit upload-pack` reads a `.git` suffix the same
+  // way. Only a trailing `/.git` — a working copy's git directory — folds
+  // to the work tree that holds it.
+  @test.assert_eq(
+    resolved("/srv/git", "/acme/app.git"),
+    "/srv/git/acme/app.git",
+  )
   @test.assert_eq(resolved("/srv/git/", "/acme/app"), "/srv/git/acme/app")
-  @test.assert_eq(resolved(".", "/app.git"), "./app")
+  @test.assert_eq(resolved(".", "/app.git"), "./app.git")
+  @test.assert_eq(resolved("/srv/git", "/acme/app/.git"), "/srv/git/acme/app")
 }
 
 ///|

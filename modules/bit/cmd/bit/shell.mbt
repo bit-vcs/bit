@@ -102,17 +102,14 @@ async fn shell_run_service_command(command_line : String) -> Unit raise Error {
       match service {
         "git-upload-pack" =>
           handle_upload_pack([path]) catch {
-            err if @async.is_cancellation_error(err) => raise err
             err => exit_with_error("upload-pack", err)
           }
         "git-receive-pack" =>
           handle_receive_pack([path]) catch {
-            err if @async.is_cancellation_error(err) => raise err
             err => exit_with_error("receive-pack", err)
           }
         "git-upload-archive" =>
           handle_upload_archive([path]) catch {
-            err if @async.is_cancellation_error(err) => raise err
             err => exit_with_error("upload-archive", err)
           }
         _ => {

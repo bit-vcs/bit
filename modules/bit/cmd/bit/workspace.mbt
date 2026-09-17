@@ -63,10 +63,6 @@ async fn run_workspace_repo_command(
   let mut code = 0
   let mut message = ""
   run_workspace_repo_command_inner(cmd, rest) catch {
-    err if @async.is_cancellation_error(err) => {
-      restore_run_git_env(snapshot)
-      raise err
-    }
     err => {
       code = 1
       message = err.to_string()

@@ -186,6 +186,10 @@ jobs:
       - name: Build native binary for wbtests
         run: |
           set -euo pipefail
+          # moonc 0.10.13's link-core pass overflows the default 8 MiB stack
+          # on cmd/bit's debug build (ICE: "Stack overflow"); the release
+          # build is unaffected. Lift the limit for this process tree.
+          ulimit -s unlimited
           moon --version
           moon build --target native modules/bit
           bin_path=$(find _build/native -maxdepth 8 -type f -name 'bit.exe' | head -1)
@@ -209,6 +213,7 @@ jobs:
         timeout-minutes: ${{ matrix.timeout }}
         run: |
           set -euo pipefail
+          ulimit -s unlimited # see "Build native binary for wbtests"
           if [ "${{ matrix.kind }}" = "pkg" ]; then
             moon test --target native -p ${{ matrix.sel }}
           else

@@ -116,7 +116,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
       "--depth" if i + 1 < args.length() => {
         depth = @string.parse_int(args[i + 1]) catch {
           err => {
-            if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+            if @async.is_being_cancelled() {
               raise err
             }
             0
@@ -128,7 +128,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
         let depth_str = String::unsafe_substring(arg, start=8, end=arg.length())
         depth = @string.parse_int(depth_str) catch {
           err => {
-            if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+            if @async.is_being_cancelled() {
               raise err
             }
             0
@@ -203,7 +203,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
   let parent = get_parent_dir(local_path)
   fs.mkdir_p(parent) catch {
     err => {
-      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+      if @async.is_being_cancelled() {
         raise err
       }
       ()

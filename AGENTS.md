@@ -24,3 +24,8 @@ toolchain to the latest release when it is older than that, so Claude Code web
 sessions get a working native backend automatically. `moon build --target
 native --release` (the `bit.exe` binary) already uses `cc`, so it is
 unaffected.
+
+On toolchain `0.10.13` the debug build of `modules/bit` (`moon build --target
+native modules/bit`, and `moon test` on `cmd/bit`) makes moonc's link-core pass
+overflow the default 8 MiB stack and abort with an ICE (`Error: Stack
+overflow`). Run `ulimit -s unlimited` first; the release build is unaffected.

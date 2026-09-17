@@ -598,7 +598,7 @@ async fn scalar_handle_delete(
   } else if fs.is_file(target) {
     fs.remove_file(target) catch {
       err => {
-        if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        if @async.is_being_cancelled() {
           raise err
         }
         ()
@@ -682,7 +682,7 @@ async fn scalar_handle_clone(
   if parsed.src {
     fs.mkdir_p(enlistment) catch {
       err => {
-        if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        if @async.is_being_cancelled() {
           raise err
         }
         ()
@@ -838,7 +838,7 @@ async fn handle_scalar(args : Array[String]) -> Unit raise Error {
     "register" =>
       scalar_handle_register(fs, cwd, subargs) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           scalar_die(1, err.to_string())
@@ -850,7 +850,7 @@ async fn handle_scalar(args : Array[String]) -> Unit raise Error {
     "reconfigure" =>
       scalar_handle_reconfigure(fs, cwd, subargs) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           scalar_die(1, err.to_string())
@@ -861,7 +861,7 @@ async fn handle_scalar(args : Array[String]) -> Unit raise Error {
     "diagnose" =>
       scalar_handle_diagnose(fs, cwd, subargs) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           scalar_die(1, err.to_string())

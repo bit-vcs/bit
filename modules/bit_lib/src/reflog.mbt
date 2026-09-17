@@ -3,7 +3,7 @@
 ///|
 #warnings("-deprecated")
 fn reflog_parse_int64(value : StringView) -> Int64 raise {
-  @strconv.parse_int64(value)
+  @string.parse_int64(value)
 }
 
 ///|

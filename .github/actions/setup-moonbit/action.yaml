@@ -5,9 +5,10 @@ inputs:
   version:
     description: MoonBit toolchain version
     required: false
-    # v0.10.7 ICEs while compiling moonbitlang/x@0.4.43. Keep CI on the
-    # last verified compiler until an upstream release fixes that regression.
-    default: "0.10.6+80dc50f24"
+    # Keep this on the toolchain the workspace is verified against: the
+    # dependency pins in modules/*/moon.mod (moonbitlang/async 0.22,
+    # moonbitlang/x 0.5, bobzhang/toml 0.4) need the 2026-09 compiler.
+    default: "0.10.13+cbb11c36f"
 
 runs:
   using: composite

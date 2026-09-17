@@ -15,7 +15,7 @@
       "default": "./lib.js"
     },
     "./bit.js": "./bit.js",
-    "./bit.cjs": "./bit.cjs",
+    "./bit.mjs": "./bit.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -27,7 +27,7 @@
   "files": [
     "bin/",
     "bit.js",
-    "bit.cjs",
+    "bit.mjs",
     "lib.js",
     "lib.d.ts",
     "lib.raw.js",

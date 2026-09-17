@@ -280,11 +280,10 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
 fn checkout_cleanup_merge_state_files(
   fs : &@bitcore.FileSystem,
   git_dir : String,
-) -> Unit raise Error {
+) -> Unit {
   let files = ["MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "SQUASH_MSG"]
   for file in files {
     fs.remove_file(git_dir + "/" + file) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
   }
@@ -677,7 +676,6 @@ async fn checkout_with_promisor_retry(
       @bitlib.sparse_checkout_reapply(fs, fs, root)
     }
     @bitlibnative.apply_worktree_modes_from_commit(fs, fs, root, git_dir, id) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     return id

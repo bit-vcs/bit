@@ -48,7 +48,7 @@ version.ts
 xxxx
 .bench-baseline
 .local
-npm/bit.cjs
+npm/bit.mjs
 npm/lib.raw.js
 /result
 apps/

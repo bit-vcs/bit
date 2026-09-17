@@ -107,7 +107,6 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
       }
     }
   } catch {
-    err if @async.is_cancellation_error(err) => raise err
     err => upload_pack_fail(err, protocol_version, advertise)
   }
 }

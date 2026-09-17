@@ -842,7 +842,6 @@ async fn notes_prune(
     let (hex, id) = pair
     let ref_id = @bitcore.ObjectId::from_hex(hex)
     let ref_obj = db.get(rfs, ref_id) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => None
     }
     match ref_obj {

@@ -3,7 +3,7 @@ name = "mizchi/bit_hash"
 version = "0.46.4"
 
 import {
-  "mizchi/simd@0.4.1",
+  "mizchi/simd@0.6.1",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"

@@ -221,7 +221,7 @@ async fn run_git_command(
   let snapshot = enter_run_git_env(invocation.cwd, invocation.git_dir)
   let code = run_git_internal_command(invocation.cmd, invocation.rest) catch {
     err => {
-      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+      if @async.is_being_cancelled() {
         restore_run_git_env(snapshot)
         raise err
       }

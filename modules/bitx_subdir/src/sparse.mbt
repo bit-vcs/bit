@@ -158,13 +158,9 @@ pub fn set_module_sparse_patterns(
 ) -> Unit raise SubdirError {
   // sparse checkout が初期化されていなければ初期化
   if !is_module_sparse_enabled(rfs, git_dir, subdir_path) {
-    init_module_sparse(fs, rfs, git_dir, subdir_path) catch {
-      e => raise e
-    }
+    init_module_sparse(fs, rfs, git_dir, subdir_path)
   }
-  write_module_sparse_patterns(fs, git_dir, subdir_path, patterns) catch {
-    e => raise e
-  }
+  write_module_sparse_patterns(fs, git_dir, subdir_path, patterns)
 }
 
 ///|
@@ -178,9 +174,7 @@ pub fn add_module_sparse_patterns(
 ) -> Unit raise SubdirError {
   // sparse checkout が初期化されていなければ初期化
   if !is_module_sparse_enabled(rfs, git_dir, subdir_path) {
-    init_module_sparse(fs, rfs, git_dir, subdir_path) catch {
-      e => raise e
-    }
+    init_module_sparse(fs, rfs, git_dir, subdir_path)
   }
   let existing = read_module_sparse_patterns(rfs, git_dir, subdir_path)
   for p in new_patterns {
@@ -188,9 +182,7 @@ pub fn add_module_sparse_patterns(
       existing.push(p)
     }
   }
-  write_module_sparse_patterns(fs, git_dir, subdir_path, existing) catch {
-    e => raise e
-  }
+  write_module_sparse_patterns(fs, git_dir, subdir_path, existing)
 }
 
 ///|

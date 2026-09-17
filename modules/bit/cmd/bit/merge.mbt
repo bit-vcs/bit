@@ -290,15 +290,12 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         |> trim_string
       ignore(@bitlib.reset(wfs, rfs, root, orig_hex, @bitlib.ResetMode::Hard))
       wfs.remove_file(orig_head_path) catch {
-        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
       wfs.remove_file(merge_head_path) catch {
-        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
       wfs.remove_file(git_dir + "/MERGE_MSG") catch {
-        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
       if !quiet {
@@ -367,15 +364,12 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
     // Clean up merge state
     wfs.remove_file(merge_head_path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(merge_msg_path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(git_dir + "/ORIG_HEAD") catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     if !quiet {
@@ -390,9 +384,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   // Check if subdir-clone and handle specially
   match get_subdir_info(fs, git_dir) {
     Some((_, subdir_path, _)) => {
-      handle_subdir_merge(fs, root, git_dir, refspec, subdir_path, message) catch {
-        err => raise err
-      }
+      handle_subdir_merge(fs, root, git_dir, refspec, subdir_path, message)
       return
     }
     None => ()

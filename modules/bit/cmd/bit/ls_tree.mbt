@@ -269,7 +269,6 @@ async fn print_tree_entries(
         // entry.id is the commit SHA in the submodule
         // Resolve it to a tree
         let sub_tree_id = resolve_to_tree(sub_db, fs, entry.id) catch {
-          err if @async.is_cancellation_error(err) => raise err
           _ => continue // Skip if can't resolve submodule tree
         }
         // Recursively print submodule tree entries

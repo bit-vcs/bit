@@ -142,13 +142,9 @@ async fn gh_collect_output(
     err => raise @bitcore.GitError::IoError("gh failed: \{err}")
   }
   let out = stdout.text() catch {
-    err if @async.is_cancellation_error(err) =>
-      raise @bitcore.GitError::IoError(err.to_string())
     _ => ""
   }
   let err_text = stderr.text() catch {
-    err if @async.is_cancellation_error(err) =>
-      raise @bitcore.GitError::IoError(err.to_string())
     _ => ""
   }
   if code != 0 {

@@ -1040,7 +1040,7 @@ async fn handle_submodule_add(
     fs, fs, sub_path, active_sub_git_dir, target_id,
   ) catch {
     err => {
-      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+      if @async.is_being_cancelled() {
         raise err
       }
       eprint_line(
@@ -2075,7 +2075,7 @@ async fn handle_submodule_status(
     let sub_git_dir = @bitlib.resolve_gitdir(rfs, sub_git)
     let head_id = @bitlib.resolve_head_commit(rfs, sub_git_dir) catch {
       err => {
-        if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        if @async.is_being_cancelled() {
           raise err
         }
         print_line(
@@ -2258,7 +2258,7 @@ async fn handle_submodule_update(
     let _gitfile_content = decode_bytes(
       rfs.read_file(gitfile) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           Default::default()
@@ -2490,7 +2490,7 @@ async fn handle_submodule_update(
         fs, fs, sub_path, sub_git_dir, target_id,
       ) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           eprint_line(
@@ -2960,8 +2960,7 @@ async fn handle_submodule_deinit(
         Some(actual_sub_git_dir) if rfs.is_dir(actual_sub_git_dir) => {
           let status = @bitlib.status(rfs, sub_path) catch {
             err => {
-              if @async.is_being_cancelled() ||
-                @async.is_cancellation_error(err) {
+              if @async.is_being_cancelled() {
                 raise err
               }
               @stdio.stderr.write(
@@ -3012,7 +3011,7 @@ async fn handle_submodule_deinit(
     if rfs.is_dir(sub_path) {
       let entries = rfs.readdir(sub_path) catch {
         err => {
-          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          if @async.is_being_cancelled() {
             raise err
           }
           continue
@@ -3029,8 +3028,7 @@ async fn handle_submodule_deinit(
         } else {
           wfs.remove_file(full) catch {
             err => {
-              if @async.is_being_cancelled() ||
-                @async.is_cancellation_error(err) {
+              if @async.is_being_cancelled() {
                 raise err
               }
               ()
@@ -3516,7 +3514,7 @@ async fn handle_submodule_foreach(
     let sub_git_dir = @bitlib.resolve_gitdir(rfs, sub_git)
     let head_id = @bitlib.resolve_head_commit(rfs, sub_git_dir) catch {
       err => {
-        if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        if @async.is_being_cancelled() {
           raise err
         }
         continue

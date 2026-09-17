@@ -152,7 +152,6 @@ async fn bisect_mark(
   }
   let log_entry = "# \{mark_type}: [\{commit_hex}] \{commit_msg}\ngit bisect \{mark_type} \{commit_hex}\n"
   let existing_log = decode_bytes(rfs.read_file(bisect_log_path)) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => ""
   }
   wfs.write_string(bisect_log_path, existing_log + log_entry)
@@ -185,7 +184,6 @@ async fn bisect_skip(
   wfs.write_string(bisect_refs_dir + "/skip-" + commit_hex, commit_hex + "\n")
   let log_entry = "git bisect skip \{commit_hex}\n"
   let existing_log = decode_bytes(rfs.read_file(bisect_log_path)) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => ""
   }
   wfs.write_string(bisect_log_path, existing_log + log_entry)
@@ -210,7 +208,6 @@ fn bisect_compute_next(
   let good_commits : Array[@bitcore.ObjectId] = []
   let skip_commits : Array[@bitcore.ObjectId] = []
   let bisect_entries = (rfs : &@bitcore.RepoFileSystem).readdir(bisect_refs_dir) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => []
   }
   for entry in bisect_entries {
@@ -392,7 +389,6 @@ async fn bisect_verify_good(
   let bisect_refs_dir = git_dir + "/refs/bisect"
   // Find a good commit
   let bisect_entries = (rfs : &@bitcore.RepoFileSystem).readdir(bisect_refs_dir) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => []
   }
   let mut good_hex : String? = None
@@ -516,7 +512,6 @@ async fn bisect_visualize(
   // Collect good commits for --not
   let good_hexes : Array[String] = []
   let bisect_entries = (rfs : &@bitcore.RepoFileSystem).readdir(bisect_refs_dir) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => []
   }
   for entry in bisect_entries {
@@ -617,22 +612,18 @@ async fn bisect_reset(
   ]
   for path in cleanup_files {
     wfs.remove_file(path) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
   }
   let entries = (rfs : &@bitcore.RepoFileSystem).readdir(bisect_refs_dir) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => []
   }
   for entry in entries {
     wfs.remove_file(bisect_refs_dir + "/" + entry) catch {
-      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
   }
   wfs.remove_file(bisect_refs_dir) catch {
-    err if @async.is_cancellation_error(err) => raise err
     _ => ()
   }
   eprint_line("Bisect reset")

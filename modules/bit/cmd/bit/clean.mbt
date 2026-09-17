@@ -93,13 +93,11 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
       if fs.is_dir(abs_dir) {
         let rfs : &@bitcore.RepoFileSystem = fs
         let entries = rfs.readdir(abs_dir) catch {
-          err if @async.is_cancellation_error(err) => raise err
           _ => continue
         }
         if entries.length() == 0 {
           let wfs : &@bitcore.FileSystem = fs
           wfs.remove_dir(abs_dir) catch {
-            err if @async.is_cancellation_error(err) => raise err
             _ => ()
           }
           if !quiet {
