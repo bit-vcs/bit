@@ -1,6 +1,9 @@
 ///|
 fn cleanup_tree(fs : OsFs, path : String) -> Unit {
-  if fs.is_dir(path) {
+  // Qualified rather than promoted through `extend`: no non-test caller
+  // reaches `is_dir` on a concrete `OsFs`, so promoting it here would only
+  // read as an unused function in the package proper.
+  if @bitcore.RepoFileSystem::is_dir(fs, path) {
     @bitlib.remove_tree(fs, fs, path)
   }
 }
