@@ -1688,7 +1688,11 @@ async fn grep_print_only_matching(
 ) -> Unit {
   for item in file_match.matches {
     let mut rest = item.line
-    let mut column = item.column
+    // Offset of `rest` within the line. Every match reports its own column
+    // counted from the start of the line, the way git's grep does
+    // (`cno = bol - start + match.rm_so + 1`): adding up the ends of the
+    // preceding matches instead double-counts the gap in front of each one.
+    let mut consumed = 0
     while rest != "" {
       let next = @bitgrep.grep_eval_expr(
         rest,
@@ -1709,7 +1713,7 @@ async fn grep_print_only_matching(
       let prefix = grep_build_prefix(
         file_path,
         item.line_number,
-        column,
+        consumed + span.start_column,
         show_line_numbers,
         show_column,
         show_heading,
@@ -1717,10 +1721,10 @@ async fn grep_print_only_matching(
         color_spec,
       )
       print_line(prefix + grep_color_wrap(matched, color_spec.match_selected))
-      column += span.end_column
       if span.end_column >= rest.length() {
         break
       }
+      consumed += span.end_column
       rest = String::unsafe_substring(
         rest,
         start=span.end_column,

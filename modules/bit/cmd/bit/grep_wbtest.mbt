@@ -665,16 +665,22 @@ async fn grep_wbtest_case_only_matching_with_column() -> Unit raise Error {
   let stdout = grep_test_git_stdout(repo_dir, [
     "grep", "--column", "-n", "-o", "-e", "mmap", "HEAD",
   ])
+  // Every match reports its own column counted from the start of the line.
+  // Git releases before "grep: fix --column --only-match for 2nd and later
+  // matches" (René Scharfe, 2026-04) summed the ends of the preceding
+  // matches instead, which double-counted the gap in front of each one and
+  // printed 13 for the second match below. The fix is in git 2.55, which
+  // `third_party/git` pins.
   @test.assert_eq(
     grep_trim_trailing_newline(stdout),
     "HEAD:file:1:5:mmap\n" +
     "HEAD:file:2:5:mmap\n" +
     "HEAD:file:3:5:mmap\n" +
-    "HEAD:file:3:13:mmap\n" +
+    "HEAD:file:3:14:mmap\n" +
     "HEAD:file:4:5:mmap\n" +
-    "HEAD:file:4:13:mmap\n" +
+    "HEAD:file:4:14:mmap\n" +
     "HEAD:file:5:5:mmap\n" +
-    "HEAD:file:5:13:mmap",
+    "HEAD:file:5:14:mmap",
   )
 
   cleanup_tree(fs, root)
