@@ -241,7 +241,9 @@ extern "js" fn js_exports_register_clone_fixture_transport(
   #| }
 
 ///|
-extern "js" fn js_exports_transport_calls(transport_id : Int) -> Array[String] =
+extern "js" fn js_exports_transport_calls(
+  transport_id : Int,
+) -> FixedArray[String] =
   #| (transportId) => {
   #|   const state = globalThis.__bitGitJsTransportState ??= { nextTransportId: 1, transports: new Map() };
   #|   const transport = state.transports.get(transportId);
