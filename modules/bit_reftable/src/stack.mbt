@@ -19,7 +19,7 @@ pub fn read_tables_list(
 ///|
 fn split_lines(s : String) -> Array[String] {
   let lines : Array[String] = []
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i = 0; i < s.length(); i = i + 1 {
     let ch = s[i].to_int()
     if ch == 0x0a {

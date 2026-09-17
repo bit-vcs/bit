@@ -2384,7 +2384,7 @@ fn for_each_ref_quote(value : String, style : String) -> String {
   }
   match style {
     "shell" => {
-      let buf = StringBuilder::new()
+      let buf = StringBuilder()
       buf.write_char('\'')
       for c in value {
         if c == '\'' {
@@ -2397,7 +2397,7 @@ fn for_each_ref_quote(value : String, style : String) -> String {
       buf.to_string()
     }
     "perl" => {
-      let buf = StringBuilder::new()
+      let buf = StringBuilder()
       buf.write_char('\'')
       for c in value {
         if c == '\'' || c == '\\' {
@@ -2409,7 +2409,7 @@ fn for_each_ref_quote(value : String, style : String) -> String {
       buf.to_string()
     }
     "python" => {
-      let buf = StringBuilder::new()
+      let buf = StringBuilder()
       buf.write_char('\'')
       for c in value {
         if c == '\n' {
@@ -2425,7 +2425,7 @@ fn for_each_ref_quote(value : String, style : String) -> String {
       buf.to_string()
     }
     "tcl" => {
-      let buf = StringBuilder::new()
+      let buf = StringBuilder()
       buf.write_char('"')
       for c in value {
         if c == '"' ||
@@ -4286,7 +4286,7 @@ async fn for_each_ref_commit_atom(
     "subject" => subject
     "subject:sanitize" => {
       // Replace runs of non-filename-safe chars with a single '-', like git does
-      let sb = StringBuilder::new()
+      let sb = StringBuilder()
       let mut last_was_dash = false
       for c in subject {
         let code = c.to_int()
@@ -4633,7 +4633,7 @@ fn for_each_ref_decode_hex_escapes(s : String) -> String {
   // Decode %xNN hex escapes
   let chars = s.to_array()
   let len = chars.length()
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let mut i = 0
   while i < len {
     if i + 3 < len && chars[i] == '%' && chars[i + 1] == 'x' {
@@ -4667,7 +4667,7 @@ fn for_each_ref_hex_digit(c : Char) -> Int {
 ///|
 fn for_each_ref_unfold_trailer_value(value : String) -> String {
   // Replace newline+whitespace with single space
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let chars = value.to_array()
   let len = chars.length()
   let mut i = 0
@@ -4873,7 +4873,7 @@ fn format_timestamp_strftime(ts : Int64, tz : String, fmt : String) -> String {
     "January", "February", "March", "April", "May", "June", "July", "August", "September",
     "October", "November", "December",
   ]
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let chars = fmt.to_array()
   let len = chars.length()
   let mut i = 0

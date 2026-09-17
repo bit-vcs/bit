@@ -263,7 +263,7 @@ fn sparse_checkout_unquote_c_style(text : String) -> String {
     start=1,
     end=trimmed.length() - 1,
   )
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let mut escape = false
   for c in inner {
     if escape {
@@ -354,7 +354,7 @@ fn sparse_checkout_split_check_rules_input(
 ) -> Array[(String, String)] {
   let entries : Array[(String, String)] = []
   if nul_terminated {
-    let buf = StringBuilder::new()
+    let buf = StringBuilder()
     for c in input {
       if c == '\u{0}' {
         let raw = buf.to_string()
@@ -388,7 +388,7 @@ fn sparse_checkout_filter_check_rules_input(
   patterns : Array[String],
   nul_terminated : Bool,
 ) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for entry in sparse_checkout_split_check_rules_input(input, nul_terminated) {
     let raw = entry.0
     let path = entry.1

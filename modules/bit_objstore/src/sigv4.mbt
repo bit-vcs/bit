@@ -43,7 +43,7 @@ const S3_SERVICE : String = "s3"
 /// separators while a query value does not.
 pub fn uri_encode(value : String, encode_slash : Bool) -> String {
   let digits = "0123456789ABCDEF"
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for byte in @utf8.encode(value) {
     let b = byte.to_int()
     let is_unreserved = (b >= 0x41 && b <= 0x5a) ||
@@ -96,7 +96,7 @@ pub fn endpoint_host(endpoint : String) -> String raise @bit.GitError {
 
 ///|
 fn lowercase(s : String) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for c in s {
     let code = c.to_int()
     if code >= 0x41 && code <= 0x5a {
@@ -137,7 +137,7 @@ fn canonical_query(query : Array[(String, String)]) -> String {
       lex_compare(a.0, b.0)
     }
   })
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for i in 0..<pairs.length() {
     if i > 0 {
       out.write_char('&')
@@ -188,8 +188,8 @@ fn canonical_request_of(
     names.push(name)
   }
   names.sort_by((a, b) => lex_compare(a, b))
-  let canonical_headers = StringBuilder::new()
-  let signed_headers = StringBuilder::new()
+  let canonical_headers = StringBuilder()
+  let signed_headers = StringBuilder()
   for i in 0..<names.length() {
     if i > 0 {
       signed_headers.write_char(';')

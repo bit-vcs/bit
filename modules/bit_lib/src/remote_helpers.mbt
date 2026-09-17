@@ -147,7 +147,7 @@ pub fn format_remove_warning(branches : Array[String]) -> String {
 ///|
 pub fn split_whitespace_all(s : String) -> Array[String] {
   let result : Array[String] = []
-  let current = StringBuilder::new()
+  let current = StringBuilder()
   let mut in_word = false
   for c in s {
     if c == ' ' || c == '\t' || c == '\n' || c == '\r' {

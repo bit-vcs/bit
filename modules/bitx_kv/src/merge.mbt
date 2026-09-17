@@ -298,7 +298,7 @@ fn Kv::create_merge_commit(
   let snap_info = @bit.parse_commit(obj.data)
   // Create proper merge commit with two parents
   let author = self.node_id.id + " <" + self.node_id.id + ">"
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("tree ")
   sb.write_string(snap_info.tree.to_hex())
   sb.write_char('\n')

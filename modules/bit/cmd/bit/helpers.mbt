@@ -1084,7 +1084,7 @@ fn quote_origin_path(path : String) -> String {
   if !needs_quote {
     return path
   }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_char('"')
   for ch in path {
     if ch == '"' || ch == '\\' {

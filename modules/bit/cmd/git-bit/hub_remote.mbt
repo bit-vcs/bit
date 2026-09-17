@@ -54,7 +54,7 @@ fn hub_remotes_path(git_dir : String) -> String {
 ///|
 /// Serialize alias entries to TSV format: "name\tpath\n" per line.
 fn serialize_alias_entries(entries : Array[(String, String)]) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for entry in entries {
     let (name, path) = entry
     buf.write_string(name)

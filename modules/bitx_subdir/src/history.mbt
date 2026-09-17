@@ -51,7 +51,7 @@ fn parse_commit_metadata(data : Bytes) -> (String, String, Int64) {
 ///|
 /// Bytes を String に変換（ローカルヘルパー）
 fn bytes_to_string_local(data : Bytes) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for b in data {
     result.write_char(b.to_int().unsafe_to_char())
   }
@@ -62,7 +62,7 @@ fn bytes_to_string_local(data : Bytes) -> String {
 /// 文字列を行に分割
 fn split_lines(text : String) -> Array[String] {
   let lines : Array[String] = []
-  let current = StringBuilder::new()
+  let current = StringBuilder()
   for c in text {
     if c == '\n' {
       lines.push(current.to_string())
@@ -87,7 +87,7 @@ fn skip_prefix(s : String, n : Int) -> String {
   if n >= chars.length() {
     return ""
   }
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i in n..<chars.length() {
     result.write_char(chars[i])
   }
@@ -113,7 +113,7 @@ fn extract_timestamp_from_author(author : String) -> Int64 {
     return 0L
   }
   // タイムスタンプを読む
-  let ts = StringBuilder::new()
+  let ts = StringBuilder()
   i = timestamp_start
   while i < chars.length() && chars[i] >= '0' && chars[i] <= '9' {
     ts.write_char(chars[i])
@@ -250,13 +250,13 @@ fn split_subdir_path(path : String) -> Array[String] {
     return []
   }
   let parts : Array[String] = []
-  let mut current = StringBuilder::new()
+  let mut current = StringBuilder()
   for c in path {
     if c == '/' {
       let s = current.to_string()
       if s.length() > 0 {
         parts.push(s)
-        current = StringBuilder::new()
+        current = StringBuilder()
       }
     } else {
       current.write_char(c)

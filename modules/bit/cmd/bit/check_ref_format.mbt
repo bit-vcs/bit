@@ -132,7 +132,7 @@ fn check_ref_format_valid(
 ///|
 fn check_ref_format_normalize(refname : String) -> String {
   // Collapse consecutive slashes (shouldn't exist if valid, but just in case)
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   let chars = refname.to_array()
   let mut prev_slash = false
   for c in chars {

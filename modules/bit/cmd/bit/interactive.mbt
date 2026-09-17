@@ -131,7 +131,7 @@ async fn default_rebase_todo_editor(todo_path : String) -> Bool raise Error {
 
 ///|
 fn commit_edit_buffer_template(initial_message : String?) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   match initial_message {
     Some(msg) => {
       sb.write_string(msg)
@@ -169,7 +169,7 @@ fn normalize_commit_edit_buffer(content : String) -> String? {
   while end >= start && kept[end].trim().to_owned().length() == 0 {
     end -= 1
   }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for i = start; i <= end; i = i + 1 {
     if i > start {
       sb.write_string("\n")

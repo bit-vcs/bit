@@ -71,7 +71,7 @@ fn fmt_merge_msg_format(
       None => ""
     }
   }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   // Prepend custom message if given
   match custom_message {
     Some(msg) => {

@@ -383,7 +383,7 @@ fn test_hex_digit(n : Int) -> Char {
 ///|
 /// Convert packfile to compact hex string (no spaces)
 fn to_hex_string(data : Bytes) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i = 0; i < data.length(); i = i + 1 {
     let b = data[i].to_int()
     let hi = b >> 4

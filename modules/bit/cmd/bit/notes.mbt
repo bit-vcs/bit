@@ -979,13 +979,13 @@ fn merge_notes_cat_sort_uniq(ours : String, theirs : String) -> String {
 ///|
 fn split_whitespace_tokens(line : String) -> Array[String] {
   let tokens : Array[String] = []
-  let mut current = StringBuilder::new()
+  let mut current = StringBuilder()
   let mut in_token = false
   for c in line {
     if c == ' ' || c == '\t' {
       if in_token {
         tokens.push(current.to_string())
-        current = StringBuilder::new()
+        current = StringBuilder()
         in_token = false
       }
     } else {

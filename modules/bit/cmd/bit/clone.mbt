@@ -1317,13 +1317,13 @@ fn clone_caps_contain_token(caps : Array[String], token : String) -> Bool {
 ///|
 fn clone_split_words(input : String) -> Array[String] {
   let words : Array[String] = []
-  let mut current = StringBuilder::new()
+  let mut current = StringBuilder()
   for ch in input {
     if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
       let s = current.to_string()
       if s.length() > 0 {
         words.push(s)
-        current = StringBuilder::new()
+        current = StringBuilder()
       }
     } else {
       current.write_char(ch)

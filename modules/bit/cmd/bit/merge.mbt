@@ -746,7 +746,7 @@ async fn handle_octopus_merge(
   let msg = match message {
     Some(m) => m
     None => {
-      let buf = StringBuilder::new()
+      let buf = StringBuilder()
       buf.write_string("Merge")
       for i = 0; i < labels.length(); i = i + 1 {
         if i == 0 {
@@ -830,7 +830,7 @@ fn truncate_and_append_reflog(
     }
   }
   // Keep only the first keep_count lines (entries before octopus merge started)
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i = 0; i < keep_count && i < lines.length(); i = i + 1 {
     buf.write_string(lines[i])
     buf.write_string("\n")

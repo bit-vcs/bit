@@ -781,7 +781,7 @@ fn normalize_add_path(path : String) -> String {
   while out.length() > 1 && out.has_suffix("/") {
     out = String::unsafe_substring(out, start=0, end=out.length() - 1)
   }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut i = 0
   while i < out.length() {
     let c = out[i].unsafe_to_char()

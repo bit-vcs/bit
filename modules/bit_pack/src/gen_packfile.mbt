@@ -36,7 +36,7 @@ pub fn generate_commit_packfile() -> (@bit.ObjectId, Bytes) {
 ///|
 /// Print packfile as hex dump for debugging
 pub fn hex_dump(data : Bytes) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i = 0; i < data.length(); i = i + 1 {
     if i > 0 && i % 16 == 0 {
       result.write_char('\n')

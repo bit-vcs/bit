@@ -109,7 +109,7 @@ fn parse_commit_details(content : Bytes) -> (String, Int64, String) {
   let mut author = ""
   let mut timestamp = 0L
   let mut in_message = false
-  let message_buf = StringBuilder::new()
+  let message_buf = StringBuilder()
   for line_view in text.split("\n") {
     let line = line_view.to_owned()
     if in_message {

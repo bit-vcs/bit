@@ -110,7 +110,7 @@ pub fn commit_apply_signoff(msg : String, committer~ : String) -> String {
   } else {
     true
   }
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   // Preserve original message
   if msg.has_suffix("\n") {
     result.write_string(msg)
@@ -130,7 +130,7 @@ pub fn commit_apply_signoff(msg : String, committer~ : String) -> String {
 /// Decode commit message bytes, handling ISO-8859-1 and UTF-8 encodings.
 pub fn decode_commit_message_bytes(data : Bytes, encoding : String) -> String {
   if is_iso_8859_1_encoding(encoding) {
-    let out = StringBuilder::new()
+    let out = StringBuilder()
     for b in data {
       out.write_char(b.to_int().unsafe_to_char())
     }
@@ -148,7 +148,7 @@ fn is_iso_8859_1_encoding(encoding : String) -> Bool {
 
 ///|
 fn normalize_commit_encoding_name(value : String) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for c in commit_trim_string(value).to_lower() {
     if c == '-' || c == '_' || c == ' ' {
       continue

@@ -67,7 +67,7 @@ test "pktline encode decode roundtrip" {
   inspect(decoded.length(), content="1")
   let (payload, is_flush) = decoded[0]
   inspect(is_flush, content="false")
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for b in payload {
     result.write_char(b.to_int().unsafe_to_char())
   }

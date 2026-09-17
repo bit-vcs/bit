@@ -134,7 +134,7 @@ fn merge_index_format_mode(mode : Int) -> String {
     digits.push((n % 8).to_string())
     n = n / 8
   }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for i = digits.length() - 1; i >= 0; i = i - 1 {
     sb.write_string(digits[i])
   }

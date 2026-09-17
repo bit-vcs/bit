@@ -490,7 +490,7 @@ async fn hash_object_validate_tag(
     eprint_line("error: badType: empty type")
     @sys.exit(128)
   }
-  let type_buf = StringBuilder::new()
+  let type_buf = StringBuilder()
   for i in type_start..<(type_start + type_len) {
     type_buf.write_char(content[i].to_int().unsafe_to_char())
   }
@@ -608,7 +608,7 @@ async fn hash_object_validate_tree(
       eprint_line("error: badTree: empty filename in tree entry")
       @sys.exit(128)
     }
-    let name_buf = StringBuilder::new()
+    let name_buf = StringBuilder()
     for i in name_start..<pos {
       name_buf.write_char(content[i].to_int().unsafe_to_char())
     }

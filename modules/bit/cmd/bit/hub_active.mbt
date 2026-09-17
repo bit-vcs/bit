@@ -22,7 +22,7 @@ fn parse_active_issues(content : String) -> Array[String] {
 ///|
 /// Join entries with newlines.
 fn serialize_active_issues(entries : Array[String]) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for entry in entries {
     buf.write_string(entry)
     buf.write_char('\n')

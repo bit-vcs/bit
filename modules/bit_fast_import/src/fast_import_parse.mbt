@@ -121,12 +121,12 @@ pub fn fast_import_parse_ident(line : String) -> FastImportIdent? {
   if gt_pos < 0 {
     return None
   }
-  let ident_buf = StringBuilder::new()
+  let ident_buf = StringBuilder()
   for i in 0..<=gt_pos {
     ident_buf.write_char(chars[i])
   }
   let ident = ident_buf.to_string()
-  let rest_buf = StringBuilder::new()
+  let rest_buf = StringBuilder()
   for i in (gt_pos + 1)..<chars.length() {
     rest_buf.write_char(chars[i])
   }
@@ -157,7 +157,7 @@ pub(all) enum FastImportFileOp {
 
 ///|
 fn fast_import_show_string(value : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_char('"')
   for c in value {
     if c == '"' {
@@ -358,7 +358,7 @@ pub fn fast_import_parse_unquote_path(path : String) -> String {
         chars.push(c)
       }
       if chars.length() > 0 && chars[chars.length() - 1] == '"' {
-        let buf = StringBuilder::new()
+        let buf = StringBuilder()
         for i in 0..<(chars.length() - 1) {
           buf.write_char(chars[i])
         }
@@ -373,7 +373,7 @@ pub fn fast_import_parse_unquote_path(path : String) -> String {
     for c in inner {
       chars.push(c)
     }
-    let buf = StringBuilder::new()
+    let buf = StringBuilder()
     let mut i = 0
     while i < chars.length() {
       if chars[i] == '\\' && i + 1 < chars.length() {

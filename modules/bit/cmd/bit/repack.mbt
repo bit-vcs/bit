@@ -391,7 +391,7 @@ fn repack_update_server_info(
   }
   let packs_path = info_dir + "/packs"
   let entries = fs.readdir(pack_dir) catch { _ => return }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for entry in entries {
     if entry.has_suffix(".pack") && !entry.has_prefix(".tmp-") {
       buf.write_string("P ")
@@ -411,7 +411,7 @@ fn repack_update_server_info(
   let refs_path = refs_info_dir + "/refs"
   let rfs : &@bitcore.RepoFileSystem = fs
   let all_refs = @bitrepo.show_ref(rfs, git_dir) catch { _ => [] }
-  let refs_buf = StringBuilder::new()
+  let refs_buf = StringBuilder()
   for item in all_refs {
     let (name, id) = item
     refs_buf.write_string(id.to_hex())

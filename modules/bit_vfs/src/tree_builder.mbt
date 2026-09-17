@@ -328,7 +328,7 @@ fn to_octal_string(value : Int) -> String {
     v = v / 8
   }
   let rev = digits.rev()
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for c in rev {
     sb.write_char(c)
   }

@@ -915,7 +915,7 @@ fn merge_common_line_prefix(a : String, b : String) -> String {
   for part in b.split("\n") {
     b_arr.push(part.to_owned())
   }
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   let limit = if a_arr.length() < b_arr.length() {
     a_arr.length()
   } else {

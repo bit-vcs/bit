@@ -218,7 +218,7 @@ fn relay_is_valid_room_name(room : String) -> Bool {
 ///|
 fn normalize_relay_sender(raw : String) -> String {
   let trimmed = raw.trim(chars=" \n\r\t").to_owned()
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for c in trimmed {
     if relay_sender_safe_char(c) {
       out.write_char(c)
@@ -628,7 +628,7 @@ fn relay_clock_to_string(clock : Map[String, Int64]) -> String {
 
 ///|
 fn relay_serialize_record_unsigned(record : @hub.HubRecord) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("version ")
   sb.write_string(record.version.to_string())
   sb.write_char('\n')

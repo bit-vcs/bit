@@ -174,7 +174,7 @@ pub fn HubRecord::new(
 
 ///|
 fn serialize_hub_record(record : HubRecord, signature : String?) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("version ")
   sb.write_string(record.version.to_string())
   sb.write_char('\n')

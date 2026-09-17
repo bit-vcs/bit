@@ -563,7 +563,7 @@ test "git compat: blob hash all 256 byte values" {
 /// Helper: parse header from raw loose object format "type size\0content"
 /// Returns (type_str, content_start_index)
 fn parse_loose_header(raw : Bytes) -> (String, Int) {
-  let type_buf = StringBuilder::new()
+  let type_buf = StringBuilder()
   let mut i = 0
   // Read type until space
   while i < raw.length() && raw[i] != b' ' {

@@ -45,7 +45,7 @@ let bench_lines_b_1000_10pct : Array[String] = bench_mutate_lines(
 
 ///|
 let bench_blob_text_100kb : Bytes = {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for i in 0..<2500 {
     sb.write_string("line \{i}: forty-byte template ABCDEFGHIJ\n")
   }

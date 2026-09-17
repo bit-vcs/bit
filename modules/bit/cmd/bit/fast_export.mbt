@@ -168,7 +168,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
   }
   let topo_order = topo_order.rev()
   // Output stream
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let blob_marks : Map[String, Int] = Map([]) // blob oid hex -> mark
   for oid_hex, mark_val in mark_map {
     blob_marks[oid_hex] = mark_val
@@ -437,7 +437,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
   }
   // Write export marks file if requested
   if export_marks_file is Some(path) {
-    let marks_buf = StringBuilder::new()
+    let marks_buf = StringBuilder()
     for oid_hex, mark_val in mark_map {
       marks_buf.write_string(":\{mark_val} \{oid_hex}\n")
     }

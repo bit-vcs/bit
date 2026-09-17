@@ -85,7 +85,7 @@ async fn handle_interpret_trailers(args : Array[String]) -> Unit raise Error {
   if only_trailers {
     // Parse and print existing trailers only
     let existing = @trailers.parse_trailers(input)
-    let result = StringBuilder::new()
+    let result = StringBuilder()
     for trailer in existing {
       result.write_string(trailer.0)
       result.write_string(": ")

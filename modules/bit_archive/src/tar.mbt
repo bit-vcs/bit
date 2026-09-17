@@ -4,7 +4,7 @@
 /// Format an Int64 value as a zero-padded octal string of the given width.
 pub fn tar_format_octal(value : Int64, width : Int) -> String {
   if value == 0L {
-    let buf = StringBuilder::new()
+    let buf = StringBuilder()
     for _i in 0..<width {
       buf.write_char('0')
     }
@@ -19,7 +19,7 @@ pub fn tar_format_octal(value : Int64, width : Int) -> String {
     v = v / 8L
   }
   // Reverse
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let digit_len = digits.length()
   // Pad with leading zeros
   if digit_len < width {

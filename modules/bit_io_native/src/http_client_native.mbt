@@ -202,7 +202,7 @@ fn build_credential_input(
   path : String,
   username : String?,
 ) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("protocol=" + protocol + "\n")
   sb.write_string("host=" + host + "\n")
   if path.length() > 0 {

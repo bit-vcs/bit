@@ -3,7 +3,7 @@
 
 ///|
 fn bytes_to_string(bytes : Bytes) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i = 0; i < bytes.length(); i = i + 1 {
     result.write_char(bytes[i].to_int().unsafe_to_char())
   }

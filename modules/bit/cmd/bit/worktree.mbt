@@ -102,7 +102,7 @@ fn worktree_quote_path(path : String) -> String {
   if !needs_quote {
     return path
   }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_char('"')
   for b in encoded {
     let v = b.to_int()
@@ -619,7 +619,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn escape_lock_reason(reason : String) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for c in reason {
     match c {
       '\n' => {

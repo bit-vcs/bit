@@ -1361,7 +1361,7 @@ fn build_tree_content(entries : Array[@bit.TreeEntry]) -> Bytes {
 ///|
 /// Build raw commit content (without "commit {size}\0" header)
 fn build_commit_content(commit : @bit.Commit) -> Bytes {
-  let content = StringBuilder::new()
+  let content = StringBuilder()
   content.write_string("tree ")
   content.write_string(commit.tree.to_hex())
   content.write_char('\n')

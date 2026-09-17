@@ -46,7 +46,7 @@ async fn handle_mailsplit(args : Array[String]) -> Unit raise Error {
   }
   // Read input: from files or stdin
   let input = if positional.length() > 0 {
-    let sb = StringBuilder::new()
+    let sb = StringBuilder()
     for path in positional {
       let data = @fs.read_file_to_bytes(path) catch {
         err => {
@@ -72,7 +72,7 @@ async fn handle_mailsplit(args : Array[String]) -> Unit raise Error {
   for line in lines {
     if line.has_prefix("From ") {
       // Start a new message
-      let msg = StringBuilder::new()
+      let msg = StringBuilder()
       if keep_from {
         msg.write_string(line)
         msg.write_char('\n')
@@ -129,7 +129,7 @@ fn mailsplit_format_number(n : Int, width : Int) -> String {
   if pad <= 0 {
     return s
   }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for _i = 0; _i < pad; _i = _i + 1 {
     sb.write_char('0')
   }

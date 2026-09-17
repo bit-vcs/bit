@@ -740,7 +740,7 @@ fn format_toml_string_array(items : Array[String]) -> String {
 
 ///|
 fn format_workspace_manifest(manifest : WorkspaceManifest) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string("version = ")
   buf.write_string(manifest.version.to_string())
   buf.write_string("\n")
@@ -1491,7 +1491,7 @@ fn workspace_flow_workspace_fingerprint(
   selected : Map[String, Bool],
   signatures : Map[String, String],
 ) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   out.write_string("task=")
   out.write_string(task)
   for node_id in ordered_ids {
@@ -1852,7 +1852,7 @@ async fn handle_workspace_status(args : Array[String]) -> Unit raise Error {
     let head = workspace_node_head_hex(fs, node_root).unwrap_or("-")
     let lock_head = lock_commits.get(node.id).unwrap_or("-")
     let drift = head != "-" && lock_head != "-" && head != lock_head
-    let summary = StringBuilder::new()
+    let summary = StringBuilder()
     summary.write_string("- ")
     summary.write_string(node.id)
     summary.write_string(" (")

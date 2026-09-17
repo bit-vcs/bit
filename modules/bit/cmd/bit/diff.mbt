@@ -2824,7 +2824,7 @@ fn diff_index_to_octal(value : Int) -> String {
     v = v / 8
   }
   let rev = digits.rev()
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   if value < 0 {
     sb.write_char('-')
   }

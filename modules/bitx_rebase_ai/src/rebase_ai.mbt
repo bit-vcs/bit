@@ -129,7 +129,7 @@ fn commit_system_prompt(_agent_loop_mode : Bool) -> String {
 
 ///|
 fn build_commit_message_prompt(diff_units : String, context : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string(
     "Write one commit message that follows Conventional Commits.\n",
   )
@@ -155,7 +155,7 @@ fn build_commit_message_prompt(diff_units : String, context : String) -> String 
 
 ///|
 fn build_resolve_prompt(path : String, conflicted_content : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string("Resolve this conflicted file:\n")
   buf.write_string("path: ")
   buf.write_string(path)
@@ -177,7 +177,7 @@ fn build_resolve_prompt_with_context(
   if trimmed_context.length() == 0 {
     return build_resolve_prompt(path, conflicted_content)
   }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string("Project/User constraints:\n")
   buf.write_string(trimmed_context)
   buf.write_string("\n\n")
@@ -202,7 +202,7 @@ fn collect_text_with_provider(
   provider : @llmlib.BoxedProvider,
   prompt : String,
 ) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let handler : @llmlib.StreamHandler = {
     on_event: fn(event) {
       match event {
@@ -321,7 +321,7 @@ fn push_unique_path(paths : Array[String], path : String) -> Unit {
 
 ///|
 fn build_agent_loop_prompt(rel_path : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string("Resolve git conflict markers using tools.\n")
   buf.write_string("Target path: ")
   buf.write_string(rel_path)
@@ -681,7 +681,7 @@ pub fn ai_generate_commit_message(
   )
   if use_agent_loop_mode(options) {
     let registry = build_repo_scoped_read_tools(fs, root)
-    let out = StringBuilder::new()
+    let out = StringBuilder()
     @llmlib.run_agent_cancellable(
       provider,
       registry,

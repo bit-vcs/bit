@@ -126,7 +126,7 @@ fn split_lines(text : String) -> Array[String] {
     return []
   }
   let lines : Array[String] = []
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for c in text {
     sb.write_char(c)
     if c == '\n' {
@@ -500,7 +500,7 @@ fn diff3_merge(
 
 ///|
 fn render_marker(ch : Char, size : Int, label : String) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for _ in 0..<size {
     sb.write_char(ch)
   }
@@ -523,7 +523,7 @@ pub fn content_merge(
   let ours_lines = split_lines(ours_text)
   let theirs_lines = split_lines(theirs_text)
   let sections = diff3_merge(base_lines, ours_lines, theirs_lines)
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut conflict_count = 0
   for section in sections {
     match section {

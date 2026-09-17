@@ -313,7 +313,7 @@ fn build_issue_children_map(
 
 ///|
 fn issue_tree_indent(depth : Int) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut i = 0
   while i < depth {
     sb.write_string("  ")

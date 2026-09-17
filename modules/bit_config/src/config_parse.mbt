@@ -630,7 +630,7 @@ fn config_decode_escape(c : Char) -> Char {
 ///|
 /// Parse a quoted/escaped config value string.
 pub fn parse_config_value(raw : String) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut in_single = false
   let mut in_double = false
   let mut escape = false
@@ -726,7 +726,7 @@ pub fn encode_config_value(value : String) -> String {
       value.contains("#") ||
       value.contains(";")
     )
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   if needs_quoting {
     sb.write_char('"')
   }

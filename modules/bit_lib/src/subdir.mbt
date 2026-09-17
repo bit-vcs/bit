@@ -11,7 +11,7 @@ pub fn write_subdir_attributes(
   fs.mkdir_p(info_dir) catch {
     _ => ()
   }
-  let content = StringBuilder::new()
+  let content = StringBuilder()
   content.write_string("# subdir-clone metadata\n")
   content.write_string("* subdir-remote=")
   content.write_string(remote_url)
@@ -289,7 +289,7 @@ fn string_to_bytes(s : String) -> Bytes {
 
 ///|
 fn bytes_to_string(bytes : Bytes) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i in 0..<bytes.length() {
     result.write_char(bytes[i].to_int().unsafe_to_char())
   }

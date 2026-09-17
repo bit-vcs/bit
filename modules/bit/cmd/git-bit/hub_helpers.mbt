@@ -379,7 +379,7 @@ fn format_issue_json(issue : @hub.Issue) -> String {
     Some(pid) => json_escape_string(pid)
     None => "null"
   }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string("{")
   buf.write_string("\"id\":" + json_escape_string(issue.id()))
   buf.write_string(",\"title\":" + json_escape_string(issue.title()))
@@ -405,7 +405,7 @@ fn format_issue_json(issue : @hub.Issue) -> String {
 /// Replaces raw epoch in serialize output with ISO-style dates.
 fn format_issue_detail(issue : @hub.Issue) -> String {
   let raw = issue.serialize()
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for line_view in raw.split("\n") {
     let line = line_view.to_owned()
     if line.has_prefix("created ") {
@@ -451,7 +451,7 @@ fn parse_int64_safe(s : String) -> Int64 {
 
 ///|
 fn json_escape_string(s : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string("\"")
   for ch in s {
     match ch {
@@ -478,7 +478,7 @@ fn format_work_item_summary(item : @hub.WorkItem) -> String {
 
 ///|
 fn format_work_item_detail(item : @hub.WorkItem) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("id ")
   sb.write_string(item.id())
   sb.write_char('\n')

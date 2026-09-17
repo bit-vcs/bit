@@ -228,7 +228,7 @@ fn file_exists_in_base(
 ///|
 /// Print changes in a readable format
 fn format_changes(changes : Array[FileChange]) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("Changes:\n")
   for change in changes {
     let prefix = match change.change_type {

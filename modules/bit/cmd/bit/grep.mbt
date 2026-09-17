@@ -1126,7 +1126,7 @@ fn grep_colorize_line(
   }
   let ordered = spans.copy()
   ordered.sort_by((a, b) => Int::compare(a.start_column, b.start_column))
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let mut cursor = 0
   for span in ordered {
     let start = span.start_column - 1
@@ -1174,7 +1174,7 @@ fn grep_build_prefix(
   color_spec : GrepColorSpec,
 ) -> String {
   let sep = sign.to_string()
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   if !show_heading {
     out.write_string(grep_color_wrap(file_path, color_spec.filename))
     out.write_string(grep_color_wrap(sep, color_spec.separator))
@@ -2229,7 +2229,7 @@ fn grep_split_path_segments(path : String) -> Array[String] {
 
 ///|
 fn grep_join_path_segments(parts : Array[String]) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for i in 0..<parts.length() {
     if i > 0 {
       out.write_char('/')

@@ -25,7 +25,7 @@ fn js_exports_expect_err_contains(
 
 ///|
 fn js_exports_parse_loose_header(raw : Bytes) -> (String, Int) {
-  let type_buf = StringBuilder::new()
+  let type_buf = StringBuilder()
   let mut i = 0
   while i < raw.length() && raw[i] != b' ' {
     type_buf.write_char(raw[i].to_int().unsafe_to_char())

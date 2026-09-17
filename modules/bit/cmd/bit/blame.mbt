@@ -814,7 +814,7 @@ async fn blame_find_line_origin_with_opts(
 ///|
 fn normalize_whitespace(s : String) -> String {
   // Collapse all whitespace to single spaces and trim
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   let mut in_space = true // Start true to trim leading spaces
   for c in s {
     if c == ' ' || c == '\t' {

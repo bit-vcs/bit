@@ -839,7 +839,7 @@ fn js_append_utf8(out : Array[Byte], value : String) -> Unit {
 
 ///|
 fn js_normalize_newlines(value : String) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let mut saw_cr = false
   for c in value {
     if saw_cr {

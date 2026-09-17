@@ -30,7 +30,7 @@ fn object_append_utf8_string(out : Array[Byte], s : String) -> Unit {
 
 ///|
 fn object_normalize_encoding_name(value : String) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for c in value.trim().to_lower() {
     if c == '-' || c == '_' || c == ' ' {
       continue

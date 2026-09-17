@@ -747,7 +747,7 @@ pub(all) struct SubmoduleInfo {
 
 ///|
 fn submodule_info_show_string(value : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_char('"')
   for c in value {
     if c == '"' {

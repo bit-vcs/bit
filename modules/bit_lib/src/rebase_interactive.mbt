@@ -200,7 +200,7 @@ pub fn parse_interactive_todo(text : String) -> Array[InteractiveTodoEntry] {
 pub fn serialize_interactive_todo(
   entries : Array[InteractiveTodoEntry],
 ) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for entry in entries {
     match entry.command {
       Label | Reset => {
@@ -371,7 +371,7 @@ pub fn save_interactive_rebase_state(
   }
   // Write labels state (for --rebase-merges)
   if state.labels.length() > 0 {
-    let sb = StringBuilder::new()
+    let sb = StringBuilder()
     for name, hex in state.labels {
       sb.write_string(name)
       sb.write_string(" ")
@@ -386,7 +386,7 @@ pub fn save_interactive_rebase_state(
   }
   // Write update-refs state
   if state.update_refs.length() > 0 {
-    let sb = StringBuilder::new()
+    let sb = StringBuilder()
     for ref_path, old_hex in state.update_refs {
       let new_hex = match state.commit_map.get(old_hex) {
         Some(h) => h
@@ -526,7 +526,7 @@ pub fn generate_interactive_todo_text(
   rfs : &@bit.RepoFileSystem,
   commits : Array[@bit.ObjectId],
 ) -> String raise @bit.GitError {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for commit in commits {
     let hex = commit.to_hex()
     let short = String::unsafe_substring(hex, start=0, end=7)
@@ -602,7 +602,7 @@ pub fn insert_exec_after_picks(
 ///|
 /// Extract comment lines from todo text (lines starting with #).
 fn extract_todo_comments(text : String) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for line_view in text.split("\n") {
     let line = line_view.to_owned()
     if line.has_prefix("#") {
@@ -754,7 +754,7 @@ fn generate_rebase_merges_todo_text(
   // Walk first-parent chains and build branches
   // A "branch" is a sequence of commits along first-parent that ends at
   // a labeled commit or at the base.
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("label onto\n\n")
   // Emit label commands for external parents (outside the rebase range).
   // These are merge parents not in commit_set that need labels so that
@@ -931,7 +931,7 @@ fn generate_rebase_merges_todo_text(
 
 ///|
 fn serialize_single_todo_entry(entry : InteractiveTodoEntry) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   match entry.command {
     Label | Reset => {
       sb.write_string(todo_command_to_string(entry.command))

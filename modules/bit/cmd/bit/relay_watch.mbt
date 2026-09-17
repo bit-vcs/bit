@@ -7,7 +7,7 @@ fn relay_safe_sender() -> String {
     None => {
       // Extract name from git author config, URL-safe
       let author = get_author_string()
-      let buf = StringBuilder::new()
+      let buf = StringBuilder()
       for c in author {
         if c == '<' {
           break

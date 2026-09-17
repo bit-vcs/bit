@@ -103,7 +103,7 @@ fn parse_tree_with_hash_size(
   let mut i = 0
   while i < content.length() {
     // Parse mode (ASCII only, so byte-by-byte is fine)
-    let mode_buf = StringBuilder::new()
+    let mode_buf = StringBuilder()
     while i < content.length() && content[i] != b' ' {
       mode_buf.write_char(content[i].to_int().unsafe_to_char())
       i += 1

@@ -465,7 +465,7 @@ async fn receive_run_hook(
     hook_path
   }
   // Build stdin data: "<old-oid> <new-oid> <refname>\n" for each update
-  let stdin_buf = StringBuilder::new()
+  let stdin_buf = StringBuilder()
   for upd in updates {
     stdin_buf.write_string(upd.old_id.to_hex())
     stdin_buf.write_char(' ')
@@ -832,7 +832,7 @@ fn receive_parse_proc_receive_output(
 
 ///|
 fn receive_proc_bytes_to_string(data : Bytes) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for b in data {
     buf.write_char(b.to_int().unsafe_to_char())
   }

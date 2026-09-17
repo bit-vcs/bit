@@ -108,7 +108,7 @@ fn scan_ref_delta_bases(pack : Bytes, hash_size? : Int = 20) -> Array[String] {
 ///|
 fn bytes_to_hex_at(data : Bytes, offset : Int, len : Int) -> String {
   let hex_chars = "0123456789abcdef"
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i in 0..<len {
     let b = data[offset + i].to_int()
     buf.write_char(hex_chars[b >> 4].to_int().unsafe_to_char())

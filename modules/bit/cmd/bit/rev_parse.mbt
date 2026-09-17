@@ -2388,7 +2388,7 @@ fn parseopt_format_help(
   opts : Array[ParseoptOpt],
   show_all : Bool,
 ) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let mut blurb_start = -1
   for i = 0; i < usage_lines.length(); i = i + 1 {
     if usage_lines[i].length() == 0 {
@@ -2619,7 +2619,7 @@ async fn parseopt_parse_args(
   stuck_long : Bool,
   usage_lines : Array[String],
 ) -> String raise Error {
-  let parsed = StringBuilder::new()
+  let parsed = StringBuilder()
   parsed.write_string("set --")
   let remaining : Array[String] = []
   let mut i = 0
@@ -2858,7 +2858,7 @@ fn parseopt_format_matched_long(
   all_args : Array[String],
   arg_idx : Int,
 ) -> ParseoptMatchResult {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let mut consumed = 1
   if unset {
     out.write_string(" --no-")
@@ -2881,7 +2881,7 @@ fn parseopt_format_matched_long(
     match opt_value {
       Some(v) => {
         if stuck_long && opt.long_name.length() > 0 && !unset {
-          let out2 = StringBuilder::new()
+          let out2 = StringBuilder()
           out2.write_string(" --")
           out2.write_string(opt.long_name)
           out2.write_char('=')
@@ -2926,7 +2926,7 @@ fn parseopt_match_short(
   all_args : Array[String],
   arg_idx : Int,
 ) -> ParseoptMatchResult {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let mut consumed = 1
   let mut ci = 1
   while ci < arg.length() {

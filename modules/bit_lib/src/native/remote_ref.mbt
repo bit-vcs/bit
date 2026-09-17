@@ -23,7 +23,7 @@ fn is_hex_string(s : String) -> Bool {
 
 ///|
 fn lower_hex_string(s : String) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for c in s {
     if c >= 'A' && c <= 'F' {
       out.write_char((c.to_int() + 32).unsafe_to_char())

@@ -1463,7 +1463,7 @@ fn parse_loose_object(data : Bytes) -> @bit.PackObject raise @bit.GitError {
   if len == 0 {
     raise @bit.GitError::InvalidObject("Empty loose object")
   }
-  let type_buf = StringBuilder::new()
+  let type_buf = StringBuilder()
   let mut i = 0
   while i < len && data[i] != b' ' {
     type_buf.write_char(data[i].to_int().unsafe_to_char())

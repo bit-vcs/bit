@@ -187,7 +187,7 @@ fn find_char(s : String, c : Char) -> Int? {
 ///|
 /// Join array of string views from start to end with "/"
 fn join_parts(parts : Array[StringView], start : Int, end : Int) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i = start; i < end; i = i + 1 {
     if i > start {
       buf.write_char('/')

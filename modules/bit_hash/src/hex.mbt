@@ -53,7 +53,7 @@ pub fn is_hex_string(s : String) -> Bool {
 
 ///|
 pub fn lower_hex_string(s : String) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for c in s {
     if c >= 'A' && c <= 'F' {
       out.write_char((c.to_int() + 32).unsafe_to_char())
@@ -98,7 +98,7 @@ pub fn int_to_hex4(n : Int) -> String {
 /// (an ETag, a SigV4 signature, a pack name) needs this.
 pub fn hex_encode(raw : FixedArray[Byte]) -> String {
   let digits = "0123456789abcdef"
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for b in raw {
     let v = b.to_int()
     out.write_char(digits[v / 16].to_int().unsafe_to_char())

@@ -555,7 +555,7 @@ fn trim_newline(s : String) -> String {
 
 ///|
 fn bytes_to_string(data : Bytes) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for b in data {
     result.write_char(b.to_int().unsafe_to_char())
   }
@@ -567,7 +567,7 @@ fn bytes_to_string_from(data : Bytes, start : Int) -> String {
   if start >= data.length() {
     return ""
   }
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i in start..<data.length() {
     result.write_char(data[i].to_int().unsafe_to_char())
   }
@@ -577,12 +577,12 @@ fn bytes_to_string_from(data : Bytes, start : Int) -> String {
 ///|
 fn split_by_space(s : String) -> Array[String] {
   let parts : Array[String] = []
-  let mut current = StringBuilder::new()
+  let mut current = StringBuilder()
   for c in s {
     if c == ' ' {
       if current.to_string().length() > 0 {
         parts.push(current.to_string())
-        current = StringBuilder::new()
+        current = StringBuilder()
       }
     } else {
       current.write_char(c)

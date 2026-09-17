@@ -1235,7 +1235,7 @@ fn reftable_index_to_hex12(value : UInt64) -> String {
     b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c',
     b'd', b'e', b'f',
   ]
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i = 11; i >= 0; i = i - 1 {
     let shift = i * 4
     let nibble = ((value >> shift.to_uint64().to_int()) & 0xfUL).to_int()

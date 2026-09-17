@@ -92,7 +92,7 @@ pub fn Hub::broadcast_feature(
   let node_id = self.store.node_id()
   let key = "hub/broadcast/feature/" + branch_name + "/" + node_id
   // Build payload as serialized key-value text
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("branch ")
   sb.write_string(branch_name)
   sb.write_char('\n')
@@ -152,7 +152,7 @@ pub fn Hub::publish_node_heartbeat(
 ) -> Unit raise @bit.GitError {
   let timestamp = clock.now()
   let key = "hub/node/heartbeat/" + node_id
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("node_id ")
   sb.write_string(node_id)
   sb.write_char('\n')

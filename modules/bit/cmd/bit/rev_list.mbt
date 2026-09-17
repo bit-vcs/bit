@@ -878,7 +878,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     }
     None =>
       for id in sliced_result {
-        let buf = StringBuilder::new()
+        let buf = StringBuilder()
         let hex = id.to_hex()
         buf.write_string(
           rev_list_output_prefix(

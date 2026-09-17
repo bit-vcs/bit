@@ -104,7 +104,7 @@ pub fn resolve_alias(
 ///|
 pub fn split_alias_command(value : String) -> Array[String] {
   let args : Array[String] = []
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut in_single = false
   let mut in_double = false
   let mut escape = false
@@ -260,7 +260,7 @@ fn unquote_value(value : String) -> String {
 
 ///|
 fn unescape_config_string(value : String) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut escape = false
   for c in value {
     if escape {

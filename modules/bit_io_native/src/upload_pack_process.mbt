@@ -43,7 +43,7 @@ fn is_space_char(c : Char) -> Bool {
 ///|
 fn split_shell_words(cmdline : String) -> Array[String] raise @bit.GitError {
   let out : Array[String] = []
-  let current = StringBuilder::new()
+  let current = StringBuilder()
   let mut in_single = false
   let mut in_double = false
   let mut escaped = false
@@ -481,7 +481,7 @@ fn resolve_upload_pack_local_command() -> String {
 
 ///|
 fn quote_shell_arg_single(value : String) -> String {
-  let b = StringBuilder::new()
+  let b = StringBuilder()
   b.write_char('\'')
   for c in value {
     if c == '\'' {

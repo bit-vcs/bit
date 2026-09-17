@@ -83,7 +83,7 @@ fn build_diff_units_for_ai(diffs : Array[@bitdiff.DiffFile]) -> String {
   if diffs.length() == 0 {
     return ""
   }
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for unit in split_diff_units(diffs) {
     out.write_string("## Logical unit: " + unit.name + "\n")
     for item in unit.diffs {
@@ -118,7 +118,7 @@ fn split_diff_units(diffs : Array[@bitdiff.DiffFile]) -> Array[AiDiffUnit] {
 
 ///|
 fn build_single_diff_unit_for_ai(unit : AiDiffUnit) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   out.write_string("## Logical unit: " + unit.name + "\n")
   for item in unit.diffs {
     out.write_string("### " + item.path + "\n")
