@@ -1,9 +1,9 @@
 name = "mizchi/bit_types"
 
-version = "0.46.4"
+version = "0.47.0"
 
 import {
-  "mizchi/bit_object@0.46.4",
+  "mizchi/bit_object@0.47.0",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"

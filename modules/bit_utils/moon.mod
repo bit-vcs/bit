@@ -1,6 +1,6 @@
 name = "mizchi/bit_utils"
 
-version = "0.46.4"
+version = "0.47.0"
 
 repository = "https://github.com/mizchi/bit-vcs"
 

@@ -1,15 +1,15 @@
 name = "mizchi/bitx_rebase_ai"
 
-version = "0.46.4"
+version = "0.47.0"
 
 import {
-  "mizchi/bit_core@0.46.4",
-  "mizchi/bit_object@0.46.4",
-  "mizchi/bit_lib@0.46.4",
-  "mizchi/bit_types@0.46.4",
-  "mizchi/bit_runtime@0.46.4",
-  "mizchi/bit_osfs@0.46.4",
-  "mizchi/bit_utils@0.46.4",
+  "mizchi/bit_core@0.47.0",
+  "mizchi/bit_object@0.47.0",
+  "mizchi/bit_lib@0.47.0",
+  "mizchi/bit_types@0.47.0",
+  "mizchi/bit_runtime@0.47.0",
+  "mizchi/bit_osfs@0.47.0",
+  "mizchi/bit_utils@0.47.0",
   "mizchi/llm@0.3.2",
   "moonbitlang/async@0.22.1",
   "moonbitlang/x@0.5.5",
