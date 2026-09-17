@@ -108,10 +108,10 @@ async test "tag: -s stores signature block via configured signing program" {
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   defer add_test_restore_env("GIT_DIR", prev_git_dir)
@@ -128,10 +128,10 @@ async test "tag: -s stores signature block via configured signing program" {
   grep_test_run_git(repo_dir, ["add", "tracked.txt"])
   grep_test_run_git(repo_dir, ["commit", "-q", "-m", "initial"])
 
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
 
   handle_tag(["-s", "-m", "signed tag", "v1"]) catch {
     err => fail("handle_tag failed: \{err}")

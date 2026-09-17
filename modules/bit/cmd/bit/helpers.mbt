@@ -57,7 +57,7 @@ fn resolve_run_git_path(path : String, cwd : String?) -> String {
   match cwd {
     Some(base) => normalize_path(base + "/" + path)
     None =>
-      @sys.get_env_var("GIT_SHIM_PWD")
+      @env.get_env_var("GIT_SHIM_PWD")
       .map(base => normalize_path(base + "/" + path))
       .unwrap_or(path)
   }
@@ -118,31 +118,31 @@ fn parse_run_git_invocation(
 ///|
 fn restore_env_var(name : String, value : String?) -> Unit {
   match value {
-    Some(v) => @sys.set_env_var(name, v)
-    None => @sys.unset_env_var(name)
+    Some(v) => @env.set_env_var(name, v)
+    None => @env.unset_env_var(name)
   }
 }
 
 ///|
 fn enter_run_git_env(cwd : String?, git_dir : String?) -> RunGitEnvSnapshot {
   let snapshot = {
-    shim_cwd: @sys.get_env_var("GIT_SHIM_CWD"),
-    git_dir: @sys.get_env_var("GIT_DIR"),
-    bit_work_tree: @sys.get_env_var("GIT_WORK_TREE"),
+    shim_cwd: @env.get_env_var("GIT_SHIM_CWD"),
+    git_dir: @env.get_env_var("GIT_DIR"),
+    bit_work_tree: @env.get_env_var("GIT_WORK_TREE"),
   }
   let fs = OsFs::new()
   match git_dir {
-    Some(dir) => @sys.set_env_var("GIT_DIR", dir)
+    Some(dir) => @env.set_env_var("GIT_DIR", dir)
     None => ()
   }
   match cwd {
     Some(dir) => {
-      @sys.set_env_var("GIT_SHIM_CWD", dir)
-      if @sys.get_env_var("GIT_DIR") is None {
-        @sys.set_env_var("GIT_DIR", default_repo_marker_path(fs, dir))
+      @env.set_env_var("GIT_SHIM_CWD", dir)
+      if @env.get_env_var("GIT_DIR") is None {
+        @env.set_env_var("GIT_DIR", default_repo_marker_path(fs, dir))
       }
-      if @sys.get_env_var("GIT_WORK_TREE") is None {
-        @sys.set_env_var("GIT_WORK_TREE", dir)
+      if @env.get_env_var("GIT_WORK_TREE") is None {
+        @env.set_env_var("GIT_WORK_TREE", dir)
       }
     }
     None => ()
@@ -300,15 +300,15 @@ fn default_repo_marker_path(
 ///|
 fn resolve_git_dir(fs : &@bitcore.RepoFileSystem, root : String) -> String {
   let default_git_dir = default_repo_marker_path(fs, root)
-  match @sys.get_env_var("GIT_DIR") {
+  match @env.get_env_var("GIT_DIR") {
     Some(dir) => {
       let resolved = if dir.has_prefix("/") {
         dir
       } else {
-        match @sys.get_env_var("GIT_SHIM_CWD") {
+        match @env.get_env_var("GIT_SHIM_CWD") {
           Some(base) => normalize_path(base + "/" + dir)
           None =>
-            @sys.get_env_var("GIT_SHIM_PWD")
+            @env.get_env_var("GIT_SHIM_PWD")
             .map(base => normalize_path(base + "/" + dir))
             .unwrap_or(dir)
         }
@@ -604,9 +604,9 @@ fn repository_validate_extension(name : String, value : String) -> String? {
 
 ///|
 fn get_author_string() -> String {
-  match @sys.get_env_var("GIT_AUTHOR_NAME") {
+  match @env.get_env_var("GIT_AUTHOR_NAME") {
     Some(name) => {
-      let email = @sys.get_env_var("GIT_AUTHOR_EMAIL").unwrap_or("unknown")
+      let email = @env.get_env_var("GIT_AUTHOR_EMAIL").unwrap_or("unknown")
       name + " <" + email + ">"
     }
     None => get_identity_from_config()
@@ -643,7 +643,7 @@ fn get_identity_from_config() -> String {
     None
   }
   // Also check ~/.gitconfig (global config)
-  let home = @sys.get_env_var("HOME").unwrap_or("")
+  let home = @env.get_env_var("HOME").unwrap_or("")
   let global_content = if home.length() > 0 {
     @fs.read_file_to_string(home + "/.gitconfig") catch {
       _ => ""
@@ -683,11 +683,11 @@ fn get_identity_from_config() -> String {
     (Some(n), Some(e)) => n + " <" + e + ">"
     (Some(n), None) => n + " <" + n + "@localhost>"
     (None, Some(e)) => {
-      let user = @sys.get_env_var("USER").unwrap_or("Unknown")
+      let user = @env.get_env_var("USER").unwrap_or("Unknown")
       user + " <" + e + ">"
     }
     (None, None) =>
-      match @sys.get_env_var("USER") {
+      match @env.get_env_var("USER") {
         Some(u) => u + " <" + u + "@localhost>"
         None => "Unknown <unknown@localhost>"
       }
@@ -696,9 +696,9 @@ fn get_identity_from_config() -> String {
 
 ///|
 fn get_committer_string() -> String {
-  match @sys.get_env_var("GIT_COMMITTER_NAME") {
+  match @env.get_env_var("GIT_COMMITTER_NAME") {
     Some(name) => {
-      let email = @sys.get_env_var("GIT_COMMITTER_EMAIL").unwrap_or("unknown")
+      let email = @env.get_env_var("GIT_COMMITTER_EMAIL").unwrap_or("unknown")
       name + " <" + email + ">"
     }
     None => get_author_string()
@@ -707,7 +707,7 @@ fn get_committer_string() -> String {
 
 ///|
 fn get_hub_signing_key() -> String? {
-  match @sys.get_env_var("BIT_COLLAB_SIGN_KEY") {
+  match @env.get_env_var("BIT_COLLAB_SIGN_KEY") {
     Some(value) => if value.length() > 0 { Some(value) } else { None }
     None => None
   }
@@ -715,7 +715,7 @@ fn get_hub_signing_key() -> String? {
 
 ///|
 fn get_hub_require_signed() -> Bool {
-  match @sys.get_env_var("BIT_COLLAB_REQUIRE_SIGNED") {
+  match @env.get_env_var("BIT_COLLAB_REQUIRE_SIGNED") {
     Some(value) => {
       let normalized = value.to_lower()
       normalized == "1" || normalized == "true" || normalized == "yes"
@@ -726,7 +726,7 @@ fn get_hub_require_signed() -> Bool {
 
 ///|
 fn get_commit_timestamp() -> Int64 {
-  match @sys.get_env_var("GIT_COMMITTER_DATE") {
+  match @env.get_env_var("GIT_COMMITTER_DATE") {
     Some(s) =>
       match parse_git_env_timestamp(s) {
         Some(ts) => ts
@@ -738,7 +738,7 @@ fn get_commit_timestamp() -> Int64 {
 
 ///|
 fn get_author_timestamp() -> Int64 {
-  match @sys.get_env_var("GIT_AUTHOR_DATE") {
+  match @env.get_env_var("GIT_AUTHOR_DATE") {
     Some(s) =>
       match parse_git_env_timestamp(s) {
         Some(ts) => ts
@@ -912,7 +912,7 @@ fn days_from_epoch(year : Int64, month : Int64, day : Int64) -> Int64 {
 
 ///|
 fn get_commit_timezone() -> String {
-  match @sys.get_env_var("GIT_COMMITTER_DATE") {
+  match @env.get_env_var("GIT_COMMITTER_DATE") {
     Some(raw) =>
       match parse_git_env_timezone(raw) {
         Some(tz) => tz
@@ -924,7 +924,7 @@ fn get_commit_timezone() -> String {
 
 ///|
 fn get_author_timezone() -> String {
-  match @sys.get_env_var("GIT_AUTHOR_DATE") {
+  match @env.get_env_var("GIT_AUTHOR_DATE") {
     Some(raw) =>
       match parse_git_env_timezone(raw) {
         Some(tz) => tz
@@ -1048,7 +1048,7 @@ fn make_relative_to_cwd(path : String) -> String {
   if !path.has_prefix("/") {
     return path
   }
-  let cwd = match @sys.get_env_var("GIT_SHIM_PWD") {
+  let cwd = match @env.get_env_var("GIT_SHIM_PWD") {
     Some(d) => d
     None =>
       match @env.current_dir() {

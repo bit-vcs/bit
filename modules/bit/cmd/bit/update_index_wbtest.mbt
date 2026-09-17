@@ -128,8 +128,8 @@ async fn update_index_wbtest_run_sparse_checkout_shim(
 ///|
 fn update_index_wbtest_restore_cwd(prev : String?) -> Unit {
   match prev {
-    Some(value) => @sys.set_env_var("GIT_SHIM_CWD", value)
-    None => @sys.unset_env_var("GIT_SHIM_CWD")
+    Some(value) => @env.set_env_var("GIT_SHIM_CWD", value)
+    None => @env.unset_env_var("GIT_SHIM_CWD")
   }
 }
 
@@ -157,8 +157,8 @@ async test "update-index: assume-unchanged works for sparse missing path" {
   update_index_wbtest_run_git(repo_dir, ["add", "a", "b", "dir/c"])
   update_index_wbtest_run_git(repo_dir, ["commit", "-q", "-m", "initial"])
 
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
+  let prev_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
   update_index_wbtest_run_sparse_checkout_shim(repo_dir, ["init", "--no-cone"])
   update_index_wbtest_run_sparse_checkout_shim(repo_dir, [
     "set", "/*", "!b", "!/*/",

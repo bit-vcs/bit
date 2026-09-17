@@ -9,7 +9,6 @@ import {
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
   "moonbitlang/x/crypto" @mbcrypto,
-  "moonbitlang/x/sys",
 }
 
 import {

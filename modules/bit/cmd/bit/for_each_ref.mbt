@@ -3310,7 +3310,7 @@ fn for_each_ref_strip_quotes(s : String) -> String {
 fn for_each_ref_find_real_git(git_dir : String) -> String {
   // Try to find the real git executable
   // Check SHIM_REAL_GIT env var first
-  match @sys.get_env_var("SHIM_REAL_GIT") {
+  match @env.get_env_var("SHIM_REAL_GIT") {
     Some(path) if path.length() > 0 => path
     _ => {
       // Try git-dir relative path

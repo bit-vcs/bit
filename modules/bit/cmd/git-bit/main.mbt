@@ -31,11 +31,11 @@ fn git_bit_apply_cwd(raw_dir : String) -> Unit {
   let resolved = if raw_dir.has_prefix("/") {
     raw_dir
   } else {
-    let base = @sys.get_env_var("PWD").unwrap_or(".")
+    let base = @env.get_env_var("PWD").unwrap_or(".")
     normalize_path(base + "/" + raw_dir)
   }
-  @sys.set_env_var("GIT_SHIM_CWD", resolved)
-  @sys.set_env_var("GIT_SHIM_PWD", resolved)
+  @env.set_env_var("GIT_SHIM_CWD", resolved)
+  @env.set_env_var("GIT_SHIM_PWD", resolved)
 }
 
 ///|

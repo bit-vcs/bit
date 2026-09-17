@@ -1,13 +1,13 @@
 ///|
 fn resolve_real_git_for_blame() -> String {
-  match @sys.get_env_var("SHIM_REAL_GIT") {
+  match @env.get_env_var("SHIM_REAL_GIT") {
     Some(path) =>
       if path.length() > 0 {
         path
       } else {
-        @sys.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
+        @env.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
       }
-    None => @sys.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
+    None => @env.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
   }
 }
 

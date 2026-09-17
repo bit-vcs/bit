@@ -109,14 +109,14 @@ fn unpack_file_find_object(
 
 ///|
 fn unpack_file_make_temp(fs : OsFs) -> String {
-  let base_dir = match @sys.get_env_var("TMPDIR") {
+  let base_dir = match @env.get_env_var("TMPDIR") {
     Some(dir) =>
       if dir.has_suffix("/") && dir.length() > 1 {
         String::unsafe_substring(dir, start=0, end=dir.length() - 1)
       } else {
         dir
       }
-    None => @sys.get_env_var("TMP").unwrap_or("/tmp")
+    None => @env.get_env_var("TMP").unwrap_or("/tmp")
   }
   let ts = get_current_timestamp()
   let base = base_dir + "/git-blob-" + "\{ts}"

@@ -218,7 +218,7 @@ fn hash_object_resolve_path_hint(root : String, hint : String) -> String {
 
 ///|
 fn get_cwd_for_hash_object() -> String {
-  match @sys.get_env_var("GIT_SHIM_PWD") {
+  match @env.get_env_var("GIT_SHIM_PWD") {
     Some(path) => path
     None =>
       match @env.current_dir() {

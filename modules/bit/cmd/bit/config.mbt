@@ -261,19 +261,19 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
     Some(path) => if path == "-" { "-" } else { resolve_in_cwd(path) }
     None =>
       if global_mode {
-        match @sys.get_env_var("GIT_CONFIG_GLOBAL") {
+        match @env.get_env_var("GIT_CONFIG_GLOBAL") {
           Some(path) => path
           None =>
-            match @sys.get_env_var("HOME") {
+            match @env.get_env_var("HOME") {
               Some(home) => home + "/.gitconfig"
               None => ".gitconfig"
             }
         }
       } else if system_mode {
-        @sys.get_env_var("GIT_CONFIG_SYSTEM").unwrap_or("/etc/gitconfig")
+        @env.get_env_var("GIT_CONFIG_SYSTEM").unwrap_or("/etc/gitconfig")
       } else {
         // GIT_CONFIG environment variable overrides default path
-        match @sys.get_env_var("GIT_CONFIG") {
+        match @env.get_env_var("GIT_CONFIG") {
           Some(path) => if path == "-" { "-" } else { resolve_in_cwd(path) }
           None => {
             let rfs : &@bitcore.RepoFileSystem = fs
@@ -303,7 +303,7 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
   // Handle --edit
   if edit_mode {
     // Editor precedence: GIT_EDITOR > core.editor > VISUAL > EDITOR > vi
-    let editor = match @sys.get_env_var("GIT_EDITOR") {
+    let editor = match @env.get_env_var("GIT_EDITOR") {
       Some(e) => e
       None => {
         // Try core.editor from repo config
@@ -321,9 +321,9 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         match core_editor {
           Some(e) => e
           None =>
-            match @sys.get_env_var("VISUAL") {
+            match @env.get_env_var("VISUAL") {
               Some(e) => e
-              None => @sys.get_env_var("EDITOR").unwrap_or("vi")
+              None => @env.get_env_var("EDITOR").unwrap_or("vi")
             }
         }
       }
@@ -356,8 +356,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
   let is_read_op = list_mode || get_mode || get_all_mode || get_regexp_mode
   if is_read_op && config_path != "-" && !@fs.path_exists(config_path) {
     if config_path_override is Some(_) ||
-      (global_mode && @sys.get_env_var("GIT_CONFIG_GLOBAL") is Some(_)) ||
-      (system_mode && @sys.get_env_var("GIT_CONFIG_SYSTEM") is Some(_)) {
+      (global_mode && @env.get_env_var("GIT_CONFIG_GLOBAL") is Some(_)) ||
+      (system_mode && @env.get_env_var("GIT_CONFIG_SYSTEM") is Some(_)) {
       eprint_line(
         "fatal: unable to read config file '\{config_path}': No such file or directory",
       )
@@ -379,9 +379,9 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
     if need_multi_source {
       // Multi-source list with scope/origin prefix
       let rfs3 : &@bitcore.RepoFileSystem = fs
-      let nosystem = @sys.get_env_var("GIT_CONFIG_NOSYSTEM")
+      let nosystem = @env.get_env_var("GIT_CONFIG_NOSYSTEM")
       if nosystem is None || nosystem == Some("false") {
-        let sys_path = @sys.get_env_var("GIT_CONFIG_SYSTEM").unwrap_or(
+        let sys_path = @env.get_env_var("GIT_CONFIG_SYSTEM").unwrap_or(
           "/etc/gitconfig",
         )
         if rfs3.is_file(sys_path) {
@@ -395,11 +395,11 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         }
       }
       // Global: GIT_CONFIG_GLOBAL or XDG + HOME
-      let global_path = match @sys.get_env_var("GIT_CONFIG_GLOBAL") {
+      let global_path = match @env.get_env_var("GIT_CONFIG_GLOBAL") {
         Some(p) => [p]
         None => {
           let paths : Array[String] = []
-          match @sys.get_env_var("HOME") {
+          match @env.get_env_var("HOME") {
             Some(home) => {
               let xdg = home + "/.config/git/config"
               if rfs3.is_file(xdg) {
@@ -544,9 +544,9 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
       let mut found = false
       if need_multi_source {
         let rfs4 : &@bitcore.RepoFileSystem = fs
-        let nosystem = @sys.get_env_var("GIT_CONFIG_NOSYSTEM")
+        let nosystem = @env.get_env_var("GIT_CONFIG_NOSYSTEM")
         if nosystem is None || nosystem == Some("false") {
-          let sys_path = @sys.get_env_var("GIT_CONFIG_SYSTEM").unwrap_or(
+          let sys_path = @env.get_env_var("GIT_CONFIG_SYSTEM").unwrap_or(
             "/etc/gitconfig",
           )
           if rfs4.is_file(sys_path) {
@@ -573,11 +573,11 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
             }
           }
         }
-        let global_paths = match @sys.get_env_var("GIT_CONFIG_GLOBAL") {
+        let global_paths = match @env.get_env_var("GIT_CONFIG_GLOBAL") {
           Some(p) => [p]
           None => {
             let paths : Array[String] = []
-            match @sys.get_env_var("HOME") {
+            match @env.get_env_var("HOME") {
               Some(home) => {
                 let xdg = home + "/.config/git/config"
                 if rfs4.is_file(xdg) {
@@ -1988,7 +1988,7 @@ fn format_config_output_value(
     }
   } else if get_path {
     if val.has_prefix("~/") {
-      match @sys.get_env_var("HOME") {
+      match @env.get_env_var("HOME") {
         Some(home) =>
           if home.length() == 0 {
             raise @bitcore.GitError::InvalidObject(
@@ -2120,14 +2120,14 @@ fn parse_config_color(value : String) -> String? {
 
 ///|
 fn resolve_real_git_for_config() -> String {
-  match @sys.get_env_var("SHIM_REAL_GIT") {
+  match @env.get_env_var("SHIM_REAL_GIT") {
     Some(path) =>
       if path.length() > 0 {
         path
       } else {
-        @sys.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
+        @env.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
       }
-    None => @sys.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
+    None => @env.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
   }
 }
 

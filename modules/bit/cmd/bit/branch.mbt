@@ -572,7 +572,7 @@ fn branch_resolve_column_mode(
 
 ///|
 fn branch_term_columns() -> Int {
-  match @sys.get_env_var("COLUMNS") {
+  match @env.get_env_var("COLUMNS") {
     Some(raw) => {
       let parsed = @string.parse_int(raw) catch { _ => 80 }
       if parsed > 1 {
@@ -731,14 +731,14 @@ async fn branch_resolve_start_point(
 
 ///|
 fn branch_get_committer_identity() -> (String, String, Int64, String) {
-  let name = match @sys.get_env_var("GIT_COMMITTER_NAME") {
+  let name = match @env.get_env_var("GIT_COMMITTER_NAME") {
     Some(n) => n
-    None => @sys.get_env_var("USER").unwrap_or("Unknown")
+    None => @env.get_env_var("USER").unwrap_or("Unknown")
   }
-  let email = match @sys.get_env_var("GIT_COMMITTER_EMAIL") {
+  let email = match @env.get_env_var("GIT_COMMITTER_EMAIL") {
     Some(e) => e
     None =>
-      match @sys.get_env_var("USER") {
+      match @env.get_env_var("USER") {
         Some(u) => u + "@localhost"
         None => "unknown@localhost"
       }

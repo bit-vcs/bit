@@ -144,7 +144,7 @@ let default_relay_http_timeout_ms : Int = 30000
 /// `BIT_RELAY_TIMEOUT_MS` environment variable; set it to `0` (or less) to
 /// disable the timeout entirely.
 fn relay_http_timeout_ms() -> Int {
-  match @sys.get_env_var("BIT_RELAY_TIMEOUT_MS") {
+  match @env.get_env_var("BIT_RELAY_TIMEOUT_MS") {
     Some(value) =>
       @string.parse_int(value) catch {
         _ => default_relay_http_timeout_ms

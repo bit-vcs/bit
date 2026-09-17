@@ -79,9 +79,9 @@ test "bench cat-file -t commit (×10)" (b : @bench.T) {
   let oids = ensure_catfile_bench_repo()
   let oid = oids[0]
   let args = ["bit", "-C", bench_catfile_repo, "cat-file", "-t", oid]
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_SHIM_CWD")
   b.bench(fn() {
     bench_stdout_suppress()
     for _ in 0..<bench_catfile_repeat {
@@ -97,9 +97,9 @@ test "bench cat-file -p commit (×10)" (b : @bench.T) {
   let oids = ensure_catfile_bench_repo()
   let oid = oids[0]
   let args = ["bit", "-C", bench_catfile_repo, "cat-file", "-p", oid]
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_SHIM_CWD")
   b.bench(fn() {
     bench_stdout_suppress()
     for _ in 0..<bench_catfile_repeat {
@@ -115,9 +115,9 @@ test "bench cat-file -s commit (×10)" (b : @bench.T) {
   let oids = ensure_catfile_bench_repo()
   let oid = oids[0]
   let args = ["bit", "-C", bench_catfile_repo, "cat-file", "-s", oid]
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_SHIM_CWD")
   b.bench(fn() {
     bench_stdout_suppress()
     for _ in 0..<bench_catfile_repeat {
@@ -133,9 +133,9 @@ test "bench cat-file -e commit (×10)" (b : @bench.T) {
   let oids = ensure_catfile_bench_repo()
   let oid = oids[0]
   let args = ["bit", "-C", bench_catfile_repo, "cat-file", "-e", oid]
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_SHIM_CWD")
   b.bench(fn() {
     bench_stdout_suppress()
     for _ in 0..<bench_catfile_repeat {

@@ -38,9 +38,9 @@ async test "scalar: register + unregister maintenance repo entries" {
   let root = "/tmp/bit-test-scalar-config-" +
     get_current_timestamp().to_string()
   fs.mkdir_p(root)
-  let prev_global = @sys.get_env_var("GIT_CONFIG_GLOBAL")
+  let prev_global = @env.get_env_var("GIT_CONFIG_GLOBAL")
   let config_path = root + "/global.gitconfig"
-  @sys.set_env_var("GIT_CONFIG_GLOBAL", config_path)
+  @env.set_env_var("GIT_CONFIG_GLOBAL", config_path)
   scalar_add_maintenance_repo(fs, "/tmp/repo-a")
   scalar_add_maintenance_repo(fs, "/tmp/repo-b")
   let listed = scalar_list_maintenance_repos(fs)
@@ -52,8 +52,8 @@ async test "scalar: register + unregister maintenance repo entries" {
   assert_eq(listed2.length(), 1)
   assert_eq(listed2[0], "/tmp/repo-b")
   match prev_global {
-    Some(path) => @sys.set_env_var("GIT_CONFIG_GLOBAL", path)
-    None => @sys.unset_env_var("GIT_CONFIG_GLOBAL")
+    Some(path) => @env.set_env_var("GIT_CONFIG_GLOBAL", path)
+    None => @env.unset_env_var("GIT_CONFIG_GLOBAL")
   }
   cleanup_scalar_test_dir(fs, root)
 }

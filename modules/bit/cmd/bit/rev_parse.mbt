@@ -47,21 +47,21 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       None => ()
     }
   }
-  let cwd_abs = match @sys.get_env_var("GIT_SHIM_CWD") {
+  let cwd_abs = match @env.get_env_var("GIT_SHIM_CWD") {
     Some(v) => v
     None =>
-      match @sys.get_env_var("GIT_SHIM_PWD") {
+      match @env.get_env_var("GIT_SHIM_PWD") {
         Some(v) => v
-        None => @sys.get_env_var("PWD").unwrap_or(root)
+        None => @env.get_env_var("PWD").unwrap_or(root)
       }
   }
   // When GIT_DIR is explicitly set (env var or --git-dir flag) and
   // GIT_WORK_TREE is not set, git uses CWD as the work tree root.
   // Override root accordingly for --show-prefix/--show-cdup/--show-toplevel.
-  let explicit_git_dir = @sys.get_env_var("GIT_DIR") is Some(_)
+  let explicit_git_dir = @env.get_env_var("GIT_DIR") is Some(_)
   let root = if explicit_git_dir &&
-    @sys.get_env_var("GIT_WORK_TREE") is None &&
-    @sys.get_env_var("GIT_SHIM_CWD") is Some(_) {
+    @env.get_env_var("GIT_WORK_TREE") is None &&
+    @env.get_env_var("GIT_SHIM_CWD") is Some(_) {
     cwd_abs
   } else {
     root
@@ -341,7 +341,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             // When GIT_DIR was explicitly set by the user (env var),
             // use the raw value for display (e.g. "../.git")
             let display_git_dir = if explicit_git_dir {
-              @sys.get_env_var("GIT_DIR").unwrap_or(git_dir)
+              @env.get_env_var("GIT_DIR").unwrap_or(git_dir)
             } else {
               git_dir
             }
@@ -1153,7 +1153,7 @@ fn rev_parse_resolve_git_path(
 
 ///|
 fn rev_parse_git_path_output_cwd(cwd_abs : String) -> String {
-  @sys.get_env_var("GIT_SHIM_CALLER_PWD").unwrap_or(cwd_abs)
+  @env.get_env_var("GIT_SHIM_CALLER_PWD").unwrap_or(cwd_abs)
 }
 
 ///|
@@ -1783,7 +1783,7 @@ fn rev_parse_is_bare_repository(
   }
   // If git_dir == root (no separate work tree), it's bare
   let abs_root = if root == "." {
-    @sys.get_env_var("PWD").unwrap_or(root)
+    @env.get_env_var("PWD").unwrap_or(root)
   } else {
     root
   }
@@ -1853,7 +1853,7 @@ fn rev_parse_is_inside_work_tree(
 ///|
 fn rev_parse_show_prefix(root : String, cwd_abs : String) -> String {
   let abs_root = if root == "." {
-    @sys.get_env_var("PWD").unwrap_or(root)
+    @env.get_env_var("PWD").unwrap_or(root)
   } else {
     root
   }
@@ -1884,7 +1884,7 @@ fn rev_parse_show_prefix(root : String, cwd_abs : String) -> String {
 ///|
 fn rev_parse_show_cdup(root : String, cwd_abs : String) -> String {
   let abs_root = if root == "." {
-    @sys.get_env_var("PWD").unwrap_or(root)
+    @env.get_env_var("PWD").unwrap_or(root)
   } else {
     root
   }
@@ -1980,9 +1980,9 @@ fn rev_parse_resolve_abs_root(root : String, cwd_abs : String) -> String {
   if root.has_prefix("/") {
     root
   } else {
-    let base = match @sys.get_env_var("GIT_SHIM_PWD") {
+    let base = match @env.get_env_var("GIT_SHIM_PWD") {
       Some(v) => v
-      None => @sys.get_env_var("PWD").unwrap_or(cwd_abs)
+      None => @env.get_env_var("PWD").unwrap_or(cwd_abs)
     }
     if root == "." {
       base
@@ -2799,7 +2799,7 @@ fn parseopt_match_long(
     }
   }
   let disallow_abbreviated = match
-    @sys.get_env_var("GIT_TEST_DISALLOW_ABBREVIATED_OPTIONS") {
+    @env.get_env_var("GIT_TEST_DISALLOW_ABBREVIATED_OPTIONS") {
     Some(v) => v == "true" || v == "1" || v == "yes"
     None => false
   }

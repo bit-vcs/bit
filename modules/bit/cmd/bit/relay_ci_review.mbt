@@ -56,7 +56,7 @@ async fn handle_relay_ci_push(args : Array[String]) -> Unit raise Error {
     @sys.exit(1)
   }
   let (base_url, room) = relay_resolve_room_arg(room_arg)
-  let sender = match @sys.get_env_var("BIT_RELAY_SENDER") {
+  let sender = match @env.get_env_var("BIT_RELAY_SENDER") {
     Some(s) => s
     None => "ci"
   }

@@ -69,12 +69,12 @@ test "rev-parse: --git-path prefers cwd-relative path for absolute git dir" {
 
 ///|
 test "rev-parse: --git-path prefers caller pwd under -C" {
-  let prev = @sys.get_env_var("GIT_SHIM_CALLER_PWD")
-  @sys.set_env_var("GIT_SHIM_CALLER_PWD", "/repo")
+  let prev = @env.get_env_var("GIT_SHIM_CALLER_PWD")
+  @env.set_env_var("GIT_SHIM_CALLER_PWD", "/repo")
   @test.assert_eq(rev_parse_git_path_output_cwd("/repo/there"), "/repo")
   match prev {
-    Some(value) => @sys.set_env_var("GIT_SHIM_CALLER_PWD", value)
-    None => @sys.unset_env_var("GIT_SHIM_CALLER_PWD")
+    Some(value) => @env.set_env_var("GIT_SHIM_CALLER_PWD", value)
+    None => @env.unset_env_var("GIT_SHIM_CALLER_PWD")
   }
 }
 

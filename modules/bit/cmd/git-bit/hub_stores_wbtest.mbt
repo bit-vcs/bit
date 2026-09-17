@@ -8,8 +8,8 @@ fn cleanup_tree(fs : OsFs, path : String) -> Unit {
 ///|
 fn add_test_restore_env(name : String, value : String?) -> Unit {
   match value {
-    Some(val) => @sys.set_env_var(name, val)
-    None => @sys.unset_env_var(name)
+    Some(val) => @env.set_env_var(name, val)
+    None => @env.unset_env_var(name)
   }
 }
 
@@ -35,8 +35,8 @@ test "hub backend: parse backend kind aliases" {
 
 ///|
 test "hub backend: forced bit env selects bit backend" {
-  let prev_backend = @sys.get_env_var("BIT_HUB_BACKEND")
-  @sys.set_env_var("BIT_HUB_BACKEND", "bit")
+  let prev_backend = @env.get_env_var("BIT_HUB_BACKEND")
+  @env.set_env_var("BIT_HUB_BACKEND", "bit")
   match resolve_hub_repo_backend_kind() {
     HubRepoBackendKind::Bit => ()
     _ => fail("expected bit backend")
@@ -67,21 +67,21 @@ async test "hub backend: git backend resolves git dir and current branch" {
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
 
-  let prev_backend = @sys.get_env_var("BIT_HUB_BACKEND")
-  let prev_default_branch = @sys.get_env_var(
+  let prev_backend = @env.get_env_var("BIT_HUB_BACKEND")
+  let prev_default_branch = @env.get_env_var(
     "GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME",
   )
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
-  @sys.set_env_var("BIT_HUB_BACKEND", "git")
-  @sys.set_env_var("GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME", "main")
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.set_env_var("GIT_SHIM_PWD", ".")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("BIT_HUB_BACKEND", "git")
+  @env.set_env_var("GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME", "main")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.set_env_var("GIT_SHIM_PWD", ".")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   @bitrepo.init_repo(fs, root, default_branch="main")
 

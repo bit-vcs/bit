@@ -86,10 +86,10 @@ async fn checkout_wbtest_case_treeish_restore() -> Unit raise Error {
   let repo_dir = root + "/repo"
   let linked_dir = root + "/linked"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -112,10 +112,10 @@ async fn checkout_wbtest_case_treeish_restore() -> Unit raise Error {
   )
   fs.write_string(repo_dir + "/init.t", "dirty\n")
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
   checkout_wbtest_run_shim_git(repo_dir, [
     "checkout", "-q", "newmain", "--", "init.t",
   ])
@@ -143,10 +143,10 @@ async fn checkout_wbtest_case_switch_back_to_main() -> Unit raise Error {
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -155,10 +155,10 @@ async fn checkout_wbtest_case_switch_back_to_main() -> Unit raise Error {
   add_test_run_git(repo_dir, ["add", "init.t"])
   add_test_run_git(repo_dir, ["commit", "-q", "-m", "main"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "-b", "newbranch"])
   fs.write_string(repo_dir + "/myworld", "hello\n")
@@ -190,10 +190,10 @@ async fn checkout_wbtest_case_switch_back_with_detached_worktree() -> Unit raise
   let repo_dir = root + "/repo"
   let detached_dir = root + "/existing_empty"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -212,10 +212,10 @@ async fn checkout_wbtest_case_switch_back_with_detached_worktree() -> Unit raise
     new_branch=None,
   )
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "-b", "newbranch"])
   fs.write_string(repo_dir + "/myworld", "hello\n")
@@ -246,10 +246,10 @@ async fn checkout_wbtest_case_switch_back_after_shim_commit() -> Unit raise Erro
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -258,10 +258,10 @@ async fn checkout_wbtest_case_switch_back_after_shim_commit() -> Unit raise Erro
   add_test_run_git(repo_dir, ["add", "init.t"])
   add_test_run_git(repo_dir, ["commit", "-q", "-m", "main"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "-b", "newbranch"])
   fs.write_string(repo_dir + "/myworld", "hello\n")
@@ -293,10 +293,10 @@ async fn checkout_wbtest_case_branch_in_use() -> Unit raise Error {
   let repo_dir = root + "/repo"
   let linked_dir = root + "/linked"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -314,10 +314,10 @@ async fn checkout_wbtest_case_branch_in_use() -> Unit raise Error {
     new_branch=Some("newmain"),
   )
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   let (_, stdout, stderr) = checkout_wbtest_collect_shim_git_output(repo_dir, [
     "checkout", "-q", "newmain",
@@ -347,10 +347,10 @@ async fn checkout_wbtest_case_force_branch_in_use() -> Unit raise Error {
   let repo_dir = root + "/repo"
   let linked_dir = root + "/linked"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -369,10 +369,10 @@ async fn checkout_wbtest_case_force_branch_in_use() -> Unit raise Error {
   )
   add_test_run_git(repo_dir, ["checkout", "--detach", "-q", "HEAD"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   @test.assert_eq(
     checkout_branch_in_use_path(fs, repo_dir, "newmain"),
@@ -419,10 +419,10 @@ async fn checkout_wbtest_case_symlinked_branch_in_use() -> Unit raise Error {
   let linked_dir = root + "/there"
   let linked_head = repo_dir + "/.git/worktrees/there/HEAD"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -448,10 +448,10 @@ async fn checkout_wbtest_case_symlinked_branch_in_use() -> Unit raise Error {
   )
   @test.assert_eq(link_code, 0)
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   @test.assert_eq(
     checkout_branch_in_use_path(fs, repo_dir, "newmain"),
@@ -482,10 +482,10 @@ async fn checkout_wbtest_case_recheckout_current_branch_with_symlink_head() -> U
   let linked_dir = root + "/there"
   let linked_head = repo_dir + "/.git/worktrees/there/HEAD"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -511,10 +511,10 @@ async fn checkout_wbtest_case_recheckout_current_branch_with_symlink_head() -> U
   )
   @test.assert_eq(link_code, 0)
 
-  @sys.set_env_var("GIT_SHIM_CWD", linked_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", linked_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", linked_dir)
+  @env.set_env_var("GIT_SHIM_PWD", linked_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   checkout_wbtest_run_shim_git(linked_dir, ["checkout", "-q", "newmain"])
 
@@ -541,10 +541,10 @@ async fn checkout_wbtest_case_bare_repo_checkout_fails() -> Unit raise Error {
   let repo_dir = root + "/repo"
   let bare_dir = root + "/bare.git"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -554,10 +554,10 @@ async fn checkout_wbtest_case_bare_repo_checkout_fails() -> Unit raise Error {
   add_test_run_git(repo_dir, ["commit", "-q", "-m", "main"])
   add_test_run_git(root, ["clone", "--bare", "repo", "bare.git"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", bare_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", bare_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", bare_dir)
+  @env.set_env_var("GIT_SHIM_PWD", bare_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   let (_, stdout, stderr) = checkout_wbtest_collect_shim_git_output(bare_dir, [
     "checkout", "-q", "main",
@@ -582,10 +582,10 @@ async fn checkout_wbtest_case_orphan_branch() -> Unit raise Error {
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -594,10 +594,10 @@ async fn checkout_wbtest_case_orphan_branch() -> Unit raise Error {
   add_test_run_git(repo_dir, ["add", "init.t"])
   add_test_run_git(repo_dir, ["commit", "-q", "-m", "main"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   checkout_wbtest_run_shim_git(repo_dir, [
     "checkout", "-q", "--orphan", "orphan1",
@@ -632,10 +632,10 @@ async fn checkout_wbtest_case_checkout_updates_head_reflog() -> Unit raise Error
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -647,10 +647,10 @@ async fn checkout_wbtest_case_checkout_updates_head_reflog() -> Unit raise Error
   fs.write_string(repo_dir + "/init.t", "second\n")
   add_test_run_git(repo_dir, ["commit", "-am", "second", "-q"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   let before = @bitrepo.read_reflog(fs, repo_dir + "/.git", "HEAD")
   @test.assert_eq(before.length(), 2)
@@ -690,10 +690,10 @@ async fn checkout_wbtest_case_force_checkout_clears_merge_state() -> Unit raise 
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -711,10 +711,10 @@ async fn checkout_wbtest_case_force_checkout_clears_merge_state() -> Unit raise 
   fs.write_string(repo_dir + "/.git/MERGE_HEAD", side_id + "\n")
   fs.write_string(repo_dir + "/.git/MERGE_MSG", "merge side\n")
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "-f", "side"])
 
@@ -746,10 +746,10 @@ async fn checkout_wbtest_case_treeish_restore_updates_index() -> Unit raise Erro
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -760,10 +760,10 @@ async fn checkout_wbtest_case_treeish_restore_updates_index() -> Unit raise Erro
   fs.write_string(repo_dir + "/file", "dirty\n")
   add_test_run_git(repo_dir, ["add", "file"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
   checkout_wbtest_run_shim_git(repo_dir, [
     "checkout", "-q", "HEAD", "--", "file",
   ])
@@ -791,10 +791,10 @@ async fn checkout_wbtest_case_treeish_restore_without_separator() -> Unit raise 
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -808,10 +808,10 @@ async fn checkout_wbtest_case_treeish_restore_without_separator() -> Unit raise 
   add_test_run_git(repo_dir, ["checkout", "-q", "main"])
   fs.write_string(repo_dir + "/file", "dirty\n")
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "side", "file"])
 
   @test.assert_eq(decode_bytes(fs.read_file(repo_dir + "/file")), "side\n")
@@ -837,10 +837,10 @@ async fn checkout_wbtest_case_track_sets_branch_config() -> Unit raise Error {
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -851,10 +851,10 @@ async fn checkout_wbtest_case_track_sets_branch_config() -> Unit raise Error {
   add_test_run_git(repo_dir, ["remote", "add", "me", "."])
   add_test_run_git(repo_dir, ["update-ref", "refs/remotes/me/main", "HEAD"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
   checkout_wbtest_run_shim_git(repo_dir, [
     "checkout", "-q", "--track", "-b", "topic", "me/main",
   ])
@@ -885,10 +885,10 @@ async fn checkout_wbtest_case_detach_head_without_target() -> Unit raise Error {
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -900,10 +900,10 @@ async fn checkout_wbtest_case_detach_head_without_target() -> Unit raise Error {
     add_test_git_stdout(repo_dir, ["rev-parse", "HEAD"]),
   )
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "--detach"])
 
   @test.assert_eq(
@@ -928,10 +928,10 @@ async fn checkout_wbtest_case_previous_checkout_syntax() -> Unit raise Error {
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -940,10 +940,10 @@ async fn checkout_wbtest_case_previous_checkout_syntax() -> Unit raise Error {
   add_test_run_git(repo_dir, ["add", "file"])
   add_test_run_git(repo_dir, ["commit", "-q", "-m", "base"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "-b", "topic"])
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "main"])

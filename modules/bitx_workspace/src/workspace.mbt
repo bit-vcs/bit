@@ -146,15 +146,15 @@ fn is_bare_repo_dir(path : String) -> Bool {
 ///|
 fn resolve_git_dir(fs : &@bit.RepoFileSystem, root : String) -> String {
   let default_git_dir = default_repo_marker_path(fs, root)
-  match @sys.get_env_var("GIT_DIR") {
+  match @env.get_env_var("GIT_DIR") {
     Some(dir) => {
       let resolved = if dir.has_prefix("/") {
         dir
       } else {
-        match @sys.get_env_var("GIT_SHIM_CWD") {
+        match @env.get_env_var("GIT_SHIM_CWD") {
           Some(base) => normalize_path(base + "/" + dir)
           None =>
-            @sys.get_env_var("GIT_SHIM_PWD")
+            @env.get_env_var("GIT_SHIM_PWD")
             .map(base => normalize_path(base + "/" + dir))
             .unwrap_or(dir)
         }
@@ -352,15 +352,15 @@ fn resolve_workspace_probe_dir(cwd : String?) -> String {
   let raw = match cwd {
     Some(dir) => dir
     None =>
-      match @sys.get_env_var("GIT_SHIM_CWD") {
+      match @env.get_env_var("GIT_SHIM_CWD") {
         Some(dir) => dir
         None =>
-          match @sys.get_env_var("GIT_SHIM_PWD") {
+          match @env.get_env_var("GIT_SHIM_PWD") {
             Some(dir) => dir
             None =>
               match @env.current_dir() {
                 Some(dir) => dir
-                None => @sys.get_env_var("PWD").unwrap_or(".")
+                None => @env.get_env_var("PWD").unwrap_or(".")
               }
           }
       }
@@ -996,7 +996,7 @@ fn workspace_json_string(
 
 ///|
 fn workspace_fingerprint_mode() -> @fingerprint.FingerprintMode {
-  match @sys.get_env_var("BIT_WORKSPACE_FINGERPRINT_MODE") {
+  match @env.get_env_var("BIT_WORKSPACE_FINGERPRINT_MODE") {
     Some(raw) =>
       match @fingerprint.parse_fingerprint_mode(raw) {
         Some(mode) => mode
@@ -2335,7 +2335,7 @@ async fn handle_workspace_flow(
   if star_path is Some(star_file) {
     let external_inputs = @bitflow.parse_external_inputs(
       star_var_cli_args,
-      @sys.get_env_vars(),
+      @env.get_env_vars(),
     )
     if external_inputs.errors.length() > 0 {
       raise @bit.GitError::InvalidObject(

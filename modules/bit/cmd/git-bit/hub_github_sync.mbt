@@ -805,7 +805,7 @@ async fn handle_hub_issue_sync_status(args : Array[String]) -> Unit raise Error 
 
 ///|
 fn github_sync_write_enabled() -> Bool {
-  match @sys.get_env_var("BIT_GITHUB_SYNC_WRITE") {
+  match @env.get_env_var("BIT_GITHUB_SYNC_WRITE") {
     Some(v) => v == "1" || v == "true"
     None => false
   }

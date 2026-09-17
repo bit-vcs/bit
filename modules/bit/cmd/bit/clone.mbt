@@ -5,10 +5,10 @@ fn clone_parse_recurse_submodules_filter(arg : String) -> String {
 
 ///|
 fn clone_command_root(fallback_root : String) -> String {
-  match @sys.get_env_var("GIT_SHIM_CWD") {
+  match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
     None =>
-      match @sys.get_env_var("GIT_SHIM_PWD") {
+      match @env.get_env_var("GIT_SHIM_PWD") {
         Some(dir) => dir
         None =>
           match @env.current_dir() {
@@ -360,13 +360,13 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   let config_overrides = @bitlib.parse_config_overrides()
   let protocol_version = match config_overrides.get("protocol.version") {
     Some(v) => v
-    None => @sys.get_env_var("GIT_TEST_PROTOCOL_VERSION").unwrap_or("0")
+    None => @env.get_env_var("GIT_TEST_PROTOCOL_VERSION").unwrap_or("0")
   }
   let prefer_v2 = protocol_version == "2"
   let transport_prefer_v2 = prefer_v2 || depth > 0 || filter.is_partial()
   match ssh_ip_option {
-    Some(v) => @sys.set_env_var("BIT_SSH_IP_VERSION", v)
-    None => @sys.unset_env_var("BIT_SSH_IP_VERSION")
+    Some(v) => @env.set_env_var("BIT_SSH_IP_VERSION", v)
+    None => @env.unset_env_var("BIT_SSH_IP_VERSION")
   }
   ignore(has_filter_flag)
   ignore(mirror)
@@ -473,7 +473,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   let mut clone_root = target
   let mut use_env_work_tree = false
   if !bare {
-    match @sys.get_env_var("GIT_WORK_TREE") {
+    match @env.get_env_var("GIT_WORK_TREE") {
       Some(work_tree) => {
         clone_root = absolutize_clone_path(
           command_root,
@@ -867,8 +867,8 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
 ///|
 fn clone_restore_env(name : String, value : String?) -> Unit {
   match value {
-    Some(v) => @sys.set_env_var(name, v)
-    None => @sys.unset_env_var(name)
+    Some(v) => @env.set_env_var(name, v)
+    None => @env.unset_env_var(name)
   }
 }
 
@@ -933,14 +933,14 @@ async fn clone_run_recurse_submodules(
   filters : Array[String],
   quiet : Bool,
 ) -> Unit raise Error {
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_CWD", clone_root)
-  @sys.set_env_var("GIT_SHIM_PWD", clone_root)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", clone_root)
+  @env.set_env_var("GIT_SHIM_PWD", clone_root)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
   let args = clone_build_recurse_submodules_args(filters, quiet)
   let result : Result[Unit, Error] = try handle_submodule(args) catch {
     e => Err(e)
@@ -1144,12 +1144,12 @@ fn clone_normalize_optional_value(value : String?) -> String? {
 
 ///|
 fn clone_relay_preferred_sender() -> String? {
-  clone_normalize_optional_value(@sys.get_env_var("BIT_RELAY_CLONE_SENDER"))
+  clone_normalize_optional_value(@env.get_env_var("BIT_RELAY_CLONE_SENDER"))
 }
 
 ///|
 fn clone_relay_preferred_repo() -> String? {
-  clone_normalize_optional_value(@sys.get_env_var("BIT_RELAY_CLONE_REPO"))
+  clone_normalize_optional_value(@env.get_env_var("BIT_RELAY_CLONE_REPO"))
 }
 
 ///|
@@ -1212,7 +1212,7 @@ fn clone_ref_format_requires_advanced_compat(ref_format : String) -> Bool {
 
 ///|
 fn clone_default_ref_format() -> String {
-  match @sys.get_env_var("GIT_TEST_DEFAULT_REF_FORMAT") {
+  match @env.get_env_var("GIT_TEST_DEFAULT_REF_FORMAT") {
     Some(value) => {
       let normalized = value.to_lower()
       if normalized == "reftable" {
@@ -1526,7 +1526,7 @@ fn emit_clone_bundle_trace_events(
   if bundle_uris.length() == 0 {
     return ()
   }
-  match @sys.get_env_var("GIT_TRACE2_EVENT") {
+  match @env.get_env_var("GIT_TRACE2_EVENT") {
     Some(path) =>
       for uri in bundle_uris {
         append_clone_trace_line(

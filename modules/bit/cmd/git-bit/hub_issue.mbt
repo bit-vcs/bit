@@ -616,7 +616,7 @@ async fn handle_hub_issue_get(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let (git_dir, id) = if repo_ref.length() > 0 {
     let local_git_dir = resolve_hub_git_dir(root)
-    let home = @sys.get_env_var("HOME").unwrap_or("/")
+    let home = @env.get_env_var("HOME").unwrap_or("/")
     let aliases = load_aliases(local_git_dir)
     let remote_path = resolve_repo_ref_to_path(repo_ref, home, aliases~)
     (resolve_hub_git_dir(remote_path), parsed_id)
@@ -812,7 +812,7 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = match repo_ref {
     Some(rref) => {
-      let home = @sys.get_env_var("HOME").unwrap_or("/")
+      let home = @env.get_env_var("HOME").unwrap_or("/")
       let local_git_dir = resolve_hub_git_dir(root)
       let aliases = load_aliases(local_git_dir)
       let remote_path = resolve_repo_ref_to_path(rref, home, aliases~)
@@ -1513,7 +1513,7 @@ async fn handle_hub_issue_init(_args : Array[String]) -> Unit raise Error {
 
 ///|
 fn issue_default_relay_url() -> String {
-  match @sys.get_env_var("BIT_RELAY_URL") {
+  match @env.get_env_var("BIT_RELAY_URL") {
     Some(url) => url
     None => "relay+https://bit-relay.mizchi.workers.dev"
   }

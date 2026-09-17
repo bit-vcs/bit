@@ -386,8 +386,8 @@ async test "relay: relay push adds relay signature headers when key env is set" 
     return
   }
 
-  @sys.set_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE", key_path)
-  @sys.set_env_var("BIT_RELAY_SIGN_PUBLIC_KEY", "test-public-key")
+  @env.set_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE", key_path)
+  @env.set_env_var("BIT_RELAY_SIGN_PUBLIC_KEY", "test-public-key")
 
   let seen_public_keys : Array[String] = []
   let seen_signatures : Array[String] = []
@@ -435,8 +435,8 @@ async test "relay: relay push adds relay signature headers when key env is set" 
     auth_token=None,
   )
 
-  @sys.unset_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE")
-  @sys.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
+  @env.unset_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE")
+  @env.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
   ignore(
     @process.run("rm", ["-f", key_path], inherit_env=true) catch {
       _ => -1
@@ -479,7 +479,7 @@ async test "relay: relay push uses BIT_RELAY_SENDER for publish sender query" {
       objects, refs, clock_ref, "hub/pr/1/meta", "hub.pr", "payload", "node-local",
     ),
   )
-  @sys.set_env_var("BIT_RELAY_SENDER", "node-a")
+  @env.set_env_var("BIT_RELAY_SENDER", "node-a")
   let seen_urls : Array[String] = []
   let post = async fn(
     url : String,
@@ -506,7 +506,7 @@ async test "relay: relay push uses BIT_RELAY_SENDER for publish sender query" {
     signing_key=None,
     auth_token=None,
   )
-  @sys.unset_env_var("BIT_RELAY_SENDER")
+  @env.unset_env_var("BIT_RELAY_SENDER")
   assert_true(result.success())
   @test.assert_eq(seen_urls.length(), 1)
   assert_true(seen_urls[0].contains("sender=node-a"))
@@ -623,7 +623,7 @@ test "relay: parse_relay_poll_clone_peers extracts latest announce per sender" {
 
 ///|
 async test "relay: relay_publish_clone_announce_with_http publishes notify payload" {
-  @sys.set_env_var("BIT_RELAY_SENDER", "node-self")
+  @env.set_env_var("BIT_RELAY_SENDER", "node-self")
   let seen_urls : Array[String] = []
   let seen_bodies : Array[String] = []
   let seen_auth : Array[String] = []
@@ -656,7 +656,7 @@ async test "relay: relay_publish_clone_announce_with_http publishes notify paylo
     repo=Some("repo-self"),
     auth_token=Some("token-3"),
   )
-  @sys.unset_env_var("BIT_RELAY_SENDER")
+  @env.unset_env_var("BIT_RELAY_SENDER")
   assert_true(accepted)
   @test.assert_eq(seen_urls.length(), 1)
   assert_true(seen_urls[0].contains("sender=node-self"))

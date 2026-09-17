@@ -152,13 +152,13 @@ pub fn split_alias_command(value : String) -> Array[String] {
 
 ///|
 fn find_global_gitconfig_path() -> String? {
-  match @sys.get_env_var("GIT_CONFIG_GLOBAL") {
+  match @env.get_env_var("GIT_CONFIG_GLOBAL") {
     Some(path) => Some(path)
     None =>
-      match @sys.get_env_var("HOME") {
+      match @env.get_env_var("HOME") {
         Some(home) => Some(home + "/.gitconfig")
         None =>
-          match @sys.get_env_var("USERPROFILE") {
+          match @env.get_env_var("USERPROFILE") {
             Some(home) => Some(home + "/.gitconfig")
             None => None
           }

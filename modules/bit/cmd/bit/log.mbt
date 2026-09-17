@@ -738,7 +738,7 @@ fn log_read_config_entries(
     }
   }
   let override_key = section_lower + "." + key_lower
-  match @sys.get_env_var("GIT_CONFIG_OVERRIDES") {
+  match @env.get_env_var("GIT_CONFIG_OVERRIDES") {
     Some(data) =>
       for line_view in data.split("\n") {
         let line = line_view.to_owned()

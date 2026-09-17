@@ -124,7 +124,7 @@ async fn handle_hub_issue_active(_args : Array[String]) -> Unit raise Error {
     print_line("No active issues")
     return
   }
-  let home = @sys.get_env_var("HOME").unwrap_or("/")
+  let home = @env.get_env_var("HOME").unwrap_or("/")
   let aliases = load_aliases(git_dir)
   for entry in entries {
     let (repo_ref, issue_id) = parse_cross_repo_ref(entry)

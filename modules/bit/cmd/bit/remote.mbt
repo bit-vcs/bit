@@ -58,7 +58,7 @@ fn emit_trace_region(
   category : String,
   label : String,
 ) -> Unit raise @bitcore.GitError {
-  let path = @sys.get_env_var("GIT_TRACE2_EVENT")
+  let path = @env.get_env_var("GIT_TRACE2_EVENT")
   guard path is Some(target) else { return () }
   let enter = "{\"event\":\"region_enter\",\"category\":\"" +
     category +
@@ -93,7 +93,7 @@ fn append_text_file(fs : OsFs, path : String, text : String) -> Unit {
 
 ///|
 fn emit_push_trace_event(fs : OsFs, key : String, value : String) -> Unit {
-  match @sys.get_env_var("GIT_TRACE2_EVENT") {
+  match @env.get_env_var("GIT_TRACE2_EVENT") {
     Some(path) => {
       let line = "{\"event\":\"data\",\"key\":\"" +
         key +
@@ -108,7 +108,7 @@ fn emit_push_trace_event(fs : OsFs, key : String, value : String) -> Unit {
 
 ///|
 fn emit_push_trace_subcommand(fs : OsFs, argv : Array[String]) -> Unit {
-  match @sys.get_env_var("GIT_TRACE2_EVENT") {
+  match @env.get_env_var("GIT_TRACE2_EVENT") {
     Some(path) => {
       let encoded : Array[String] = []
       for arg in argv {
@@ -1259,7 +1259,7 @@ async fn remote_prune(
   let url = rc.urls[0]
   print_line("Pruning \{name}")
   print_line("URL: \{url}")
-  let local_root = match @sys.get_env_var("GIT_SHIM_CWD") {
+  let local_root = match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
     None => root
   }
@@ -1500,7 +1500,7 @@ async fn remote_set_head_auto(
   if url.length() == 0 {
     raise @bitcore.GitError::InvalidObject("No remote configured")
   }
-  let local_root = match @sys.get_env_var("GIT_SHIM_CWD") {
+  let local_root = match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
     None => root
   }
@@ -1547,21 +1547,21 @@ async fn remote_set_head_auto(
 
 ///|
 fn get_committer_identity() -> (String, String, Int64, String) {
-  let name = match @sys.get_env_var("GIT_COMMITTER_NAME") {
+  let name = match @env.get_env_var("GIT_COMMITTER_NAME") {
     Some(n) => n
-    None => @sys.get_env_var("USER").unwrap_or("Unknown")
+    None => @env.get_env_var("USER").unwrap_or("Unknown")
   }
-  let email = match @sys.get_env_var("GIT_COMMITTER_EMAIL") {
+  let email = match @env.get_env_var("GIT_COMMITTER_EMAIL") {
     Some(e) => e
     None =>
-      match @sys.get_env_var("USER") {
+      match @env.get_env_var("USER") {
         Some(u) => u + "@localhost"
         None => "unknown@localhost"
       }
   }
   let mut timestamp = get_current_timestamp()
   let mut timezone = "+0000"
-  match @sys.get_env_var("GIT_COMMITTER_DATE") {
+  match @env.get_env_var("GIT_COMMITTER_DATE") {
     Some(raw) => {
       let parts = @bitlib.split_whitespace_all(raw)
       if parts.length() > 0 {
@@ -1776,7 +1776,7 @@ fn parse_legacy_branches_entry(
 
 ///|
 fn legacy_default_branch_name() -> String {
-  @sys.get_env_var("GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME").unwrap_or("main")
+  @env.get_env_var("GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME").unwrap_or("main")
 }
 
 ///|
@@ -1837,10 +1837,10 @@ fn write_clone_alternates(
 fn read_global_branch_autosetuprebase(
   fs : &@bitcore.RepoFileSystem,
 ) -> String? raise Error {
-  let config_path = match @sys.get_env_var("GIT_CONFIG_GLOBAL") {
+  let config_path = match @env.get_env_var("GIT_CONFIG_GLOBAL") {
     Some(path) => path
     None =>
-      match @sys.get_env_var("HOME") {
+      match @env.get_env_var("HOME") {
         Some(home) => home + "/.gitconfig"
         None => return None
       }
@@ -2668,7 +2668,7 @@ async fn fetch_local_repo(
   } else {
     src_path
   }
-  match @sys.get_env_var("GIT_TRACE_PACKET") {
+  match @env.get_env_var("GIT_TRACE_PACKET") {
     Some(path) => append_text_file(fs, path, "")
     None => ()
   }
@@ -2748,7 +2748,7 @@ async fn fetch_local_repo(
     "uploadpack",
     "allowreachablesha1inwant",
   ).unwrap_or(false)
-  let protocol_version = @sys.get_env_var("GIT_TEST_PROTOCOL_VERSION").unwrap_or(
+  let protocol_version = @env.get_env_var("GIT_TEST_PROTOCOL_VERSION").unwrap_or(
     "2",
   )
   let enforce_unadvertised_oid = protocol_version == "0"
@@ -3088,7 +3088,7 @@ async fn fetch_from_remote(
   force_transport? : Bool = false,
   quiet? : Bool = false,
 ) -> Unit raise Error {
-  let local_root = match @sys.get_env_var("GIT_SHIM_CWD") {
+  let local_root = match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
     None => root
   }
@@ -3519,7 +3519,7 @@ async fn remote_show(
       print_line("  Push  URL: \{pu}")
     }
   }
-  let local_root = match @sys.get_env_var("GIT_SHIM_CWD") {
+  let local_root = match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
     None => root
   }

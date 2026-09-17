@@ -2,7 +2,7 @@
 
 ///|
 fn relay_safe_sender() -> String {
-  match @sys.get_env_var("BIT_RELAY_SENDER") {
+  match @env.get_env_var("BIT_RELAY_SENDER") {
     Some(s) => s
     None => {
       // Extract name from git author config, URL-safe
@@ -29,7 +29,7 @@ fn relay_safe_sender() -> String {
 
 ///|
 fn relay_default_base_url() -> String {
-  match @sys.get_env_var("BIT_RELAY_URL") {
+  match @env.get_env_var("BIT_RELAY_URL") {
     Some(url) =>
       // Strip relay+ prefix if present
       if url.has_prefix("relay+") {

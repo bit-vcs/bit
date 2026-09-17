@@ -550,7 +550,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         let stopped_path = git_dir + "/rebase-merge/stopped-sha"
         if rfs.is_file(stopped_path) {
           let hex = trim_string(decode_bytes(rfs.read_file(stopped_path)))
-          if @sys.get_env_var("GIT_TRACE") is Some(v) && v != "" && v != "0" {
+          if @env.get_env_var("GIT_TRACE") is Some(v) && v != "" && v != "0" {
             let backend_path = git_dir + "/rebase-merge/backend"
             let use_apply = rfs.is_file(backend_path) &&
               trim_string(decode_bytes(rfs.read_file(backend_path))) == "apply"

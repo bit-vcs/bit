@@ -70,16 +70,16 @@ async fn run_add_interactive(
 
 ///|
 fn resolve_sequence_editor() -> String? {
-  match @sys.get_env_var("GIT_SEQUENCE_EDITOR") {
+  match @env.get_env_var("GIT_SEQUENCE_EDITOR") {
     Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
     _ =>
-      match @sys.get_env_var("GIT_EDITOR") {
+      match @env.get_env_var("GIT_EDITOR") {
         Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
         _ =>
-          match @sys.get_env_var("VISUAL") {
+          match @env.get_env_var("VISUAL") {
             Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
             _ =>
-              match @sys.get_env_var("EDITOR") {
+              match @env.get_env_var("EDITOR") {
                 Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
                 _ => None
               }
@@ -90,13 +90,13 @@ fn resolve_sequence_editor() -> String? {
 
 ///|
 fn resolve_commit_editor() -> String? {
-  match @sys.get_env_var("GIT_EDITOR") {
+  match @env.get_env_var("GIT_EDITOR") {
     Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
     _ =>
-      match @sys.get_env_var("VISUAL") {
+      match @env.get_env_var("VISUAL") {
         Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
         _ =>
-          match @sys.get_env_var("EDITOR") {
+          match @env.get_env_var("EDITOR") {
             Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
             _ => None
           }

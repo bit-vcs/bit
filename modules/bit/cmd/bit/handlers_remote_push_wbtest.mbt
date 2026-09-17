@@ -1,8 +1,8 @@
 ///|
 fn restore_env_var_for_push_wbtest(name : String, prev : String?) -> Unit {
   match prev {
-    Some(value) => @sys.set_env_var(name, value)
-    None => @sys.unset_env_var(name)
+    Some(value) => @env.set_env_var(name, value)
+    None => @env.unset_env_var(name)
   }
 }
 
@@ -380,14 +380,14 @@ test "push relay: remote detection handles explicit relay schemes" {
 
 ///|
 test "push relay: preferred sender/repo env is trimmed and optional" {
-  let prev_sender = @sys.get_env_var("BIT_RELAY_PUSH_SENDER")
-  let prev_repo = @sys.get_env_var("BIT_RELAY_PUSH_REPO")
-  @sys.set_env_var("BIT_RELAY_PUSH_SENDER", " node-a ")
-  @sys.set_env_var("BIT_RELAY_PUSH_REPO", " repo-b ")
+  let prev_sender = @env.get_env_var("BIT_RELAY_PUSH_SENDER")
+  let prev_repo = @env.get_env_var("BIT_RELAY_PUSH_REPO")
+  @env.set_env_var("BIT_RELAY_PUSH_SENDER", " node-a ")
+  @env.set_env_var("BIT_RELAY_PUSH_REPO", " repo-b ")
   @test.assert_eq(push_relay_preferred_sender(), Some("node-a"))
   @test.assert_eq(push_relay_preferred_repo(), Some("repo-b"))
-  @sys.set_env_var("BIT_RELAY_PUSH_SENDER", "   ")
-  @sys.set_env_var("BIT_RELAY_PUSH_REPO", "   ")
+  @env.set_env_var("BIT_RELAY_PUSH_SENDER", "   ")
+  @env.set_env_var("BIT_RELAY_PUSH_REPO", "   ")
   @test.assert_eq(push_relay_preferred_sender(), None)
   @test.assert_eq(push_relay_preferred_repo(), None)
   restore_env_var_for_push_wbtest("BIT_RELAY_PUSH_SENDER", prev_sender)

@@ -787,7 +787,7 @@ fn tag_resolve_column_mode(
 
 ///|
 fn tag_term_columns() -> Int {
-  match @sys.get_env_var("COLUMNS") {
+  match @env.get_env_var("COLUMNS") {
     Some(raw) => {
       let parsed = @string.parse_int(raw) catch { _ => 80 }
       if parsed > 1 {

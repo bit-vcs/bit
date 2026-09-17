@@ -33,8 +33,8 @@ fn cmd_storage_trim(s : String) -> String {
 ///|
 fn cmd_storage_restore_env(name : String, prev : String?) -> Unit {
   match prev {
-    Some(value) => @sys.set_env_var(name, value)
-    None => @sys.unset_env_var(name)
+    Some(value) => @env.set_env_var(name, value)
+    None => @env.unset_env_var(name)
   }
 }
 
@@ -47,18 +47,18 @@ fn cmd_storage_setup_test_env() -> (
   String?,
   String?,
 ) {
-  let prev_author_name = @sys.get_env_var("GIT_AUTHOR_NAME")
-  let prev_author_email = @sys.get_env_var("GIT_AUTHOR_EMAIL")
-  let prev_committer_name = @sys.get_env_var("GIT_COMMITTER_NAME")
-  let prev_committer_email = @sys.get_env_var("GIT_COMMITTER_EMAIL")
-  let prev_committer_date = @sys.get_env_var("GIT_COMMITTER_DATE")
-  let prev_quiet = @sys.get_env_var("BIT_STORAGE_RUNTIME_QUIET")
-  @sys.set_env_var("GIT_AUTHOR_NAME", "Storage Delegate Test")
-  @sys.set_env_var("GIT_AUTHOR_EMAIL", "storage-delegate@example.com")
-  @sys.set_env_var("GIT_COMMITTER_NAME", "Storage Delegate Test")
-  @sys.set_env_var("GIT_COMMITTER_EMAIL", "storage-delegate@example.com")
-  @sys.set_env_var("GIT_COMMITTER_DATE", "1700000000")
-  @sys.set_env_var("BIT_STORAGE_RUNTIME_QUIET", "1")
+  let prev_author_name = @env.get_env_var("GIT_AUTHOR_NAME")
+  let prev_author_email = @env.get_env_var("GIT_AUTHOR_EMAIL")
+  let prev_committer_name = @env.get_env_var("GIT_COMMITTER_NAME")
+  let prev_committer_email = @env.get_env_var("GIT_COMMITTER_EMAIL")
+  let prev_committer_date = @env.get_env_var("GIT_COMMITTER_DATE")
+  let prev_quiet = @env.get_env_var("BIT_STORAGE_RUNTIME_QUIET")
+  @env.set_env_var("GIT_AUTHOR_NAME", "Storage Delegate Test")
+  @env.set_env_var("GIT_AUTHOR_EMAIL", "storage-delegate@example.com")
+  @env.set_env_var("GIT_COMMITTER_NAME", "Storage Delegate Test")
+  @env.set_env_var("GIT_COMMITTER_EMAIL", "storage-delegate@example.com")
+  @env.set_env_var("GIT_COMMITTER_DATE", "1700000000")
+  @env.set_env_var("BIT_STORAGE_RUNTIME_QUIET", "1")
   (
     prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
     prev_committer_date, prev_quiet,

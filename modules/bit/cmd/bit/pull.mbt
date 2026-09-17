@@ -1360,14 +1360,14 @@ fn pull_reflog_action(args : Array[String]) -> String {
 
 ///|
 fn pull_reflog_identity() -> (String, String) {
-  let name = match @sys.get_env_var("GIT_COMMITTER_NAME") {
+  let name = match @env.get_env_var("GIT_COMMITTER_NAME") {
     Some(n) => n
-    None => @sys.get_env_var("USER").unwrap_or("Unknown")
+    None => @env.get_env_var("USER").unwrap_or("Unknown")
   }
-  let email = match @sys.get_env_var("GIT_COMMITTER_EMAIL") {
+  let email = match @env.get_env_var("GIT_COMMITTER_EMAIL") {
     Some(e) => e
     None =>
-      match @sys.get_env_var("USER") {
+      match @env.get_env_var("USER") {
         Some(u) => u + "@localhost"
         None => "unknown@localhost"
       }
@@ -1411,12 +1411,12 @@ fn pull_append_fast_forward_reflog(
 
 ///|
 fn pull_relay_preferred_sender() -> String? {
-  pull_normalize_optional_value(@sys.get_env_var("BIT_RELAY_PULL_SENDER"))
+  pull_normalize_optional_value(@env.get_env_var("BIT_RELAY_PULL_SENDER"))
 }
 
 ///|
 fn pull_relay_preferred_repo() -> String? {
-  pull_normalize_optional_value(@sys.get_env_var("BIT_RELAY_PULL_REPO"))
+  pull_normalize_optional_value(@env.get_env_var("BIT_RELAY_PULL_REPO"))
 }
 
 ///|

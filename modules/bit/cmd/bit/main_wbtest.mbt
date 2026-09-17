@@ -65,14 +65,14 @@ test "main: grep supported -c overrides stay in shim" {
 
 ///|
 test "main: config overrides use last matching value" {
-  let prev = @sys.get_env_var("GIT_CONFIG_OVERRIDES")
-  @sys.set_env_var(
+  let prev = @env.get_env_var("GIT_CONFIG_OVERRIDES")
+  @env.set_env_var(
     "GIT_CONFIG_OVERRIDES", "grep.patternType=extended\ngrep.patternType=default\ngrep.patternType=fixed",
   )
   @test.assert_eq(get_config_override("grep.patternType"), Some("fixed"))
   match prev {
-    Some(value) => @sys.set_env_var("GIT_CONFIG_OVERRIDES", value)
-    None => @sys.unset_env_var("GIT_CONFIG_OVERRIDES")
+    Some(value) => @env.set_env_var("GIT_CONFIG_OVERRIDES", value)
+    None => @env.unset_env_var("GIT_CONFIG_OVERRIDES")
   }
 }
 
@@ -94,29 +94,29 @@ test "main: config and status stay native without config injection" {
 
 ///|
 test "main: bit-only commands stay native under config injection" {
-  let prev = @sys.get_env_var("GIT_CONFIG_PARAMETERS")
-  @sys.set_env_var("GIT_CONFIG_PARAMETERS", "'core.editor'='vim'")
+  let prev = @env.get_env_var("GIT_CONFIG_PARAMETERS")
+  @env.set_env_var("GIT_CONFIG_PARAMETERS", "'core.editor'='vim'")
   for cmd in ["issue", "pr", "hub", "relay", "workspace", "ws", "hq"] {
     let opts = parse_global_options(["bit", cmd, "list"])
     assert_false(should_delegate_to_real_git(["bit", cmd, "list"], opts))
   }
   match prev {
-    Some(value) => @sys.set_env_var("GIT_CONFIG_PARAMETERS", value)
-    None => @sys.unset_env_var("GIT_CONFIG_PARAMETERS")
+    Some(value) => @env.set_env_var("GIT_CONFIG_PARAMETERS", value)
+    None => @env.unset_env_var("GIT_CONFIG_PARAMETERS")
   }
 }
 
 ///|
 test "main: config and status still delegate under config injection" {
-  let prev = @sys.get_env_var("GIT_CONFIG_PARAMETERS")
-  @sys.set_env_var("GIT_CONFIG_PARAMETERS", "'core.editor'='vim'")
+  let prev = @env.get_env_var("GIT_CONFIG_PARAMETERS")
+  @env.set_env_var("GIT_CONFIG_PARAMETERS", "'core.editor'='vim'")
   for cmd in ["config", "status"] {
     let opts = parse_global_options(["bit", cmd])
     assert_true(should_delegate_to_real_git(["bit", cmd], opts))
   }
   match prev {
-    Some(value) => @sys.set_env_var("GIT_CONFIG_PARAMETERS", value)
-    None => @sys.unset_env_var("GIT_CONFIG_PARAMETERS")
+    Some(value) => @env.set_env_var("GIT_CONFIG_PARAMETERS", value)
+    None => @env.unset_env_var("GIT_CONFIG_PARAMETERS")
   }
 }
 
@@ -130,14 +130,14 @@ test "main: worktree stays in shim without config overrides" {
 
 ///|
 test "main: worktree stays in shim with config env overrides" {
-  let prev = @sys.get_env_var("GIT_CONFIG_PARAMETERS")
-  @sys.set_env_var("GIT_CONFIG_PARAMETERS", "'core.abbrev'='false'")
+  let prev = @env.get_env_var("GIT_CONFIG_PARAMETERS")
+  @env.set_env_var("GIT_CONFIG_PARAMETERS", "'core.abbrev'='false'")
   let opts = parse_global_options(["bit", "worktree", "add", "wt", "-"])
   assert_false(
     should_delegate_to_real_git(["bit", "worktree", "add", "wt", "-"], opts),
   )
   match prev {
-    Some(value) => @sys.set_env_var("GIT_CONFIG_PARAMETERS", value)
-    None => @sys.unset_env_var("GIT_CONFIG_PARAMETERS")
+    Some(value) => @env.set_env_var("GIT_CONFIG_PARAMETERS", value)
+    None => @env.unset_env_var("GIT_CONFIG_PARAMETERS")
   }
 }

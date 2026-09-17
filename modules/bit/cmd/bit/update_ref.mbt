@@ -794,10 +794,10 @@ fn get_author_info(
   let mut name = "Unknown"
   let mut email = "unknown@unknown"
   // Check environment variables first
-  if @sys.get_env_var("GIT_COMMITTER_NAME") is Some(n) {
+  if @env.get_env_var("GIT_COMMITTER_NAME") is Some(n) {
     name = n
   }
-  if @sys.get_env_var("GIT_COMMITTER_EMAIL") is Some(e) {
+  if @env.get_env_var("GIT_COMMITTER_EMAIL") is Some(e) {
     email = e
   }
   // If not in env, try config

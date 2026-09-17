@@ -151,7 +151,7 @@ fn is_http_url(url : String) -> Bool {
 
 ///|
 fn relay_signing_key() -> String? {
-  match @sys.get_env_var("BIT_COLLAB_SIGN_KEY") {
+  match @env.get_env_var("BIT_COLLAB_SIGN_KEY") {
     Some(value) => if value.length() > 0 { Some(value) } else { None }
     None => None
   }
@@ -159,7 +159,7 @@ fn relay_signing_key() -> String? {
 
 ///|
 fn relay_require_signed() -> Bool {
-  match @sys.get_env_var("BIT_COLLAB_REQUIRE_SIGNED") {
+  match @env.get_env_var("BIT_COLLAB_REQUIRE_SIGNED") {
     Some(value) => {
       let normalized = value.to_lower()
       normalized == "1" || normalized == "true" || normalized == "yes"
@@ -170,7 +170,7 @@ fn relay_require_signed() -> Bool {
 
 ///|
 fn relay_auth_token() -> String? {
-  match @sys.get_env_var("BIT_RELAY_AUTH_TOKEN") {
+  match @env.get_env_var("BIT_RELAY_AUTH_TOKEN") {
     Some(value) => if value.length() > 0 { Some(value) } else { None }
     None => None
   }
@@ -236,7 +236,7 @@ fn normalize_relay_sender(raw : String) -> String {
 
 ///|
 fn relay_sender() -> String {
-  match @sys.get_env_var("BIT_RELAY_SENDER") {
+  match @env.get_env_var("BIT_RELAY_SENDER") {
     Some(value) => normalize_relay_sender(value)
     None => "bit"
   }
@@ -244,7 +244,7 @@ fn relay_sender() -> String {
 
 ///|
 fn relay_conflict_policy() -> @hub.RecordMergePolicy {
-  match @sys.get_env_var("BIT_HUB_CONFLICT_POLICY") {
+  match @env.get_env_var("BIT_HUB_CONFLICT_POLICY") {
     Some(value) =>
       match @hub.parse_record_merge_policy(value) {
         Some(policy) => policy

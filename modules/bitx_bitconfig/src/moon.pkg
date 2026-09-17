@@ -1,6 +1,6 @@
 import {
   "bobzhang/toml",
-  "moonbitlang/x/sys",
+  "moonbitlang/core/env",
   "moonbitlang/x/fs",
 }
 

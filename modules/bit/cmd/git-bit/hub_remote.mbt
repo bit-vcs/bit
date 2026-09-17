@@ -174,7 +174,7 @@ async fn handle_hub_issue_remote_add(args : Array[String]) -> Unit raise Error {
   let git_dir = resolve_hub_git_dir(root)
   let aliases = load_aliases(git_dir)
   // Resolve target: if it looks like owner/repo, resolve to ghq path
-  let home = @sys.get_env_var("HOME").unwrap_or("/")
+  let home = @env.get_env_var("HOME").unwrap_or("/")
   let resolved_path = if target.has_prefix("/") {
     target
   } else {

@@ -76,9 +76,9 @@ async fn relay_bench_http_post_ok(
 
 ///|
 test "bench relay push 200 records default sender" (b : @bench.T) {
-  @sys.unset_env_var("BIT_RELAY_SENDER")
-  @sys.unset_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE")
-  @sys.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
+  @env.unset_env_var("BIT_RELAY_SENDER")
+  @env.unset_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE")
+  @env.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
   b.bench(fn() {
     let mut ok = false
     @async.run_async_main(async fn() {
@@ -98,9 +98,9 @@ test "bench relay push 200 records default sender" (b : @bench.T) {
 
 ///|
 test "bench relay push 200 records BIT_RELAY_SENDER set" (b : @bench.T) {
-  @sys.set_env_var("BIT_RELAY_SENDER", "node-a")
-  @sys.unset_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE")
-  @sys.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
+  @env.set_env_var("BIT_RELAY_SENDER", "node-a")
+  @env.unset_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE")
+  @env.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
   b.bench(fn() {
     let mut ok = false
     @async.run_async_main(async fn() {
@@ -116,5 +116,5 @@ test "bench relay push 200 records BIT_RELAY_SENDER set" (b : @bench.T) {
     })
     b.keep(ok)
   })
-  @sys.unset_env_var("BIT_RELAY_SENDER")
+  @env.unset_env_var("BIT_RELAY_SENDER")
 }

@@ -33,14 +33,14 @@ async test "init: --object-format sha256 creates SHA-256 repo with valid config"
   let root = "/tmp/bit-test-init-sha256-" + get_current_timestamp().to_string()
   cleanup_tree(fs, root)
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.set_env_var("GIT_SHIM_PWD", ".")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.set_env_var("GIT_SHIM_PWD", ".")
 
   handle_init(["-q", "--object-format", "sha256", root])
 
@@ -124,19 +124,19 @@ async test "init: respects GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME" {
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
-  let prev_default_branch = @sys.get_env_var(
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
+  let prev_default_branch = @env.get_env_var(
     "GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME",
   )
 
-  @sys.set_env_var("GIT_SHIM_CWD", root)
-  @sys.set_env_var("GIT_SHIM_PWD", root)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME", "main")
+  @env.set_env_var("GIT_SHIM_CWD", root)
+  @env.set_env_var("GIT_SHIM_PWD", root)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME", "main")
 
   handle_init(["-q", "repo"])
 

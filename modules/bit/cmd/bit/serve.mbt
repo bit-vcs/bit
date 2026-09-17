@@ -90,7 +90,7 @@ fn parse_hub_serve_options(args : Array[String]) -> HubServeOptions? {
   let url = match relay_url {
     Some(u) => u
     None =>
-      match @sys.get_env_var("BIT_RELAY_URL") {
+      match @env.get_env_var("BIT_RELAY_URL") {
         Some(u) => u
         None => "relay+https://bit-relay.mizchi.workers.dev"
       }
@@ -1512,7 +1512,7 @@ fn serve_parent_path(path : String) -> String {
 
 ///|
 fn serve_add_auth_header(headers : Map[String, String]) -> Unit {
-  match @sys.get_env_var("BIT_RELAY_AUTH_TOKEN") {
+  match @env.get_env_var("BIT_RELAY_AUTH_TOKEN") {
     Some(token) =>
       if token.length() > 0 {
         if token.has_prefix("Bearer ") || token.has_prefix("bearer ") {

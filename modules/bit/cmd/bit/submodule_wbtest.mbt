@@ -58,8 +58,8 @@ async fn submodule_wbtest_git_stderr(
 ///|
 fn submodule_wbtest_restore_env(name : String, value : String?) -> Unit {
   match value {
-    Some(v) => @sys.set_env_var(name, v)
-    None => @sys.unset_env_var(name)
+    Some(v) => @env.set_env_var(name, v)
+    None => @env.unset_env_var(name)
   }
 }
 
@@ -130,8 +130,8 @@ async fn submodule_wbtest_setup_deinit_repo(
     "config", "user.email", "test@example.com",
   ])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_git(super_dir, ["submodule", "add", "./../init", "init"])
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
   super_dir
@@ -175,7 +175,7 @@ async test "submodule absorbgitdirs: embedded repo migrates and update reuses mo
     get_current_timestamp().to_string()
   ignore(@process.run("rm", ["-rf", root], inherit_env=true))
   fs.mkdir_p(root)
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
   submodule_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "."])
   submodule_wbtest_run_git(root, ["config", "user.name", "Test User"])
   submodule_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
@@ -188,7 +188,7 @@ async test "submodule absorbgitdirs: embedded repo migrates and update reuses mo
   submodule_wbtest_run_git(root + "/sub1", ["add", "a"])
   submodule_wbtest_run_git(root + "/sub1", ["commit", "-q", "-m", "initial"])
 
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   let (add_code, add_stderr) = submodule_wbtest_collect_shim_git_stderr(root, [
     "submodule", "add", "./sub1",
   ])
@@ -232,7 +232,7 @@ async test "submodule add: relative local url works from absorbed submodule root
     get_current_timestamp().to_string()
   ignore(@process.run("rm", ["-rf", root], inherit_env=true))
   fs.mkdir_p(root)
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
   submodule_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "."])
   submodule_wbtest_run_git(root, ["config", "user.name", "Test User"])
   submodule_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
@@ -245,7 +245,7 @@ async test "submodule add: relative local url works from absorbed submodule root
   submodule_wbtest_run_git(root + "/sub1", ["add", "a"])
   submodule_wbtest_run_git(root + "/sub1", ["commit", "-q", "-m", "initial"])
 
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_shim_git(root, ["submodule", "add", "./sub1"])
   submodule_wbtest_run_git(root, ["commit", "-q", "-am", "superproject"])
   let (absorb_code, _absorb_stderr) = submodule_wbtest_collect_shim_git_stderr(
@@ -560,8 +560,8 @@ async test "submodule update --remote: moved source fails until set-url" {
   submodule_wbtest_run_git(super_dir, [
     "config", "user.email", "test@example.com",
   ])
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_git(super_dir, ["submodule", "add", "../source"])
   submodule_wbtest_run_git(super_dir, ["commit", "-q", "-am", "add submodule"])
 
@@ -610,10 +610,10 @@ async test "submodule add: template dir is read from global config" {
   fs.mkdir_p(root + "/home")
   let global_config = root + "/home/.gitconfig"
   fs.write_string(global_config, "[init]\n\ttemplateDir = ~/templates\n")
-  let prev_home = @sys.get_env_var("HOME")
-  let prev_global = @sys.get_env_var("GIT_CONFIG_GLOBAL")
-  @sys.set_env_var("HOME", root + "/home")
-  @sys.set_env_var("GIT_CONFIG_GLOBAL", global_config)
+  let prev_home = @env.get_env_var("HOME")
+  let prev_global = @env.get_env_var("GIT_CONFIG_GLOBAL")
+  @env.set_env_var("HOME", root + "/home")
+  @env.set_env_var("GIT_CONFIG_GLOBAL", global_config)
   let actual = submodule_add_template_dir(fs)
   submodule_wbtest_restore_env("HOME", prev_home)
   submodule_wbtest_restore_env("GIT_CONFIG_GLOBAL", prev_global)
@@ -666,8 +666,8 @@ async test "submodule add: template hook keeps executable bit" {
   fs.write_string(hook_path, "#!/bin/sh\nexit 0\n")
   let chmod_code = @process.run("chmod", ["+x", hook_path], inherit_env=true)
   @test.assert_eq(chmod_code, 0)
-  let prev_template_dir = @sys.get_env_var("GIT_TEMPLATE_DIR")
-  @sys.set_env_var("GIT_TEMPLATE_DIR", template_dir)
+  let prev_template_dir = @env.get_env_var("GIT_TEMPLATE_DIR")
+  @env.set_env_var("GIT_TEMPLATE_DIR", template_dir)
   @bitlib.init_repo(fs, super_git_dir, bare=true)
   submodule_init_modules_repo(fs, super_git_dir, modules_dir)
   submodule_wbtest_restore_env("GIT_TEMPLATE_DIR", prev_template_dir)
@@ -1258,8 +1258,8 @@ async test "submodule status: ignores config-only entries" {
     "config", "user.email", "test@example.com",
   ])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_git(super_dir, ["submodule", "add", "./../init", "init"])
   submodule_wbtest_run_git(super_dir, ["commit", "-qam", "initial"])
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
@@ -1401,8 +1401,8 @@ async test "submodule deinit: unregisters config and removes worktree gitfile" {
     "config", "user.email", "test@example.com",
   ])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_git(super_dir, ["submodule", "add", "./../init", "init"])
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
 
@@ -1451,8 +1451,8 @@ async test "submodule deinit: missing worktree path is recreated as empty direct
     "config", "user.email", "test@example.com",
   ])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_git(super_dir, ["submodule", "add", "./../init", "init"])
   submodule_wbtest_run_git(super_dir, ["commit", "-qam", "initial"])
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
@@ -1566,8 +1566,8 @@ async test "submodule update: recreates missing worktree before writing gitfile"
     "config", "user.email", "test@example.com",
   ])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_git(super_dir, ["submodule", "add", "./../init", "init"])
   submodule_wbtest_run_git(super_dir, ["commit", "-qam", "initial"])
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
@@ -1611,8 +1611,8 @@ async test "submodule update: linked worktree reads shared submodule config" {
     read_submodule_config_value(fs, linked_git_dir, "init", "url") is Some(_),
   )
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_shim_git(linked_dir, ["submodule", "update", "--quiet"])
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
 
@@ -1670,8 +1670,8 @@ async test "submodule update: restores deinitialized worktree when another submo
     "config", "user.email", "test@example.com",
   ])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_git(super_dir, ["submodule", "add", "./../init", "init"])
   submodule_wbtest_run_git(super_dir, [
     "submodule", "add", "./../other", "other",
@@ -2386,8 +2386,8 @@ async test "submodule sync: relative url resolves against superproject root when
     "config", "user.email", "test@example.com",
   ])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_git(super_dir, [
     "submodule", "add", "../repo", "relative",
   ])
@@ -2446,8 +2446,8 @@ async test "submodule sync: relative url stays relative in config when origin ex
     "remote", "add", "origin", "../parent.git",
   ])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_git(super_dir, [
     "submodule", "add", "../repo", "relative",
   ])

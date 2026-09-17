@@ -117,21 +117,21 @@ test "clone relay: no peers returns none" {
 
 ///|
 test "clone relay: preferred sender env is trimmed and optional" {
-  @sys.set_env_var("BIT_RELAY_CLONE_SENDER", " node-preferred ")
+  @env.set_env_var("BIT_RELAY_CLONE_SENDER", " node-preferred ")
   @test.assert_eq(clone_relay_preferred_sender(), Some("node-preferred"))
-  @sys.set_env_var("BIT_RELAY_CLONE_SENDER", "   ")
+  @env.set_env_var("BIT_RELAY_CLONE_SENDER", "   ")
   @test.assert_eq(clone_relay_preferred_sender(), None)
-  @sys.unset_env_var("BIT_RELAY_CLONE_SENDER")
+  @env.unset_env_var("BIT_RELAY_CLONE_SENDER")
   @test.assert_eq(clone_relay_preferred_sender(), None)
 }
 
 ///|
 test "clone relay: preferred repo env is trimmed and optional" {
-  @sys.set_env_var("BIT_RELAY_CLONE_REPO", " repo-b ")
+  @env.set_env_var("BIT_RELAY_CLONE_REPO", " repo-b ")
   @test.assert_eq(clone_relay_preferred_repo(), Some("repo-b"))
-  @sys.set_env_var("BIT_RELAY_CLONE_REPO", "   ")
+  @env.set_env_var("BIT_RELAY_CLONE_REPO", "   ")
   @test.assert_eq(clone_relay_preferred_repo(), None)
-  @sys.unset_env_var("BIT_RELAY_CLONE_REPO")
+  @env.unset_env_var("BIT_RELAY_CLONE_REPO")
   @test.assert_eq(clone_relay_preferred_repo(), None)
 }
 
@@ -189,8 +189,8 @@ fn cleanup_clone_wbtest_tree(fs : OsFs, path : String) -> Unit {
 ///|
 fn restore_clone_env(name : String, value : String?) -> Unit {
   match value {
-    Some(v) => @sys.set_env_var(name, v)
-    None => @sys.unset_env_var(name)
+    Some(v) => @env.set_env_var(name, v)
+    None => @env.unset_env_var(name)
   }
 }
 
@@ -214,10 +214,10 @@ test "clone: configure_reftable_ref_storage writes reftable metadata" {
 
 ///|
 test "clone: command root prefers shim pwd when cwd is absent" {
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.set_env_var("GIT_SHIM_PWD", "/tmp/bit-clone-command-root")
+  let prev_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.set_env_var("GIT_SHIM_PWD", "/tmp/bit-clone-command-root")
   let resolved = clone_command_root("/tmp/bit-clone-fallback")
   restore_clone_env("GIT_SHIM_CWD", prev_cwd)
   restore_clone_env("GIT_SHIM_PWD", prev_pwd)

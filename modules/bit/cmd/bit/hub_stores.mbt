@@ -190,7 +190,7 @@ fn hub_stdin_is_tty() -> Bool {
 
 ///|
 fn hub_should_prompt() -> Bool {
-  match @sys.get_env_var("BIT_HUB_INIT_PROMPT") {
+  match @env.get_env_var("BIT_HUB_INIT_PROMPT") {
     Some(value) =>
       parse_hub_init_prompt_override(value).unwrap_or(hub_stdin_is_tty())
     None => hub_stdin_is_tty()

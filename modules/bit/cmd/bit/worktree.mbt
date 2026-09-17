@@ -4,9 +4,9 @@
 /// Get absolute work root path for worktree operations
 fn get_absolute_work_root() -> String {
   let root = get_work_root()
-  let base = match @sys.get_env_var("GIT_SHIM_PWD") {
+  let base = match @env.get_env_var("GIT_SHIM_PWD") {
     Some(pwd) => Some(pwd)
-    None => @sys.get_env_var("PWD")
+    None => @env.get_env_var("PWD")
   }
   if root == "." {
     // Use GIT_SHIM_PWD or PWD if available
@@ -31,17 +31,17 @@ fn get_absolute_worktree_cwd() -> String {
       normalize_path(get_absolute_work_root() + "/" + path)
     }
   }
-  if @sys.get_env_var("GIT_SHIM_CALLER_PWD") is Some(_) {
-    return match @sys.get_env_var("GIT_SHIM_CWD") {
+  if @env.get_env_var("GIT_SHIM_CALLER_PWD") is Some(_) {
+    return match @env.get_env_var("GIT_SHIM_CWD") {
       Some(path) => from_hint(path)
       None =>
-        match @sys.get_env_var("GIT_SHIM_PWD") {
+        match @env.get_env_var("GIT_SHIM_PWD") {
           Some(path) => from_hint(path)
           None => get_absolute_work_root()
         }
     }
   }
-  match @sys.get_env_var("PWD") {
+  match @env.get_env_var("PWD") {
     Some(path) => from_hint(path)
     None =>
       match @env.current_dir() {

@@ -841,10 +841,10 @@ fn add_normalize_input_path(root : String, raw_path : String) -> String {
 
 ///|
 fn add_repo_relative_cwd(root : String) -> String {
-  let cwd = match @sys.get_env_var("GIT_SHIM_CWD") {
+  let cwd = match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
     None =>
-      match @sys.get_env_var("GIT_SHIM_PWD") {
+      match @env.get_env_var("GIT_SHIM_PWD") {
         Some(dir) => dir
         None =>
           match @env.current_dir() {

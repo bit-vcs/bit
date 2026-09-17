@@ -3,7 +3,7 @@
 ///|
 fn find_git_dir(fs : OsFs) -> String {
   // Check GIT_DIR environment variable first
-  if @sys.get_env_var("GIT_DIR") is Some(dir) {
+  if @env.get_env_var("GIT_DIR") is Some(dir) {
     if fs.is_dir(dir) || fs.is_file(dir) {
       return dir
     }
@@ -47,7 +47,7 @@ fn find_git_dir(fs : OsFs) -> String {
 
 ///|
 fn get_config_override(key : String) -> String? {
-  let overrides = @sys.get_env_var("GIT_CONFIG_OVERRIDES")
+  let overrides = @env.get_env_var("GIT_CONFIG_OVERRIDES")
   match overrides {
     Some(data) => {
       let mut found : String? = None
@@ -118,7 +118,7 @@ fn diff_get_external_command(
   fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> String? {
-  match @sys.get_env_var("GIT_EXTERNAL_DIFF") {
+  match @env.get_env_var("GIT_EXTERNAL_DIFF") {
     Some(value) if value.trim().length() > 0 =>
       return Some(value.trim().to_owned())
     _ => ()
@@ -269,10 +269,10 @@ fn diff_current_relative_prefix(root : String) -> String {
 
 ///|
 fn diff_effective_cwd(root : String) -> String {
-  match @sys.get_env_var("GIT_SHIM_CWD") {
+  match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
     None =>
-      match @sys.get_env_var("GIT_SHIM_PWD") {
+      match @env.get_env_var("GIT_SHIM_PWD") {
         Some(dir) => dir
         None =>
           match @env.current_dir() {

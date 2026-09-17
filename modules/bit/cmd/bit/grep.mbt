@@ -786,10 +786,10 @@ fn grep_resolve_pattern_file_path(root : String, file : String) -> String {
 
 ///|
 fn grep_get_invocation_cwd(root : String) -> String {
-  match @sys.get_env_var("GIT_SHIM_CWD") {
+  match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
     None =>
-      match @sys.get_env_var("GIT_SHIM_PWD") {
+      match @env.get_env_var("GIT_SHIM_PWD") {
         Some(dir) => dir
         None => @env.current_dir().unwrap_or(root)
       }

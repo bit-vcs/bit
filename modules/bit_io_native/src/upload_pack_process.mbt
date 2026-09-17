@@ -363,10 +363,10 @@ fn command_looks_like_script(cmd : String) -> Bool {
 
 ///|
 fn read_ssh_variant_override() -> String? {
-  match @sys.get_env_var("GIT_SSH_VARIANT") {
+  match @env.get_env_var("GIT_SSH_VARIANT") {
     Some(value) => Some(value.to_lower())
     None =>
-      match @sys.get_env_var("GIT_CONFIG_OVERRIDES") {
+      match @env.get_env_var("GIT_CONFIG_OVERRIDES") {
         None => None
         Some(overrides) => {
           for line_view in overrides.split("\n") {
@@ -424,7 +424,7 @@ fn resolve_ssh_variant(
 
 ///|
 fn resolve_ssh_command_spec() -> SshCommandSpec raise @bit.GitError {
-  match @sys.get_env_var("GIT_SSH_COMMAND") {
+  match @env.get_env_var("GIT_SSH_COMMAND") {
     Some(cmdline) => {
       let words = split_shell_words(cmdline)
       let cmd = words[0]
@@ -435,7 +435,7 @@ fn resolve_ssh_command_spec() -> SshCommandSpec raise @bit.GitError {
       { cmd, args }
     }
     None =>
-      match @sys.get_env_var("GIT_SSH") {
+      match @env.get_env_var("GIT_SSH") {
         Some(cmd) => { cmd, args: [] }
         None => { cmd: "ssh", args: [] }
       }
@@ -444,7 +444,7 @@ fn resolve_ssh_command_spec() -> SshCommandSpec raise @bit.GitError {
 
 ///|
 fn read_ssh_ip_option() -> String? {
-  match @sys.get_env_var("BIT_SSH_IP_VERSION") {
+  match @env.get_env_var("BIT_SSH_IP_VERSION") {
     Some("-4") => Some("-4")
     Some("-6") => Some("-6")
     _ => None
@@ -462,14 +462,14 @@ fn build_upload_pack_remote_command(path : String) -> String {
 
 ///|
 fn resolve_upload_pack_local_command() -> String {
-  match @sys.get_env_var("SHIM_EXEC_PATH") {
+  match @env.get_env_var("SHIM_EXEC_PATH") {
     Some(exec_path) =>
       if exec_path.length() > 0 {
         return exec_path + "/git-upload-pack"
       }
     None => ()
   }
-  match @sys.get_env_var("GIT_EXEC_PATH") {
+  match @env.get_env_var("GIT_EXEC_PATH") {
     Some(exec_path) =>
       if exec_path.length() > 0 {
         return exec_path + "/git-upload-pack"
@@ -604,15 +604,15 @@ fn cleanup_temp_files(paths : Array[String]) -> Unit {
 
 ///|
 fn resolve_process_cwd() -> String? {
-  match @sys.get_env_var("GIT_SHIM_CWD") {
+  match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => Some(dir)
-    None => @sys.get_env_var("GIT_SHIM_PWD")
+    None => @env.get_env_var("GIT_SHIM_PWD")
   }
 }
 
 ///|
 fn maybe_trace_packfile(pack : Bytes) -> Unit {
-  match @sys.get_env_var("GIT_TRACE_PACKFILE") {
+  match @env.get_env_var("GIT_TRACE_PACKFILE") {
     Some(path) => ignore(@fs.write_bytes_to_file(path, pack) catch { _ => () })
     None => ()
   }

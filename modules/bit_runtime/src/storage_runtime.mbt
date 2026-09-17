@@ -156,7 +156,7 @@ fn storage_default_repo_marker_path(
 ///|
 fn storage_resolve_git_dir(rfs : &@bit.RepoFileSystem, root : String) -> String {
   let default_git_dir = storage_default_repo_marker_path(rfs, root)
-  match @sys.get_env_var("GIT_DIR") {
+  match @env.get_env_var("GIT_DIR") {
     Some(dir) => {
       let resolved = if dir.has_prefix("/") {
         dir
@@ -343,9 +343,9 @@ fn storage_get_current_timestamp() -> Int64 {
 
 ///|
 fn storage_get_author_string() -> String {
-  match @sys.get_env_var("GIT_AUTHOR_NAME") {
+  match @env.get_env_var("GIT_AUTHOR_NAME") {
     Some(name) => {
-      let email = @sys.get_env_var("GIT_AUTHOR_EMAIL").unwrap_or("unknown")
+      let email = @env.get_env_var("GIT_AUTHOR_EMAIL").unwrap_or("unknown")
       name + " <" + email + ">"
     }
     None => storage_get_user_from_config()
@@ -356,11 +356,11 @@ fn storage_get_author_string() -> String {
 fn storage_get_user_from_config() -> String {
   // env BIT_COMMIT_AUTHOR is set by cmd/bit commit handler
   // to pass resolved author from git config
-  match @sys.get_env_var("BIT_COMMIT_AUTHOR") {
+  match @env.get_env_var("BIT_COMMIT_AUTHOR") {
     Some(a) if a.length() > 0 => return a
     _ => ()
   }
-  match @sys.get_env_var("USER") {
+  match @env.get_env_var("USER") {
     Some(user) => user + " <" + user + "@localhost>"
     None => "Unknown <unknown@localhost>"
   }
@@ -368,14 +368,14 @@ fn storage_get_user_from_config() -> String {
 
 ///|
 fn storage_get_committer_string() -> String {
-  match @sys.get_env_var("GIT_COMMITTER_NAME") {
+  match @env.get_env_var("GIT_COMMITTER_NAME") {
     Some(name) => {
-      let email = @sys.get_env_var("GIT_COMMITTER_EMAIL").unwrap_or("unknown")
+      let email = @env.get_env_var("GIT_COMMITTER_EMAIL").unwrap_or("unknown")
       name + " <" + email + ">"
     }
     None =>
       // env BIT_COMMIT_COMMITTER is set by cmd/bit commit handler
-      match @sys.get_env_var("BIT_COMMIT_COMMITTER") {
+      match @env.get_env_var("BIT_COMMIT_COMMITTER") {
         Some(c) if c.length() > 0 => c
         _ => storage_get_author_string()
       }
@@ -384,7 +384,7 @@ fn storage_get_committer_string() -> String {
 
 ///|
 fn storage_get_commit_timestamp() -> Int64 {
-  match @sys.get_env_var("GIT_COMMITTER_DATE") {
+  match @env.get_env_var("GIT_COMMITTER_DATE") {
     Some(raw) =>
       match storage_parse_git_env_timestamp(raw) {
         Some(ts) => ts
@@ -396,7 +396,7 @@ fn storage_get_commit_timestamp() -> Int64 {
 
 ///|
 fn storage_get_author_timestamp() -> Int64 {
-  match @sys.get_env_var("GIT_AUTHOR_DATE") {
+  match @env.get_env_var("GIT_AUTHOR_DATE") {
     Some(raw) =>
       match storage_parse_git_env_timestamp(raw) {
         Some(ts) => ts
@@ -446,7 +446,7 @@ fn storage_parse_git_env_timezone(raw : String) -> String? {
 
 ///|
 fn storage_get_commit_timezone() -> String {
-  match @sys.get_env_var("GIT_COMMITTER_DATE") {
+  match @env.get_env_var("GIT_COMMITTER_DATE") {
     Some(raw) =>
       match storage_parse_git_env_timezone(raw) {
         Some(tz) => tz
@@ -458,7 +458,7 @@ fn storage_get_commit_timezone() -> String {
 
 ///|
 fn storage_get_author_timezone() -> String {
-  match @sys.get_env_var("GIT_AUTHOR_DATE") {
+  match @env.get_env_var("GIT_AUTHOR_DATE") {
     Some(raw) =>
       match storage_parse_git_env_timezone(raw) {
         Some(tz) => tz
@@ -580,7 +580,7 @@ fn storage_fail_unsupported_mode(
 
 ///|
 fn storage_runtime_is_quiet() -> Bool {
-  match @sys.get_env_var("BIT_STORAGE_RUNTIME_QUIET") {
+  match @env.get_env_var("BIT_STORAGE_RUNTIME_QUIET") {
     Some(value) => {
       let normalized = storage_trim_string(value).to_lower()
       normalized == "1" || normalized == "true" || normalized == "yes"
@@ -1174,7 +1174,7 @@ fn storage_handle_hash_object(
   root : String,
   args : StorageHashObjectArgs,
 ) -> Unit raise Error {
-  let cwd = match @sys.get_env_var("GIT_SHIM_PWD") {
+  let cwd = match @env.get_env_var("GIT_SHIM_PWD") {
     Some(path) => path
     None =>
       match @env.current_dir() {

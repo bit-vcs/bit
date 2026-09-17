@@ -1616,7 +1616,7 @@ fn midx_parse_config_bool(value : String) -> Bool? {
 
 ///|
 fn midx_emit_lookup_table_trace(fs : OsFs) -> Unit {
-  match @sys.get_env_var("GIT_TRACE2_EVENT") {
+  match @env.get_env_var("GIT_TRACE2_EVENT") {
     Some(path) => {
       let target = path.trim().to_owned()
       if target.length() == 0 || target == "1" || target == "2" {
@@ -2683,7 +2683,7 @@ fn midx_write_rev_file(
 
 ///|
 fn midx_should_write_rev() -> Bool {
-  match @sys.get_env_var("GIT_TEST_MIDX_WRITE_REV") {
+  match @env.get_env_var("GIT_TEST_MIDX_WRITE_REV") {
     Some(value) => {
       let v = value.trim().to_owned()
       v == "1" || v.to_lower() == "true"

@@ -599,7 +599,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
   }
   let protocol_version = match overrides.get("protocol.version") {
     Some(v) => v
-    None => @sys.get_env_var("GIT_TEST_PROTOCOL_VERSION").unwrap_or("2")
+    None => @env.get_env_var("GIT_TEST_PROTOCOL_VERSION").unwrap_or("2")
   }
   let negotiation_failed = push_negotiate && protocol_version == "0"
   if negotiation_failed {
@@ -915,7 +915,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
     refspec_args.length() == 0 &&
     !push_all &&
     default_plan is Some(_) {
-    if @sys.get_env_var("GIT_REMOTE_TESTGIT_NOREFSPEC") is Some(_) {
+    if @env.get_env_var("GIT_REMOTE_TESTGIT_NOREFSPEC") is Some(_) {
       raise @bitcore.GitError::InvalidObject(
         "remote-helper doesn't support push; refspec needed",
       )
@@ -993,7 +993,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
             )
           }
           if helper_is_testgit &&
-            @sys.get_env_var("GIT_REMOTE_TESTGIT_FAILURE") is Some(_) {
+            @env.get_env_var("GIT_REMOTE_TESTGIT_FAILURE") is Some(_) {
             raise @bitcore.GitError::InvalidObject(
               "failed to push some refs to '\{url}'",
             )
@@ -1019,7 +1019,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
           ).map(fn(v) { v.to_lower() })
           let push_hide_refs = read_hide_refs(fs, rgd, ["transfer", "receive"])
           let no_private_update = helper_is_testgit &&
-            @sys.get_env_var("GIT_REMOTE_TESTGIT_NO_PRIVATE_UPDATE") is Some(_)
+            @env.get_env_var("GIT_REMOTE_TESTGIT_NO_PRIVATE_UPDATE") is Some(_)
           let (
             push_log_name,
             push_log_email,
@@ -2084,12 +2084,12 @@ fn push_normalize_optional_value(value : String?) -> String? {
 
 ///|
 fn push_relay_preferred_sender() -> String? {
-  push_normalize_optional_value(@sys.get_env_var("BIT_RELAY_PUSH_SENDER"))
+  push_normalize_optional_value(@env.get_env_var("BIT_RELAY_PUSH_SENDER"))
 }
 
 ///|
 fn push_relay_preferred_repo() -> String? {
-  push_normalize_optional_value(@sys.get_env_var("BIT_RELAY_PUSH_REPO"))
+  push_normalize_optional_value(@env.get_env_var("BIT_RELAY_PUSH_REPO"))
 }
 
 ///|

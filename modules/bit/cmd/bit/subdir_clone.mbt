@@ -87,7 +87,7 @@ async fn subdir_clone(
   )
   let fs = OsFs::new()
   let target_existed = fs.is_dir(target)
-  let local_root = match @sys.get_env_var("GIT_SHIM_CWD") {
+  let local_root = match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
     None => root
   }

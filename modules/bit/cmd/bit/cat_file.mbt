@@ -416,7 +416,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
     let mut pending_chunks : Array[Bytes] = []
     let buffer_enabled = batch_buffer && !batch_no_buffer
     let suppress_flush_on_exit = match
-      @sys.get_env_var("GIT_TEST_CAT_FILE_NO_FLUSH_ON_EXIT") {
+      @env.get_env_var("GIT_TEST_CAT_FILE_NO_FLUSH_ON_EXIT") {
       Some(value) => value == "1"
       None => false
     }

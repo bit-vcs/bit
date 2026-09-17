@@ -1,13 +1,13 @@
 ///|
 fn shim_cwd_from_env() -> String? {
-  @sys.get_env_var("GIT_SHIM_CWD")
+  @env.get_env_var("GIT_SHIM_CWD")
 }
 
 ///|
 fn resolve_in_cwd(path : String) -> String {
   let base = match shim_cwd_from_env() {
     Some(cwd) => Some(cwd)
-    None => @sys.get_env_var("GIT_SHIM_PWD")
+    None => @env.get_env_var("GIT_SHIM_PWD")
   }
   match base {
     None => path
@@ -271,7 +271,7 @@ fn is_sha256_repo_from_env() -> Bool {
   if is_sha256_repo(git_dir) {
     return true
   }
-  match @sys.get_env_var("GIT_SHIM_CWD") {
+  match @env.get_env_var("GIT_SHIM_CWD") {
     Some(cwd) => {
       let alt_git_dir = cwd + "/.git"
       if alt_git_dir != git_dir && is_sha256_repo(alt_git_dir) {
@@ -280,7 +280,7 @@ fn is_sha256_repo_from_env() -> Bool {
     }
     None => ()
   }
-  match @sys.get_env_var("GIT_WORK_TREE") {
+  match @env.get_env_var("GIT_WORK_TREE") {
     Some(dir) => {
       let alt_git_dir = dir + "/.git"
       if alt_git_dir != git_dir && is_sha256_repo(alt_git_dir) {
@@ -294,7 +294,7 @@ fn is_sha256_repo_from_env() -> Bool {
   while i + 1 < args.length() {
     if args[i] == "-C" {
       let raw = args[i + 1]
-      let base = @sys.get_env_var("GIT_SHIM_PWD").unwrap_or(".")
+      let base = @env.get_env_var("GIT_SHIM_PWD").unwrap_or(".")
       let cwd = if raw.has_prefix("/") { raw } else { base + "/" + raw }
       if is_sha256_repo(cwd + "/.git") {
         return true

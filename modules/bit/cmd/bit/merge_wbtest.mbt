@@ -22,10 +22,10 @@ async test "merge: -S stores gpgsig header on merge commit" {
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   defer add_test_restore_env("GIT_DIR", prev_git_dir)
@@ -53,10 +53,10 @@ async test "merge: -S stores gpgsig header on merge commit" {
   grep_test_run_git(repo_dir, ["add", "main.txt"])
   grep_test_run_git(repo_dir, ["commit", "-q", "-m", "main"])
 
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
 
   handle_merge(["-q", "-S", "-m", "signed merge", "side"]) catch {
     err => fail("handle_merge failed: \{err}")
@@ -179,10 +179,10 @@ async test "merge: --no-commit with strategy ours keeps merge state" {
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   defer add_test_restore_env("GIT_DIR", prev_git_dir)
@@ -210,10 +210,10 @@ async test "merge: --no-commit with strategy ours keeps merge state" {
     grep_test_git_stdout(repo_dir, ["rev-parse", "HEAD"]),
   )
 
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
 
   handle_merge(["-q", "--no-commit", "-s", "ours", "side"]) catch {
     err => fail("handle_merge failed: \{err}")
@@ -313,7 +313,7 @@ async test "merge: --continue records MERGE_HEAD as second parent" {
   fs.write_string(repo_dir + "/file", "main\n")
   grep_test_run_git(repo_dir, ["commit", "-q", "-am", "main"])
 
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
   let (conflict_code, _) = grep_test_git_stderr(repo_dir, [
     "merge", "-m", "merge", "side",
   ])

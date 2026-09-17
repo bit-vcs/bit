@@ -10,9 +10,9 @@ async fn show_init_command_help() -> Unit {
 
 ///|
 async fn handle_init(args : Array[String]) -> Unit raise Error {
-  let root = match @sys.get_env_var("GIT_SHIM_CWD") {
+  let root = match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
-    None => @sys.get_env_var("GIT_SHIM_PWD").unwrap_or(".")
+    None => @env.get_env_var("GIT_SHIM_PWD").unwrap_or(".")
   }
   let fs = OsFs::new()
   // Parse options
@@ -111,9 +111,9 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   // Resolve ref format from env if not explicitly set via --ref-format
   let mut ref_format_from_env = false
   if ref_format_env_deferred && !ref_format_explicit {
-    let env_ref_format = match @sys.get_env_var("GIT_DEFAULT_REF_FORMAT") {
+    let env_ref_format = match @env.get_env_var("GIT_DEFAULT_REF_FORMAT") {
       Some(value) => Some(value)
-      None => @sys.get_env_var("GIT_TEST_DEFAULT_REF_FORMAT")
+      None => @env.get_env_var("GIT_TEST_DEFAULT_REF_FORMAT")
     }
     match env_ref_format {
       Some(value) => {
@@ -141,8 +141,8 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     return
   }
   // Check GIT_DIR and GIT_WORK_TREE environment variables
-  let bit_dir_env = @sys.get_env_var("GIT_DIR")
-  let work_tree_env = @sys.get_env_var("GIT_WORK_TREE")
+  let bit_dir_env = @env.get_env_var("GIT_DIR")
+  let work_tree_env = @env.get_env_var("GIT_WORK_TREE")
   // GIT_WORK_TREE without GIT_DIR is an error during init
   if work_tree_env is Some(_) && (bit_dir_env is None || bare) {
     eprint_line(
@@ -153,7 +153,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   }
   // Check GIT_TEMPLATE_DIR environment variable, then config
   if template_dir is None {
-    template_dir = @sys.get_env_var("GIT_TEMPLATE_DIR")
+    template_dir = @env.get_env_var("GIT_TEMPLATE_DIR")
   }
   if template_dir is None {
     // Read init.templatedir from global config
@@ -173,7 +173,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
           Some(tpl_path) => {
             // Expand ~ to HOME
             let expanded = if tpl_path.has_prefix("~/") {
-              match @sys.get_env_var("HOME") {
+              match @env.get_env_var("HOME") {
                 Some(home) =>
                   home +
                   String::unsafe_substring(
@@ -260,7 +260,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   let branch = match initial_branch {
     Some(b) => b
     None =>
-      match @sys.get_env_var("GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME") {
+      match @env.get_env_var("GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME") {
         Some(env_branch) if env_branch != "" => env_branch
         _ => {
           let config_branch = init_read_default_branch(fs)
@@ -488,7 +488,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
       None => ()
     }
     if object_format is None {
-      let env_default = @sys.get_env_var("GIT_DEFAULT_HASH").unwrap_or("sha1")
+      let env_default = @env.get_env_var("GIT_DEFAULT_HASH").unwrap_or("sha1")
       let normalized = env_default.to_lower()
       if normalized != "sha1" && normalized != "sha256" {
         eprint_line("fatal: unknown hash algorithm '\{normalized}'")

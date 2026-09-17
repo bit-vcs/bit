@@ -2,7 +2,7 @@
 
 ///|
 pub fn github_has_gh_cli() -> Bool {
-  match @sys.get_env_var("PATH") {
+  match @env.get_env_var("PATH") {
     None => false
     Some(_) => true // gh availability checked at call time via exit code
   }
@@ -10,10 +10,10 @@ pub fn github_has_gh_cli() -> Bool {
 
 ///|
 pub fn github_has_token() -> Bool {
-  match @sys.get_env_var("GITHUB_TOKEN") {
+  match @env.get_env_var("GITHUB_TOKEN") {
     Some(t) => t.length() > 0
     None =>
-      match @sys.get_env_var("GH_TOKEN") {
+      match @env.get_env_var("GH_TOKEN") {
         Some(t) => t.length() > 0
         None => false
       }

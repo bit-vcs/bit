@@ -15,8 +15,8 @@ let relay_sign_test_message = "hello relay"
 ///|
 fn relay_sign_test_restore_public_key_override(saved : String?) -> Unit {
   match saved {
-    Some(value) => @sys.set_env_var("BIT_RELAY_SIGN_PUBLIC_KEY", value)
-    None => @sys.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
+    Some(value) => @env.set_env_var("BIT_RELAY_SIGN_PUBLIC_KEY", value)
+    None => @env.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
   }
 }
 
@@ -78,8 +78,8 @@ async test "relay sign web: sha256 matches known digest" {
 
 ///|
 async test "relay sign web: resolves public key and signs with Ed25519" {
-  let saved_public_key = @sys.get_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
-  @sys.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
+  let saved_public_key = @env.get_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
+  @env.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
   let public_key = relay_resolve_public_key(relay_sign_test_private_key)
   assert_eq(public_key, relay_sign_test_public_key)
   let signature = relay_sign_ed25519(

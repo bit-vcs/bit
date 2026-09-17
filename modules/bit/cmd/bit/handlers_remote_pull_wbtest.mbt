@@ -249,7 +249,7 @@ async fn handlers_remote_pull_wbtest_collect_shim_git(
   handlers_remote_pull_wbtest_shim_lock.acquire()
   defer handlers_remote_pull_wbtest_shim_lock.release()
   // Derive repo root from the executable path to avoid CWD pollution
-  let repo_root = match @sys.get_env_var("CARGO_MANIFEST_DIR") {
+  let repo_root = match @env.get_env_var("CARGO_MANIFEST_DIR") {
     Some(d) => d
     None => {
       let exe = @env.args()[0]
@@ -327,14 +327,14 @@ async test "pull: local fetch with main:main writes target ref and FETCH_HEAD" {
   let dst_dir = root + "/dst"
 
   // Protect against env pollution from other tests
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_git_work_tree = @sys.get_env_var("GIT_WORK_TREE")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_SHIM_PWD")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_git_work_tree = @env.get_env_var("GIT_WORK_TREE")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_SHIM_PWD")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_DIR", prev_git_dir)
   defer add_test_restore_env("GIT_WORK_TREE", prev_git_work_tree)
@@ -381,14 +381,14 @@ async test "pull: local fetch for main writes remote-tracking ref and FETCH_HEAD
   let dst_dir = root + "/dst"
 
   // Protect against env pollution from other tests
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_git_work_tree = @sys.get_env_var("GIT_WORK_TREE")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_SHIM_PWD")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_git_work_tree = @env.get_env_var("GIT_WORK_TREE")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_SHIM_PWD")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_DIR", prev_git_dir)
   defer add_test_restore_env("GIT_WORK_TREE", prev_git_work_tree)
@@ -950,14 +950,14 @@ test "pull relay: remote detection handles explicit relay schemes" {
 
 ///|
 test "pull relay: preferred sender/repo env is trimmed and optional" {
-  let prev_sender = @sys.get_env_var("BIT_RELAY_PULL_SENDER")
-  let prev_repo = @sys.get_env_var("BIT_RELAY_PULL_REPO")
-  @sys.set_env_var("BIT_RELAY_PULL_SENDER", " node-a ")
-  @sys.set_env_var("BIT_RELAY_PULL_REPO", " repo-b ")
+  let prev_sender = @env.get_env_var("BIT_RELAY_PULL_SENDER")
+  let prev_repo = @env.get_env_var("BIT_RELAY_PULL_REPO")
+  @env.set_env_var("BIT_RELAY_PULL_SENDER", " node-a ")
+  @env.set_env_var("BIT_RELAY_PULL_REPO", " repo-b ")
   @test.assert_eq(pull_relay_preferred_sender(), Some("node-a"))
   @test.assert_eq(pull_relay_preferred_repo(), Some("repo-b"))
-  @sys.set_env_var("BIT_RELAY_PULL_SENDER", "   ")
-  @sys.set_env_var("BIT_RELAY_PULL_REPO", "   ")
+  @env.set_env_var("BIT_RELAY_PULL_SENDER", "   ")
+  @env.set_env_var("BIT_RELAY_PULL_REPO", "   ")
   @test.assert_eq(pull_relay_preferred_sender(), None)
   @test.assert_eq(pull_relay_preferred_repo(), None)
   restore_env_var_for_fetch_wbtest("BIT_RELAY_PULL_SENDER", prev_sender)

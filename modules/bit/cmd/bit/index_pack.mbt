@@ -922,7 +922,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           @stdio.stderr.write("fatal: not a git repository\n")
           @sys.exit(1)
         }
-        let trace2_event = @sys.get_env_var("GIT_TRACE2_EVENT")
+        let trace2_event = @env.get_env_var("GIT_TRACE2_EVENT")
         match trace2_event {
           Some(path) =>
             write_trace2_region_event(
