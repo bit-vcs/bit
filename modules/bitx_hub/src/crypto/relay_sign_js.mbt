@@ -2,7 +2,7 @@
 
 ///|
 fn relay_sign_public_key() -> String? {
-  match @sys.get_env_var("BIT_RELAY_SIGN_PUBLIC_KEY") {
+  match @env.get_env_var("BIT_RELAY_SIGN_PUBLIC_KEY") {
     Some(value) => {
       let normalized = value.trim(chars=" \n\r\t").to_owned()
       if normalized.length() > 0 {

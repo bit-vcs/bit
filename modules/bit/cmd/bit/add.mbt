@@ -781,7 +781,7 @@ fn normalize_add_path(path : String) -> String {
   while out.length() > 1 && out.has_suffix("/") {
     out = String::unsafe_substring(out, start=0, end=out.length() - 1)
   }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut i = 0
   while i < out.length() {
     let c = out[i].unsafe_to_char()
@@ -841,10 +841,10 @@ fn add_normalize_input_path(root : String, raw_path : String) -> String {
 
 ///|
 fn add_repo_relative_cwd(root : String) -> String {
-  let cwd = match @sys.get_env_var("GIT_SHIM_CWD") {
+  let cwd = match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
     None =>
-      match @sys.get_env_var("GIT_SHIM_PWD") {
+      match @env.get_env_var("GIT_SHIM_PWD") {
         Some(dir) => dir
         None =>
           match @env.current_dir() {

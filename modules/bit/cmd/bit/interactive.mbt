@@ -70,16 +70,16 @@ async fn run_add_interactive(
 
 ///|
 fn resolve_sequence_editor() -> String? {
-  match @sys.get_env_var("GIT_SEQUENCE_EDITOR") {
+  match @env.get_env_var("GIT_SEQUENCE_EDITOR") {
     Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
     _ =>
-      match @sys.get_env_var("GIT_EDITOR") {
+      match @env.get_env_var("GIT_EDITOR") {
         Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
         _ =>
-          match @sys.get_env_var("VISUAL") {
+          match @env.get_env_var("VISUAL") {
             Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
             _ =>
-              match @sys.get_env_var("EDITOR") {
+              match @env.get_env_var("EDITOR") {
                 Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
                 _ => None
               }
@@ -90,13 +90,13 @@ fn resolve_sequence_editor() -> String? {
 
 ///|
 fn resolve_commit_editor() -> String? {
-  match @sys.get_env_var("GIT_EDITOR") {
+  match @env.get_env_var("GIT_EDITOR") {
     Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
     _ =>
-      match @sys.get_env_var("VISUAL") {
+      match @env.get_env_var("VISUAL") {
         Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
         _ =>
-          match @sys.get_env_var("EDITOR") {
+          match @env.get_env_var("EDITOR") {
             Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
             _ => None
           }
@@ -131,7 +131,7 @@ async fn default_rebase_todo_editor(todo_path : String) -> Bool raise Error {
 
 ///|
 fn commit_edit_buffer_template(initial_message : String?) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   match initial_message {
     Some(msg) => {
       sb.write_string(msg)
@@ -169,7 +169,7 @@ fn normalize_commit_edit_buffer(content : String) -> String? {
   while end >= start && kept[end].trim().to_owned().length() == 0 {
     end -= 1
   }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for i = start; i <= end; i = i + 1 {
     if i > start {
       sb.write_string("\n")

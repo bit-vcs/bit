@@ -205,22 +205,22 @@ async test "rm: stage-only missing submodule is removable" {
   submodule_wbtest_run_git(super_dir, ["add", "t"])
   submodule_wbtest_run_git(super_dir, ["commit", "-q", "-m", "base"])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   submodule_wbtest_run_git(super_dir, [
     "submodule", "add", "./../source", "repo",
   ])
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
   cleanup_tree(fs, super_dir + "/repo")
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_CWD", super_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", super_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", super_dir)
+  @env.set_env_var("GIT_SHIM_PWD", super_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
   defer submodule_wbtest_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer submodule_wbtest_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   defer submodule_wbtest_restore_env("GIT_DIR", prev_git_dir)
@@ -246,10 +246,10 @@ async test "rm: orphan checkout keeps tracked files removable" {
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
 
   add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
   add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
@@ -258,10 +258,10 @@ async test "rm: orphan checkout keeps tracked files removable" {
   add_test_run_git(repo_dir, ["add", "init.t"])
   add_test_run_git(repo_dir, ["commit", "-q", "-m", "main"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   checkout_wbtest_run_shim_git(repo_dir, [
     "checkout", "-q", "--orphan", "orphan1",
@@ -313,22 +313,22 @@ async test "rm: removing named submodule clears matching gitmodules section only
   submodule_wbtest_run_git(super_dir, ["add", "t"])
   submodule_wbtest_run_git(super_dir, ["commit", "-q", "-m", "base"])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   handle_submodule_add(fs, super_dir, super_dir + "/.git", [
     "--quiet", "--name", "repo_new", "./../source", "repo",
   ])
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
   submodule_wbtest_run_git(super_dir, ["commit", "-q", "-am", "add submodule"])
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_CWD", super_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", super_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", super_dir)
+  @env.set_env_var("GIT_SHIM_PWD", super_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   handle_rm(["-q", "repo"])
 
@@ -387,8 +387,8 @@ async test "rm: cached submodule removal preserves gitmodules entry" {
   submodule_wbtest_run_git(super_dir, ["add", "t"])
   submodule_wbtest_run_git(super_dir, ["commit", "-q", "-m", "base"])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   handle_submodule_add(fs, super_dir, super_dir + "/.git", [
     "--quiet", "--name", "repo_new", "./../source", "repo",
   ])
@@ -397,14 +397,14 @@ async test "rm: cached submodule removal preserves gitmodules entry" {
 
   let before_gitmodules = decode_bytes(fs.read_file(super_dir + "/.gitmodules"))
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_CWD", super_dir)
-  @sys.set_env_var("GIT_SHIM_PWD", super_dir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_CWD", super_dir)
+  @env.set_env_var("GIT_SHIM_PWD", super_dir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
 
   handle_rm(["-q", "--cached", "repo"])
 

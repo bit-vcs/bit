@@ -156,7 +156,7 @@ async fn handle_last_modified(args : Array[String]) -> Unit raise Error {
   )
 
   // -- emit -----------------------------------------------------------------
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for r in results {
     if r.boundary {
       buf.write_char('^')

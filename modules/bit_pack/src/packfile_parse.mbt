@@ -505,8 +505,8 @@ fn parse_packfile_internal(
   }
   let count = read_u32_be(data, 8)
   let mut offset = 12
-  let objects : Array[@bit.PackObject] = Array::new(capacity=count)
-  let resolved : Array[Bool] = Array::new(capacity=count)
+  let objects : Array[@bit.PackObject] = Array(capacity=count)
+  let resolved : Array[Bool] = Array(capacity=count)
   let pending : Array[PendingDelta] = []
   for _ in 0..<count {
     let obj_offset = offset

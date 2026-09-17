@@ -22,7 +22,7 @@ let lfs_max_pointer_size : Int = 1024
 fn lfs_sha256_hex(data : Bytes) -> String {
   let raw = @bithash.sha256_bytes(data)
   let digits = "0123456789abcdef"
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for b in raw {
     let v = b.to_int()
     out.write_char(digits[v / 16].to_int().unsafe_to_char())

@@ -787,7 +787,7 @@ fn tag_resolve_column_mode(
 
 ///|
 fn tag_term_columns() -> Int {
-  match @sys.get_env_var("COLUMNS") {
+  match @env.get_env_var("COLUMNS") {
     Some(raw) => {
       let parsed = @string.parse_int(raw) catch { _ => 80 }
       if parsed > 1 {
@@ -969,7 +969,7 @@ fn tag_apply_trailers(message : String, trailers : Array[String]) -> String {
   } else {
     true
   }
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   result.write_string(message)
   if !message.has_suffix("\n") {
     result.write_char('\n')
@@ -1286,7 +1286,7 @@ async fn tag_edit_message(
 
 ///|
 fn tag_edit_buffer_template(initial_message : String?) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   match initial_message {
     Some(message) =>
       if message.length() > 0 {

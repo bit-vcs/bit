@@ -32,13 +32,13 @@ test "relay_resolve_room_arg: full URL without room" {
 
 ///|
 test "relay_safe_sender: from env" {
-  let prev = @sys.get_env_var("BIT_RELAY_SENDER")
-  @sys.set_env_var("BIT_RELAY_SENDER", "test-bot")
+  let prev = @env.get_env_var("BIT_RELAY_SENDER")
+  @env.set_env_var("BIT_RELAY_SENDER", "test-bot")
   let sender = relay_safe_sender()
   assert_eq(sender, "test-bot")
   match prev {
-    Some(v) => @sys.set_env_var("BIT_RELAY_SENDER", v)
-    None => @sys.unset_env_var("BIT_RELAY_SENDER")
+    Some(v) => @env.set_env_var("BIT_RELAY_SENDER", v)
+    None => @env.unset_env_var("BIT_RELAY_SENDER")
   }
 }
 

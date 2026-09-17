@@ -103,7 +103,7 @@ async fn handle_for_each_repo(args : Array[String]) -> Unit raise Error {
 ///|
 fn for_each_repo_expand_path(path : String) -> String {
   if path.has_prefix("~/") {
-    match @sys.get_env_var("HOME") {
+    match @env.get_env_var("HOME") {
       Some(home) =>
         home + String::unsafe_substring(path, start=1, end=path.length())
       None => path
@@ -121,9 +121,9 @@ fn for_each_repo_read_config_values(
 ) -> Array[String] {
   let values : Array[String] = []
   // 1. System config
-  let nosystem = @sys.get_env_var("GIT_CONFIG_NOSYSTEM")
+  let nosystem = @env.get_env_var("GIT_CONFIG_NOSYSTEM")
   if nosystem is None || nosystem == Some("false") {
-    let sys_path = @sys.get_env_var("GIT_CONFIG_SYSTEM").unwrap_or(
+    let sys_path = @env.get_env_var("GIT_CONFIG_SYSTEM").unwrap_or(
       "/etc/gitconfig",
     )
     if rfs.is_file(sys_path) {
@@ -136,11 +136,11 @@ fn for_each_repo_read_config_values(
     }
   }
   // 2. Global config (XDG + ~/.gitconfig)
-  let global_paths = match @sys.get_env_var("GIT_CONFIG_GLOBAL") {
+  let global_paths = match @env.get_env_var("GIT_CONFIG_GLOBAL") {
     Some(p) => [p]
     None => {
       let paths : Array[String] = []
-      match @sys.get_env_var("HOME") {
+      match @env.get_env_var("HOME") {
         Some(home) => {
           let xdg = home + "/.config/git/config"
           if rfs.is_file(xdg) {

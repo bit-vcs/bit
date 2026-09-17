@@ -118,7 +118,7 @@ pub fn status_porcelain_from(s : Status) -> Array[String] {
     ymap[p] = 'D'
   }
   // xmap.keys() ∪ ymap.keys() — paths touched by either side.
-  let list : Array[String] = Array::new(capacity=tracked_count)
+  let list : Array[String] = Array(capacity=tracked_count)
   for p in xmap.keys() {
     list.push(p)
   }
@@ -128,9 +128,7 @@ pub fn status_porcelain_from(s : Status) -> Array[String] {
     }
   }
   list.sort()
-  let out : Array[String] = Array::new(
-    capacity=list.length() + s.untracked.length(),
-  )
+  let out : Array[String] = Array(capacity=list.length() + s.untracked.length())
   for p in list {
     let x = xmap.get(p).unwrap_or(' ')
     let y = ymap.get(p).unwrap_or(' ')
@@ -1235,7 +1233,7 @@ fn reftable_index_to_hex12(value : UInt64) -> String {
     b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c',
     b'd', b'e', b'f',
   ]
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i = 11; i >= 0; i = i - 1 {
     let shift = i * 4
     let nibble = ((value >> shift.to_uint64().to_int()) & 0xfUL).to_int()
@@ -1855,7 +1853,7 @@ pub fn rm_paths(
       }
     }
   }
-  let out : Array[IndexEntry] = Array::new(capacity=map.length())
+  let out : Array[IndexEntry] = Array(capacity=map.length())
   let remaining_skip_worktree_paths : Map[String, Bool] = Map([])
   let remaining_skip_paths : Array[String] = []
   for path, entry in map {

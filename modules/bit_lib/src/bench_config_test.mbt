@@ -14,7 +14,7 @@ fn bench_setup_config_repo(num_remotes : Int) -> @bit.TestFs {
   let fs = @bit.TestFs::new()
   let git_dir = bench_config_root + "/.git"
   fs.mkdir_p(git_dir)
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string(
     "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tautocrlf = false\n",
   )

@@ -79,7 +79,7 @@ pub fn fast_directory_fingerprint(
   }
   let files : Array[String] = []
   collect_fast_hash_files(fs, root, "", ignore_entries, files)
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for rel in files {
     let file_path = root + "/" + rel
     let content = fs.read_file(file_path) catch { _ => Bytes::from_array([]) }
@@ -220,7 +220,7 @@ fn to_octal_string(value : Int) -> String {
     v = v / 8
   }
   let rev = digits.rev()
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for c in rev {
     sb.write_char(c)
   }

@@ -4,17 +4,17 @@ fn restore_env_var_for_upload_pack_process_wbtest(
   prev : String?,
 ) -> Unit {
   match prev {
-    Some(value) => @sys.set_env_var(name, value)
-    None => @sys.unset_env_var(name)
+    Some(value) => @env.set_env_var(name, value)
+    None => @env.unset_env_var(name)
   }
 }
 
 ///|
 test "upload-pack process: info-refs over ssh uses native protocol (no stateless-rpc)" {
-  let prev_ssh_command = @sys.get_env_var("GIT_SSH_COMMAND")
-  let prev_ssh = @sys.get_env_var("GIT_SSH")
-  @sys.unset_env_var("GIT_SSH_COMMAND")
-  @sys.unset_env_var("GIT_SSH")
+  let prev_ssh_command = @env.get_env_var("GIT_SSH_COMMAND")
+  let prev_ssh = @env.get_env_var("GIT_SSH")
+  @env.unset_env_var("GIT_SSH_COMMAND")
+  @env.unset_env_var("GIT_SSH")
   let spec = build_upload_pack_info_refs_process_spec(
     "git@github.com:mizchi/bit-vcs.git", true,
   )
@@ -37,10 +37,10 @@ test "upload-pack process: info-refs over ssh uses native protocol (no stateless
 
 ///|
 test "upload-pack process: request over ssh uses native protocol (no stateless-rpc)" {
-  let prev_ssh_command = @sys.get_env_var("GIT_SSH_COMMAND")
-  let prev_ssh = @sys.get_env_var("GIT_SSH")
-  @sys.unset_env_var("GIT_SSH_COMMAND")
-  @sys.unset_env_var("GIT_SSH")
+  let prev_ssh_command = @env.get_env_var("GIT_SSH_COMMAND")
+  let prev_ssh = @env.get_env_var("GIT_SSH")
+  @env.unset_env_var("GIT_SSH_COMMAND")
+  @env.unset_env_var("GIT_SSH")
   let spec = build_upload_pack_request_process_spec(
     "git@github.com:mizchi/bit-vcs.git", true,
   )
@@ -62,10 +62,10 @@ test "upload-pack process: request over ssh uses native protocol (no stateless-r
 
 ///|
 test "upload-pack process: ssh remote command escapes single quote in path" {
-  let prev_ssh_command = @sys.get_env_var("GIT_SSH_COMMAND")
-  let prev_ssh = @sys.get_env_var("GIT_SSH")
-  @sys.unset_env_var("GIT_SSH_COMMAND")
-  @sys.unset_env_var("GIT_SSH")
+  let prev_ssh_command = @env.get_env_var("GIT_SSH_COMMAND")
+  let prev_ssh = @env.get_env_var("GIT_SSH")
+  @env.unset_env_var("GIT_SSH_COMMAND")
+  @env.unset_env_var("GIT_SSH")
   let spec = build_upload_pack_info_refs_process_spec(
     "git@github.com:mizchi/o'hara.git", true,
   )
@@ -81,8 +81,8 @@ test "upload-pack process: ssh remote command escapes single quote in path" {
 
 ///|
 test "upload-pack process: file transport prefers SHIM_EXEC_PATH" {
-  let prev_exec_path = @sys.get_env_var("SHIM_EXEC_PATH")
-  @sys.set_env_var("SHIM_EXEC_PATH", "/tmp/git-core")
+  let prev_exec_path = @env.get_env_var("SHIM_EXEC_PATH")
+  @env.set_env_var("SHIM_EXEC_PATH", "/tmp/git-core")
   let spec = build_upload_pack_info_refs_process_spec("/tmp/repo.git", false)
   assert_eq(spec.cmd, "/tmp/git-core/git-upload-pack")
   restore_env_var_for_upload_pack_process_wbtest(
@@ -92,8 +92,8 @@ test "upload-pack process: file transport prefers SHIM_EXEC_PATH" {
 
 ///|
 async test "upload-pack process: run_process_with_files works with cwd override" {
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  @sys.set_env_var("GIT_SHIM_CWD", "/tmp")
+  let prev_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  @env.set_env_var("GIT_SHIM_CWD", "/tmp")
   let stdin_data = Bytes::from_array([b'h', b'i', b'\n'])
   let (code, stdout, stderr) = run_process_with_files(
     { cmd: "/bin/cat", args: [], extra_env: None },

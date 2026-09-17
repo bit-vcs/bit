@@ -1,10 +1,13 @@
 ///| JS transport registry bridge for injected HTTP transports.
 
 ///|
-fn js_transport_bytes_to_array(bytes : Bytes) -> Array[Byte] {
-  let out : Array[Byte] = Array::new(capacity=bytes.length())
+/// A `FixedArray` rather than an `Array`: `Array` is deprecated at the JS FFI
+/// boundary, and a `FixedArray[Byte]` arrives as a `Uint8Array`, which the
+/// bridge's `Uint8Array.from` reads exactly as it read the plain array.
+fn js_transport_bytes_to_fixedarray(bytes : Bytes) -> FixedArray[Byte] {
+  let out = FixedArray::make(bytes.length(), b'\x00')
   for i in 0..<bytes.length() {
-    out.push(bytes[i])
+    out[i] = bytes[i]
   }
   out
 }
@@ -12,13 +15,14 @@ fn js_transport_bytes_to_array(bytes : Bytes) -> Array[Byte] {
 ///|
 fn js_transport_headers_to_arrays(
   headers : Map[String, String],
-) -> (Array[String], Array[String]) {
-  let names : Array[String] = []
-  let values : Array[String] = []
-  for entry in headers.to_array() {
+) -> (FixedArray[String], FixedArray[String]) {
+  let entries = headers.to_array()
+  let names = FixedArray::make(entries.length(), "")
+  let values = FixedArray::make(entries.length(), "")
+  for i, entry in entries {
     let (name, value) = entry
-    names.push(name)
-    values.push(value)
+    names[i] = name
+    values[i] = value
   }
   (names, values)
 }
@@ -101,8 +105,8 @@ fn js_transport_parse_response(
 extern "js" fn lib_js_transport_get(
   transport_id : Int,
   url : String,
-  header_names : Array[String],
-  header_values : Array[String],
+  header_names : FixedArray[String],
+  header_values : FixedArray[String],
 ) -> @js_async.Promise[String] =
   #| async (transportId, url, headerNames, headerValues) => {
   #|   const state = globalThis.__bitGitJsTransportState ??= { nextTransportId: 1, transports: new Map() };
@@ -141,9 +145,9 @@ extern "js" fn lib_js_transport_get(
 extern "js" fn lib_js_transport_post(
   transport_id : Int,
   url : String,
-  body : Array[Byte],
-  header_names : Array[String],
-  header_values : Array[String],
+  body : FixedArray[Byte],
+  header_names : FixedArray[String],
+  header_values : FixedArray[String],
 ) -> @js_async.Promise[String] =
   #| async (transportId, url, body, headerNames, headerValues) => {
   #|   const state = globalThis.__bitGitJsTransportState ??= { nextTransportId: 1, transports: new Map() };
@@ -202,7 +206,7 @@ async fn js_transport_post(
   let raw = lib_js_transport_post(
     transport_id,
     url,
-    js_transport_bytes_to_array(body),
+    js_transport_bytes_to_fixedarray(body),
     header_names,
     header_values,
   ).wait() catch {

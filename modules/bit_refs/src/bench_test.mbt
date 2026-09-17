@@ -34,7 +34,7 @@ fn setup_packed_refs_repo(ref_count : Int) -> @bit.TestFs {
   let git_dir = bench_refs_root + "/.git"
   fs.mkdir_p(git_dir + "/refs")
   fs.write_string(git_dir + "/HEAD", "ref: refs/heads/main\n")
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("# pack-refs with: peeled fully-peeled sorted \n")
   let fake_id = "0123456789abcdef0123456789abcdef01234567"
   for i in 0..<ref_count {

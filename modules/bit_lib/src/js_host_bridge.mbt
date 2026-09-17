@@ -16,10 +16,13 @@ fn js_make_host_fs(host_id : Int) -> LibJsHostFs {
 }
 
 ///|
-fn js_bytes_to_array(bytes : Bytes) -> Array[Byte] {
-  let out : Array[Byte] = Array::new(capacity=bytes.length())
+/// A `FixedArray` rather than an `Array`: `Array` is deprecated at the JS FFI
+/// boundary, and a `FixedArray[Byte]` arrives as a `Uint8Array`, which the
+/// bridge's `Uint8Array.from` reads exactly as it read the plain array.
+fn js_bytes_to_fixedarray(bytes : Bytes) -> FixedArray[Byte] {
+  let out = FixedArray::make(bytes.length(), b'\x00')
   for i in 0..<bytes.length() {
-    out.push(bytes[i])
+    out[i] = bytes[i]
   }
   out
 }
@@ -45,7 +48,7 @@ extern "js" fn lib_js_host_last_error() -> String =
 extern "js" fn lib_js_host_write_file(
   host_id : Int,
   path : String,
-  content : Array[Byte],
+  content : FixedArray[Byte],
 ) -> String? =
   #| (hostId, path, content) => {
   #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
@@ -456,7 +459,8 @@ impl @bit.FileSystem for LibJsHostFs with fn mkdir_p(self, path) {
 
 ///|
 impl @bit.FileSystem for LibJsHostFs with fn write_file(self, path, content) {
-  match lib_js_host_write_file(self.host_id, path, js_bytes_to_array(content)) {
+  match
+    lib_js_host_write_file(self.host_id, path, js_bytes_to_fixedarray(content)) {
     Some(error) => raise @bit.GitError::IoError(error)
     None => ()
   }

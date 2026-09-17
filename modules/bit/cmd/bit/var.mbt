@@ -78,7 +78,7 @@ fn var_default_branch() -> String {
 
 ///|
 fn var_editor() -> String {
-  match @sys.get_env_var("GIT_EDITOR") {
+  match @env.get_env_var("GIT_EDITOR") {
     Some(e) => return e
     None => ()
   }
@@ -87,11 +87,11 @@ fn var_editor() -> String {
     Some(e) => return e
     None => ()
   }
-  match @sys.get_env_var("VISUAL") {
+  match @env.get_env_var("VISUAL") {
     Some(e) => return e
     None => ()
   }
-  match @sys.get_env_var("EDITOR") {
+  match @env.get_env_var("EDITOR") {
     Some(e) => return e
     None => ()
   }
@@ -100,7 +100,7 @@ fn var_editor() -> String {
 
 ///|
 fn var_pager() -> String {
-  match @sys.get_env_var("GIT_PAGER") {
+  match @env.get_env_var("GIT_PAGER") {
     Some(p) => return p
     None => ()
   }
@@ -109,7 +109,7 @@ fn var_pager() -> String {
     Some(p) => return p
     None => ()
   }
-  match @sys.get_env_var("PAGER") {
+  match @env.get_env_var("PAGER") {
     Some(p) => return p
     None => ()
   }

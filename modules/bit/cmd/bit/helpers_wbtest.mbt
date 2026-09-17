@@ -5,13 +5,13 @@ test "helpers: resolve_git_dir falls back to bare repo when GIT_DIR points missi
     get_current_timestamp().to_string()
   fs.mkdir_p(root + "/objects")
   fs.write_string(root + "/HEAD", "ref: refs/heads/main\n")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  @sys.set_env_var("GIT_DIR", root + "/.git")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  @env.set_env_var("GIT_DIR", root + "/.git")
   let resolved = resolve_git_dir(fs, root)
   @test.assert_eq(resolved, root)
   match prev_git_dir {
-    Some(value) => @sys.set_env_var("GIT_DIR", value)
-    None => @sys.unset_env_var("GIT_DIR")
+    Some(value) => @env.set_env_var("GIT_DIR", value)
+    None => @env.unset_env_var("GIT_DIR")
   }
   fs.remove_file(root + "/HEAD") catch {
     _ => ()
@@ -68,13 +68,13 @@ test "helpers: resolve_git_dir prefers .git when .git is present" {
     get_current_timestamp().to_string()
   fs.mkdir_p(root + "/.bit")
   fs.mkdir_p(root + "/.git")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_DIR")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_DIR")
   let resolved = resolve_git_dir(fs, root)
   @test.assert_eq(resolved, root + "/.git")
   match prev_git_dir {
-    Some(value) => @sys.set_env_var("GIT_DIR", value)
-    None => @sys.unset_env_var("GIT_DIR")
+    Some(value) => @env.set_env_var("GIT_DIR", value)
+    None => @env.unset_env_var("GIT_DIR")
   }
   fs.remove_dir(root + "/.bit") catch {
     _ => ()
@@ -93,13 +93,13 @@ test "helpers: resolve_git_dir falls back to .bit when .git is absent" {
   let root = "/tmp/bit-test-resolve-git-dir-bit-only-" +
     get_current_timestamp().to_string()
   fs.mkdir_p(root + "/.bit")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_DIR")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_DIR")
   let resolved = resolve_git_dir(fs, root)
   @test.assert_eq(resolved, root + "/.bit")
   match prev_git_dir {
-    Some(value) => @sys.set_env_var("GIT_DIR", value)
-    None => @sys.unset_env_var("GIT_DIR")
+    Some(value) => @env.set_env_var("GIT_DIR", value)
+    None => @env.unset_env_var("GIT_DIR")
   }
   fs.remove_dir(root + "/.bit") catch {
     _ => ()
@@ -116,13 +116,13 @@ test "helpers: resolve_git_dir keeps explicit GIT_DIR even if .bit exists" {
     get_current_timestamp().to_string()
   fs.mkdir_p(root + "/.bit")
   fs.mkdir_p(root + "/custom-meta")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  @sys.set_env_var("GIT_DIR", root + "/custom-meta")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  @env.set_env_var("GIT_DIR", root + "/custom-meta")
   let resolved = resolve_git_dir(fs, root)
   @test.assert_eq(resolved, root + "/custom-meta")
   match prev_git_dir {
-    Some(value) => @sys.set_env_var("GIT_DIR", value)
-    None => @sys.unset_env_var("GIT_DIR")
+    Some(value) => @env.set_env_var("GIT_DIR", value)
+    None => @env.unset_env_var("GIT_DIR")
   }
   fs.remove_dir(root + "/custom-meta") catch {
     _ => ()
@@ -191,147 +191,147 @@ test "helpers: parse_git_env_timezone extracts timezone token" {
 
 ///|
 test "helpers: get_commit_timestamp parses git-style committer date" {
-  let prev = @sys.get_env_var("GIT_COMMITTER_DATE")
-  @sys.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
+  let prev = @env.get_env_var("GIT_COMMITTER_DATE")
+  @env.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
   @test.assert_eq(get_commit_timestamp(), 1234567890L)
   match prev {
-    Some(value) => @sys.set_env_var("GIT_COMMITTER_DATE", value)
-    None => @sys.unset_env_var("GIT_COMMITTER_DATE")
+    Some(value) => @env.set_env_var("GIT_COMMITTER_DATE", value)
+    None => @env.unset_env_var("GIT_COMMITTER_DATE")
   }
 }
 
 ///|
 test "helpers: get_author_timestamp prefers author date" {
-  let prev_author = @sys.get_env_var("GIT_AUTHOR_DATE")
-  let prev_committer = @sys.get_env_var("GIT_COMMITTER_DATE")
-  @sys.set_env_var("GIT_AUTHOR_DATE", "1234567891 -0600")
-  @sys.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
+  let prev_author = @env.get_env_var("GIT_AUTHOR_DATE")
+  let prev_committer = @env.get_env_var("GIT_COMMITTER_DATE")
+  @env.set_env_var("GIT_AUTHOR_DATE", "1234567891 -0600")
+  @env.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
   @test.assert_eq(get_author_timestamp(), 1234567891L)
   match prev_author {
-    Some(value) => @sys.set_env_var("GIT_AUTHOR_DATE", value)
-    None => @sys.unset_env_var("GIT_AUTHOR_DATE")
+    Some(value) => @env.set_env_var("GIT_AUTHOR_DATE", value)
+    None => @env.unset_env_var("GIT_AUTHOR_DATE")
   }
   match prev_committer {
-    Some(value) => @sys.set_env_var("GIT_COMMITTER_DATE", value)
-    None => @sys.unset_env_var("GIT_COMMITTER_DATE")
+    Some(value) => @env.set_env_var("GIT_COMMITTER_DATE", value)
+    None => @env.unset_env_var("GIT_COMMITTER_DATE")
   }
 }
 
 ///|
 test "helpers: get_commit_timezone parses git-style committer date" {
-  let prev = @sys.get_env_var("GIT_COMMITTER_DATE")
-  @sys.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
+  let prev = @env.get_env_var("GIT_COMMITTER_DATE")
+  @env.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
   @test.assert_eq(get_commit_timezone(), "-0700")
   match prev {
-    Some(value) => @sys.set_env_var("GIT_COMMITTER_DATE", value)
-    None => @sys.unset_env_var("GIT_COMMITTER_DATE")
+    Some(value) => @env.set_env_var("GIT_COMMITTER_DATE", value)
+    None => @env.unset_env_var("GIT_COMMITTER_DATE")
   }
 }
 
 ///|
 test "helpers: get_author_timezone prefers author date" {
-  let prev_author = @sys.get_env_var("GIT_AUTHOR_DATE")
-  let prev_committer = @sys.get_env_var("GIT_COMMITTER_DATE")
-  @sys.set_env_var("GIT_AUTHOR_DATE", "1234567891 -0600")
-  @sys.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
+  let prev_author = @env.get_env_var("GIT_AUTHOR_DATE")
+  let prev_committer = @env.get_env_var("GIT_COMMITTER_DATE")
+  @env.set_env_var("GIT_AUTHOR_DATE", "1234567891 -0600")
+  @env.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
   @test.assert_eq(get_author_timezone(), "-0600")
   match prev_author {
-    Some(value) => @sys.set_env_var("GIT_AUTHOR_DATE", value)
-    None => @sys.unset_env_var("GIT_AUTHOR_DATE")
+    Some(value) => @env.set_env_var("GIT_AUTHOR_DATE", value)
+    None => @env.unset_env_var("GIT_AUTHOR_DATE")
   }
   match prev_committer {
-    Some(value) => @sys.set_env_var("GIT_COMMITTER_DATE", value)
-    None => @sys.unset_env_var("GIT_COMMITTER_DATE")
+    Some(value) => @env.set_env_var("GIT_COMMITTER_DATE", value)
+    None => @env.unset_env_var("GIT_COMMITTER_DATE")
   }
 }
 
 ///|
 test "helpers: get_committer_string prefers GIT_COMMITTER identity" {
-  let prev_committer_name = @sys.get_env_var("GIT_COMMITTER_NAME")
-  let prev_committer_email = @sys.get_env_var("GIT_COMMITTER_EMAIL")
-  let prev_author_name = @sys.get_env_var("GIT_AUTHOR_NAME")
-  let prev_author_email = @sys.get_env_var("GIT_AUTHOR_EMAIL")
-  @sys.set_env_var("GIT_COMMITTER_NAME", "Committer")
-  @sys.set_env_var("GIT_COMMITTER_EMAIL", "committer@example.com")
-  @sys.set_env_var("GIT_AUTHOR_NAME", "Author")
-  @sys.set_env_var("GIT_AUTHOR_EMAIL", "author@example.com")
+  let prev_committer_name = @env.get_env_var("GIT_COMMITTER_NAME")
+  let prev_committer_email = @env.get_env_var("GIT_COMMITTER_EMAIL")
+  let prev_author_name = @env.get_env_var("GIT_AUTHOR_NAME")
+  let prev_author_email = @env.get_env_var("GIT_AUTHOR_EMAIL")
+  @env.set_env_var("GIT_COMMITTER_NAME", "Committer")
+  @env.set_env_var("GIT_COMMITTER_EMAIL", "committer@example.com")
+  @env.set_env_var("GIT_AUTHOR_NAME", "Author")
+  @env.set_env_var("GIT_AUTHOR_EMAIL", "author@example.com")
   @test.assert_eq(get_committer_string(), "Committer <committer@example.com>")
   match prev_committer_name {
-    Some(value) => @sys.set_env_var("GIT_COMMITTER_NAME", value)
-    None => @sys.unset_env_var("GIT_COMMITTER_NAME")
+    Some(value) => @env.set_env_var("GIT_COMMITTER_NAME", value)
+    None => @env.unset_env_var("GIT_COMMITTER_NAME")
   }
   match prev_committer_email {
-    Some(value) => @sys.set_env_var("GIT_COMMITTER_EMAIL", value)
-    None => @sys.unset_env_var("GIT_COMMITTER_EMAIL")
+    Some(value) => @env.set_env_var("GIT_COMMITTER_EMAIL", value)
+    None => @env.unset_env_var("GIT_COMMITTER_EMAIL")
   }
   match prev_author_name {
-    Some(value) => @sys.set_env_var("GIT_AUTHOR_NAME", value)
-    None => @sys.unset_env_var("GIT_AUTHOR_NAME")
+    Some(value) => @env.set_env_var("GIT_AUTHOR_NAME", value)
+    None => @env.unset_env_var("GIT_AUTHOR_NAME")
   }
   match prev_author_email {
-    Some(value) => @sys.set_env_var("GIT_AUTHOR_EMAIL", value)
-    None => @sys.unset_env_var("GIT_AUTHOR_EMAIL")
+    Some(value) => @env.set_env_var("GIT_AUTHOR_EMAIL", value)
+    None => @env.unset_env_var("GIT_AUTHOR_EMAIL")
   }
 }
 
 ///|
 test "helpers: get_committer_string falls back to author identity" {
-  let prev_committer_name = @sys.get_env_var("GIT_COMMITTER_NAME")
-  let prev_committer_email = @sys.get_env_var("GIT_COMMITTER_EMAIL")
-  let prev_author_name = @sys.get_env_var("GIT_AUTHOR_NAME")
-  let prev_author_email = @sys.get_env_var("GIT_AUTHOR_EMAIL")
-  @sys.unset_env_var("GIT_COMMITTER_NAME")
-  @sys.unset_env_var("GIT_COMMITTER_EMAIL")
-  @sys.set_env_var("GIT_AUTHOR_NAME", "Author")
-  @sys.set_env_var("GIT_AUTHOR_EMAIL", "author@example.com")
+  let prev_committer_name = @env.get_env_var("GIT_COMMITTER_NAME")
+  let prev_committer_email = @env.get_env_var("GIT_COMMITTER_EMAIL")
+  let prev_author_name = @env.get_env_var("GIT_AUTHOR_NAME")
+  let prev_author_email = @env.get_env_var("GIT_AUTHOR_EMAIL")
+  @env.unset_env_var("GIT_COMMITTER_NAME")
+  @env.unset_env_var("GIT_COMMITTER_EMAIL")
+  @env.set_env_var("GIT_AUTHOR_NAME", "Author")
+  @env.set_env_var("GIT_AUTHOR_EMAIL", "author@example.com")
   @test.assert_eq(get_committer_string(), "Author <author@example.com>")
   match prev_committer_name {
-    Some(value) => @sys.set_env_var("GIT_COMMITTER_NAME", value)
-    None => @sys.unset_env_var("GIT_COMMITTER_NAME")
+    Some(value) => @env.set_env_var("GIT_COMMITTER_NAME", value)
+    None => @env.unset_env_var("GIT_COMMITTER_NAME")
   }
   match prev_committer_email {
-    Some(value) => @sys.set_env_var("GIT_COMMITTER_EMAIL", value)
-    None => @sys.unset_env_var("GIT_COMMITTER_EMAIL")
+    Some(value) => @env.set_env_var("GIT_COMMITTER_EMAIL", value)
+    None => @env.unset_env_var("GIT_COMMITTER_EMAIL")
   }
   match prev_author_name {
-    Some(value) => @sys.set_env_var("GIT_AUTHOR_NAME", value)
-    None => @sys.unset_env_var("GIT_AUTHOR_NAME")
+    Some(value) => @env.set_env_var("GIT_AUTHOR_NAME", value)
+    None => @env.unset_env_var("GIT_AUTHOR_NAME")
   }
   match prev_author_email {
-    Some(value) => @sys.set_env_var("GIT_AUTHOR_EMAIL", value)
-    None => @sys.unset_env_var("GIT_AUTHOR_EMAIL")
+    Some(value) => @env.set_env_var("GIT_AUTHOR_EMAIL", value)
+    None => @env.unset_env_var("GIT_AUTHOR_EMAIL")
   }
 }
 
 ///|
 test "main: resolve_global_path uses GIT_SHIM_PWD when available" {
-  let prev = @sys.get_env_var("GIT_SHIM_PWD")
-  @sys.set_env_var("GIT_SHIM_PWD", "/tmp/bit-main-wbtest")
+  let prev = @env.get_env_var("GIT_SHIM_PWD")
+  @env.set_env_var("GIT_SHIM_PWD", "/tmp/bit-main-wbtest")
   let resolved = resolve_global_path("dest", None)
   @test.assert_eq(resolved, "/tmp/bit-main-wbtest/dest")
   match prev {
-    Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
-    None => @sys.unset_env_var("GIT_SHIM_PWD")
+    Some(value) => @env.set_env_var("GIT_SHIM_PWD", value)
+    None => @env.unset_env_var("GIT_SHIM_PWD")
   }
 }
 
 ///|
 test "main: resolve_global_path resolves relative path without GIT_SHIM_PWD" {
-  let prev = @sys.get_env_var("GIT_SHIM_PWD")
-  @sys.unset_env_var("GIT_SHIM_PWD")
+  let prev = @env.get_env_var("GIT_SHIM_PWD")
+  @env.unset_env_var("GIT_SHIM_PWD")
   let resolved = resolve_global_path("dest", None)
   assert_true(resolved.has_prefix("/"))
   assert_true(resolved.has_suffix("/dest"))
   match prev {
-    Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
-    None => @sys.unset_env_var("GIT_SHIM_PWD")
+    Some(value) => @env.set_env_var("GIT_SHIM_PWD", value)
+    None => @env.unset_env_var("GIT_SHIM_PWD")
   }
 }
 
 ///|
 test "main: parse_global_options resolves -C relative path without GIT_SHIM_PWD" {
-  let prev = @sys.get_env_var("GIT_SHIM_PWD")
-  @sys.unset_env_var("GIT_SHIM_PWD")
+  let prev = @env.get_env_var("GIT_SHIM_PWD")
+  @env.unset_env_var("GIT_SHIM_PWD")
   let opts = parse_global_options(["bit", "-C", "dest", "status"])
   @test.assert_eq(opts.subcmd, Some("status"))
   match opts.cwd {
@@ -342,8 +342,8 @@ test "main: parse_global_options resolves -C relative path without GIT_SHIM_PWD"
     None => fail("expected cwd to be resolved")
   }
   match prev {
-    Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
-    None => @sys.unset_env_var("GIT_SHIM_PWD")
+    Some(value) => @env.set_env_var("GIT_SHIM_PWD", value)
+    None => @env.unset_env_var("GIT_SHIM_PWD")
   }
 }
 
@@ -363,36 +363,36 @@ test "helpers: get_work_root finds repo root from PWD when shim pwd is absent" {
   cleanup_tree(fs, root)
   fs.mkdir_p(root + "/.git")
   fs.mkdir_p(subdir)
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_pwd = @sys.get_env_var("PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_SHIM_PWD")
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.set_env_var("PWD", subdir)
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_pwd = @env.get_env_var("PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_SHIM_PWD")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.set_env_var("PWD", subdir)
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
   @test.assert_eq(get_work_root(), root)
   match prev_shim_pwd {
-    Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
-    None => @sys.unset_env_var("GIT_SHIM_PWD")
+    Some(value) => @env.set_env_var("GIT_SHIM_PWD", value)
+    None => @env.unset_env_var("GIT_SHIM_PWD")
   }
   match prev_shim_cwd {
-    Some(value) => @sys.set_env_var("GIT_SHIM_CWD", value)
-    None => @sys.unset_env_var("GIT_SHIM_CWD")
+    Some(value) => @env.set_env_var("GIT_SHIM_CWD", value)
+    None => @env.unset_env_var("GIT_SHIM_CWD")
   }
   match prev_pwd {
-    Some(value) => @sys.set_env_var("PWD", value)
-    None => @sys.unset_env_var("PWD")
+    Some(value) => @env.set_env_var("PWD", value)
+    None => @env.unset_env_var("PWD")
   }
   match prev_git_dir {
-    Some(value) => @sys.set_env_var("GIT_DIR", value)
-    None => @sys.unset_env_var("GIT_DIR")
+    Some(value) => @env.set_env_var("GIT_DIR", value)
+    None => @env.unset_env_var("GIT_DIR")
   }
   match prev_work_tree {
-    Some(value) => @sys.set_env_var("GIT_WORK_TREE", value)
-    None => @sys.unset_env_var("GIT_WORK_TREE")
+    Some(value) => @env.set_env_var("GIT_WORK_TREE", value)
+    None => @env.unset_env_var("GIT_WORK_TREE")
   }
   cleanup_tree(fs, root)
 }
@@ -483,19 +483,19 @@ async test "main: show_command_help supports command aliases" {
 
 ///|
 test "main: opt-in help text is disabled by default" {
-  let prev_full = @sys.get_env_var("BIT_HELP_FULL")
-  let prev_dir = @sys.get_env_var("BIT_HELP_TEXT_DIR")
-  @sys.unset_env_var("BIT_HELP_FULL")
-  @sys.unset_env_var("BIT_HELP_TEXT_DIR")
+  let prev_full = @env.get_env_var("BIT_HELP_FULL")
+  let prev_dir = @env.get_env_var("BIT_HELP_TEXT_DIR")
+  @env.unset_env_var("BIT_HELP_FULL")
+  @env.unset_env_var("BIT_HELP_TEXT_DIR")
   assert_false(help_text_opt_in_enabled())
   @test.assert_eq(load_opt_in_help_text("status"), None)
   match prev_full {
-    Some(value) => @sys.set_env_var("BIT_HELP_FULL", value)
-    None => @sys.unset_env_var("BIT_HELP_FULL")
+    Some(value) => @env.set_env_var("BIT_HELP_FULL", value)
+    None => @env.unset_env_var("BIT_HELP_FULL")
   }
   match prev_dir {
-    Some(value) => @sys.set_env_var("BIT_HELP_TEXT_DIR", value)
-    None => @sys.unset_env_var("BIT_HELP_TEXT_DIR")
+    Some(value) => @env.set_env_var("BIT_HELP_TEXT_DIR", value)
+    None => @env.unset_env_var("BIT_HELP_TEXT_DIR")
   }
 }
 
@@ -506,22 +506,22 @@ test "main: opt-in help text is loaded from external files" {
   cleanup_tree(fs, dir)
   fs.mkdir_p(dir)
   fs.write_string(dir + "/show-branch.txt", "Detailed show-branch help")
-  let prev_full = @sys.get_env_var("BIT_HELP_FULL")
-  let prev_dir = @sys.get_env_var("BIT_HELP_TEXT_DIR")
-  @sys.set_env_var("BIT_HELP_FULL", "1")
-  @sys.set_env_var("BIT_HELP_TEXT_DIR", dir)
+  let prev_full = @env.get_env_var("BIT_HELP_FULL")
+  let prev_dir = @env.get_env_var("BIT_HELP_TEXT_DIR")
+  @env.set_env_var("BIT_HELP_FULL", "1")
+  @env.set_env_var("BIT_HELP_TEXT_DIR", dir)
   assert_true(help_text_opt_in_enabled())
   @test.assert_eq(
     load_opt_in_help_text("show-branches"),
     Some("Detailed show-branch help"),
   )
   match prev_full {
-    Some(value) => @sys.set_env_var("BIT_HELP_FULL", value)
-    None => @sys.unset_env_var("BIT_HELP_FULL")
+    Some(value) => @env.set_env_var("BIT_HELP_FULL", value)
+    None => @env.unset_env_var("BIT_HELP_FULL")
   }
   match prev_dir {
-    Some(value) => @sys.set_env_var("BIT_HELP_TEXT_DIR", value)
-    None => @sys.unset_env_var("BIT_HELP_TEXT_DIR")
+    Some(value) => @env.set_env_var("BIT_HELP_TEXT_DIR", value)
+    None => @env.unset_env_var("BIT_HELP_TEXT_DIR")
   }
   cleanup_tree(fs, dir)
 }

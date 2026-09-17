@@ -270,7 +270,7 @@ fn name_rev_replace_oids(
   // Find 40-char hex strings and replace with names. With --name-only the oid
   // is replaced by just the name; otherwise it becomes `<oid> (<name>)`.
   let chars = line.to_array()
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   let mut i = 0
   while i < chars.length() {
     // Check if we have a 40-char hex starting here

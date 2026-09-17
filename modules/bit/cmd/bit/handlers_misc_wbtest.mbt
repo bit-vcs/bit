@@ -71,21 +71,21 @@ async test "config: --global writes to HOME/.gitconfig without delegation" {
   let home = root + "/home"
   fs.mkdir_p(home)
   let config_path = home + "/.gitconfig"
-  let prev_home = @sys.get_env_var("HOME")
-  let prev_global = @sys.get_env_var("GIT_CONFIG_GLOBAL")
-  @sys.set_env_var("HOME", home)
-  @sys.unset_env_var("GIT_CONFIG_GLOBAL")
+  let prev_home = @env.get_env_var("HOME")
+  let prev_global = @env.get_env_var("GIT_CONFIG_GLOBAL")
+  @env.set_env_var("HOME", home)
+  @env.unset_env_var("GIT_CONFIG_GLOBAL")
   handle_config(["--global", "user.name", "bit-test"])
   let content = decode_bytes(fs.read_file(config_path))
   assert_true(content.contains("[user]"))
   assert_true(content.contains("name = bit-test"))
   match prev_home {
-    Some(v) => @sys.set_env_var("HOME", v)
-    None => @sys.unset_env_var("HOME")
+    Some(v) => @env.set_env_var("HOME", v)
+    None => @env.unset_env_var("HOME")
   }
   match prev_global {
-    Some(v) => @sys.set_env_var("GIT_CONFIG_GLOBAL", v)
-    None => @sys.unset_env_var("GIT_CONFIG_GLOBAL")
+    Some(v) => @env.set_env_var("GIT_CONFIG_GLOBAL", v)
+    None => @env.unset_env_var("GIT_CONFIG_GLOBAL")
   }
   fs.remove_file(config_path) catch {
     _ => ()

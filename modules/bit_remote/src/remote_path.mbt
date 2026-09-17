@@ -33,7 +33,7 @@ fn hex_char_to_int(c : Char) -> Int? {
 
 ///|
 fn decode_file_url_path(path : String) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let mut i = 0
   while i < path.length() {
     let c = path.unsafe_get(i).to_int().unsafe_to_char()

@@ -2471,7 +2471,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       }
       let fs = OsFs::new()
       let git_dir = find_git_dir(fs)
-      match @sys.get_env_var("GIT_TEST_NAME_HASH_VERSION") {
+      match @env.get_env_var("GIT_TEST_NAME_HASH_VERSION") {
         Some(_) => ()
         None => ()
       }
@@ -2484,7 +2484,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         @bitobject.HashAlgorithm::Sha1
       }
       let hash_size = hash_algo.hash_size()
-      let trace2_event = @sys.get_env_var("GIT_TRACE2_EVENT")
+      let trace2_event = @env.get_env_var("GIT_TRACE2_EVENT")
       ignore(is_pack_reuse_config_enabled(git_dir))
       // Keep these flags visible for future compatibility tuning.
       let non_default_delta_params = cfg.window == 0 || cfg.depth != 50
@@ -2848,7 +2848,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         let use_sparse = match cfg.sparse_mode {
           Some(v) => v
           None =>
-            match @sys.get_env_var("GIT_TEST_PACK_SPARSE") {
+            match @env.get_env_var("GIT_TEST_PACK_SPARSE") {
               Some(val) =>
                 parse_bool_value(val).unwrap_or(get_pack_use_sparse(git_dir))
               None => get_pack_use_sparse(git_dir)

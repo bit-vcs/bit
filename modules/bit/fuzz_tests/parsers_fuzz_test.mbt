@@ -12,7 +12,7 @@ fn random_bytes(rng : Lcg, len : Int) -> Bytes {
 
 ///|
 fn random_ascii_string(rng : Lcg, len : Int) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for _ in 0..<len {
     let code = rng.next_int() % 95 + 32
     sb.write_char(code.unsafe_to_char())
@@ -275,7 +275,7 @@ test "fuzz: parse_reflog_selector with random spec" {
   }
   // Structured: `<refname>@{<digits>}`
   for _ in 0..<128 {
-    let sb = StringBuilder::new()
+    let sb = StringBuilder()
     sb.write_string(random_ascii_string(rng, rng.next_int() % 12))
     sb.write_string("@{")
     let digit_count = rng.next_int() % 20
@@ -309,7 +309,7 @@ test "fuzz: parse_index_pathspec with random spec" {
   }
   // Bias toward the `:N:` prefix form.
   for _ in 0..<128 {
-    let sb = StringBuilder::new()
+    let sb = StringBuilder()
     sb.write_char(':')
     let stage_code = rng.next_int() % 60 + 48 // 0..<60 + '0'
     sb.write_char(stage_code.unsafe_to_char())

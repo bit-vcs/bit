@@ -192,7 +192,7 @@ fn trailers_split(input : String) -> (String, Array[String]) {
     trailers.push(lines[ti])
     ti += 1
   }
-  let body_sb = StringBuilder::new()
+  let body_sb = StringBuilder()
   let mut bi = 0
   while bi < trailer_start {
     body_sb.write_string(lines[bi])
@@ -210,7 +210,7 @@ pub fn add_trailer(message : String, key : String, value : String) -> String {
   let all_trailers : Array[String] = []
   all_trailers.append(existing)
   all_trailers.push(trailers_normalize("\{key}: \{value}"))
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   result.write_string(body)
   // Ensure blank line before trailers if body doesn't end with one
   if body.length() > 0 && !body.has_suffix("\n\n") {

@@ -335,7 +335,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
 ///|
 fn repack_find_bit_exe(git_dir : String) -> String {
   // Check GIT_TEST_INSTALLED (used in shim tests)
-  match @sys.get_env_var("GIT_TEST_INSTALLED") {
+  match @env.get_env_var("GIT_TEST_INSTALLED") {
     Some(dir) if dir.length() > 0 => {
       let fs = OsFs::new()
       let candidate = dir + "/git"
@@ -346,7 +346,7 @@ fn repack_find_bit_exe(git_dir : String) -> String {
     _ => ()
   }
   // Check SHIM_MOON env var (bit binary path for shim tests)
-  match @sys.get_env_var("SHIM_MOON") {
+  match @env.get_env_var("SHIM_MOON") {
     Some(path) if path.length() > 0 => return path
     _ => ()
   }
@@ -391,7 +391,7 @@ fn repack_update_server_info(
   }
   let packs_path = info_dir + "/packs"
   let entries = fs.readdir(pack_dir) catch { _ => return }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for entry in entries {
     if entry.has_suffix(".pack") && !entry.has_prefix(".tmp-") {
       buf.write_string("P ")
@@ -411,7 +411,7 @@ fn repack_update_server_info(
   let refs_path = refs_info_dir + "/refs"
   let rfs : &@bitcore.RepoFileSystem = fs
   let all_refs = @bitrepo.show_ref(rfs, git_dir) catch { _ => [] }
-  let refs_buf = StringBuilder::new()
+  let refs_buf = StringBuilder()
   for item in all_refs {
     let (name, id) = item
     refs_buf.write_string(id.to_hex())

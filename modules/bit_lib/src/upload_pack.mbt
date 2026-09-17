@@ -676,7 +676,7 @@ fn upload_parse_pkt_len(data : Bytes, start : Int) -> Int raise @bit.GitError {
 
 ///|
 fn upload_bytes_to_string_range(data : Bytes, start : Int, end : Int) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let mut i = start
   while i < end {
     buf.write_char(data[i].to_int().unsafe_to_char())
@@ -712,7 +712,7 @@ fn upload_split_by_space(s : String) -> Array[String] {
 
 ///|
 fn upload_chars_to_string(chars : Array[Char]) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for c in chars {
     buf.write_char(c)
   }
@@ -853,7 +853,7 @@ pub fn ls_refs_v2(
   let db = if req.peel { Some(ObjectDb::load(fs, git_dir)) } else { None }
   for entry in listing {
     let (name, id) = entry
-    let line = StringBuilder::new()
+    let line = StringBuilder()
     line.write_string(id.to_hex())
     line.write_char(' ')
     line.write_string(name)

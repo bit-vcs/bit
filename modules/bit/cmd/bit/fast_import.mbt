@@ -169,7 +169,7 @@ async fn handle_fast_import(args : Array[String]) -> Unit raise Error {
   // Export marks if specified
   if export_marks_file is Some(path) {
     let abs_path = if path.has_prefix("/") { path } else { root + "/" + path }
-    let buf = StringBuilder::new()
+    let buf = StringBuilder()
     // Sort marks by number for deterministic output
     let mark_keys : Array[Int] = []
     for k, _ in marks {
@@ -811,7 +811,7 @@ async fn fast_import_parse_tag(
   let message_bytes = parser.read_data()
   let message = decode_bytes(message_bytes)
   // Build tag object content
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string("object ")
   buf.write_string(target_id.to_hex())
   buf.write_string("\n")

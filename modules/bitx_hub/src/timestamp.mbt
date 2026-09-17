@@ -107,7 +107,7 @@ pub fn unix_to_iso8601(unix : Int64) -> String {
   }
   let day = days + 1
   // Format with zero-padding
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string(pad4(year))
   buf.write_string("-")
   buf.write_string(pad2(month))

@@ -765,7 +765,7 @@ fn signing_openpgp_native_keyring(
   root : String,
   git_dir : String,
 ) -> Array[String]? raise @bitcore.GitError {
-  let configured = match @sys.get_env_var("BIT_OPENPGP_KEYRING") {
+  let configured = match @env.get_env_var("BIT_OPENPGP_KEYRING") {
     Some(value) if value.trim().to_owned().length() > 0 => Some(value)
     _ => bit_config_get(git_dir, "gpg", "openpgpKeyringFile")
   }
@@ -813,7 +813,7 @@ fn signing_openpgp_native_result(
 /// (OpenPGP self-activates whenever a native keyring is configured, so it does
 /// not require this flag.)
 fn signing_native_verify_enabled(git_dir : String) -> Bool {
-  match @sys.get_env_var("BIT_NATIVE_VERIFY") {
+  match @env.get_env_var("BIT_NATIVE_VERIFY") {
     Some(value) => {
       let normalized = value.trim().to_owned().to_lower()
       if normalized != "" && normalized != "0" && normalized != "false" {

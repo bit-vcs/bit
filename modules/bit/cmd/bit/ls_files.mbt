@@ -635,12 +635,12 @@ fn ls_files_repo_root_abs(root : String) -> String {
   if root.has_prefix("/") {
     return normalize_path(root)
   }
-  let base_dir = match @sys.get_env_var("GIT_SHIM_PWD") {
+  let base_dir = match @env.get_env_var("GIT_SHIM_PWD") {
     Some(dir) => Some(dir)
     None =>
       match @env.current_dir() {
         Some(dir) => Some(dir)
-        None => @sys.get_env_var("PWD")
+        None => @env.get_env_var("PWD")
       }
   }
   match base_dir {
@@ -747,7 +747,7 @@ pub(all) struct SubmoduleInfo {
 
 ///|
 fn submodule_info_show_string(value : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_char('"')
   for c in value {
     if c == '"' {
@@ -1145,10 +1145,10 @@ fn normalize_ls_tree_filters(
 
 ///|
 fn compute_cwd_prefix(root : String) -> String {
-  let cwd = match @sys.get_env_var("GIT_SHIM_PWD") {
+  let cwd = match @env.get_env_var("GIT_SHIM_PWD") {
     Some(dir) => Some(dir)
     None =>
-      match @sys.get_env_var("PWD") {
+      match @env.get_env_var("PWD") {
         Some(dir) => Some(dir)
         None => @env.current_dir()
       }

@@ -98,7 +98,7 @@ async fn column_layout_column(
     1
   }
   let num_rows = (items.length() + num_cols - 1) / num_cols
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   let mut row = 0
   while row < num_rows {
     let mut col = 0
@@ -149,7 +149,7 @@ async fn column_layout_row(
   } else {
     1
   }
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i, item in items {
     result.write_string(item)
     let col_in_row = i % num_cols

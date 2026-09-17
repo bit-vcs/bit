@@ -82,10 +82,10 @@ async test "verify: verify-commit validates ssh signatures via native ssh-keygen
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   defer add_test_restore_env("GIT_DIR", prev_git_dir)
@@ -106,10 +106,10 @@ async test "verify: verify-commit validates ssh signatures via native ssh-keygen
   fs.write_string(root + "/signed.txt", "signed\n")
   commit_wbtest_run_git(root, ["add", "signed.txt"])
 
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_PWD", root)
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_PWD", root)
 
   handle_commit(["-q", "-S", "-m", "signed ssh"]) catch {
     err => fail("handle_commit failed: \{err}")
@@ -133,12 +133,12 @@ async test "verify: ssh verifier uses commit timestamp for key validity" {
   fs.mkdir_p(root)
   let git_dir = root + "/.git"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
-  let prev_author_date = @sys.get_env_var("GIT_AUTHOR_DATE")
-  let prev_committer_date = @sys.get_env_var("GIT_COMMITTER_DATE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
+  let prev_author_date = @env.get_env_var("GIT_AUTHOR_DATE")
+  let prev_committer_date = @env.get_env_var("GIT_COMMITTER_DATE")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   defer add_test_restore_env("GIT_DIR", prev_git_dir)
@@ -157,12 +157,12 @@ async test "verify: ssh verifier uses commit timestamp for key validity" {
     "config", "gpg.ssh.allowedSignersFile", allowed_signers,
   ])
 
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_PWD", root)
-  @sys.set_env_var("GIT_AUTHOR_DATE", "1112912001 +0000")
-  @sys.set_env_var("GIT_COMMITTER_DATE", "1112912001 +0000")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_PWD", root)
+  @env.set_env_var("GIT_AUTHOR_DATE", "1112912001 +0000")
+  @env.set_env_var("GIT_COMMITTER_DATE", "1112912001 +0000")
 
   commit_wbtest_run_git(root, ["config", "user.signingkey", valid_key])
   fs.write_string(root + "/signed.txt", "valid\n")
@@ -235,10 +235,10 @@ async test "verify: verify-tag validates ssh signatures via native ssh-keygen" {
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   defer add_test_restore_env("GIT_DIR", prev_git_dir)
@@ -261,10 +261,10 @@ async test "verify: verify-tag validates ssh signatures via native ssh-keygen" {
   grep_test_run_git(repo_dir, ["add", "tracked.txt"])
   grep_test_run_git(repo_dir, ["commit", "-q", "-m", "initial"])
 
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
 
   handle_tag(["-s", "-m", "signed tag", "v1"]) catch {
     err => fail("handle_tag failed: \{err}")
@@ -289,11 +289,11 @@ async test "verify: ssh verifier uses tagger timestamp for key validity" {
   let repo_dir = root + "/repo"
   let git_dir = repo_dir + "/.git"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
-  let prev_committer_date = @sys.get_env_var("GIT_COMMITTER_DATE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
+  let prev_committer_date = @env.get_env_var("GIT_COMMITTER_DATE")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   defer add_test_restore_env("GIT_DIR", prev_git_dir)
@@ -316,11 +316,11 @@ async test "verify: ssh verifier uses tagger timestamp for key validity" {
   grep_test_run_git(repo_dir, ["add", "tracked.txt"])
   grep_test_run_git(repo_dir, ["commit", "-q", "-m", "initial"])
 
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
-  @sys.set_env_var("GIT_COMMITTER_DATE", "1112912001 +0000")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.set_env_var("GIT_COMMITTER_DATE", "1112912001 +0000")
 
   grep_test_run_git(repo_dir, ["config", "user.signingkey", valid_key])
   handle_tag(["-s", "-m", "signed tag", "v-valid"]) catch {
@@ -388,10 +388,10 @@ async test "verify: verify-commit uses external openpgp verifier" {
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   defer add_test_restore_env("GIT_DIR", prev_git_dir)
@@ -408,10 +408,10 @@ async test "verify: verify-commit uses external openpgp verifier" {
   fs.write_string(root + "/signed.txt", "signed\n")
   commit_wbtest_run_git(root, ["add", "signed.txt"])
 
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_PWD", root)
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_PWD", root)
 
   handle_commit(["-q", "-S", "-m", "signed gpg"]) catch {
     err => fail("handle_commit failed: \{err}")
@@ -435,10 +435,10 @@ async test "verify: verify-tag uses external openpgp verifier" {
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
 
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_work_tree = @env.get_env_var("GIT_WORK_TREE")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   defer add_test_restore_env("GIT_DIR", prev_git_dir)
@@ -457,10 +457,10 @@ async test "verify: verify-tag uses external openpgp verifier" {
   grep_test_run_git(repo_dir, ["add", "tracked.txt"])
   grep_test_run_git(repo_dir, ["commit", "-q", "-m", "initial"])
 
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.set_env_var("GIT_SHIM_PWD", repo_dir)
 
   handle_tag(["-s", "-m", "signed tag", "v1"]) catch {
     err => fail("handle_tag failed: \{err}")

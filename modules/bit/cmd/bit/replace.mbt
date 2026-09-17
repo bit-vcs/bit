@@ -441,7 +441,7 @@ fn replace_rebuild_commit(
 /// Split a string into lines, keeping the newline character at the end of each line.
 fn replace_split_lines_keep_newlines(text : String) -> Array[String] {
   let lines : Array[String] = []
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for c in text {
     buf.write_char(c)
     if c == '\n' {

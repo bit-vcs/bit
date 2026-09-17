@@ -104,7 +104,7 @@ pub fn resolve_alias(
 ///|
 pub fn split_alias_command(value : String) -> Array[String] {
   let args : Array[String] = []
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut in_single = false
   let mut in_double = false
   let mut escape = false
@@ -152,13 +152,13 @@ pub fn split_alias_command(value : String) -> Array[String] {
 
 ///|
 fn find_global_gitconfig_path() -> String? {
-  match @sys.get_env_var("GIT_CONFIG_GLOBAL") {
+  match @env.get_env_var("GIT_CONFIG_GLOBAL") {
     Some(path) => Some(path)
     None =>
-      match @sys.get_env_var("HOME") {
+      match @env.get_env_var("HOME") {
         Some(home) => Some(home + "/.gitconfig")
         None =>
-          match @sys.get_env_var("USERPROFILE") {
+          match @env.get_env_var("USERPROFILE") {
             Some(home) => Some(home + "/.gitconfig")
             None => None
           }
@@ -260,7 +260,7 @@ fn unquote_value(value : String) -> String {
 
 ///|
 fn unescape_config_string(value : String) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut escape = false
   for c in value {
     if escape {

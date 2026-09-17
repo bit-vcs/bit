@@ -26,10 +26,10 @@ fn scalar_current_dir() -> String {
   match @env.current_dir() {
     Some(dir) => dir
     None =>
-      match @sys.get_env_var("PWD") {
+      match @env.get_env_var("PWD") {
         Some(dir) => dir
         None =>
-          match @sys.get_env_var("GIT_SHIM_PWD") {
+          match @env.get_env_var("GIT_SHIM_PWD") {
             Some(dir) => dir
             None => "."
           }
@@ -48,10 +48,10 @@ fn scalar_abs_path(path : String, cwd : String) -> String {
 
 ///|
 fn scalar_global_config_path() -> String {
-  match @sys.get_env_var("GIT_CONFIG_GLOBAL") {
+  match @env.get_env_var("GIT_CONFIG_GLOBAL") {
     Some(path) => path
     None =>
-      match @sys.get_env_var("HOME") {
+      match @env.get_env_var("HOME") {
         Some(home) => home + "/.gitconfig"
         None => ".gitconfig"
       }
@@ -409,7 +409,7 @@ fn scalar_remove_dir_recursive(fs : OsFs, path : String) -> Unit {
 
 ///|
 fn scalar_append_trace_line(fs : OsFs, line : String) -> Unit {
-  match @sys.get_env_var("GIT_TRACE2_EVENT") {
+  match @env.get_env_var("GIT_TRACE2_EVENT") {
     Some(path) => {
       let existing = if fs.is_file(path) {
         decode_bytes(fs.read_file(path)) catch {
@@ -442,7 +442,7 @@ fn scalar_trace_subcommand(fs : OsFs, argv : Array[String]) -> Unit {
 
 ///|
 fn scalar_ensure_trace_file(fs : OsFs) -> Unit {
-  match @sys.get_env_var("GIT_TRACE2_EVENT") {
+  match @env.get_env_var("GIT_TRACE2_EVENT") {
     Some(path) =>
       if !fs.is_file(path) {
         fs.write_string(path, "") catch {

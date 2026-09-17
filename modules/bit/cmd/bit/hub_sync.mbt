@@ -181,7 +181,7 @@ fn parse_hub_sync_runtime_options(
         Some(url)
       } else {
         // Treat as namespace/room name → use default relay
-        let base = match @sys.get_env_var("BIT_RELAY_URL") {
+        let base = match @env.get_env_var("BIT_RELAY_URL") {
           Some(u) => u
           None => "relay+https://bit-relay.mizchi.workers.dev"
         }

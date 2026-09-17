@@ -202,7 +202,7 @@ pub fn CommitGraphFile::synthesize_commit_object(
 ) -> @bit.PackObject {
   let (tree_oid, parents, timestamp) = self.read_commit(pos)
   // Build minimal commit content
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string("tree ")
   buf.write_string(tree_oid.to_hex())
   buf.write_string("\n")

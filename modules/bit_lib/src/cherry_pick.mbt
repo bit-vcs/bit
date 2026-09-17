@@ -264,7 +264,7 @@ fn cherry_pick_trim_trailing_newlines(s : String) -> String {
   while end > 0 && (chars[end - 1] == '\n' || chars[end - 1] == '\r') {
     end -= 1
   }
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i in 0..<end {
     result.write_char(chars[i])
   }

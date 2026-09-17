@@ -22,7 +22,7 @@ async fn handle_stripspace(args : Array[String]) -> Unit raise Error {
   let input = decode_bytes(read_all_stdin())
   if comment_lines {
     // Prefix each line with "# "
-    let result = StringBuilder::new()
+    let result = StringBuilder()
     let lines = stripspace_split_lines(input)
     for i, line in lines {
       if i > 0 {
@@ -95,7 +95,7 @@ fn stripspace_clean(input : String, strip_comments : Bool) -> String {
   if result.length() == 0 {
     return ""
   }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for i, line in result {
     if i > 0 {
       sb.write_char('\n')

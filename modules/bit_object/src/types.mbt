@@ -99,7 +99,7 @@ fn hex_char_to_int(c : Char) -> Int raise GitError {
 
 ///|
 pub fn ObjectId::to_hex(self : ObjectId) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for b in self.bytes {
     let hi = (b.to_int() >> 4) & 0x0f
     let lo = b.to_int() & 0x0f
@@ -203,7 +203,7 @@ pub(all) suberror GitError {
 
 ///|
 fn git_error_show_string(value : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_char('"')
   for c in value {
     if c == '"' {

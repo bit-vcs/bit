@@ -99,7 +99,7 @@ fn sparse_checkout_wbtest_strip_moon_warnings(text : String) -> String {
   if lines.length() == 0 {
     return ""
   }
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for i, line in lines {
     if i > 0 {
       out.write_char('\n')
@@ -1072,7 +1072,7 @@ test "sparse-checkout: check-rules helper preserves quoted and nul-delimited mat
   )
   @test.assert_eq(quoted, "\"folder\\\" a/file\"\n")
 
-  let nul_input = StringBuilder::new()
+  let nul_input = StringBuilder()
   nul_input.write_string("folder\" a/a")
   nul_input.write_char('\u{0}')
   nul_input.write_string("folder\" b/file")
@@ -1082,7 +1082,7 @@ test "sparse-checkout: check-rules helper preserves quoted and nul-delimited mat
     patterns,
     true,
   )
-  let expect = StringBuilder::new()
+  let expect = StringBuilder()
   expect.write_string("folder\" a/a")
   expect.write_char('\u{0}')
   @test.assert_eq(nul_output, expect.to_string())

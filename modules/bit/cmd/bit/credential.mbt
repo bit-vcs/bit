@@ -69,10 +69,10 @@ async fn credential_fill() -> Unit raise Error {
   }
   // Try GIT_ASKPASS or SSH_ASKPASS
   if username.length() == 0 || password.length() == 0 {
-    let askpass = match @sys.get_env_var("GIT_ASKPASS") {
+    let askpass = match @env.get_env_var("GIT_ASKPASS") {
       Some(v) if v.length() > 0 => Some(v)
       _ =>
-        match @sys.get_env_var("SSH_ASKPASS") {
+        match @env.get_env_var("SSH_ASKPASS") {
           Some(v) if v.length() > 0 => Some(v)
           _ => None
         }

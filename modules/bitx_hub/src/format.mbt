@@ -3,7 +3,7 @@
 ///|
 /// Serialize PullRequest to Git-style text format
 pub fn PullRequest::serialize(self : PullRequest) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("pr ")
   sb.write_string(self.id)
   sb.write_char('\n')
@@ -171,7 +171,7 @@ pub fn parse_legacy_pull_request(text : String) -> PullRequest raise PrError {
 ///|
 /// Serialize WorkItem to Git-style text format
 pub fn WorkItem::serialize(self : WorkItem) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("work-item ")
   sb.write_string(self.id)
   sb.write_char('\n')
@@ -407,7 +407,7 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
 ///|
 /// Serialize PrComment to Git-style text format
 pub fn PrComment::serialize(self : PrComment) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("comment ")
   sb.write_string(self.id)
   sb.write_char('\n')
@@ -528,7 +528,7 @@ pub fn parse_pr_comment(text : String) -> PrComment raise PrError {
 ///|
 /// Serialize PrReview to Git-style text format
 pub fn PrReview::serialize(self : PrReview) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("review ")
   sb.write_string(self.id)
   sb.write_char('\n')
@@ -667,7 +667,7 @@ fn parse_review_verdict(s : String) -> ReviewVerdict {
 ///|
 /// Serialize Issue to Git-style text format
 pub fn Issue::serialize(self : Issue) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("issue ")
   sb.write_string(self.id)
   sb.write_char('\n')
@@ -810,7 +810,7 @@ pub fn parse_legacy_issue(text : String) -> Issue raise PrError {
 ///|
 /// Serialize IssueComment to Git-style text format
 pub fn IssueComment::serialize(self : IssueComment) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("comment ")
   sb.write_string(self.id)
   sb.write_char('\n')
@@ -903,7 +903,7 @@ fn parse_issue_state(s : String) -> IssueState {
 /// Serialize Note to Git-style text format
 /// Note: Git standard notes are plain text, but we add metadata for Hub
 pub fn Note::serialize(self : Note) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("commit ")
   sb.write_string(self.commit_id.to_hex())
   sb.write_char('\n')

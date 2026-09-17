@@ -550,7 +550,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         let stopped_path = git_dir + "/rebase-merge/stopped-sha"
         if rfs.is_file(stopped_path) {
           let hex = trim_string(decode_bytes(rfs.read_file(stopped_path)))
-          if @sys.get_env_var("GIT_TRACE") is Some(v) && v != "" && v != "0" {
+          if @env.get_env_var("GIT_TRACE") is Some(v) && v != "" && v != "0" {
             let backend_path = git_dir + "/rebase-merge/backend"
             let use_apply = rfs.is_file(backend_path) &&
               trim_string(decode_bytes(rfs.read_file(backend_path))) == "apply"
@@ -1605,7 +1605,7 @@ fn generate_rebase_todo(
   rfs : &@bitcore.RepoFileSystem,
   commits : Array[@bitcore.ObjectId],
 ) -> String raise Error {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for commit in commits {
     let full_hex = commit.to_hex()
     let obj = db.get(rfs, commit)
@@ -1834,7 +1834,7 @@ fn parse_rebase_todo(content : String) -> Array[RebaseTodoEntry] {
 ///|
 fn split_whitespace(s : String, max_parts : Int) -> Array[String] {
   let result : Array[String] = []
-  let current = StringBuilder::new()
+  let current = StringBuilder()
   let mut in_word = false
   for c in s {
     if c == ' ' || c == '\t' {
@@ -2360,7 +2360,7 @@ fn parse_commit_author_message(content : Bytes) -> (String, String) {
   let text = @utf8.decode_lossy(content[:])
   let mut author = ""
   let mut in_message = false
-  let message = StringBuilder::new()
+  let message = StringBuilder()
   for line_view in text.split("\n") {
     let line = line_view.to_owned()
     if in_message {
@@ -2503,7 +2503,7 @@ fn subdir_write_tree(
 
 ///|
 fn subdir_bytes_to_string(bytes : Bytes) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i in 0..<bytes.length() {
     result.write_char(bytes[i].to_int().unsafe_to_char())
   }

@@ -16,7 +16,6 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/x/codec/base64",
   "moonbitlang/x/fs",
-  "moonbitlang/x/sys",
 }
 
 import {

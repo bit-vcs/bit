@@ -27,9 +27,9 @@ fn ensure_bench_dir(path : String) -> Unit {
 
 ///|
 fn bench_reset_env() -> Unit {
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_SHIM_CWD")
 }
 
 ///|
@@ -92,7 +92,7 @@ fn ensure_bench_config() -> Unit {
   @fs.write_string_to_file(bench_config_path, content) catch {
     _ => ()
   }
-  @sys.set_env_var("GIT_CONFIG_GLOBAL", bench_config_path)
+  @env.set_env_var("GIT_CONFIG_GLOBAL", bench_config_path)
 }
 
 ///|
@@ -150,10 +150,10 @@ test "bench init first status startup (-C)" (b : @bench.T) {
     _ => ()
   }
   let args = ["bit", "-C", bench_status_repo_root, "status", "--porcelain"]
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_CONFIG_OVERRIDES")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_CONFIG_OVERRIDES")
   b.bench(fn() {
     bench_stdout_suppress()
     for _ in 0..<bench_startup_repeat {

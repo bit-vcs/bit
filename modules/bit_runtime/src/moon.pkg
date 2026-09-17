@@ -11,7 +11,6 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/string",
   "moonbitlang/core/strconv",
-  "moonbitlang/x/sys",
 }
 
 warnings = "-29"

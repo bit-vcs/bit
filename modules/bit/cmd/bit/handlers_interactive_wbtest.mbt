@@ -9,7 +9,7 @@ test "interactive: detect add patch mode" {
 
 ///|
 async test "interactive: add patch default runner rejects with error" {
-  let runner_called = Array::new(capacity=1)
+  let runner_called = Array(capacity=1)
   let runner = Some(async fn(_args : Array[String]) -> Int noraise {
     runner_called.push(true)
     0
@@ -69,17 +69,17 @@ async test "interactive: rebase todo editor callback is invoked" {
 
 ///|
 test "interactive: resolve commit editor precedence" {
-  @sys.set_env_var("EDITOR", "vi")
-  @sys.set_env_var("VISUAL", "nvim")
-  @sys.set_env_var("GIT_EDITOR", "hx")
+  @env.set_env_var("EDITOR", "vi")
+  @env.set_env_var("VISUAL", "nvim")
+  @env.set_env_var("GIT_EDITOR", "hx")
   let selected = resolve_commit_editor()
   match selected {
     Some(cmd) => @test.assert_eq(cmd, "hx")
     None => fail("expected editor")
   }
-  @sys.unset_env_var("GIT_EDITOR")
-  @sys.unset_env_var("VISUAL")
-  @sys.unset_env_var("EDITOR")
+  @env.unset_env_var("GIT_EDITOR")
+  @env.unset_env_var("VISUAL")
+  @env.unset_env_var("EDITOR")
 }
 
 ///|

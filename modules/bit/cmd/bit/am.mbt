@@ -341,11 +341,11 @@ async fn apply_remaining_patches(
     }
     stage_all_changes(fs, root)
     if author.length() > 0 {
-      @sys.set_env_var("GIT_AUTHOR_NAME", extract_name_str(author))
-      @sys.set_env_var("GIT_AUTHOR_EMAIL", extract_email_str(author))
+      @env.set_env_var("GIT_AUTHOR_NAME", extract_name_str(author))
+      @env.set_env_var("GIT_AUTHOR_EMAIL", extract_email_str(author))
     }
     if author_date.length() > 0 {
-      @sys.set_env_var("GIT_AUTHOR_DATE", author_date)
+      @env.set_env_var("GIT_AUTHOR_DATE", author_date)
     }
     let commit_author = get_author_string()
     let commit_timestamp = get_commit_timestamp()

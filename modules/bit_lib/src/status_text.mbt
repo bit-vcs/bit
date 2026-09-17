@@ -17,7 +17,7 @@ pub async fn status_text(
   } else {
     bit_marker
   }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let head = read_head_ref(fs, git_dir)
   match head {
     Branch(name) => sb.write_string("On branch " + name + "\n")

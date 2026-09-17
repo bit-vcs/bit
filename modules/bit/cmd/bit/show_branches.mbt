@@ -78,7 +78,7 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
       }
       displayed[hex] = true
       // Build indicator line
-      let indicators = StringBuilder::new()
+      let indicators = StringBuilder()
       for i = 0; i < branches_to_show.length(); i = i + 1 {
         if i == branch_idx {
           let ch = if i < branch_chars.length() {

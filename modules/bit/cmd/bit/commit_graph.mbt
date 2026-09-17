@@ -179,7 +179,7 @@ async fn check_commit_graph_paranoia(
   fs : OsFs,
   git_dir : String,
 ) -> Unit raise Error {
-  match @sys.get_env_var("GIT_COMMIT_GRAPH_PARANOIA") {
+  match @env.get_env_var("GIT_COMMIT_GRAPH_PARANOIA") {
     Some(value) => if value != "true" { return }
     None => return
   }

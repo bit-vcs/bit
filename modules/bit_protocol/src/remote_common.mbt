@@ -24,7 +24,7 @@ pub fn Remote::new(url : String) -> Remote {
 fn normalize_url(url : String) -> String {
   if url.has_suffix(".git") {
     let chars = url.to_array()
-    let result = StringBuilder::new()
+    let result = StringBuilder()
     for i in 0..<(chars.length() - 4) {
       result.write_char(chars[i])
     }
@@ -261,7 +261,7 @@ pub fn extract_capabilities(data : Bytes) -> Array[String] {
         for c in caps_str {
           if c == ' ' || c == '\n' {
             if current.length() > 0 {
-              let sb = StringBuilder::new()
+              let sb = StringBuilder()
               for ch in current {
                 sb.write_char(ch)
               }
@@ -273,7 +273,7 @@ pub fn extract_capabilities(data : Bytes) -> Array[String] {
           }
         }
         if current.length() > 0 {
-          let sb = StringBuilder::new()
+          let sb = StringBuilder()
           for ch in current {
             sb.write_char(ch)
           }
@@ -292,7 +292,7 @@ fn remote_substring_from(s : String, start : Int) -> String {
   if start >= chars.length() {
     return ""
   }
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i in start..<chars.length() {
     result.write_char(chars[i])
   }
@@ -301,7 +301,7 @@ fn remote_substring_from(s : String, start : Int) -> String {
 
 ///|
 fn remote_bytes_to_string(data : Bytes) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for b in data {
     result.write_char(b.to_int().unsafe_to_char())
   }

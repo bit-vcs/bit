@@ -146,15 +146,15 @@ fn is_bare_repo_dir(path : String) -> Bool {
 ///|
 fn resolve_git_dir(fs : &@bit.RepoFileSystem, root : String) -> String {
   let default_git_dir = default_repo_marker_path(fs, root)
-  match @sys.get_env_var("GIT_DIR") {
+  match @env.get_env_var("GIT_DIR") {
     Some(dir) => {
       let resolved = if dir.has_prefix("/") {
         dir
       } else {
-        match @sys.get_env_var("GIT_SHIM_CWD") {
+        match @env.get_env_var("GIT_SHIM_CWD") {
           Some(base) => normalize_path(base + "/" + dir)
           None =>
-            @sys.get_env_var("GIT_SHIM_PWD")
+            @env.get_env_var("GIT_SHIM_PWD")
             .map(base => normalize_path(base + "/" + dir))
             .unwrap_or(dir)
         }
@@ -352,15 +352,15 @@ fn resolve_workspace_probe_dir(cwd : String?) -> String {
   let raw = match cwd {
     Some(dir) => dir
     None =>
-      match @sys.get_env_var("GIT_SHIM_CWD") {
+      match @env.get_env_var("GIT_SHIM_CWD") {
         Some(dir) => dir
         None =>
-          match @sys.get_env_var("GIT_SHIM_PWD") {
+          match @env.get_env_var("GIT_SHIM_PWD") {
             Some(dir) => dir
             None =>
               match @env.current_dir() {
                 Some(dir) => dir
-                None => @sys.get_env_var("PWD").unwrap_or(".")
+                None => @env.get_env_var("PWD").unwrap_or(".")
               }
           }
       }
@@ -740,7 +740,7 @@ fn format_toml_string_array(items : Array[String]) -> String {
 
 ///|
 fn format_workspace_manifest(manifest : WorkspaceManifest) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string("version = ")
   buf.write_string(manifest.version.to_string())
   buf.write_string("\n")
@@ -996,7 +996,7 @@ fn workspace_json_string(
 
 ///|
 fn workspace_fingerprint_mode() -> @fingerprint.FingerprintMode {
-  match @sys.get_env_var("BIT_WORKSPACE_FINGERPRINT_MODE") {
+  match @env.get_env_var("BIT_WORKSPACE_FINGERPRINT_MODE") {
     Some(raw) =>
       match @fingerprint.parse_fingerprint_mode(raw) {
         Some(mode) => mode
@@ -1491,7 +1491,7 @@ fn workspace_flow_workspace_fingerprint(
   selected : Map[String, Bool],
   signatures : Map[String, String],
 ) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   out.write_string("task=")
   out.write_string(task)
   for node_id in ordered_ids {
@@ -1852,7 +1852,7 @@ async fn handle_workspace_status(args : Array[String]) -> Unit raise Error {
     let head = workspace_node_head_hex(fs, node_root).unwrap_or("-")
     let lock_head = lock_commits.get(node.id).unwrap_or("-")
     let drift = head != "-" && lock_head != "-" && head != lock_head
-    let summary = StringBuilder::new()
+    let summary = StringBuilder()
     summary.write_string("- ")
     summary.write_string(node.id)
     summary.write_string(" (")
@@ -2335,7 +2335,7 @@ async fn handle_workspace_flow(
   if star_path is Some(star_file) {
     let external_inputs = @bitflow.parse_external_inputs(
       star_var_cli_args,
-      @sys.get_env_vars(),
+      @env.get_env_vars(),
     )
     if external_inputs.errors.length() > 0 {
       raise @bit.GitError::InvalidObject(

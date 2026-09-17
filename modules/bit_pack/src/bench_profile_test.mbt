@@ -5,7 +5,7 @@ fn make_realistic_objects(count : Int) -> Array[@bit.PackObject] {
   // Simulate real repo: mix of blobs, trees, commits with similar content
   let objects : Array[@bit.PackObject] = []
   for i in 0..<count {
-    let content = StringBuilder::new()
+    let content = StringBuilder()
     // Each blob ~200 bytes with shared prefix (realistic for source files)
     content.write_string("// File auto-generated for testing\n")
     content.write_string("package main\n\nimport \"fmt\"\n\n")
@@ -93,7 +93,7 @@ test "bench profile: Array[Byte] collect 500x200B" (b : @bench.T) {
       parts.push(obj.data)
       total += obj.data.length()
     }
-    let arr : Array[Byte] = Array::new(capacity=total)
+    let arr : Array[Byte] = Array(capacity=total)
     for part in parts {
       for i in 0..<part.length() {
         arr.push(part[i])

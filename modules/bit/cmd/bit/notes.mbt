@@ -572,7 +572,7 @@ async fn notes_add(
   let tree_id = notes_write_tree(wfs, common_git_dir, notes)
   // Create commit
   let author = get_author_string()
-  let timestamp = @sys.get_env_var("GIT_COMMITTER_DATE")
+  let timestamp = @env.get_env_var("GIT_COMMITTER_DATE")
     .map(parse_commit_date)
     .unwrap_or(get_current_timestamp())
   let parents = match parent_commit {
@@ -733,7 +733,7 @@ async fn notes_copy(
   notes.push((to_hex, src_id))
   let tree_id = notes_write_tree(wfs, common_git_dir, notes)
   let author = get_author_string()
-  let timestamp = @sys.get_env_var("GIT_COMMITTER_DATE")
+  let timestamp = @env.get_env_var("GIT_COMMITTER_DATE")
     .map(parse_commit_date)
     .unwrap_or(get_current_timestamp())
   let commit = @bitcore.Commit::new(
@@ -798,7 +798,7 @@ async fn notes_remove(
   let tree_id = notes_write_tree(wfs, common_git_dir, notes)
   // Create commit
   let author = get_author_string()
-  let timestamp = @sys.get_env_var("GIT_COMMITTER_DATE")
+  let timestamp = @env.get_env_var("GIT_COMMITTER_DATE")
     .map(parse_commit_date)
     .unwrap_or(get_current_timestamp())
   let commit = @bitcore.Commit::new(
@@ -855,7 +855,7 @@ async fn notes_prune(
   let tree_id = notes_write_tree(wfs, common_git_dir, notes)
   // Create commit
   let author = get_author_string()
-  let timestamp = @sys.get_env_var("GIT_COMMITTER_DATE")
+  let timestamp = @env.get_env_var("GIT_COMMITTER_DATE")
     .map(parse_commit_date)
     .unwrap_or(get_current_timestamp())
   let commit = @bitcore.Commit::new(
@@ -979,13 +979,13 @@ fn merge_notes_cat_sort_uniq(ours : String, theirs : String) -> String {
 ///|
 fn split_whitespace_tokens(line : String) -> Array[String] {
   let tokens : Array[String] = []
-  let mut current = StringBuilder::new()
+  let mut current = StringBuilder()
   let mut in_token = false
   for c in line {
     if c == ' ' || c == '\t' {
       if in_token {
         tokens.push(current.to_string())
-        current = StringBuilder::new()
+        current = StringBuilder()
         in_token = false
       }
     } else {

@@ -1,21 +1,21 @@
 ///|
 fn restore_env_var_for_fetch_wbtest(name : String, prev : String?) -> Unit {
   match prev {
-    Some(value) => @sys.set_env_var(name, value)
-    None => @sys.unset_env_var(name)
+    Some(value) => @env.set_env_var(name, value)
+    None => @env.unset_env_var(name)
   }
 }
 
 ///|
 test "fetch-delegate: collects global path overrides in deterministic order" {
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_explicit_git_dir = @sys.get_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
-  @sys.set_env_var("GIT_SHIM_CWD", "/tmp/bit-delegate-cwd")
-  @sys.set_env_var("GIT_SHIM_PWD", "/tmp/bit-delegate-pwd")
-  @sys.set_env_var("GIT_DIR", "/tmp/bit-delegate-gitdir")
-  @sys.set_env_var("GIT_SHIM_EXPLICIT_GIT_DIR", "1")
+  let prev_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_explicit_git_dir = @env.get_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
+  @env.set_env_var("GIT_SHIM_CWD", "/tmp/bit-delegate-cwd")
+  @env.set_env_var("GIT_SHIM_PWD", "/tmp/bit-delegate-pwd")
+  @env.set_env_var("GIT_DIR", "/tmp/bit-delegate-gitdir")
+  @env.set_env_var("GIT_SHIM_EXPLICIT_GIT_DIR", "1")
   let args = collect_global_path_overrides_for_delegate()
   @test.assert_eq(args.length(), 3)
   @test.assert_eq(args[0], "-C")
@@ -31,14 +31,14 @@ test "fetch-delegate: collects global path overrides in deterministic order" {
 
 ///|
 test "fetch-delegate: falls back to GIT_SHIM_PWD when CWD is missing" {
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_explicit_git_dir = @sys.get_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.set_env_var("GIT_SHIM_PWD", "/tmp/bit-delegate-pwd")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
+  let prev_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_explicit_git_dir = @env.get_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.set_env_var("GIT_SHIM_PWD", "/tmp/bit-delegate-pwd")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
   let args = collect_global_path_overrides_for_delegate()
   @test.assert_eq(args.length(), 2)
   @test.assert_eq(args[0], "-C")
@@ -53,14 +53,14 @@ test "fetch-delegate: falls back to GIT_SHIM_PWD when CWD is missing" {
 
 ///|
 test "fetch-delegate: skips unset global path overrides" {
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_explicit_git_dir = @sys.get_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_SHIM_PWD")
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
+  let prev_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_explicit_git_dir = @env.get_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_SHIM_PWD")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
   let args = collect_global_path_overrides_for_delegate()
   @test.assert_eq(args.length(), 0)
   restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
@@ -73,14 +73,14 @@ test "fetch-delegate: skips unset global path overrides" {
 
 ///|
 test "fetch-delegate: does not append --git-dir without explicit marker" {
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  let prev_git_dir = @sys.get_env_var("GIT_DIR")
-  let prev_explicit_git_dir = @sys.get_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
-  @sys.set_env_var("GIT_SHIM_CWD", "/tmp/bit-delegate-cwd")
-  @sys.unset_env_var("GIT_SHIM_PWD")
-  @sys.set_env_var("GIT_DIR", "/tmp/bit-delegate-gitdir")
-  @sys.unset_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
+  let prev_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @env.get_env_var("GIT_DIR")
+  let prev_explicit_git_dir = @env.get_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
+  @env.set_env_var("GIT_SHIM_CWD", "/tmp/bit-delegate-cwd")
+  @env.unset_env_var("GIT_SHIM_PWD")
+  @env.set_env_var("GIT_DIR", "/tmp/bit-delegate-gitdir")
+  @env.unset_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
   let args = collect_global_path_overrides_for_delegate()
   @test.assert_eq(args.length(), 2)
   @test.assert_eq(args[0], "-C")
@@ -95,8 +95,8 @@ test "fetch-delegate: does not append --git-dir without explicit marker" {
 
 ///|
 test "fetch-delegate: parses multiline -c overrides and ignores empty lines" {
-  let prev_overrides = @sys.get_env_var("GIT_CONFIG_OVERRIDES")
-  @sys.set_env_var(
+  let prev_overrides = @env.get_env_var("GIT_CONFIG_OVERRIDES")
+  @env.set_env_var(
     "GIT_CONFIG_OVERRIDES", "push.default=upstream\n\ncore.eol=lf\n",
   )
   let args = collect_global_config_overrides_for_delegate()
@@ -125,20 +125,20 @@ test "fetch relay: remote detection handles explicit relay schemes" {
 
 ///|
 test "fetch relay: preferred sender env is trimmed and optional" {
-  let prev_sender = @sys.get_env_var("BIT_RELAY_FETCH_SENDER")
-  @sys.set_env_var("BIT_RELAY_FETCH_SENDER", " node-a ")
+  let prev_sender = @env.get_env_var("BIT_RELAY_FETCH_SENDER")
+  @env.set_env_var("BIT_RELAY_FETCH_SENDER", " node-a ")
   @test.assert_eq(fetch_relay_preferred_sender(), Some("node-a"))
-  @sys.set_env_var("BIT_RELAY_FETCH_SENDER", "   ")
+  @env.set_env_var("BIT_RELAY_FETCH_SENDER", "   ")
   @test.assert_eq(fetch_relay_preferred_sender(), None)
   restore_env_var_for_fetch_wbtest("BIT_RELAY_FETCH_SENDER", prev_sender)
 }
 
 ///|
 test "fetch relay: preferred repo env is trimmed and optional" {
-  let prev_repo = @sys.get_env_var("BIT_RELAY_FETCH_REPO")
-  @sys.set_env_var("BIT_RELAY_FETCH_REPO", " repo-b ")
+  let prev_repo = @env.get_env_var("BIT_RELAY_FETCH_REPO")
+  @env.set_env_var("BIT_RELAY_FETCH_REPO", " repo-b ")
   @test.assert_eq(fetch_relay_preferred_repo(), Some("repo-b"))
-  @sys.set_env_var("BIT_RELAY_FETCH_REPO", "   ")
+  @env.set_env_var("BIT_RELAY_FETCH_REPO", "   ")
   @test.assert_eq(fetch_relay_preferred_repo(), None)
   restore_env_var_for_fetch_wbtest("BIT_RELAY_FETCH_REPO", prev_repo)
 }
@@ -187,12 +187,12 @@ async test "fetch: depth and unshallow update shallow metadata natively" {
   cleanup_tree(fs, root)
   fs.mkdir_p(src)
   fs.mkdir_p(dst)
-  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
   defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_SHIM_PWD")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_SHIM_PWD")
   commit_wbtest_run_git(src, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(src, ["config", "user.name", "Test User"])
   commit_wbtest_run_git(src, ["config", "user.email", "test@example.com"])

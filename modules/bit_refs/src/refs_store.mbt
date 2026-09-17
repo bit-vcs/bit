@@ -243,7 +243,7 @@ pub fn serialize_packed_refs_entries(entries : Array[PackedRefEntry]) -> String 
   // NOTE: String::compare is length-first in MoonBit; git requires plain
   // byte order (memcmp) for the `sorted` trait, which lexical_compare gives.
   unique.sort_by((a, b) => String::lexical_compare(a.refname, b.refname))
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   // Trailing space after "sorted" matches real git's header byte-for-byte.
   buf.write_string("# pack-refs with: peeled fully-peeled sorted \n")
   for e in unique {

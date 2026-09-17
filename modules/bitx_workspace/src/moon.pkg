@@ -17,7 +17,6 @@ import {
   "moonbitlang/x/encoding",
   "moonbitlang/x/fs",
   "moonbitlang/x/path",
-  "moonbitlang/x/sys",
 }
 
 warnings = "-29"

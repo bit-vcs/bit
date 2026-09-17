@@ -186,7 +186,7 @@ fn pad_right(s : String, width : Int) -> String {
   if s.length() >= width {
     return s
   }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string(s)
   for i = s.length(); i < width; i = i + 1 {
     buf.write_char(' ')

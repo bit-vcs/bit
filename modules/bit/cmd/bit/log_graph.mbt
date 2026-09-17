@@ -318,7 +318,7 @@ fn graph_pad_horizontally(g : GitGraph, line : Array[Char]) -> Unit {
 
 ///|
 fn graph_chars_to_string(line : Array[Char]) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for c in line {
     sb.write_char(c)
   }

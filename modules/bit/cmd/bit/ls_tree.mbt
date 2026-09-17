@@ -415,7 +415,7 @@ fn ls_tree_format_output(
   id : @bitcore.ObjectId,
 ) -> String raise Error {
   let is_dir = type_str == "tree" || type_str == "commit"
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let chars = fmt.to_array()
   let mut i = 0
   while i < chars.length() {
@@ -485,7 +485,7 @@ fn ls_tree_pad_size(size : String, width : Int) -> String {
   if size.length() >= width {
     return size
   }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for _ in 0..<(width - size.length()) {
     buf.write_char(' ')
   }
@@ -542,7 +542,7 @@ fn c_quote_path(path : String) -> String {
   if !needs_quote {
     return path
   }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_char('"')
   for c in path {
     if c == '"' {

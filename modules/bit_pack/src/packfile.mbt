@@ -459,7 +459,7 @@ fn build_delta_with_index(
   let base_len = base.length()
   let target_len = target.length()
   // Pre-allocate output buffer: delta is typically smaller than target
-  let out : Array[Byte] = Array::new(capacity=target_len / 2 + 32)
+  let out : Array[Byte] = Array(capacity=target_len / 2 + 32)
   encode_delta_size(base_len, out)
   encode_delta_size(target_len, out)
   if target_len == 0 {
@@ -1361,7 +1361,7 @@ fn build_tree_content(entries : Array[@bit.TreeEntry]) -> Bytes {
 ///|
 /// Build raw commit content (without "commit {size}\0" header)
 fn build_commit_content(commit : @bit.Commit) -> Bytes {
-  let content = StringBuilder::new()
+  let content = StringBuilder()
   content.write_string("tree ")
   content.write_string(commit.tree.to_hex())
   content.write_char('\n')

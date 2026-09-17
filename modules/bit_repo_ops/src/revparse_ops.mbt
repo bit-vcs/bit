@@ -672,7 +672,7 @@ fn revparse_read_graft_parents(
 ///|
 fn substring_revparse(s : String, start : Int, end : Int) -> String {
   let chars = s.to_array()
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i = start; i < end && i < chars.length(); i = i + 1 {
     result.write_char(chars[i])
   }
@@ -732,7 +732,7 @@ fn resolve_index_stage_entry(
       }
       len
     }
-    let entry_path_buf = StringBuilder::new()
+    let entry_path_buf = StringBuilder()
     for i in 0..<actual_len {
       if path_start + i < data.length() {
         entry_path_buf.write_char(
@@ -1250,9 +1250,7 @@ pub fn show_ref(
   if fs.is_file(packed) {
     ref_collect_packed(fs, packed, out)
   }
-  let result : Array[(String, @object.ObjectId)] = Array::new(
-    capacity=out.length(),
-  )
+  let result : Array[(String, @object.ObjectId)] = Array(capacity=out.length())
   for name, id in out {
     result.push((name, id))
   }

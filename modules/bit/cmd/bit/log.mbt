@@ -738,7 +738,7 @@ fn log_read_config_entries(
     }
   }
   let override_key = section_lower + "." + key_lower
-  match @sys.get_env_var("GIT_CONFIG_OVERRIDES") {
+  match @env.get_env_var("GIT_CONFIG_OVERRIDES") {
     Some(data) =>
       for line_view in data.split("\n") {
         let line = line_view.to_owned()
@@ -1731,7 +1731,7 @@ fn log_parse_wrap_spec(text : String) -> LogWrapSpec {
 
 ///|
 fn log_indent_string(count : Int) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for _ in 0..<count {
     out.write_char(' ')
   }
@@ -3275,7 +3275,7 @@ fn log_string_without_last_char(text : String) -> String {
 
 ///|
 fn log_repeat_char(c : Char, count : Int) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let mut i = 0
   while i < count {
     out.write_char(c)
@@ -3600,7 +3600,7 @@ fn format_commit_string(fmt : String, data : CommitFormatData) -> String {
 
 ///|
 fn log_sanitize_subject_for_format(s : String) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut last_was_dash = false
   for c in s {
     if (c >= 'a' && c <= 'z') ||
@@ -3781,7 +3781,7 @@ fn log_format_commit_identity(
   abbrev_commit : Bool,
   show_parents : Bool,
 ) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let format_hex = fn(hex : String) -> String {
     if abbrev_commit {
       log_abbrev_hex(hex, abbrev_len)
@@ -5730,7 +5730,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           line_prefix,
         )
         if entry.parents.length() > 1 {
-          let mline = StringBuilder::new()
+          let mline = StringBuilder()
           mline.write_string("Merge:")
           for p in entry.parents {
             mline.write_string(" ")
@@ -6881,7 +6881,7 @@ async fn log_emit_commit_graph(
       // Merge commits carry a "Merge: <p1> <p2> ..." line (abbreviated parents,
       // always at abbrev_len even when the commit id is shown in full).
       if e.parents.length() > 1 {
-        let mline = StringBuilder::new()
+        let mline = StringBuilder()
         mline.write_string("Merge:")
         for p in e.parents {
           mline.write_string(" ")

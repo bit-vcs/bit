@@ -728,7 +728,7 @@ fn reset_is_iso_8859_1(encoding : String) -> Bool {
 ///|
 fn reset_normalize_encoding_name(value : String) -> String {
   let trimmed = trim_string(value).to_lower()
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for c in trimmed {
     if c == '-' || c == '_' || c == ' ' {
       continue

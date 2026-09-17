@@ -1,7 +1,7 @@
 ///|
 /// ~/.config/bit/bitconfig.toml のパスを解決
 fn config_path() -> String? {
-  match @sys.get_env_var("HOME") {
+  match @env.get_env_var("HOME") {
     Some(home) => Some(home + "/.config/bit/bitconfig.toml")
     None => None
   }
@@ -43,9 +43,9 @@ fn get_table(
 ///|
 /// 環境変数が未設定の場合のみ値を注入
 fn inject_if_unset(env_key : String, value : String) -> Unit {
-  match @sys.get_env_var(env_key) {
+  match @env.get_env_var(env_key) {
     Some(existing) if existing.length() > 0 => () // 既存値を優先
-    _ => @sys.set_env_var(env_key, value)
+    _ => @env.set_env_var(env_key, value)
   }
 }
 
@@ -137,7 +137,7 @@ pub fn load_and_inject() -> Unit {
   let content = @fs.read_file_to_string(path) catch { _ => return }
   let root = @toml.parse(content) catch { _ => return }
   guard root is @toml.TomlValue::TomlTable(top) else { return }
-  let home = @sys.get_env_var("HOME").unwrap_or("")
+  let home = @env.get_env_var("HOME").unwrap_or("")
   // [bit.*] セクションから bit 固有の設定を注入
   if get_table(top, "bit") is Some(bit) {
     inject_from_bit_table(bit, home)

@@ -263,7 +263,7 @@ fn write_object(
 /// 文字列から部分文字列を取得
 fn hex_substring(s : String, start : Int, end : Int) -> String {
   let chars = s.to_array()
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i = start; i < end && i < chars.length(); i = i + 1 {
     result.write_char(chars[i])
   }
@@ -282,7 +282,7 @@ fn create_commit_object(
   timestamp : Int64,
 ) -> @bit.ObjectId raise SubdirError {
   // コミット内容を構築
-  let content = StringBuilder::new()
+  let content = StringBuilder()
   content.write_string("tree ")
   content.write_string(tree_id.to_hex())
   content.write_string("\n")
@@ -346,7 +346,7 @@ fn update_head_ref(
 
 ///|
 fn bytes_to_string_commit(data : Bytes) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for b in data {
     result.write_char(b.to_int().unsafe_to_char())
   }
@@ -360,7 +360,7 @@ fn trim_head_content(s : String) -> String {
   while end > 0 && (chars[end - 1] == '\n' || chars[end - 1] == '\r') {
     end -= 1
   }
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i in 0..<end {
     result.write_char(chars[i])
   }
@@ -373,7 +373,7 @@ fn skip_prefix_commit(s : String, n : Int) -> String {
   if n >= chars.length() {
     return ""
   }
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i in n..<chars.length() {
     result.write_char(chars[i])
   }
@@ -392,7 +392,7 @@ fn get_parent_dir(path : String) -> String {
   if last_slash <= 0 {
     return "/"
   }
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i in 0..<last_slash {
     result.write_char(chars[i])
   }

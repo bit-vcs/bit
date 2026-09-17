@@ -52,7 +52,7 @@ pub impl @bitcore.RepoFileSystem for OsFs with fn read_file(_self, path) {
 
 ///|
 pub impl @bitcore.RepoFileSystem for OsFs with fn readdir(_self, path) {
-  @fs.read_dir(path).to_array() catch {
+  @fs.read_dir(path).to_owned() catch {
     err => raise io_error(err)
   }
 }
@@ -78,3 +78,13 @@ pub impl @bitcore.RepoFileSystem for OsFs with fn mtime(self, path) {
     None => raise @bitcore.GitError::IoError("Unable to stat path: \{path}")
   }
 }
+
+///| Promote the trait methods this package calls on a concrete `OsFs`.
+///
+/// Reaching them through the `impl` alone is deprecated: the compiler asks
+/// for either a fully qualified `@bitcore.RepoFileSystem::read_file(fs, ..)`
+/// at every call site or one `extend` declaration here.
+extend OsFs with @bitcore.FileSystem::{ mkdir_p, write_file, write_string }
+
+///|
+extend OsFs with @bitcore.RepoFileSystem::{ is_file, read_file }

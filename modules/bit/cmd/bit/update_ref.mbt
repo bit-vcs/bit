@@ -794,10 +794,10 @@ fn get_author_info(
   let mut name = "Unknown"
   let mut email = "unknown@unknown"
   // Check environment variables first
-  if @sys.get_env_var("GIT_COMMITTER_NAME") is Some(n) {
+  if @env.get_env_var("GIT_COMMITTER_NAME") is Some(n) {
     name = n
   }
-  if @sys.get_env_var("GIT_COMMITTER_EMAIL") is Some(e) {
+  if @env.get_env_var("GIT_COMMITTER_EMAIL") is Some(e) {
     email = e
   }
   // If not in env, try config
@@ -1083,7 +1083,7 @@ async fn update_ref_parse_stdin_z(
   let mut create_reflog = create_reflog_init
   // Split into NUL-terminated records; the trailing NUL closes the last field.
   let records : Array[String] = []
-  let cur = StringBuilder::new()
+  let cur = StringBuilder()
   let mut pending = false
   for ch in input {
     if ch == '\u{0}' {
@@ -1551,7 +1551,7 @@ fn reftable_pad_hex12(value : UInt64) -> String {
     b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c',
     b'd', b'e', b'f',
   ]
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i = 11; i >= 0; i = i - 1 {
     let shift = i * 4
     let nibble = ((value >> shift.to_uint64().to_int()) & 0xfUL).to_int()

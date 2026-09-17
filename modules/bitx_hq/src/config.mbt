@@ -64,7 +64,7 @@ pub fn contract_home(path : String, home : String) -> String {
 ///|
 /// Safe string slice from start index to end
 fn slice_from(s : String, start : Int) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i = start; i < s.length(); i = i + 1 {
     match s.get_char(i) {
       Some(c) => buf.write_char(c)
@@ -77,7 +77,7 @@ fn slice_from(s : String, start : Int) -> String {
 ///|
 /// Safe string slice from 0 to end index
 fn slice_to(s : String, end : Int) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i = 0; i < end && i < s.length(); i = i + 1 {
     match s.get_char(i) {
       Some(c) => buf.write_char(c)

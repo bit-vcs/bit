@@ -24,7 +24,7 @@ let bench_small_config : String =
 /// Synthesize a config with many remotes — realistic upper bound for
 /// a repo with lots of upstreams (e.g. an aggregator).
 fn bench_make_large_config(num_remotes : Int) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n")
   for i in 0..<num_remotes {
     sb.write_string("[remote \"r\{i}\"]\n")

@@ -41,7 +41,7 @@ pub fn xml_unescape(value : String) -> String {
   if value.find("&") is None {
     return value
   }
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let n = value.length()
   let mut run_start = 0
   let mut i = 0

@@ -174,7 +174,7 @@ pub fn HubRecord::new(
 
 ///|
 fn serialize_hub_record(record : HubRecord, signature : String?) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("version ")
   sb.write_string(record.version.to_string())
   sb.write_char('\n')
@@ -750,7 +750,7 @@ fn commit_notes(
   timestamp : Int64,
 ) -> @bit.ObjectId raise @bit.GitError {
   // Build tree from entries
-  let tree_entries : Array[@bit.TreeEntry] = Array::new(
+  let tree_entries : Array[@bit.TreeEntry] = Array(
     capacity=store.entries.length(),
   )
   for name, blob_id in store.entries {

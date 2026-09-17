@@ -509,7 +509,7 @@ fn revparse_read_graft_parents(
 ///|
 fn substring_revparse(s : String, start : Int, end : Int) -> String {
   let chars = s.to_array()
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i = start; i < end && i < chars.length(); i = i + 1 {
     result.write_char(chars[i])
   }
@@ -665,9 +665,7 @@ pub fn show_ref(
   if fs.is_file(packed) {
     ref_collect_packed(fs, packed, out)
   }
-  let result : Array[(String, @bit.ObjectId)] = Array::new(
-    capacity=out.length(),
-  )
+  let result : Array[(String, @bit.ObjectId)] = Array(capacity=out.length())
   for name, id in out {
     result.push((name, id))
   }
@@ -1065,7 +1063,7 @@ pub fn shorten_oid_hex(hex : String, requested : Int) -> String {
 ///|
 /// Shell-escape a value with single quotes.
 pub fn shell_single_quote(value : String) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   out.write_char('\'')
   for c in value {
     if c == '\'' {
@@ -1347,7 +1345,7 @@ pub fn rev_parse_parse_config_bool(raw : String) -> Bool? {
 /// Split a string into lines (parseopt helper).
 pub fn parseopt_split_lines(s : String) -> Array[String] {
   let lines : Array[String] = []
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for c in s {
     if c == '\n' {
       lines.push(buf.to_string())

@@ -13,8 +13,8 @@ import {
   "mizchi/bit_osfs" @osfs,
   "mizchi/zlib",
   "moonbitlang/core/bench",
+  "moonbitlang/core/env",
   "moonbitlang/async",
-  "moonbitlang/x/sys",
   "moonbitlang/core/test",
 } for "test"
 

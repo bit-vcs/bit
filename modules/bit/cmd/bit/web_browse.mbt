@@ -49,12 +49,12 @@ async fn handle_web_browse(args : Array[String]) -> Unit raise Error {
 ///|
 fn web_browse_detect_browser() -> String {
   // Check GIT_BROWSER env var first
-  match @sys.get_env_var("GIT_BROWSER") {
+  match @env.get_env_var("GIT_BROWSER") {
     Some(b) => if b.length() > 0 { return b }
     None => ()
   }
   // Check BROWSER env var
-  match @sys.get_env_var("BROWSER") {
+  match @env.get_env_var("BROWSER") {
     Some(b) => if b.length() > 0 { return b }
     None => ()
   }

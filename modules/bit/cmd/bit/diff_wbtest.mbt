@@ -171,8 +171,8 @@ async test "diff: resolve relative prefix from cwd and config" {
   let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.write_string("/repo/.git/config", "[diff]\n\trelative = true\n")
-  @sys.set_env_var("GIT_SHIM_CWD", "/repo/subdir")
-  @sys.set_env_var("GIT_SHIM_PWD", "/repo/subdir")
+  @env.set_env_var("GIT_SHIM_CWD", "/repo/subdir")
+  @env.set_env_var("GIT_SHIM_PWD", "/repo/subdir")
   let from_config = diff_resolve_relative_prefix(
     fs,
     "/repo/.git",
@@ -197,8 +197,8 @@ async test "diff: resolve relative prefix from cwd and config" {
     true,
   )
   @test.assert_eq(disabled, None)
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_SHIM_PWD")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_SHIM_PWD")
 }
 
 ///|
@@ -520,8 +520,8 @@ async test "diff: real fs diff_worktree sees gitlink head change" {
     "config", "user.email", "test@example.com",
   ])
 
-  let prev_allow_protocol = @sys.get_env_var("GIT_ALLOW_PROTOCOL")
-  @sys.set_env_var("GIT_ALLOW_PROTOCOL", "file")
+  let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
+  @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
   let (code_add, _, _) = @process.collect_output(
     "git",
     ["-C", super_dir, "submodule", "add", "./../init", "init"],

@@ -1,6 +1,6 @@
 ///|
 fn build_rule_content(rng : Lcg, len : Int) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for _ in 0..<len {
     let v = rng.next_int() % 100
     let c = if v < 5 {
@@ -19,7 +19,7 @@ fn build_rule_content(rng : Lcg, len : Int) -> String {
 
 ///|
 fn build_pattern(rng : Lcg, len : Int) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for _ in 0..<len {
     let v = rng.next_int() % 10
     let c = match v {
@@ -38,7 +38,7 @@ fn build_pattern(rng : Lcg, len : Int) -> String {
 
 ///|
 fn build_path(rng : Lcg, len : Int) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for _ in 0..<len {
     let v = rng.next_int() % 20
     let c = if v == 0 { '/' } else { (v % 26 + 97).unsafe_to_char() }

@@ -38,7 +38,7 @@ fn append_bytes(buf : Array[Byte], text : String) -> Unit {
 
 ///|
 fn bytes_to_string(buf : Array[Byte]) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for b in buf {
     sb.write_char(b.to_int().unsafe_to_char())
   }

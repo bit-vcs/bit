@@ -878,7 +878,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     }
     None =>
       for id in sliced_result {
-        let buf = StringBuilder::new()
+        let buf = StringBuilder()
         let hex = id.to_hex()
         buf.write_string(
           rev_list_output_prefix(
@@ -1662,7 +1662,7 @@ async fn rev_list_test_bitmap(fs : OsFs, git_dir : String) -> Unit raise Error {
 
 ///|
 fn emit_revindex_trace(fs : OsFs, kind : String) -> Unit {
-  match @sys.get_env_var("GIT_TRACE2_EVENT") {
+  match @env.get_env_var("GIT_TRACE2_EVENT") {
     Some(path) => {
       let target = path.trim().to_owned()
       if target.length() == 0 || target == "1" || target == "2" {

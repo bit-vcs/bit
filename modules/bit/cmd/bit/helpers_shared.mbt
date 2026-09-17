@@ -127,7 +127,7 @@ fn find_repo_root(start : String) -> String? {
     current = "."
   }
   let ceiling_dirs : Array[String] = []
-  match @sys.get_env_var("GIT_CEILING_DIRECTORIES") {
+  match @env.get_env_var("GIT_CEILING_DIRECTORIES") {
     Some(raw) =>
       for view in raw.split(":") {
         let dir = view.to_owned()
@@ -192,7 +192,7 @@ fn find_repo_root(start : String) -> String? {
 
 ///|
 fn get_work_root() -> String {
-  match @sys.get_env_var("GIT_SHIM_CWD") {
+  match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) =>
       // -C dir sets CWD to a subdirectory; find the repo root from there
       if is_bare_repo_dir(dir) {
@@ -201,13 +201,13 @@ fn get_work_root() -> String {
         find_repo_root(dir).unwrap_or(dir)
       }
     None =>
-      match @sys.get_env_var("GIT_WORK_TREE") {
+      match @env.get_env_var("GIT_WORK_TREE") {
         Some(dir) => dir
         None =>
-          match @sys.get_env_var("GIT_DIR") {
+          match @env.get_env_var("GIT_DIR") {
             Some(dir) => normalize_repo_root(dir)
             None =>
-              match @sys.get_env_var("GIT_SHIM_PWD") {
+              match @env.get_env_var("GIT_SHIM_PWD") {
                 Some(pwd) =>
                   if is_bare_repo_dir(pwd) {
                     pwd
@@ -215,7 +215,7 @@ fn get_work_root() -> String {
                     find_repo_root(pwd).unwrap_or(".")
                   }
                 None => {
-                  if @sys.get_env_var("PWD") is Some(pwd) {
+                  if @env.get_env_var("PWD") is Some(pwd) {
                     if is_bare_repo_dir(pwd) {
                       return pwd
                     }

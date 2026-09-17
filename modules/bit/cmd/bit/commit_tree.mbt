@@ -130,8 +130,8 @@ fn get_commit_tree_ident(
   name_env : String,
   email_env : String,
 ) -> (String, String) {
-  let name_from_env = @sys.get_env_var(name_env)
-  let email_from_env = @sys.get_env_var(email_env)
+  let name_from_env = @env.get_env_var(name_env)
+  let email_from_env = @env.get_env_var(email_env)
   let mut name = name_from_env.unwrap_or("")
   let mut email = email_from_env.unwrap_or("")
   let name_set = name_from_env is Some(_)
@@ -199,7 +199,7 @@ fn get_commit_tree_ident(
 
 ///|
 fn get_commit_tree_timestamp(env_name : String) -> Int64 {
-  match @sys.get_env_var(env_name) {
+  match @env.get_env_var(env_name) {
     Some(raw) =>
       match parse_git_env_timestamp(raw) {
         Some(ts) => ts
@@ -211,7 +211,7 @@ fn get_commit_tree_timestamp(env_name : String) -> Int64 {
 
 ///|
 fn get_commit_tree_timezone(env_name : String) -> String {
-  match @sys.get_env_var(env_name) {
+  match @env.get_env_var(env_name) {
     Some(raw) =>
       match parse_git_env_timezone(raw) {
         Some(tz) => tz

@@ -55,14 +55,14 @@ fn e2e_cleanup_tree(fs : OsFs, path : String) -> Unit {
 
 ///|
 fn e2e_reset_git_env() -> Unit {
-  @sys.unset_env_var("GIT_DIR")
-  @sys.unset_env_var("GIT_WORK_TREE")
-  @sys.unset_env_var("GIT_SHIM_CWD")
-  @sys.unset_env_var("GIT_SHIM_PWD")
-  @sys.unset_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
-  @sys.unset_env_var("GIT_CONFIG_OVERRIDES")
-  @sys.unset_env_var("SHIM_REAL_GIT")
-  @sys.unset_env_var("GIT_SHIM_REAL_GIT")
+  @env.unset_env_var("GIT_DIR")
+  @env.unset_env_var("GIT_WORK_TREE")
+  @env.unset_env_var("GIT_SHIM_CWD")
+  @env.unset_env_var("GIT_SHIM_PWD")
+  @env.unset_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
+  @env.unset_env_var("GIT_CONFIG_OVERRIDES")
+  @env.unset_env_var("SHIM_REAL_GIT")
+  @env.unset_env_var("GIT_SHIM_REAL_GIT")
 }
 
 ///|

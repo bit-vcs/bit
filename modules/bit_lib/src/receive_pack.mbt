@@ -646,7 +646,7 @@ fn receive_bytes_to_string_range(
   start : Int,
   end : Int,
 ) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let mut i = start
   while i < end {
     buf.write_char(data[i].to_int().unsafe_to_char())
@@ -692,7 +692,7 @@ fn receive_split_by_space(s : String) -> Array[String] {
 
 ///|
 fn receive_chars_to_string(chars : Array[Char]) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for c in chars {
     buf.write_char(c)
   }

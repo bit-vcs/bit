@@ -61,9 +61,9 @@ fn get_effective_remote_url(fs : OsFs, git_dir : String) -> String? {
 
 ///|
 fn get_author_string() -> String {
-  match @sys.get_env_var("GIT_AUTHOR_NAME") {
+  match @env.get_env_var("GIT_AUTHOR_NAME") {
     Some(name) => {
-      let email = @sys.get_env_var("GIT_AUTHOR_EMAIL").unwrap_or("unknown")
+      let email = @env.get_env_var("GIT_AUTHOR_EMAIL").unwrap_or("unknown")
       name + " <" + email + ">"
     }
     None => get_identity_from_config()
@@ -96,7 +96,7 @@ fn get_identity_from_config() -> String {
   } else {
     None
   }
-  let home = @sys.get_env_var("HOME").unwrap_or("")
+  let home = @env.get_env_var("HOME").unwrap_or("")
   let global_content = if home.length() > 0 {
     @fs.read_file_to_string(home + "/.gitconfig") catch {
       _ => ""
@@ -136,11 +136,11 @@ fn get_identity_from_config() -> String {
     (Some(n), Some(e)) => n + " <" + e + ">"
     (Some(n), None) => n + " <" + n + "@localhost>"
     (None, Some(e)) => {
-      let user = @sys.get_env_var("USER").unwrap_or("Unknown")
+      let user = @env.get_env_var("USER").unwrap_or("Unknown")
       user + " <" + e + ">"
     }
     (None, None) =>
-      match @sys.get_env_var("USER") {
+      match @env.get_env_var("USER") {
         Some(u) => u + " <" + u + "@localhost>"
         None => "Unknown <unknown@localhost>"
       }
@@ -149,7 +149,7 @@ fn get_identity_from_config() -> String {
 
 ///|
 fn get_hub_signing_key() -> String? {
-  match @sys.get_env_var("BIT_COLLAB_SIGN_KEY") {
+  match @env.get_env_var("BIT_COLLAB_SIGN_KEY") {
     Some(value) => if value.length() > 0 { Some(value) } else { None }
     None => None
   }
@@ -157,7 +157,7 @@ fn get_hub_signing_key() -> String? {
 
 ///|
 fn get_hub_require_signed() -> Bool {
-  match @sys.get_env_var("BIT_COLLAB_REQUIRE_SIGNED") {
+  match @env.get_env_var("BIT_COLLAB_REQUIRE_SIGNED") {
     Some(value) => {
       let normalized = value.to_lower()
       normalized == "1" || normalized == "true" || normalized == "yes"
@@ -180,7 +180,7 @@ fn format_timestamp_iso(ts : Int64, tz : String) -> String {
 
 ///|
 fn get_commit_timestamp() -> Int64 {
-  match @sys.get_env_var("GIT_COMMITTER_DATE") {
+  match @env.get_env_var("GIT_COMMITTER_DATE") {
     Some(s) =>
       match parse_git_env_timestamp(s) {
         Some(ts) => ts

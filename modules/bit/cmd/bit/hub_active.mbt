@@ -22,7 +22,7 @@ fn parse_active_issues(content : String) -> Array[String] {
 ///|
 /// Join entries with newlines.
 fn serialize_active_issues(entries : Array[String]) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for entry in entries {
     buf.write_string(entry)
     buf.write_char('\n')
@@ -124,7 +124,7 @@ async fn handle_hub_issue_active(_args : Array[String]) -> Unit raise Error {
     print_line("No active issues")
     return
   }
-  let home = @sys.get_env_var("HOME").unwrap_or("/")
+  let home = @env.get_env_var("HOME").unwrap_or("/")
   let aliases = load_aliases(git_dir)
   for entry in entries {
     let (repo_ref, issue_id) = parse_cross_repo_ref(entry)

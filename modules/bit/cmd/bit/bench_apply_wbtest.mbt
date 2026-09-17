@@ -21,7 +21,7 @@ fn bench_apply_ensure_repo() -> Unit {
   }
   // Create base files
   for i in 0..<100 {
-    let content = StringBuilder::new()
+    let content = StringBuilder()
     for line in 0..<50 {
       content.write_string("line \{line} of file \{i}\n")
     }
@@ -42,7 +42,7 @@ fn bench_apply_ensure_repo() -> Unit {
     _ => ()
   }
   // Generate patch file directly (unified diff format)
-  let diff_buf = StringBuilder::new()
+  let diff_buf = StringBuilder()
   for i in 0..<20 {
     diff_buf.write_string("diff --git a/file_\{i}.txt b/file_\{i}.txt\n")
     diff_buf.write_string("--- a/file_\{i}.txt\n")

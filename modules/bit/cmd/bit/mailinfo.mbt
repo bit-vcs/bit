@@ -47,8 +47,8 @@ async fn handle_mailinfo(args : Array[String]) -> Unit raise Error {
   let mut subject = ""
   let mut date = ""
   let mut in_headers = true
-  let body = StringBuilder::new()
-  let patch = StringBuilder::new()
+  let body = StringBuilder()
+  let patch = StringBuilder()
   let mut in_patch = false
   let mut past_scissors = false
   for line_view in input.split("\n") {

@@ -51,7 +51,7 @@ fn bench_grep_file_body(
   lines_per_file : Int,
   hit_interval : Int,
 ) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for line_idx in 0..<lines_per_file {
     buf.write_string(
       "line=\{line_idx} file=\{file_idx} payload lorem ipsum dolor sit amet\n",

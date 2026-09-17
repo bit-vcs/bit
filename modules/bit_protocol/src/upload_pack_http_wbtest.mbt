@@ -29,7 +29,7 @@ fn upload_pack_http_hex_to_bytes(hex : String) -> Bytes {
 
 ///|
 fn upload_pack_http_bytes_to_string(bytes : Bytes) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for b in bytes {
     sb.write_char(b.to_int().unsafe_to_char())
   }

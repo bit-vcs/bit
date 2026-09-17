@@ -1,13 +1,13 @@
 ///|
 fn resolve_real_git_for_blame() -> String {
-  match @sys.get_env_var("SHIM_REAL_GIT") {
+  match @env.get_env_var("SHIM_REAL_GIT") {
     Some(path) =>
       if path.length() > 0 {
         path
       } else {
-        @sys.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
+        @env.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
       }
-    None => @sys.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
+    None => @env.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
   }
 }
 
@@ -814,7 +814,7 @@ async fn blame_find_line_origin_with_opts(
 ///|
 fn normalize_whitespace(s : String) -> String {
   // Collapse all whitespace to single spaces and trim
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   let mut in_space = true // Start true to trim leading spaces
   for c in s {
     if c == ' ' || c == '\t' {

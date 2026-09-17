@@ -49,15 +49,15 @@ fn restore_env_var_for_storage_runtime_wbtest(
   prev : String?,
 ) -> Unit {
   match prev {
-    Some(value) => @sys.set_env_var(name, value)
-    None => @sys.unset_env_var(name)
+    Some(value) => @env.set_env_var(name, value)
+    None => @env.unset_env_var(name)
   }
 }
 
 ///|
 fn setup_storage_runtime_quiet_for_wbtest() -> String? {
-  let prev = @sys.get_env_var("BIT_STORAGE_RUNTIME_QUIET")
-  @sys.set_env_var("BIT_STORAGE_RUNTIME_QUIET", "1")
+  let prev = @env.get_env_var("BIT_STORAGE_RUNTIME_QUIET")
+  @env.set_env_var("BIT_STORAGE_RUNTIME_QUIET", "1")
   prev
 }
 
@@ -68,14 +68,14 @@ fn setup_identity_for_storage_runtime_wbtest() -> (
   String?,
   String?,
 ) {
-  let prev_author_name = @sys.get_env_var("GIT_AUTHOR_NAME")
-  let prev_author_email = @sys.get_env_var("GIT_AUTHOR_EMAIL")
-  let prev_committer_name = @sys.get_env_var("GIT_COMMITTER_NAME")
-  let prev_committer_email = @sys.get_env_var("GIT_COMMITTER_EMAIL")
-  @sys.set_env_var("GIT_AUTHOR_NAME", "Storage Test")
-  @sys.set_env_var("GIT_AUTHOR_EMAIL", "storage@example.com")
-  @sys.set_env_var("GIT_COMMITTER_NAME", "Storage Test")
-  @sys.set_env_var("GIT_COMMITTER_EMAIL", "storage@example.com")
+  let prev_author_name = @env.get_env_var("GIT_AUTHOR_NAME")
+  let prev_author_email = @env.get_env_var("GIT_AUTHOR_EMAIL")
+  let prev_committer_name = @env.get_env_var("GIT_COMMITTER_NAME")
+  let prev_committer_email = @env.get_env_var("GIT_COMMITTER_EMAIL")
+  @env.set_env_var("GIT_AUTHOR_NAME", "Storage Test")
+  @env.set_env_var("GIT_AUTHOR_EMAIL", "storage@example.com")
+  @env.set_env_var("GIT_COMMITTER_NAME", "Storage Test")
+  @env.set_env_var("GIT_COMMITTER_EMAIL", "storage@example.com")
   (
     prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
   )
@@ -107,10 +107,10 @@ fn setup_commit_date_for_storage_runtime_wbtest(
   author_date : String,
   committer_date : String,
 ) -> (String?, String?) {
-  let prev_author_date = @sys.get_env_var("GIT_AUTHOR_DATE")
-  let prev_committer_date = @sys.get_env_var("GIT_COMMITTER_DATE")
-  @sys.set_env_var("GIT_AUTHOR_DATE", author_date)
-  @sys.set_env_var("GIT_COMMITTER_DATE", committer_date)
+  let prev_author_date = @env.get_env_var("GIT_AUTHOR_DATE")
+  let prev_committer_date = @env.get_env_var("GIT_COMMITTER_DATE")
+  @env.set_env_var("GIT_AUTHOR_DATE", author_date)
+  @env.set_env_var("GIT_COMMITTER_DATE", committer_date)
   (prev_author_date, prev_committer_date)
 }
 
@@ -340,8 +340,8 @@ test "storage runtime: hash-object -w and write-tree work on TestFs" {
   let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-objects"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
-  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
-  @sys.set_env_var("GIT_SHIM_PWD", root)
+  let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")
+  @env.set_env_var("GIT_SHIM_PWD", root)
   run_storage_command(fs, fs, root, storage_runtime_wbtest_init_command()) catch {
     err => fail("init failed: \{err}")
   }

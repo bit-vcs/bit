@@ -22,7 +22,7 @@
 /// Get the git directory path for benchmarks
 /// Uses BIT_BENCH_GIT_DIR when set, otherwise a local fallback.
 fn get_bench_git_dir() -> String {
-  match @sys.get_env_var("BIT_BENCH_GIT_DIR") {
+  match @env.get_env_var("BIT_BENCH_GIT_DIR") {
     Some(dir) => dir
     None => "/Users/mz/ghq/github.com/mizchi/git/.git"
   }

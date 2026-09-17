@@ -396,7 +396,7 @@ fn match_simple_glob(filename : String, pattern : String) -> Bool {
 ///|
 /// sparse checkout パターンファイルの内容を構築
 fn build_sparse_content(patterns : Array[String]) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   result.write_string("# Sparse checkout patterns\n")
   for p in patterns {
     result.write_string(p)
@@ -434,7 +434,7 @@ fn sparse_trim(s : String) -> String {
 
 ///|
 fn bytes_to_string_sparse(bytes : Bytes) -> String {
-  let result = StringBuilder::new()
+  let result = StringBuilder()
   for i in 0..<bytes.length() {
     result.write_char(bytes[i].to_int().unsafe_to_char())
   }

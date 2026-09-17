@@ -87,7 +87,7 @@ pub fn SyncLink::remote_updated_at(self : SyncLink) -> Int64 {
 ///|
 /// Serialize SyncLink to Git-style text format
 pub fn SyncLink::serialize(self : SyncLink) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("sync-link ")
   sb.write_string(self.local_id)
   sb.write_char('\n')

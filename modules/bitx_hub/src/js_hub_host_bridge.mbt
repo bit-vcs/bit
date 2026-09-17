@@ -20,7 +20,7 @@ extern "js" fn hub_js_host_last_error() -> String =
 extern "js" fn hub_js_host_write_file(
   host_id : Int,
   path : String,
-  content : Array[Byte],
+  content : FixedArray[Byte],
 ) -> String? =
   #| (hostId, path, content) => {
   #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
@@ -154,9 +154,12 @@ impl @bit.FileSystem for HubJsHostFs with fn mkdir_p(self, path) {
 
 ///|
 impl @bit.FileSystem for HubJsHostFs with fn write_file(self, path, content) {
-  let arr = Array::new(capacity=content.length())
+  // A `FixedArray` rather than an `Array`: `Array` is deprecated at the JS FFI
+  // boundary, and a `FixedArray[Byte]` arrives as a `Uint8Array`, which the
+  // bridge's `Uint8Array.from` reads exactly as it read the plain array.
+  let arr = FixedArray::make(content.length(), b'\x00')
   for i in 0..<content.length() {
-    arr.push(content[i])
+    arr[i] = content[i]
   }
   match hub_js_host_write_file(self.host_id, path, arr) {
     Some(e) => raise @bit.GitError::IoError(e)

@@ -38,7 +38,7 @@ pub struct ClaimMessage {
 
 ///|
 fn claim_show_string(value : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_char('"')
   for c in value {
     if c == '"' {

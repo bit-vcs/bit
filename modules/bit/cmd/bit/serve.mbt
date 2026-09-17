@@ -90,7 +90,7 @@ fn parse_hub_serve_options(args : Array[String]) -> HubServeOptions? {
   let url = match relay_url {
     Some(u) => u
     None =>
-      match @sys.get_env_var("BIT_RELAY_URL") {
+      match @env.get_env_var("BIT_RELAY_URL") {
         Some(u) => u
         None => "relay+https://bit-relay.mizchi.workers.dev"
       }
@@ -160,7 +160,7 @@ fn serve_b64_char(idx : Int) -> Char {
 
 ///|
 fn serve_base64_encode(data : Bytes) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   let len = data.length()
   let mut i = 0
   while i < len {
@@ -1110,7 +1110,7 @@ fn serve_parse_pkt_len(data : Bytes, start : Int) -> Int {
 
 ///|
 fn serve_bytes_to_string(data : Bytes, start : Int, end : Int) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let mut i = start
   while i < end {
     buf.write_char(data[i].to_int().unsafe_to_char())
@@ -1122,7 +1122,7 @@ fn serve_bytes_to_string(data : Bytes, start : Int, end : Int) -> String {
 ///|
 fn serve_split_spaces(s : String) -> Array[String] {
   let out : Array[String] = []
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for c in s {
     if c == ' ' {
       out.push(buf.to_string())
@@ -1512,7 +1512,7 @@ fn serve_parent_path(path : String) -> String {
 
 ///|
 fn serve_add_auth_header(headers : Map[String, String]) -> Unit {
-  match @sys.get_env_var("BIT_RELAY_AUTH_TOKEN") {
+  match @env.get_env_var("BIT_RELAY_AUTH_TOKEN") {
     Some(token) =>
       if token.length() > 0 {
         if token.has_prefix("Bearer ") || token.has_prefix("bearer ") {

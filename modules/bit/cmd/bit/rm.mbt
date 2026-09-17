@@ -739,7 +739,7 @@ fn rm_append_conflict_block(
 
 ///|
 fn rm_quote_path(path : String) -> String {
-  let b = StringBuilder::new()
+  let b = StringBuilder()
   b.write_char('\'')
   for c in path {
     if c == '\'' {

@@ -16,7 +16,7 @@ pub struct RelayPublishHttpSignature {
 
 ///|
 pub fn relay_base64_to_base64url(base64 : String) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for c in base64 {
     if c == '+' {
       out.write_char('-')

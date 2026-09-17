@@ -49,7 +49,7 @@ pub(all) struct RefRecord {
 
 ///|
 fn reftable_show_string(value : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_char('"')
   for c in value {
     if c == '"' {
@@ -241,7 +241,7 @@ pub fn parse_footer(data : Bytes) -> ReftableFooter? {
 ///|
 /// Extract a UTF-8 string from bytes.
 fn bytes_to_string(data : Bytes, start : Int, len : Int) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i = start; i < start + len; i = i + 1 {
     buf.write_char(Int::unsafe_to_char(data[i].to_int()))
   }
@@ -272,7 +272,7 @@ pub fn decode_ref_record(
   let suffix_len = (suffix_and_type >> 3).to_int()
   let prefix_len_int = prefix_len.to_int()
   // Reconstruct key
-  let key_buf = StringBuilder::new()
+  let key_buf = StringBuilder()
   for i = 0; i < prefix_len_int; i = i + 1 {
     if i < prev_key.length() {
       key_buf.write_char(Int::unsafe_to_char(prev_key[i].to_int()))

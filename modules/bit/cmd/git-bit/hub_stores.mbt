@@ -141,7 +141,7 @@ fn can_use_hub_git_backend() -> Bool {
 
 ///|
 fn resolve_hub_repo_backend_kind() -> HubRepoBackendKind {
-  match @sys.get_env_var("BIT_HUB_BACKEND") {
+  match @env.get_env_var("BIT_HUB_BACKEND") {
     Some(raw) =>
       match parse_hub_repo_backend_kind(raw) {
         Some(HubRepoBackendKind::Bit) => HubRepoBackendKind::Bit

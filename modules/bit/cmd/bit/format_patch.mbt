@@ -226,7 +226,7 @@ fn format_patch_signature_suffix(signature : String?) -> String {
 
 ///|
 fn format_patch_concat(parts : Array[String]) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for part in parts {
     sb.write_string(part)
   }
@@ -549,7 +549,7 @@ fn filter_format_patch_commits_by_grep(
 
 ///|
 fn generate_cover_letter(num_patches : Int, signature : String?) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string(
     "From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001\n",
   )
@@ -585,7 +585,7 @@ fn generate_patch(
   let subject = get_first_line(message)
   let body = get_rest_lines(message)
   // Build patch header
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("From ")
   sb.write_string(commit_id.to_hex())
   sb.write_string(" Mon Sep 17 00:00:00 2001\n")
@@ -650,7 +650,7 @@ fn format_patch_filename(
 
 ///|
 fn sanitize_filename(s : String) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut last_was_dash = false
   for c in s {
     if (c >= 'a' && c <= 'z') ||

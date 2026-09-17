@@ -75,7 +75,7 @@ async fn show_submodule_usage_stderr() -> Unit raise Error {
 
 ///|
 fn resolve_submodule_root() -> String {
-  match @sys.get_env_var("GIT_SHIM_CWD") {
+  match @env.get_env_var("GIT_SHIM_CWD") {
     Some(dir) =>
       if is_bare_repo_dir(dir) {
         dir
@@ -83,7 +83,7 @@ fn resolve_submodule_root() -> String {
         find_repo_root(dir).unwrap_or(dir)
       }
     None =>
-      match @sys.get_env_var("GIT_SHIM_PWD") {
+      match @env.get_env_var("GIT_SHIM_PWD") {
         Some(dir) =>
           if is_bare_repo_dir(dir) {
             dir
@@ -91,7 +91,7 @@ fn resolve_submodule_root() -> String {
             find_repo_root(dir).unwrap_or(dir)
           }
         None =>
-          match @sys.get_env_var("PWD") {
+          match @env.get_env_var("PWD") {
             Some(dir) =>
               match find_repo_root(dir) {
                 Some(root) => root
@@ -113,14 +113,14 @@ fn resolve_submodule_root() -> String {
 
 ///|
 async fn handle_submodule(args : Array[String]) -> Unit raise Error {
-  let raw_root = match @sys.get_env_var("GIT_WORK_TREE") {
+  let raw_root = match @env.get_env_var("GIT_WORK_TREE") {
     Some(path) => path
     None => resolve_submodule_root()
   }
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let root = normalize_path(raw_root)
-  let raw_git_dir = match @sys.get_env_var("GIT_DIR") {
+  let raw_git_dir = match @env.get_env_var("GIT_DIR") {
     Some(path) => path
     None => raw_root + "/.git"
   }
@@ -324,7 +324,7 @@ fn submodule_expand_template_dir(path : String) -> String {
   if !path.has_prefix("~/") {
     return path
   }
-  match @sys.get_env_var("HOME") {
+  match @env.get_env_var("HOME") {
     Some(home) =>
       home + String::unsafe_substring(path, start=1, end=path.length())
     None => path
@@ -333,7 +333,7 @@ fn submodule_expand_template_dir(path : String) -> String {
 
 ///|
 fn submodule_add_template_dir(fs : OsFs) -> String? {
-  match @sys.get_env_var("GIT_TEMPLATE_DIR") {
+  match @env.get_env_var("GIT_TEMPLATE_DIR") {
     Some(path) => Some(submodule_expand_template_dir(path))
     None => {
       let rfs : &@bitcore.RepoFileSystem = fs
@@ -1782,12 +1782,12 @@ fn submodule_status_exact_ref_label(
 
 ///|
 fn submodule_cwd_prefix(root : String) -> String {
-  let cwd_abs = match @sys.get_env_var("GIT_SHIM_CWD") {
+  let cwd_abs = match @env.get_env_var("GIT_SHIM_CWD") {
     Some(v) => v
     None =>
-      match @sys.get_env_var("GIT_SHIM_PWD") {
+      match @env.get_env_var("GIT_SHIM_PWD") {
         Some(v) => v
-        None => @sys.get_env_var("PWD").unwrap_or(root)
+        None => @env.get_env_var("PWD").unwrap_or(root)
       }
   }
   let raw_cwd_prefix = rev_parse_show_prefix(root, cwd_abs)

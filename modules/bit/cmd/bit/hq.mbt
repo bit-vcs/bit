@@ -333,7 +333,7 @@ async fn handle_hq_root(_args : Array[String]) -> Unit {
 ///|
 /// Get environment variable
 fn get_env_hq(key : String) -> String? {
-  @sys.get_env_var(key)
+  @env.get_env_var(key)
 }
 
 ///|
@@ -347,7 +347,7 @@ fn get_git_config_hq(_key : String) -> String? {
 ///|
 /// Get home directory
 fn get_home_dir_hq() -> String {
-  @sys.get_env_var("HOME").unwrap_or("/home/user")
+  @env.get_env_var("HOME").unwrap_or("/home/user")
 }
 
 ///|
