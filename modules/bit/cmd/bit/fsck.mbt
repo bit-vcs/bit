@@ -84,6 +84,7 @@ async fn handle_fsck(args : Array[String]) -> Unit raise Error {
     fs,
     ref_tips,
     collect_extra=need_extra,
+    shallow=@repo.read_shallow_boundaries(fs, git_dir),
   )
   errors += result.errors
   // Report missing objects

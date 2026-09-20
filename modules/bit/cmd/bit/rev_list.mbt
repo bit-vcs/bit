@@ -600,6 +600,13 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   } else {
     Map([])
   }
+  // Commits on the shallow boundary are grafted: their parents were never
+  // fetched. Following those links emits an id whose object is not in the
+  // store, so the walk must stop here exactly as `log` does.
+  let shallow_boundary : Map[String, Bool] = Map([])
+  for id in @repo.read_shallow_boundaries(fs, git_dir) {
+    shallow_boundary[id.to_hex()] = true
+  }
   let visited : Map[String, Bool] = Map([])
   let result : Array[@bitcore.ObjectId] = []
   // BFS/DFS traversal — collect ALL reachable commits, then sort/slice
@@ -618,7 +625,9 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     // Get commit and add parents
     match rev_list_load_commit_info(db, fs, id) {
       Some(info) =>
-        if first_parent && info.parents.length() > 0 {
+        if shallow_boundary.contains(hex) {
+          ()
+        } else if first_parent && info.parents.length() > 0 {
           if !visited.contains(info.parents[0].to_hex()) {
             queue.push(info.parents[0])
           }

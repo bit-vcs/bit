@@ -332,8 +332,12 @@ local e2e: Task = new {
 
 local testSubdir: Task = new {
   name = "test-subdir"
-  description = "subdir-clone/push integration tests (t/ directory)"
-  cmd = "bash t/run-tests.sh t900"
+  description = "subdir-clone/push and transport integration tests (t/ directory)"
+  // The filter is a substring match, so `t900` alone silently skips t902x.
+  cmd = #"""
+    bash t/run-tests.sh t900
+    bash t/run-tests.sh t902
+    """#
 }
 
 local testDistributed: Task = new {

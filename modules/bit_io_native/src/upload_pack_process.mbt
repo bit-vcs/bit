@@ -1261,7 +1261,10 @@ pub async fn clone_process_to_fs(
   if wants.length() == 0 {
     return refs
   }
-  let pack = fetch_pack_process(remote, wants, prefer_v2, depth~, filter~)
+  let fetched = fetch_pack_process_result(
+    remote, wants, prefer_v2, depth~, filter~,
+  )
+  let pack = fetched.pack
   let objects = @pack.parse_packfile(pack)
   let git_dir = @bit.join_path(root, ".git")
   let pack_id = read_pack_trailer_id(pack)
@@ -1290,24 +1293,13 @@ pub async fn clone_process_to_fs(
         )
       }
   }
-  if depth > 0 {
-    let shallow_ids : Array[String] = []
-    let seen : Map[String, Bool] = Map([])
-    for id in wants {
-      let hex = id.to_hex()
-      if seen.contains(hex) {
-        continue
-      }
-      seen[hex] = true
-      shallow_ids.push(hex)
-    }
-    if shallow_ids.length() > 0 {
-      fs.write_string(
-        @bit.join_path(git_dir, "shallow"),
-        shallow_ids.join("\n") + "\n",
-      )
-    }
-  }
+  // The boundary is whatever the server reported as shallow, not the refs we
+  // wanted: those coincide only at depth 1. Recording the tips instead makes
+  // every deeper clone look parentless at its tip, which then truncates the
+  // history a repack keeps.
+  @repo.apply_shallow_updates(
+    fs, rfs, git_dir, fetched.shallow, fetched.unshallow,
+  )
   refs
 }
 

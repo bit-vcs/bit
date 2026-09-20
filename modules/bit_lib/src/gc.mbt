@@ -83,7 +83,10 @@ fn repack_git_dir(
   if roots.length() == 0 {
     return None
   }
-  let objects = collect_reachable_objects_from_commits(db, rfs, roots)
+  // A shallow clone's boundary commits have no parents on disk. Walking past
+  // them either aborts the run or, worse, truncates what a repack keeps.
+  let shallow = @repo.read_shallow_boundaries(rfs, git_dir)
+  let objects = collect_reachable_objects_from_commits(db, rfs, roots, shallow~)
   collect_reachable_tag_objects(db, rfs, ref_ids, objects)
   // Reflog-referenced objects are roots too (git keeps them); repacking without
   // them would drop reflog-only objects from the new pack.
@@ -101,10 +104,11 @@ fn gc_git_dir(
   let db = ObjectDb::load(rfs, git_dir)
   let roots = resolve_commit_roots(db, rfs, ref_ids)
   let prune_enabled = roots.length() > 0
+  let shallow = @repo.read_shallow_boundaries(rfs, git_dir)
   let reachable = if roots.length() == 0 {
     []
   } else {
-    collect_reachable_objects_from_commits(db, rfs, roots)
+    collect_reachable_objects_from_commits(db, rfs, roots, shallow~)
   }
   // Also include tag objects that refs point to directly (annotated tags).
   collect_reachable_tag_objects(db, rfs, ref_ids, reachable)
@@ -154,7 +158,8 @@ fn prune_git_dir(
   if roots.length() == 0 {
     return { pruned: [] }
   }
-  let reachable = collect_reachable_objects_from_commits(db, rfs, roots)
+  let shallow = @repo.read_shallow_boundaries(rfs, git_dir)
+  let reachable = collect_reachable_objects_from_commits(db, rfs, roots, shallow~)
   collect_reachable_tag_objects(db, rfs, ref_ids, reachable)
   // Match gc_git_dir: reflog-referenced objects are protected roots, so a bare
   // `bit gc --prune` must not delete reflog-only loose objects.
@@ -374,6 +379,7 @@ fn collect_reflog_referenced_objects(
   git_dir : String,
   objects : Array[@bit.PackObject],
 ) -> Unit raise @bit.GitError {
+  let shallow = @repo.read_shallow_boundaries(fs, git_dir)
   let seen : Map[String, Bool] = Map([])
   for obj in objects {
     seen[@bit.hash_object_content(obj.obj_type, obj.data).to_hex()] = true
@@ -391,7 +397,9 @@ fn collect_reflog_referenced_objects(
         objects.push(obj)
         // If it's a commit, also collect its tree and blobs
         if obj.obj_type == @bit.ObjectType::Commit {
-          let sub = collect_reachable_objects_from_commits(db, fs, [id])
+          let sub = collect_reachable_objects_from_commits(
+            db, fs, [id], shallow~,
+          )
           for s in sub {
             let sh = @bit.hash_object_content(s.obj_type, s.data).to_hex()
             if !seen.contains(sh) {
