@@ -253,6 +253,8 @@ priv struct PreparedClone {
   pack : Bytes
   pack_id : @bit.ObjectId
   objects : Array[@bit.PackObject]
+  shallow : Array[@bit.ObjectId]
+  unshallow : Array[@bit.ObjectId]
 }
 
 ///|
@@ -276,9 +278,13 @@ async fn prepare_clone_with_http(
   if default_ref is None || wants.length() == 0 {
     return (refs, None)
   }
-  let pack = fetch_pack_with_http(
+  // Keep the shallow/unshallow lines: without them a --depth clone leaves no
+  // boundary on disk, so the repository reports itself complete and a later
+  // `fetch --unshallow` has nothing to deepen from.
+  let result = fetch_pack_with_http_result(
     remote, wants, prefer_v2, depth, filter, http_get, http_post,
   )
+  let pack = result.pack
   (
     refs,
     Some({
@@ -286,6 +292,8 @@ async fn prepare_clone_with_http(
       pack,
       pack_id: read_pack_trailer_id_http(pack),
       objects: @pack.parse_packfile(pack),
+      shallow: result.shallow,
+      unshallow: result.unshallow,
     }),
   )
 }
@@ -316,6 +324,9 @@ pub async fn clone_to_fs_with_http(
   let git_dir = @bit.join_path(root, ".git")
   fs.mkdir_p(@bit.join_path(git_dir, "objects/pack"))
   @pack.write_packfile_with_index(fs, git_dir, prepared.pack, prepared.objects)
+  @repo.apply_shallow_updates(
+    fs, rfs, git_dir, prepared.shallow, prepared.unshallow,
+  )
   if filter.is_partial() {
     write_promisor_file(fs, git_dir, remote)
     write_pack_promisor_marker_http(
@@ -384,6 +395,7 @@ pub async fn[
     prepared.pack,
     prepared.objects,
   )
+  @repo.write_shallow_boundaries_async(fs, git_dir, prepared.shallow)
   if filter.is_partial() {
     write_promisor_file_async(fs, git_dir, remote)
     write_pack_promisor_marker_http_async(

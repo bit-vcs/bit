@@ -127,3 +127,48 @@ test "fsck_verify_loose_hash valid" {
     ),
   )
 }
+
+///|
+test "fsck_connectivity_check treats a shallow boundary as grafted" {
+  let fs = @bit.TestFs::new()
+  let git_dir = "/repo/.git"
+  fs.mkdir_p(git_dir)
+  fs.mkdir_p(git_dir + "/objects")
+  fs.mkdir_p(git_dir + "/refs")
+  let (tree_id, tree_bytes) = @bit.create_tree([])
+  @bit_lib.write_object_bytes(fs, git_dir, tree_id, tree_bytes)
+  // A boundary commit whose parent was never fetched, exactly what a
+  // `clone --depth` leaves behind.
+  let absent_parent_hex = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  let absent_parent = @bit.ObjectId::from_hex(absent_parent_hex)
+  let commit = @bit.Commit::new(
+    tree_id,
+    [absent_parent],
+    "A <a@b.c>",
+    1000000000L,
+    "+0000",
+    "A <a@b.c>",
+    1000000000L,
+    "+0000",
+    "boundary\n",
+  )
+  let (commit_id, commit_bytes) = @bit.create_commit(commit)
+  @bit_lib.write_object_bytes(fs, git_dir, commit_id, commit_bytes)
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
+
+  // Without the boundary the absent parent is reported as corruption.
+  let plain = @bit_lib.fsck_connectivity_check(db, fs, [commit_id])
+  assert_true(plain.errors > 0)
+  assert_true(plain.missing.contains(absent_parent_hex))
+
+  // Declaring the boundary makes the same repository read as clean.
+  let grafted = @bit_lib.fsck_connectivity_check(
+    db,
+    fs,
+    [commit_id],
+    shallow=[commit_id],
+  )
+  assert_eq(grafted.errors, 0)
+  assert_true(!grafted.missing.contains(absent_parent_hex))
+  assert_true(grafted.reachable.contains(tree_id.to_hex()))
+}

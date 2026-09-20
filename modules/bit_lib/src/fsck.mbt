@@ -18,7 +18,15 @@ pub fn fsck_connectivity_check(
   fs : &@bit.RepoFileSystem,
   tips : Array[@bit.ObjectId],
   collect_extra? : Bool = false,
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> FsckResult {
+  // Commits on the shallow boundary are grafted: their parents were never
+  // fetched, so following those links would report a well-formed shallow
+  // clone as corrupt.
+  let boundary : Map[String, Bool] = Map([])
+  for id in shallow {
+    boundary[id.to_hex()] = true
+  }
   let reachable : Map[String, Bool] = Map([])
   let missing : Map[String, Bool] = Map([])
   let root_commits : Array[String] = []
@@ -68,10 +76,12 @@ pub fn fsck_connectivity_check(
             if !reachable.contains(tree_hex) {
               queue.push(info.tree)
             }
-            for parent in info.parents {
-              let phex = parent.to_hex()
-              if !reachable.contains(phex) {
-                queue.push(parent)
+            if !boundary.contains(hex) {
+              for parent in info.parents {
+                let phex = parent.to_hex()
+                if !reachable.contains(phex) {
+                  queue.push(parent)
+                }
               }
             }
           }
