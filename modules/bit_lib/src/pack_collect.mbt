@@ -54,6 +54,7 @@ fn collect_object_ids_only(
   fs : &@bit.RepoFileSystem,
   commit_id : @bit.ObjectId,
   seen : Map[String, Bool],
+  shallow? : Map[String, Bool] = Map([]),
 ) -> Unit raise @bit.GitError {
   let hex = commit_id.to_hex()
   if seen.contains(hex) {
@@ -67,8 +68,12 @@ fn collect_object_ids_only(
       if o.obj_type == @bit.ObjectType::Commit {
         let info = @bit.parse_commit(o.data)
         collect_tree_ids_only(db, fs, info.tree, seen)
+        if shallow.contains(hex) {
+          // Shallow boundary: the parents are absent by construction.
+          return
+        }
         for p in info.parents {
-          collect_object_ids_only(db, fs, p, seen)
+          collect_object_ids_only(db, fs, p, seen, shallow~)
         }
       }
   }
@@ -202,10 +207,12 @@ pub fn collect_reachable_objects(
   db : ObjectDb,
   fs : &@bit.RepoFileSystem,
   commit_id : @bit.ObjectId,
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   let seen : Map[String, Bool] = Map([])
   let out : Array[@bit.PackObject] = []
-  collect_commit_objects(db, fs, commit_id, seen, out)
+  let boundaries = shallow_boundary_set(shallow)
+  collect_commit_objects(db, fs, commit_id, seen, out, shallow=boundaries)
   out
 }
 
@@ -215,11 +222,13 @@ pub fn collect_reachable_objects_from_commits(
   db : ObjectDb,
   fs : &@bit.RepoFileSystem,
   commits : Array[@bit.ObjectId],
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   let seen : Map[String, Bool] = Map([])
   let out : Array[@bit.PackObject] = []
+  let boundaries = shallow_boundary_set(shallow)
   for commit_id in commits {
-    collect_commit_objects(db, fs, commit_id, seen, out)
+    collect_commit_objects(db, fs, commit_id, seen, out, shallow=boundaries)
   }
   out
 }
@@ -234,17 +243,52 @@ pub fn collect_reachable_objects_excluding_commits(
   fs : &@bit.RepoFileSystem,
   commits : Array[@bit.ObjectId],
   excluded_commits : Array[@bit.ObjectId],
+  shallow? : Array[@bit.ObjectId] = [],
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   // Mark the complete object closure already owned by the receiver. Merely
   // stopping the commit walk at a have commit is insufficient: the wanted
   // commit's new tree can still reference unchanged blobs from that commit.
   let seen : Map[String, Bool] = Map([])
+  let boundaries = shallow_boundary_set(shallow)
   for id in excluded_commits {
-    collect_object_ids_only(db, fs, id, seen)
+    collect_object_ids_only(db, fs, id, seen, shallow=boundaries)
   }
   let out : Array[@bit.PackObject] = []
   for commit_id in commits {
-    collect_commit_objects(db, fs, commit_id, seen, out)
+    collect_commit_objects(db, fs, commit_id, seen, out, shallow=boundaries)
+  }
+  out
+}
+
+///|
+/// The distinct non-zero commit ids a peer advertises, usable as the exclusion
+/// set of a push walk: everything reachable from them is already on the other
+/// side, so it must not be packed again.
+pub fn advertised_have_ids(
+  refs : Array[(@bit.ObjectId, String)],
+) -> Array[@bit.ObjectId] {
+  let zero = @bit.ObjectId::zero()
+  let seen : Map[String, Bool] = Map([])
+  let haves : Array[@bit.ObjectId] = []
+  for item in refs {
+    let (id, _) = item
+    let hex = id.to_hex()
+    if id != zero && !seen.contains(hex) {
+      seen[hex] = true
+      haves.push(id)
+    }
+  }
+  haves
+}
+
+///|
+/// Index shallow boundary commits by hex id for O(1) lookups during a walk.
+fn shallow_boundary_set(
+  shallow : Array[@bit.ObjectId],
+) -> Map[String, Bool] {
+  let out : Map[String, Bool] = Map([])
+  for id in shallow {
+    out[id.to_hex()] = true
   }
   out
 }
@@ -256,6 +300,7 @@ fn collect_commit_objects(
   commit_id : @bit.ObjectId,
   seen : Map[String, Bool],
   out : Array[@bit.PackObject],
+  shallow? : Map[String, Bool] = Map([]),
 ) -> Unit raise @bit.GitError {
   let hex = commit_id.to_hex()
   if seen.contains(hex) {
@@ -272,8 +317,13 @@ fn collect_commit_objects(
       out.push(o)
       let info = @bit.parse_commit(o.data)
       collect_tree_objects(db, fs, info.tree, seen, out)
+      if shallow.contains(hex) {
+        // Shallow boundary: this commit's parents were never fetched, so the
+        // history stops here just as it does for git's grafted walk.
+        return
+      }
       for p in info.parents {
-        collect_commit_objects(db, fs, p, seen, out)
+        collect_commit_objects(db, fs, p, seen, out, shallow~)
       }
     }
   }
