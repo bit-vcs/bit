@@ -13,6 +13,8 @@ pub fn add_paths(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Arr
 
 pub async fn add_paths_async(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[String], run_filter_cmd? : FilterCmd, warnings? : Array[String]) -> Unit raise @bit_object.GitError
 
+pub fn advertised_have_ids(Array[(@bit_object.ObjectId, String)]) -> Array[@bit_object.ObjectId]
+
 pub fn append_reflog(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, @bit_object.ObjectId, @bit_object.ObjectId, String, String, Int64, String, String) -> Unit raise @bit_object.GitError
 
 pub fn apply_config_overrides(Map[String, RemoteConfig], Map[String, BranchConfig], Array[(String, String)]) -> Unit
@@ -61,11 +63,11 @@ pub fn collect_loose_ref_ids(&@bit_types.RepoFileSystem, String, String, Map[Str
 
 pub fn collect_packed_ref_ids(&@bit_types.RepoFileSystem, String, Map[String, @bit_object.ObjectId], String?) -> Unit
 
-pub fn collect_reachable_objects(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId) -> Array[@bit_object.PackObject] raise @bit_object.GitError
+pub fn collect_reachable_objects(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, shallow? : Array[@bit_object.ObjectId]) -> Array[@bit_object.PackObject] raise @bit_object.GitError
 
-pub fn collect_reachable_objects_excluding_commits(ObjectDb, &@bit_types.RepoFileSystem, Array[@bit_object.ObjectId], Array[@bit_object.ObjectId]) -> Array[@bit_object.PackObject] raise @bit_object.GitError
+pub fn collect_reachable_objects_excluding_commits(ObjectDb, &@bit_types.RepoFileSystem, Array[@bit_object.ObjectId], Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Array[@bit_object.PackObject] raise @bit_object.GitError
 
-pub fn collect_reachable_objects_from_commits(ObjectDb, &@bit_types.RepoFileSystem, Array[@bit_object.ObjectId]) -> Array[@bit_object.PackObject] raise @bit_object.GitError
+pub fn collect_reachable_objects_from_commits(ObjectDb, &@bit_types.RepoFileSystem, Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Array[@bit_object.PackObject] raise @bit_object.GitError
 
 pub fn collect_tree_blobs(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId) -> Array[@bit_object.ObjectId] raise @bit_object.GitError
 

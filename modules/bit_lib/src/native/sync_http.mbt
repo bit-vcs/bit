@@ -160,6 +160,7 @@ pub async fn push_http(
         rfs,
         [head_id],
         sync_remote_have_ids(refs),
+        shallow=@repo.read_shallow_boundaries(rfs, actual_git_dir),
       )
       let pack = @pack.create_packfile(objects)
       sync_raise_lfs_upload_errors(
@@ -204,6 +205,7 @@ pub async fn push_http_from_commit(
     rfs,
     [commit_id],
     sync_remote_have_ids(refs),
+    shallow=@repo.read_shallow_boundaries(rfs, actual_git_dir),
   )
   let pack = @pack.create_packfile(objects)
   sync_raise_lfs_upload_errors(
@@ -274,18 +276,7 @@ fn sync_find_ref(
 fn sync_remote_have_ids(
   refs : Array[(@bit.ObjectId, String)],
 ) -> Array[@bit.ObjectId] {
-  let zero = @bit.ObjectId::zero()
-  let seen : Map[String, Bool] = Map([])
-  let haves : Array[@bit.ObjectId] = []
-  for item in refs {
-    let (id, _) = item
-    let hex = id.to_hex()
-    if id != zero && !seen.contains(hex) {
-      seen[hex] = true
-      haves.push(id)
-    }
-  }
-  haves
+  @bitlib.advertised_have_ids(refs)
 }
 
 ///|

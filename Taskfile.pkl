@@ -313,7 +313,7 @@ local testUpdate: Task = new {
 local testJsBuild: Task = new {
   name = "test-js-build"
   description = "Node-side smoke tests for the published JS lib + npm wrapper"
-  cmd = "node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/npm-cli.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs tools/playground-commands.test.mjs tools/playground-view.test.mjs tools/flaker-affected-rules.test.mjs tools/select-affected-tests.test.mjs"
+  cmd = "node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/shallow-push.test.mjs tools/npm-cli.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs tools/playground-commands.test.mjs tools/playground-view.test.mjs tools/flaker-affected-rules.test.mjs tools/select-affected-tests.test.mjs"
   deps {
     syncNpmLibRaw
     syncNpmBitMjs

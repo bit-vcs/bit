@@ -397,3 +397,105 @@ test "collect_reachable_objects_excluding_commits: stops at have commits" {
   assert_eq(nested_shared_blob_count, 0)
   assert_eq(new_blob_count, 1)
 }
+
+///|
+/// Drop a loose object so the walk sees the truncated history a shallow clone
+/// actually has on disk.
+fn drop_loose_object(
+  fs : @bit.TestFs,
+  git_dir : String,
+  id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
+  let hex = id.to_hex()
+  let prefix = String::unsafe_substring(hex, start=0, end=2)
+  let suffix = String::unsafe_substring(hex, start=2, end=hex.length())
+  fs.remove_file(git_dir + "/objects/" + prefix + "/" + suffix)
+}
+
+///|
+test "collect_reachable_objects_excluding_commits: shallow tip whose parent is absent" {
+  let fs = @bit.TestFs::new()
+  init_repo(fs, "/repo") catch {
+    _ => ()
+  }
+  fs.write_file("/repo/base.txt", b"base")
+  add_paths(fs, fs, "/repo", ["."])
+  let base = commit(fs, fs, "/repo", "base", "test <test@test.com>", 1000L)
+  fs.write_file("/repo/boundary.txt", b"boundary")
+  add_paths(fs, fs, "/repo", ["."])
+  let boundary = commit(
+    fs, fs, "/repo", "boundary", "test <test@test.com>", 2000L,
+  )
+  fs.write_file("/repo/new.txt", b"new")
+  add_paths(fs, fs, "/repo", ["."])
+  let tip = commit(fs, fs, "/repo", "tip", "test <test@test.com>", 3000L)
+  // A depth-1 clone (or a clone of an already shallow remote) holds `boundary`
+  // but never received its parent.
+  drop_loose_object(fs, "/repo/.git", base)
+  let db = ObjectDb::load(fs, "/repo/.git")
+
+  // The receiver advertises `boundary`, so the walk must stop there instead of
+  // trying to load the absent parent.
+  let objects = collect_reachable_objects_excluding_commits(db, fs, [tip], [
+    boundary,
+  ])
+  let ids : Map[String, Bool] = Map([])
+  for obj in objects {
+    ids[obj.id.to_hex()] = true
+  }
+  assert_true(ids.contains(tip.to_hex()))
+  assert_true(!ids.contains(boundary.to_hex()))
+}
+
+///|
+test "collect_reachable_objects: stops at a shallow boundary commit" {
+  let fs = @bit.TestFs::new()
+  init_repo(fs, "/repo") catch {
+    _ => ()
+  }
+  fs.write_file("/repo/base.txt", b"base")
+  add_paths(fs, fs, "/repo", ["."])
+  let base = commit(fs, fs, "/repo", "base", "test <test@test.com>", 1000L)
+  fs.write_file("/repo/boundary.txt", b"boundary")
+  add_paths(fs, fs, "/repo", ["."])
+  let boundary = commit(
+    fs, fs, "/repo", "boundary", "test <test@test.com>", 2000L,
+  )
+  drop_loose_object(fs, "/repo/.git", base)
+  let db = ObjectDb::load(fs, "/repo/.git")
+
+  // Without the boundary the walk reaches the absent parent and fails.
+  let mut failed = false
+  (collect_reachable_objects(db, fs, boundary) |> ignore) catch {
+    _ => failed = true
+  }
+  assert_true(failed)
+
+  // Declaring the boundary grafts the history closed, as git's shallow file does.
+  let objects = collect_reachable_objects(db, fs, boundary, shallow=[boundary])
+  let ids : Map[String, Bool] = Map([])
+  for obj in objects {
+    ids[obj.id.to_hex()] = true
+  }
+  assert_true(ids.contains(boundary.to_hex()))
+  assert_true(!ids.contains(base.to_hex()))
+}
+
+///|
+test "advertised_have_ids: drops zero and duplicate ids" {
+  let first = @bit.ObjectId::from_hex(
+    "1111111111111111111111111111111111111111",
+  )
+  let second = @bit.ObjectId::from_hex(
+    "2222222222222222222222222222222222222222",
+  )
+  let haves = advertised_have_ids([
+    (first, "HEAD"),
+    (first, "refs/heads/main"),
+    (@bit.ObjectId::zero(), "refs/heads/empty"),
+    (second, "refs/heads/topic"),
+  ])
+  assert_eq(haves.length(), 2)
+  assert_eq(haves[0].to_hex(), first.to_hex())
+  assert_eq(haves[1].to_hex(), second.to_hex())
+}

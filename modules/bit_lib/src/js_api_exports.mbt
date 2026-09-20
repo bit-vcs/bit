@@ -2579,7 +2579,7 @@ pub async fn js_clone_remote(
       }
       Some((refname, commit_id)) => {
         if wants.length() > 0 {
-          let pack = @bitnative.fetch_pack_with_http(
+          let result = @bitnative.fetch_pack_with_http_result(
             remote_url,
             wants,
             prefer_v2,
@@ -2599,6 +2599,7 @@ pub async fn js_clone_remote(
               js_transport_post(transport_id, url, body, headers)
             },
           )
+          let pack = result.pack
           let objects = @pack.parse_packfile(pack)
           let git_dir = join_path(root, ".git")
           @bit.FileSystem::mkdir_p(fs, join_path(git_dir, "objects/pack"))
@@ -2606,6 +2607,16 @@ pub async fn js_clone_remote(
           let store = @bit.ObjectStore::from_pack(objects)
           @bit.materialize_clone_to_fs(
             store, commit_id, refname, remote_url, fs, root, fs,
+          )
+          // Record the history boundary so later walks (push in particular)
+          // know the parents of these commits were never fetched. The server
+          // reports it for a `depth` request and for an already-shallow repo.
+          @repo.apply_shallow_updates(
+            fs,
+            fs,
+            js_resolve_git_dir(fs, root),
+            result.shallow,
+            result.unshallow,
           )
         } else {
           init_repo(
@@ -2680,7 +2691,7 @@ pub async fn js_fetch_remote(
     match js_select_fetch_target(refs, symrefs, refspec) {
       None => { status: "empty", commit_id: "", refname: "", remote_ref: "" }
       Some((refname, commit_id)) => {
-        let pack = @bitnative.fetch_pack_with_http(
+        let result = @bitnative.fetch_pack_with_http_result(
           remote_url,
           [commit_id],
           prefer_v2,
@@ -2699,10 +2710,19 @@ pub async fn js_fetch_remote(
           ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
             js_transport_post(transport_id, url, body, headers)
           },
+          shallow=@repo.read_shallow_boundaries(fs, git_dir),
         )
+        let pack = result.pack
         let objects = @pack.parse_packfile(pack)
         @bit.FileSystem::mkdir_p(fs, join_path(git_dir, "objects/pack"))
         @pack.write_packfile_with_index(fs, git_dir, pack, objects)
+        @repo.apply_shallow_updates(
+          fs,
+          fs,
+          git_dir,
+          result.shallow,
+          result.unshallow,
+        )
         let remote_ref = js_remote_tracking_refname(refname)
         let remote_ref_path = join_path(git_dir, remote_ref)
         @bit.FileSystem::mkdir_p(fs, rebase_parent_dir(remote_ref_path))
@@ -2769,9 +2789,11 @@ pub async fn js_push_remote(
       js_normalize_push_refname(refname)
     }
     let db = ObjectDb::load(fs, git_dir)
-    let objects = collect_reachable_objects(db, fs, head_id)
-    let pack = @pack.create_packfile(objects)
     let remote = @protocol.Remote::new(remote_url)
+    // Discover before collecting: the refs the receiver advertises bound the
+    // walk. Packing HEAD's full history first both sends objects the remote
+    // already has and fails outright when this clone (or the remote itself)
+    // is shallow, because the advertised tip's parents are not local.
     let (refs, _caps) = @protocol.discover_refs_with_http(remote, async fn(
       url : String,
       headers : Map[String, String],
@@ -2786,6 +2808,14 @@ pub async fn js_push_remote(
         )
       }
     }
+    let objects = collect_reachable_objects_excluding_commits(
+      db,
+      fs,
+      [head_id],
+      advertised_have_ids(refs),
+      shallow=@repo.read_shallow_boundaries(fs, git_dir),
+    )
+    let pack = @pack.create_packfile(objects)
     let req = @protocol.PushRequest::new(old_id, head_id, target_ref, pack)
     @protocol.push_with_http(
       remote,
