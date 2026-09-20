@@ -21,6 +21,11 @@ init_repo() {
 	(
 		cd "$repo_dir"
 		git init -q
+		# Pin the branch rather than inheriting the host's default. Tests built
+		# on this fixture name `main`, and git still defaults to `master` where
+		# init.defaultBranch is unset. Setting HEAD while it is unborn works on
+		# every git version, unlike `git init -b`.
+		git symbolic-ref HEAD refs/heads/main
 		git config user.email "fixture@example.com"
 		git config user.name "Fixture User"
 		printf "%s\n" "$file_content" > "$file_name"
