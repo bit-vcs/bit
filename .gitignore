@@ -42,6 +42,9 @@ t/shim.log
 t/t0022-shim-random.sh
 t/tmptrace/
 t/trace
+# t/test-lib.sh keeps the trash directory when a test fails, so these linger
+# after every red run.
+t/trash-directory.*
 tmp/
 goodbye.ts
 version.ts
