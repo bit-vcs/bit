@@ -1,0 +1,61 @@
+name: t9 Suite
+
+# The t/ integration tests had no CI job at all: ci.yml's `select` skips its
+# jobs for a diff that only touches t/, and nothing invoked the test-subdir
+# task. That blind spot let t9014, t90010 and a t9007 assertion sit broken for
+# months. This workflow is deliberately ungated — it runs on every pull
+# request, like js-build.yml — so the suite cannot go dark again.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  t9-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # t9020 and t9021 stand up a smart HTTP server with tools/http-test-server.js.
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Install pkfire
+        uses: mizchi/pkfire@v0.12.1
+        with:
+          version: 0.12.1
+      - name: Install pkspec
+        uses: mizchi/pkspec@v0.4.1
+        with:
+          version: 0.4.1
+          pkl-version: none
+
+      - name: Install MoonBit CLI
+        uses: ./.github/actions/setup-moonbit
+
+      - name: Moon update
+        run: moon update
+
+      # t/test-lib.sh sets no identity of its own, and several tests commit
+      # without configuring one per repository, so they rely on a global it
+      # never establishes. Without this the suite dies on "unable to
+      # auto-detect email address".
+      - name: Configure git identity
+        run: |
+          git config --global user.name "Bit Test"
+          git config --global user.email "test@example.com"
+
+      # Builds the release binary at the path t/test-lib.sh looks for, via the
+      # test-subdir task's build dependency.
+      - name: Run t9 suite
+        run: pkf run test-subdir

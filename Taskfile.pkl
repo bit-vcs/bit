@@ -332,12 +332,12 @@ local e2e: Task = new {
 
 local testSubdir: Task = new {
   name = "test-subdir"
-  description = "subdir-clone/push and transport integration tests (t/ directory)"
-  // The filter is a substring match, so `t900` alone silently skips t902x.
-  cmd = #"""
-    bash t/run-tests.sh t900
-    bash t/run-tests.sh t902
-    """#
+  description = "t9 integration tests: subdir clone/push, workspace, transports"
+  // The filter is a substring match, so `t9` covers the whole t9 range in one
+  // pass — `t900` alone skipped t9011-t9021, which is how several of these
+  // tests stayed broken unnoticed.
+  cmd = "bash t/run-tests.sh t9"
+  deps { build }
 }
 
 local testDistributed: Task = new {
