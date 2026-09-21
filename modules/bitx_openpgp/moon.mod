@@ -1,6 +1,6 @@
 name = "mizchi/bitx_openpgp"
 
-version = "0.47.0"
+version = "0.48.0"
 
 import {
   "mizchi/experimental_crypto@0.0.2",

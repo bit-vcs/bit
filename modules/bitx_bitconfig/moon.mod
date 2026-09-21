@@ -1,6 +1,6 @@
 name = "mizchi/bitx_bitconfig"
 
-version = "0.47.0"
+version = "0.48.0"
 
 import {
   "bobzhang/toml@0.4.3",
