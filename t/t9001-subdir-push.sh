@@ -11,7 +11,9 @@ TEST_DIRECTORY=$(cd "$(dirname "$0")" && pwd)
 # Setup: create upstream repository
 test_expect_success 'setup: create upstream repository' '
 	mkdir -p upstream &&
-	(cd upstream && git init --bare)
+	(cd upstream &&
+	 git init --bare &&
+	 git symbolic-ref HEAD refs/heads/main)
 '
 
 test_expect_success 'setup: create working clone' '

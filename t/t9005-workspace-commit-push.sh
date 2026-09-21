@@ -10,7 +10,9 @@ TEST_DIRECTORY=$(cd "$(dirname "$0")" && pwd)
 
 test_expect_success 'setup: create upstream bare repository and working clone' '
 	mkdir upstream.git &&
-	(cd upstream.git && git init --bare) &&
+	(cd upstream.git &&
+	 git init --bare &&
+	 git symbolic-ref HEAD refs/heads/main) &&
 	git clone upstream.git work &&
 	(cd work &&
 	 git config user.email "test@example.com" &&
