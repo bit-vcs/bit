@@ -5,7 +5,7 @@ This directory contains shell-based integration tests for bit, following the Git
 ## Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (this is what the t-suite CI job runs, via `pkf run test-t`)
 ./t/run-tests.sh
 
 # Run legacy e2e subset (t00xx)

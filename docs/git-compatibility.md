@@ -175,7 +175,7 @@ Full upstream run (`pkf run git-t`) summary on macOS (2026-02-07):
 - `pkf run check`: pass
 - `pkf run test`: pass (`js/lib 215 pass`, `native 811 pass`)
 - `pkf run e2e` (`t/run-tests.sh t00`): pass
-- `pkf run test-subdir` (`t/run-tests.sh t900`): pass
+- `pkf run test-t` (`t/run-tests.sh`, all 63 files): pass
 - `pkf run git-t-allowlist`: pass (`success 24,279 / failed 0 / broken 177`)
 
 ## Performance Snapshot (2026-02-12)

@@ -330,13 +330,13 @@ local e2e: Task = new {
   cmd = "bash e2e/run-tests.sh"
 }
 
-local testSubdir: Task = new {
-  name = "test-subdir"
-  description = "t9 integration tests: subdir clone/push, workspace, transports"
-  // The filter is a substring match, so `t9` covers the whole t9 range in one
-  // pass — `t900` alone skipped t9011-t9021, which is how several of these
-  // tests stayed broken unnoticed.
-  cmd = "bash t/run-tests.sh t9"
+local testT: Task = new {
+  name = "test-t"
+  description = "All t/ integration tests (t0 core, t1/t3/t7, t9 subdir/workspace/transport)"
+  // No filter: every t/ range runs. A filter is how these tests went dark
+  // before — `t900` skipped t9011-t9021, and widening it to `t9` still left
+  // the 30 t0xxx files with no CI job at all.
+  cmd = "bash t/run-tests.sh"
   deps { build }
 }
 
@@ -717,7 +717,7 @@ tasks {
   buildPagesDemo
 
   e2e
-  testSubdir
+  testT
   testDistributed
   testAi
 

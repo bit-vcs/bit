@@ -1,10 +1,13 @@
-name: t9 Suite
+name: t Suite
 
 # The t/ integration tests had no CI job at all: ci.yml's `select` skips its
-# jobs for a diff that only touches t/, and nothing invoked the test-subdir
-# task. That blind spot let t9014, t90010 and a t9007 assertion sit broken for
+# jobs for a diff that only touches t/, and nothing invoked the task that runs
+# them. That blind spot let t9014, t90010 and a t9007 assertion sit broken for
 # months. This workflow is deliberately ungated — it runs on every pull
 # request, like js-build.yml — so the suite cannot go dark again.
+#
+# It runs the whole t/ tree, not one range: t0xxx went uncovered for the same
+# structural reason t9 did, and a filter here is exactly how that happens.
 
 on:
   push:
@@ -17,7 +20,7 @@ permissions:
   contents: read
 
 jobs:
-  t9-suite:
+  t-suite:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -46,16 +49,12 @@ jobs:
       - name: Moon update
         run: moon update
 
-      # t/test-lib.sh sets no identity of its own, and several tests commit
-      # without configuring one per repository, so they rely on a global it
-      # never establishes. Without this the suite dies on "unable to
-      # auto-detect email address".
-      - name: Configure git identity
-        run: |
-          git config --global user.name "Bit Test"
-          git config --global user.email "test@example.com"
+      # No `git config --global user.name/user.email` step: t/test-lib.sh and
+      # t/test-lib-e2e.sh each point HOME at their own trash directory and
+      # establish an identity of their own, so the suite no longer depends on
+      # the runner's git configuration.
 
-      # Builds the release binary at the path t/test-lib.sh looks for, via the
-      # test-subdir task's build dependency.
-      - name: Run t9 suite
-        run: pkf run test-subdir
+      # Builds the release binary at the path the test libs look for, via the
+      # test-t task's build dependency.
+      - name: Run t/ suite
+        run: pkf run test-t
