@@ -33,13 +33,14 @@ test_expect_success 'repo status bypasses workspace translation at workspace roo
 	! grep "workspace root:" nested-repo-status.out
 '
 
-test_expect_success 'repo status from deep nested path fails as plain repo command' '
-	if $BIT -C nested/a/b/c repo status > nested-repo-nested.out 2>&1; then
-	  false
-	else
-	  true
-	fi &&
-	grep "Not a git repository" nested-repo-nested.out
+# The escape hatch has to work at any depth, not only at the workspace root:
+# `bit repo <cmd>` means "skip the implicit translation and run the regular
+# command", and a regular command finds its repository by walking up, exactly
+# as git does from a subdirectory.
+test_expect_success 'repo status from deep nested path also bypasses workspace translation' '
+	$BIT -C nested/a/b/c repo status > nested-repo-nested.out 2>&1 &&
+	grep "On branch" nested-repo-nested.out &&
+	! grep "workspace root:" nested-repo-nested.out
 '
 
 test_expect_success 'implicit commit from workspace root performs workspace commit' '
