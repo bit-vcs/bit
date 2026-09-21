@@ -49,6 +49,25 @@ rm -rf "$TRASH_DIRECTORY"
 mkdir -p "$TRASH_DIRECTORY"
 cd "$TRASH_DIRECTORY" || exit 1
 
+# Give the suite its own git identity instead of borrowing whoever is running
+# it. Several tests commit without configuring one per repository, so on a
+# machine with no global identity — a fresh runner, a container — they died
+# with "unable to auto-detect email address".
+#
+# This writes a global config under a private HOME rather than exporting
+# GIT_AUTHOR_* / GIT_COMMITTER_*: those env vars outrank repository config,
+# and would silently override the many tests that set `git config user.email`
+# in their own repositories. A global file keeps the normal precedence, so a
+# per-repository setting still wins. Pointing HOME here also stops the
+# developer's real ~/.gitconfig from leaking into a run.
+HOME="$TRASH_DIRECTORY"
+export HOME
+cat >"$TRASH_DIRECTORY/.gitconfig" <<-EOF
+	[user]
+		name = Bit Test
+		email = test@example.com
+EOF
+
 # Cleanup on exit
 cleanup() {
 	cd "$TEST_DIRECTORY" || exit 1
