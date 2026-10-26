@@ -39,5 +39,6 @@ options(
     "upload_pack_process_wbtest.mbt": [ "native" ],
     "upload_pack_remote_native.mbt": [ "native" ],
     "worktree_probe_native.mbt": [ "native" ],
+    "worktree_probe_native_wbtest.mbt": [ "native" ],
   },
 )

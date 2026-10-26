@@ -1,9 +1,6 @@
 #include <stdint.h>
 #include <string.h>
-
-#ifndef MOONBIT_FFI_EXPORT
-#define MOONBIT_FFI_EXPORT __attribute__((visibility("default")))
-#endif
+#include <moonbit.h>
 
 /* Bounds are checked by apply_delta before this helper is called. */
 MOONBIT_FFI_EXPORT void bit_pack_copy_delta_bytes(

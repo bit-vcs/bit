@@ -1,6 +1,10 @@
+#ifndef _WIN32
 #include <dirent.h>
+#endif
 #include <stdint.h>
 #include <string.h>
+#include <moonbit.h>
+#include "windows_path.h"
 
 /*
  * bit_readdir: list directory entries with d_type (no stat needed).
@@ -13,7 +17,48 @@
  * Returns total bytes written on success (>= 0), -1 on failure.
  * Only complete entries are written; partial entries are never included.
  */
-int bit_readdir(const char *path, uint8_t *buf, int buf_size) {
+MOONBIT_FFI_EXPORT int bit_readdir(const char *path, uint8_t *buf, int buf_size) {
+#ifdef _WIN32
+  wchar_t *wide = bit_windows_path(path);
+  if (wide == NULL) return -1;
+  size_t length = wcslen(wide);
+  wchar_t *pattern = (wchar_t *)malloc((length + 3) * sizeof(wchar_t));
+  if (pattern == NULL) { free(wide); return -1; }
+  memcpy(pattern, wide, length * sizeof(wchar_t));
+  free(wide);
+  if (length > 0 && pattern[length - 1] != L'/' && pattern[length - 1] != L'\\') {
+    pattern[length++] = L'\\';
+  }
+  pattern[length++] = L'*';
+  pattern[length] = 0;
+  WIN32_FIND_DATAW entry;
+  HANDLE handle = FindFirstFileW(pattern, &entry);
+  free(pattern);
+  if (handle == INVALID_HANDLE_VALUE) return -1;
+  int pos = 0;
+  do {
+    if (wcscmp(entry.cFileName, L".") == 0 || wcscmp(entry.cFileName, L"..") == 0) continue;
+    int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, entry.cFileName,
+        -1, NULL, 0, NULL, NULL);
+    if (length == 0) { FindClose(handle); return -1; }
+    int name_len = length - 1;
+    if (name_len + 3 > buf_size - pos) break;
+    /* Exclude the UTF-8 terminator from the packed entry. */
+    if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, entry.cFileName,
+        (int)wcslen(entry.cFileName), (char *)buf + pos + 3, name_len, NULL, NULL) == 0) {
+      FindClose(handle);
+      return -1;
+    }
+    buf[pos] = (uint8_t)(name_len & 0xff);
+    buf[pos + 1] = (uint8_t)(name_len >> 8);
+    buf[pos + 2] = (entry.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
+        (entry.dwReserved0 == IO_REPARSE_TAG_SYMLINK || entry.dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT)
+        ? 10 : (entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? 4 : 8;
+    pos += name_len + 3;
+  } while (FindNextFileW(handle, &entry));
+  FindClose(handle);
+  return pos;
+#else
   DIR *d = opendir(path);
   if (!d) {
     return -1;
@@ -44,4 +89,5 @@ int bit_readdir(const char *path, uint8_t *buf, int buf_size) {
 
   closedir(d);
   return pos;
+#endif
 }

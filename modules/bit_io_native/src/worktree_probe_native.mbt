@@ -145,7 +145,7 @@ fn native_string_to_cstring(path : String) -> Bytes {
 
 ///|
 #borrow(path_buf, buf)
-extern "c" fn readlink(path_buf : Bytes, buf : Bytes, size : Int) -> Int = "readlink"
+extern "c" fn readlink(path_buf : Bytes, buf : Bytes, size : Int) -> Int = "bit_readlink"
 
 ///|
 #borrow(path_buf, buf)
