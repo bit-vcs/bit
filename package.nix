@@ -3,28 +3,21 @@
   git,
   autoPatchelfHook,
   stdenv,
-  writeText,
-  moonPlatform,
+  callPackage,
+  moonbit,
   moonRegistryIndex,
 }:
 let
   bitMod = (import ./nix/parse-moon-mod.nix { inherit lib; }) ./modules/bit/moon.mod;
-  # buildCachedRegistry reads moon.mod.json to know which packages to fetch
-  # from mooncakes.io. Workspace-local deps (mizchi/bit_* and mizchi/bitx_*)
-  # aren't published there, so drop them and keep only registry deps.
+  # Only registry deps need caching. Workspace-local deps (mizchi/bit_* and
+  # mizchi/bitx_*) aren't published to mooncakes.io, so drop them.
   registryOnlyDeps = lib.filterAttrs (
     name: _: !(lib.hasPrefix "mizchi/bit_" name || lib.hasPrefix "mizchi/bitx_" name)
   ) bitMod.deps;
-  registryOnlyMod = bitMod // {
-    deps = registryOnlyDeps;
-  };
-  registryOnlyModFile = writeText "moon.mod.json" (builtins.toJSON registryOnlyMod);
 
-  moonHome = moonPlatform.bundleWithRegistry {
-    cachedRegistry = moonPlatform.buildCachedRegistry {
-      moonModJson = registryOnlyModFile;
-      registryIndexSrc = moonRegistryIndex;
-    };
+  registry = callPackage ./nix/moon-registry.nix { } {
+    registryIndexSrc = moonRegistryIndex;
+    deps = registryOnlyDeps;
   };
 in
 stdenv.mkDerivation {
@@ -33,13 +26,17 @@ stdenv.mkDerivation {
 
   src = lib.cleanSource ./.;
 
-  nativeBuildInputs = [ moonHome ] ++ lib.optionals stdenv.isLinux [ autoPatchelfHook ];
+  nativeBuildInputs = [ moonbit ] ++ lib.optionals stdenv.isLinux [ autoPatchelfHook ];
   propagatedBuildInputs = [ git ];
 
   configurePhase = ''
     runHook preConfigure
-    export MOON_HOME=${moonHome}
     export HOME=$TMPDIR
+    # The toolchain locates itself via MOON_TOOLCHAIN_ROOT, so MOON_HOME only
+    # holds the registry. moon writes to it, hence the writable copy.
+    export MOON_HOME=$TMPDIR/moon-home
+    mkdir -p $MOON_HOME
+    cp -r --no-preserve=mode ${registry}/registry $MOON_HOME/
     runHook postConfigure
   '';
 

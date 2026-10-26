@@ -31,6 +31,7 @@
       flake = {
         overlays.default = _final: prev: {
           bit = prev.callPackage ./package.nix {
+            moonbit = inputs.moonbit-overlay.packages.${prev.stdenv.hostPlatform.system}.latest;
             moonRegistryIndex = inputs.moon-registry;
           };
         };
@@ -45,25 +46,11 @@
             config.allowBroken = true;
           };
 
+          moonbit = pkgs.moonbit-bin.latest;
+
           bit = pkgs.callPackage ./package.nix {
+            inherit moonbit;
             moonRegistryIndex = inputs.moon-registry;
-          };
-
-          # Strip workspace-local deps so buildCachedRegistry only resolves
-          # packages that actually exist on mooncakes.io.
-          bitMod = (import ./nix/parse-moon-mod.nix { inherit (pkgs) lib; }) ./modules/bit/moon.mod;
-          registryOnlyMod = bitMod // {
-            deps = pkgs.lib.filterAttrs (
-              name: _: !(pkgs.lib.hasPrefix "mizchi/bit_" name || pkgs.lib.hasPrefix "mizchi/bitx_" name)
-            ) bitMod.deps;
-          };
-          registryOnlyModFile = pkgs.writeText "moon.mod.json" (builtins.toJSON registryOnlyMod);
-
-          moonHome = pkgs.moonPlatform.bundleWithRegistry {
-            cachedRegistry = pkgs.moonPlatform.buildCachedRegistry {
-              moonModJson = registryOnlyModFile;
-              registryIndexSrc = inputs.moon-registry;
-            };
           };
 
           pkfire = inputs.pkfire.packages.${system}.default;
@@ -96,14 +83,13 @@
 
           devShells.default = pkgs.mkShellNoCC {
             packages = [
-              moonHome
+              moonbit
               pkgs.git
               pkgs.pnpm
               pkgs.nodejs
               pkfire
               pkspec
             ];
-            env.MOON_HOME = "${moonHome}";
           };
         };
     };
