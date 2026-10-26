@@ -14,7 +14,7 @@ pub fn expand_home(String) -> String
 
 pub fn expand_home_with(String, String) -> String
 
-pub fn hq_get(RepoPath, HqConfig, HqGetOptions, (String) -> (Int, String, String), (String) -> Bool) -> HqGetResult
+pub fn hq_get(RepoPath, HqConfig, HqGetOptions, (String) -> (Int32, String, String), (String) -> Bool) -> HqGetResult
 
 pub fn hq_list(HqConfig, String?, (String) -> Array[(String, Bool)], (String) -> Bool) -> Array[String]
 
@@ -42,13 +42,13 @@ pub fn HqConfig::new(String, ghq_compat? : Bool) -> Self
 pub struct HqGetOptions {
   update : Bool
   shallow : Bool
-  depth : Int
+  depth : Int32
   ssh : Bool
   branch : String?
   unshallow : Bool
 }
 pub fn HqGetOptions::default() -> Self
-pub fn HqGetOptions::new(update? : Bool, shallow? : Bool, depth? : Int, ssh? : Bool, branch? : String?, unshallow? : Bool) -> Self
+pub fn HqGetOptions::new(update? : Bool, shallow? : Bool, depth? : Int32, ssh? : Bool, branch? : String?, unshallow? : Bool) -> Self
 
 pub(all) enum HqGetResult {
   Cloned(String)
@@ -56,6 +56,11 @@ pub(all) enum HqGetResult {
   Skipped(String)
   Error(String)
 } derive(Eq, @debug.Debug)
+pub fn HqGetResult::equal(Self, Self) -> Bool
+pub fn HqGetResult::not_equal(Self, Self) -> Bool
+pub fn HqGetResult::output(Self, &Logger) -> Unit
+pub fn HqGetResult::to_repr(Self) -> @debug.Repr
+pub fn HqGetResult::to_string(Self) -> String
 pub impl Show for HqGetResult
 
 pub struct RepoPath {
@@ -65,14 +70,18 @@ pub struct RepoPath {
   subdir : String?
 } derive(Eq, @debug.Debug)
 pub fn RepoPath::clone_url(Self, ssh? : Bool) -> String
+pub fn RepoPath::equal(Self, Self) -> Bool
 pub fn RepoPath::full_name(Self) -> String
 pub fn RepoPath::host_name(Self) -> String
 pub fn RepoPath::local_path(Self, String) -> String
 pub fn RepoPath::needs_sparse(Self) -> Bool
 pub fn RepoPath::new(String, String, host? : String?, subdir? : String?) -> Self
+pub fn RepoPath::not_equal(Self, Self) -> Bool
+pub fn RepoPath::output(Self, &Logger) -> Unit
+pub fn RepoPath::to_repr(Self) -> @debug.Repr
+pub fn RepoPath::to_string(Self) -> String
 pub impl Show for RepoPath
 
 // Type aliases
 
 // Traits
-

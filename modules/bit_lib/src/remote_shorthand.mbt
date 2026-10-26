@@ -8,6 +8,12 @@ pub(all) enum GitHubShorthand {
 } derive(Eq, Debug)
 
 ///|
+pub extend GitHubShorthand with Eq::{not_equal, equal}
+
+///|
+pub extend GitHubShorthand with Debug::{to_repr}
+
+///|
 fn bitcore_shorthand_show_string(value : String) -> String {
   let buf = StringBuilder()
   buf.write_char('"')
@@ -69,6 +75,9 @@ pub impl Show for GitHubShorthand with fn output(self, logger) {
       )
   }
 }
+
+///|
+pub extend GitHubShorthand with Show::{to_string, output}
 
 ///|
 fn from_remote_shorthand(value : @bitremote.GitHubShorthand) -> GitHubShorthand {

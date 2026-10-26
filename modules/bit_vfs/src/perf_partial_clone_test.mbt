@@ -45,7 +45,7 @@ test "perf: partial clone access pattern verification" {
   println("  - Parsing HEAD reference only")
   println("  - No pack file parsing yet")
   println("  - No network activity")
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
   println(
     "  → Mounted: lazy=\{bitfs.is_lazy()}, promisor=\{bitfs.is_promisor_enabled()}",
   )
@@ -150,7 +150,7 @@ test "perf: verify lazy vs eager difference" {
   println("Lazy Mode (default):")
   println("  - Pack index: parsed on-demand")
   println("  - Objects: resolved when accessed")
-  let bitfs_lazy = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs_lazy = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
   println("  → is_lazy: \{bitfs_lazy.is_lazy()}")
   let entries_lazy = bitfs_lazy.readdir(osfs, "")
   println("  → readdir works: \{entries_lazy.length()} entries")

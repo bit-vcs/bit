@@ -45,4 +45,3 @@ pub fn write_tree_from_index(&@bit_types.FileSystem, &@bit_types.RepoFileSystem,
 // Type aliases
 
 // Traits
-

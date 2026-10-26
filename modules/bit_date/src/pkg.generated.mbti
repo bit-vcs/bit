@@ -2,11 +2,11 @@
 package "mizchi/bit_date"
 
 // Values
-pub fn date_is_leap_year(Int) -> Bool
+pub fn date_is_leap_year(Int32) -> Bool
 
-pub fn days_since_epoch(Int, Int, Int) -> Int
+pub fn days_since_epoch(Int32, Int32, Int32) -> Int32
 
-pub fn month_name_to_number(String) -> Int?
+pub fn month_name_to_number(String) -> Int32?
 
 pub fn parse_approxidate(String, Int64) -> Int64?
 
@@ -20,9 +20,9 @@ pub fn parse_approxidate_iso_date(String) -> Int64?
 
 pub fn parse_approxidate_relative(String, Int64) -> Int64?
 
-pub fn parse_date_digits(Array[Char], Int, Int) -> Int
+pub fn parse_date_digits(Array[Char], Int32, Int32) -> Int32
 
-pub fn parse_int_from_string(String) -> Int
+pub fn parse_int_from_string(String) -> Int32
 
 // Errors
 
@@ -31,4 +31,3 @@ pub fn parse_int_from_string(String) -> Int
 // Type aliases
 
 // Traits
-

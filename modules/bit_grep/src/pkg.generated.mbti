@@ -24,15 +24,15 @@ pub fn grep_patterns_first_match_span(String, Array[String], GrepPatternType, Bo
 
 pub fn grep_patterns_match_message(String, Array[String], GrepPatternType, Bool) -> Bool
 
-pub fn list_index_candidate_paths(&@bit_types.RepoFileSystem, String, Array[String], max_depth? : Int) -> Array[String] raise @bit_object.GitError
+pub fn list_index_candidate_paths(&@bit_types.RepoFileSystem, String, Array[String], max_depth? : Int32) -> Array[String] raise @bit_object.GitError
 
-pub fn list_plain_worktree_candidate_paths(&@bit_types.RepoFileSystem, String, Array[String], max_depth? : Int, exclude_standard? : Bool) -> Array[String] raise @bit_object.GitError
+pub fn list_plain_worktree_candidate_paths(&@bit_types.RepoFileSystem, String, Array[String], max_depth? : Int32, exclude_standard? : Bool) -> Array[String] raise @bit_object.GitError
 
-pub fn list_tracked_worktree_candidate_paths(&@bit_types.RepoFileSystem, String, Array[String], max_depth? : Int) -> Array[String] raise @bit_object.GitError
+pub fn list_tracked_worktree_candidate_paths(&@bit_types.RepoFileSystem, String, Array[String], max_depth? : Int32) -> Array[String] raise @bit_object.GitError
 
-pub fn list_treeish_candidate_paths(&@bit_types.RepoFileSystem, String, String, Array[String], max_depth? : Int) -> Array[String] raise @bit_object.GitError
+pub fn list_treeish_candidate_paths(&@bit_types.RepoFileSystem, String, String, Array[String], max_depth? : Int32) -> Array[String] raise @bit_object.GitError
 
-pub fn list_untracked_worktree_candidate_paths(&@bit_types.RepoFileSystem, String, String, Array[String], max_depth? : Int) -> Array[String] raise @bit_object.GitError
+pub fn list_untracked_worktree_candidate_paths(&@bit_types.RepoFileSystem, String, String, Array[String], max_depth? : Int32) -> Array[String] raise @bit_object.GitError
 
 pub fn parse_grep_expr(Array[GrepExprToken]) -> GrepExpr raise @bit_object.GitError
 
@@ -40,21 +40,21 @@ pub fn parse_grep_pattern_type_name(String) -> GrepPatternType
 
 pub fn resolve_grep_pattern_type(&@bit_types.RepoFileSystem, String, GrepPatternType?, String?) -> GrepPatternType
 
-pub fn search_index(&@bit_types.RepoFileSystem, String, Array[String], Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @bit_object.GitError
+pub fn search_index(&@bit_types.RepoFileSystem, String, Array[String], Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int32) -> Array[GrepFileMatch] raise @bit_object.GitError
 
-pub fn search_index_expr(&@bit_types.RepoFileSystem, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @bit_object.GitError
+pub fn search_index_expr(&@bit_types.RepoFileSystem, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int32) -> Array[GrepFileMatch] raise @bit_object.GitError
 
-pub fn search_plain_worktree_expr(&@bit_types.RepoFileSystem, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int, exclude_standard? : Bool) -> Array[GrepFileMatch] raise @bit_object.GitError
+pub fn search_plain_worktree_expr(&@bit_types.RepoFileSystem, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int32, exclude_standard? : Bool) -> Array[GrepFileMatch] raise @bit_object.GitError
 
-pub fn search_tracked_worktree(&@bit_types.RepoFileSystem, String, String, Array[String], Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @bit_object.GitError
+pub fn search_tracked_worktree(&@bit_types.RepoFileSystem, String, String, Array[String], Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int32) -> Array[GrepFileMatch] raise @bit_object.GitError
 
-pub fn search_tracked_worktree_expr(&@bit_types.RepoFileSystem, String, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @bit_object.GitError
+pub fn search_tracked_worktree_expr(&@bit_types.RepoFileSystem, String, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int32) -> Array[GrepFileMatch] raise @bit_object.GitError
 
-pub fn search_treeish(&@bit_types.RepoFileSystem, String, String, Array[String], Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @bit_object.GitError
+pub fn search_treeish(&@bit_types.RepoFileSystem, String, String, Array[String], Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int32) -> Array[GrepFileMatch] raise @bit_object.GitError
 
-pub fn search_treeish_expr(&@bit_types.RepoFileSystem, String, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @bit_object.GitError
+pub fn search_treeish_expr(&@bit_types.RepoFileSystem, String, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int32) -> Array[GrepFileMatch] raise @bit_object.GitError
 
-pub fn search_untracked_worktree_expr(&@bit_types.RepoFileSystem, String, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @bit_object.GitError
+pub fn search_untracked_worktree_expr(&@bit_types.RepoFileSystem, String, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int32) -> Array[GrepFileMatch] raise @bit_object.GitError
 
 pub fn validate_grep_expr(GrepExpr, GrepPatternType) -> Unit raise @bit_object.GitError
 
@@ -69,12 +69,22 @@ pub(all) enum GrepExpr {
   Or(GrepExpr, GrepExpr)
   Not(GrepExpr)
 } derive(Eq, @debug.Debug)
+pub fn GrepExpr::equal(Self, Self) -> Bool
+pub fn GrepExpr::not_equal(Self, Self) -> Bool
+pub fn GrepExpr::output(Self, &Logger) -> Unit
+pub fn GrepExpr::to_repr(Self) -> @debug.Repr
+pub fn GrepExpr::to_string(Self) -> String
 pub impl Show for GrepExpr
 
 pub(all) struct GrepExprMatch {
   matched : Bool
   span : GrepMatchSpan?
 } derive(Eq, @debug.Debug)
+pub fn GrepExprMatch::equal(Self, Self) -> Bool
+pub fn GrepExprMatch::not_equal(Self, Self) -> Bool
+pub fn GrepExprMatch::output(Self, &Logger) -> Unit
+pub fn GrepExprMatch::to_repr(Self) -> @debug.Repr
+pub fn GrepExprMatch::to_string(Self) -> String
 pub impl Show for GrepExprMatch
 
 pub(all) enum GrepExprToken {
@@ -85,25 +95,45 @@ pub(all) enum GrepExprToken {
   LParen
   RParen
 } derive(Eq, @debug.Debug)
+pub fn GrepExprToken::equal(Self, Self) -> Bool
+pub fn GrepExprToken::not_equal(Self, Self) -> Bool
+pub fn GrepExprToken::output(Self, &Logger) -> Unit
+pub fn GrepExprToken::to_repr(Self) -> @debug.Repr
+pub fn GrepExprToken::to_string(Self) -> String
 pub impl Show for GrepExprToken
 
 pub(all) struct GrepFileMatch {
   path : String
   matches : Array[GrepLineMatch]
 } derive(Eq, @debug.Debug)
+pub fn GrepFileMatch::equal(Self, Self) -> Bool
+pub fn GrepFileMatch::not_equal(Self, Self) -> Bool
+pub fn GrepFileMatch::output(Self, &Logger) -> Unit
+pub fn GrepFileMatch::to_repr(Self) -> @debug.Repr
+pub fn GrepFileMatch::to_string(Self) -> String
 pub impl Show for GrepFileMatch
 
 pub(all) struct GrepLineMatch {
-  line_number : Int
-  column : Int
+  line_number : Int32
+  column : Int32
   line : String
 } derive(Eq, @debug.Debug)
+pub fn GrepLineMatch::equal(Self, Self) -> Bool
+pub fn GrepLineMatch::not_equal(Self, Self) -> Bool
+pub fn GrepLineMatch::output(Self, &Logger) -> Unit
+pub fn GrepLineMatch::to_repr(Self) -> @debug.Repr
+pub fn GrepLineMatch::to_string(Self) -> String
 pub impl Show for GrepLineMatch
 
 pub(all) struct GrepMatchSpan {
-  start_column : Int
-  end_column : Int
+  start_column : Int32
+  end_column : Int32
 } derive(Eq, @debug.Debug)
+pub fn GrepMatchSpan::equal(Self, Self) -> Bool
+pub fn GrepMatchSpan::not_equal(Self, Self) -> Bool
+pub fn GrepMatchSpan::output(Self, &Logger) -> Unit
+pub fn GrepMatchSpan::to_repr(Self) -> @debug.Repr
+pub fn GrepMatchSpan::to_string(Self) -> String
 pub impl Show for GrepMatchSpan
 
 pub(all) enum GrepPatternType {
@@ -112,9 +142,13 @@ pub(all) enum GrepPatternType {
   Extended
   Perl
 } derive(Eq, @debug.Debug)
+pub fn GrepPatternType::equal(Self, Self) -> Bool
+pub fn GrepPatternType::not_equal(Self, Self) -> Bool
+pub fn GrepPatternType::output(Self, &Logger) -> Unit
+pub fn GrepPatternType::to_repr(Self) -> @debug.Repr
+pub fn GrepPatternType::to_string(Self) -> String
 pub impl Show for GrepPatternType
 
 // Type aliases
 
 // Traits
-

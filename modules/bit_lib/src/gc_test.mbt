@@ -5,13 +5,13 @@ fn build_simple_repo(
   fs : @bit.TestFs,
   root : String,
 ) -> (@bit.ObjectId, @bit.ObjectId, @bit.ObjectId) raise @bit.GitError {
-  init_repo(fs, root)
+  @bit_lib.init_repo(fs, root)
   let git_dir = root + "/.git"
   let (blob_id, blob_bytes) = @bit.create_blob_string("hello\n")
-  write_object_bytes(fs, git_dir, blob_id, blob_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, blob_id, blob_bytes)
   let entry = @bit.TreeEntry::new("100644", "hello.txt", blob_id)
   let (tree_id, tree_bytes) = @bit.create_tree([entry])
-  write_object_bytes(fs, git_dir, tree_id, tree_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, tree_id, tree_bytes)
   let commit = @bit.Commit::new(
     tree_id,
     [],
@@ -24,8 +24,8 @@ fn build_simple_repo(
     "test commit\n",
   )
   let (commit_id, commit_bytes) = @bit.create_commit(commit)
-  write_object_bytes(fs, git_dir, commit_id, commit_bytes)
-  update_head_ref(fs, fs, git_dir, commit_id)
+  @bit_lib.write_object_bytes(fs, git_dir, commit_id, commit_bytes)
+  @bit_lib.update_head_ref(fs, fs, git_dir, commit_id)
   (commit_id, tree_id, blob_id)
 }
 
@@ -36,8 +36,8 @@ test "repack_repo writes pack with reachable objects" {
   let git_dir = root + "/.git"
   let _ = build_simple_repo(fs, root)
   let (orphan_id, orphan_bytes) = @bit.create_blob_string("orphan\n")
-  write_object_bytes(fs, git_dir, orphan_id, orphan_bytes)
-  let result = repack_repo(fs, fs, root)
+  @bit_lib.write_object_bytes(fs, git_dir, orphan_id, orphan_bytes)
+  let result = @bit_lib.repack_repo(fs, fs, root)
   match result {
     None => fail("expected pack")
     Some(r) => {
@@ -61,8 +61,8 @@ test "gc_repo reports unreachable objects" {
   let git_dir = root + "/.git"
   let _ = build_simple_repo(fs, root)
   let (orphan_id, orphan_bytes) = @bit.create_blob_string("orphan\n")
-  write_object_bytes(fs, git_dir, orphan_id, orphan_bytes)
-  let result = gc_repo(fs, fs, root)
+  @bit_lib.write_object_bytes(fs, git_dir, orphan_id, orphan_bytes)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   assert_true(result.dangling.length() == 1)
   assert_true(result.dangling[0].to_hex() == orphan_id.to_hex())
   let hex = orphan_id.to_hex()
@@ -96,7 +96,7 @@ test "gc_repo keeps tag and remote refs" {
     "tagged commit\n",
   )
   let (tag_commit_id, tag_commit_bytes) = @bit.create_commit(tag_commit)
-  write_object_bytes(fs, git_dir, tag_commit_id, tag_commit_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, tag_commit_id, tag_commit_bytes)
   fs.mkdir_p(git_dir + "/refs/tags")
   fs.write_string(git_dir + "/refs/tags/v1", tag_commit_id.to_hex() + "\n")
   fs.mkdir_p(git_dir + "/refs/remotes/origin")
@@ -104,7 +104,7 @@ test "gc_repo keeps tag and remote refs" {
     git_dir + "/refs/remotes/origin/main",
     tag_commit_id.to_hex() + "\n",
   )
-  let result = gc_repo(fs, fs, root)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   for id in result.dangling {
     assert_true(id.to_hex() != tag_commit_id.to_hex())
   }
@@ -118,8 +118,8 @@ test "gc_repo skips prune when no refs" {
   let _ = build_simple_repo(fs, root)
   fs.remove_file(git_dir + "/refs/heads/main")
   let (orphan_id, orphan_bytes) = @bit.create_blob_string("orphan\n")
-  write_object_bytes(fs, git_dir, orphan_id, orphan_bytes)
-  let result = gc_repo(fs, fs, root)
+  @bit_lib.write_object_bytes(fs, git_dir, orphan_id, orphan_bytes)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   match result.pack {
     None => ()
     Some(_) => fail("expected no pack")
@@ -142,11 +142,11 @@ test "gc_repo preserves all reachable objects after multiple commits" {
   let (commit1_id, tree1_id, blob1_id) = build_simple_repo(fs, root)
   // Create second commit with different content
   let (blob2_id, blob2_bytes) = @bit.create_blob_string("world\n")
-  write_object_bytes(fs, git_dir, blob2_id, blob2_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, blob2_id, blob2_bytes)
   let entry2 = @bit.TreeEntry::new("100644", "world.txt", blob2_id)
   let entry1 = @bit.TreeEntry::new("100644", "hello.txt", blob1_id)
   let (tree2_id, tree2_bytes) = @bit.create_tree([entry1, entry2])
-  write_object_bytes(fs, git_dir, tree2_id, tree2_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, tree2_id, tree2_bytes)
   let commit2 = @bit.Commit::new(
     tree2_id,
     [commit1_id],
@@ -159,10 +159,10 @@ test "gc_repo preserves all reachable objects after multiple commits" {
     "second commit\n",
   )
   let (commit2_id, commit2_bytes) = @bit.create_commit(commit2)
-  write_object_bytes(fs, git_dir, commit2_id, commit2_bytes)
-  update_head_ref(fs, fs, git_dir, commit2_id)
+  @bit_lib.write_object_bytes(fs, git_dir, commit2_id, commit2_bytes)
+  @bit_lib.update_head_ref(fs, fs, git_dir, commit2_id)
   // Run gc
-  let result = gc_repo(fs, fs, root)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   // All 6 objects should be preserved (2 commits, 2 trees, 2 blobs)
   match result.pack {
     None => fail("expected pack")
@@ -199,10 +199,10 @@ test "gc_repo preserves objects reachable from multiple branches" {
   let (commit1_id, _, _) = build_simple_repo(fs, root)
   // Create a branch with different content
   let (blob2_id, blob2_bytes) = @bit.create_blob_string("feature\n")
-  write_object_bytes(fs, git_dir, blob2_id, blob2_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, blob2_id, blob2_bytes)
   let entry2 = @bit.TreeEntry::new("100644", "feature.txt", blob2_id)
   let (tree2_id, tree2_bytes) = @bit.create_tree([entry2])
-  write_object_bytes(fs, git_dir, tree2_id, tree2_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, tree2_id, tree2_bytes)
   let commit2 = @bit.Commit::new(
     tree2_id,
     [commit1_id],
@@ -215,11 +215,11 @@ test "gc_repo preserves objects reachable from multiple branches" {
     "feature commit\n",
   )
   let (commit2_id, commit2_bytes) = @bit.create_commit(commit2)
-  write_object_bytes(fs, git_dir, commit2_id, commit2_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, commit2_id, commit2_bytes)
   // Create feature branch pointing to commit2
   fs.write_string(git_dir + "/refs/heads/feature", commit2_id.to_hex() + "\n")
   // Run gc
-  let result = gc_repo(fs, fs, root)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   // All objects from both branches should be preserved
   match result.pack {
     None => fail("expected pack")
@@ -235,7 +235,7 @@ test "gc_repo creates new packfile" {
   let git_dir = root + "/.git"
   let _ = build_simple_repo(fs, root)
   // Run gc
-  let result = gc_repo(fs, fs, root)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   // New packfile should exist
   match result.pack {
     None => fail("expected pack")
@@ -269,11 +269,11 @@ test "gc_repo handles annotated tags" {
     @bit.ObjectType::Tag,
     tag_bytes,
   )
-  write_object_bytes(fs, git_dir, tag_id, tag_compressed)
+  @bit_lib.write_object_bytes(fs, git_dir, tag_id, tag_compressed)
   fs.mkdir_p(git_dir + "/refs/tags")
   fs.write_string(git_dir + "/refs/tags/v1.0", tag_id.to_hex() + "\n")
   // Run gc
-  let result = gc_repo(fs, fs, root)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   // Objects should be preserved - at minimum commit + tree + blob = 3
   // Tag may or may not be collected depending on how gc traverses from tag refs
   match result.pack {
@@ -293,7 +293,7 @@ test "prune_repo does not remove reachable objects" {
   let git_dir = root + "/.git"
   let (commit_id, tree_id, blob_id) = build_simple_repo(fs, root)
   // Run prune
-  let result = prune_repo(fs, fs, root)
+  let result = @bit_lib.prune_repo(fs, fs, root)
   // No objects should be pruned
   assert_true(result.pruned.length() == 0)
   // Verify objects still exist
@@ -320,10 +320,10 @@ fn build_side_graph(
   content : String,
 ) -> (@bit.ObjectId, @bit.ObjectId) raise @bit.GitError {
   let (blob_id, blob_bytes) = @bit.create_blob_string(content)
-  write_object_bytes(fs, git_dir, blob_id, blob_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, blob_id, blob_bytes)
   let entry = @bit.TreeEntry::new("100644", "fact.md", blob_id)
   let (tree_id, tree_bytes) = @bit.create_tree([entry])
-  write_object_bytes(fs, git_dir, tree_id, tree_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, tree_id, tree_bytes)
   let commit = @bit.Commit::new(
     tree_id,
     [],
@@ -336,7 +336,7 @@ fn build_side_graph(
     "side graph\n",
   )
   let (commit_id, commit_bytes) = @bit.create_commit(commit)
-  write_object_bytes(fs, git_dir, commit_id, commit_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, commit_id, commit_bytes)
   (commit_id, blob_id)
 }
 
@@ -352,12 +352,12 @@ test "gc keeps objects reachable from refs/agent" {
     git_dir + "/refs/agent/memory/main",
     mem_commit.to_hex() + "\n",
   )
-  let result = gc_repo(fs, fs, root)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   for id in result.dangling {
     assert_true(id.to_hex() != mem_commit.to_hex())
     assert_true(id.to_hex() != mem_blob.to_hex())
   }
-  let db = ObjectDb::load(fs, git_dir)
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
   assert_true(db.get(fs, mem_blob) is Some(_))
   assert_true(db.get(fs, mem_commit) is Some(_))
 }
@@ -371,11 +371,11 @@ test "gc keeps objects reachable from refs/notes" {
   let (note_commit, note_blob) = build_side_graph(fs, git_dir, "a note\n")
   fs.mkdir_p(git_dir + "/refs/notes")
   fs.write_string(git_dir + "/refs/notes/commits", note_commit.to_hex() + "\n")
-  let result = gc_repo(fs, fs, root)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   for id in result.dangling {
     assert_true(id.to_hex() != note_commit.to_hex())
   }
-  let db = ObjectDb::load(fs, git_dir)
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
   assert_true(db.get(fs, note_blob) is Some(_))
 }
 
@@ -392,11 +392,11 @@ test "gc keeps objects reachable from packed custom refs" {
     mem_commit.to_hex() +
     " refs/agent/memory/main\n",
   )
-  let result = gc_repo(fs, fs, root)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   for id in result.dangling {
     assert_true(id.to_hex() != mem_commit.to_hex())
   }
-  let db = ObjectDb::load(fs, git_dir)
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
   assert_true(db.get(fs, mem_blob) is Some(_))
 }
 
@@ -412,7 +412,7 @@ test "gc tolerates symref files under refs" {
     "ref: refs/heads/main\n",
   )
   // Must not raise, and reachable objects stay reachable.
-  let result = gc_repo(fs, fs, root)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   for id in result.dangling {
     assert_true(id.to_hex() != commit_id.to_hex())
   }
@@ -427,11 +427,11 @@ test "gc keeps objects reachable from linked worktree HEADs" {
   let (wt_commit, wt_blob) = build_side_graph(fs, git_dir, "wt work\n")
   fs.mkdir_p(git_dir + "/worktrees/wt")
   fs.write_string(git_dir + "/worktrees/wt/HEAD", wt_commit.to_hex() + "\n")
-  let result = gc_repo(fs, fs, root)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   for id in result.dangling {
     assert_true(id.to_hex() != wt_commit.to_hex())
   }
-  let db = ObjectDb::load(fs, git_dir)
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
   assert_true(db.get(fs, wt_blob) is Some(_))
 }
 
@@ -449,11 +449,11 @@ test "gc keeps objects reachable from per-worktree refs" {
     git_dir + "/worktrees/wt/refs/bisect/bad",
     bisect_commit.to_hex() + "\n",
   )
-  let result = gc_repo(fs, fs, root)
+  let result = @bit_lib.gc_repo(fs, fs, root)
   for id in result.dangling {
     assert_true(id.to_hex() != bisect_commit.to_hex())
   }
-  let db = ObjectDb::load(fs, git_dir)
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
   assert_true(db.get(fs, bisect_blob) is Some(_))
 }
 
@@ -475,12 +475,12 @@ test "prune keeps reflog-only objects" {
     orphan_commit.to_hex() +
     " Test <t@e.com> 0 +0000\tcommit\n",
   )
-  let result = prune_repo(fs, fs, root)
+  let result = @bit_lib.prune_repo(fs, fs, root)
   for id in result.pruned {
     assert_true(id.to_hex() != orphan_commit.to_hex())
     assert_true(id.to_hex() != orphan_blob.to_hex())
   }
-  let db = ObjectDb::load(fs, git_dir)
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
   assert_true(db.get(fs, orphan_commit) is Some(_))
   assert_true(db.get(fs, orphan_blob) is Some(_))
 }
@@ -499,7 +499,7 @@ test "repack keeps reflog-only objects in the pack" {
     orphan_commit.to_hex() +
     " Test <t@e.com> 0 +0000\tcommit\n",
   )
-  let result = repack_repo(fs, fs, root)
+  let result = @bit_lib.repack_repo(fs, fs, root)
   match result {
     None => fail("expected pack")
     Some(r) => {

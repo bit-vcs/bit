@@ -27,9 +27,13 @@ pub(all) enum GitHubShorthand {
   Subdir(String, String, String?)
   File(String, String)
 } derive(Eq, @debug.Debug)
+pub fn GitHubShorthand::equal(Self, Self) -> Bool
+pub fn GitHubShorthand::not_equal(Self, Self) -> Bool
+pub fn GitHubShorthand::output(Self, &Logger) -> Unit
+pub fn GitHubShorthand::to_repr(Self) -> @debug.Repr
+pub fn GitHubShorthand::to_string(Self) -> String
 pub impl Show for GitHubShorthand
 
 // Type aliases
 
 // Traits
-

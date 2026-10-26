@@ -5,10 +5,10 @@ inputs:
   version:
     description: MoonBit toolchain version
     required: false
-    # Keep this on the toolchain the workspace is verified against: the
-    # dependency pins in modules/*/moon.mod (moonbitlang/async 0.22,
-    # moonbitlang/x 0.5, bobzhang/toml 0.4) need the 2026-09 compiler.
-    default: "0.10.13+cbb11c36f"
+    # Keep this on the toolchain the workspace is verified against: it must
+    # build warning-free and accept the dependency pins in modules/*/moon.mod
+    # (this release rejects dependencies still shipping moon.mod.json).
+    default: "0.10.17+d971670cd"
 
 runs:
   using: composite

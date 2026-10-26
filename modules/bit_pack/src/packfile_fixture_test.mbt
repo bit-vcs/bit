@@ -22,7 +22,7 @@ let oracle_after_delta_hex : String = "5041434b00000002000000067f566e595e40d3966
 ///|
 test "packfile fixture: oracle.pack" {
   let packfile = load_fixture("oracle.pack", oracle_pack_hex)
-  let objects = parse_packfile(packfile)
+  let objects = @bit_pack.parse_packfile(packfile)
   assert_true(objects.length() == 4)
   assert_true(count_type(objects, @bit.ObjectType::Commit) == 1)
   assert_true(count_type(objects, @bit.ObjectType::Tree) == 1)
@@ -37,7 +37,7 @@ test "packfile fixture: oracle.pack" {
 ///|
 test "packfile fixture: oracle_deflate.pack" {
   let packfile = load_fixture("oracle_deflate.pack", oracle_deflate_hex)
-  let objects = parse_packfile(packfile)
+  let objects = @bit_pack.parse_packfile(packfile)
   assert_true(objects.length() == 4)
   assert_true(count_type(objects, @bit.ObjectType::Commit) == 1)
   assert_true(count_type(objects, @bit.ObjectType::Tree) == 1)
@@ -52,7 +52,7 @@ test "packfile fixture: oracle_deflate.pack" {
 ///|
 test "packfile fixture: oracle_delta.pack" {
   let packfile = load_fixture("oracle_delta.pack", oracle_delta_hex)
-  let objects = parse_packfile(packfile)
+  let objects = @bit_pack.parse_packfile(packfile)
   assert_true(objects.length() == 4)
   assert_true(count_type(objects, @bit.ObjectType::Commit) == 1)
   assert_true(count_type(objects, @bit.ObjectType::Tree) == 1)
@@ -70,7 +70,7 @@ test "packfile fixture: oracle_delta.pack" {
 ///|
 test "packfile fixture: oracle_thin.pack (missing base)" {
   let packfile = load_fixture("oracle_thin.pack", oracle_thin_hex)
-  try ignore(parse_packfile(packfile)) catch {
+  try ignore(@bit_pack.parse_packfile(packfile)) catch {
     @bit.GitError::PackfileError(_) => ()
     _ => assert_true(false)
   } noraise {
@@ -81,9 +81,9 @@ test "packfile fixture: oracle_thin.pack (missing base)" {
 ///|
 test "packfile fixture: oracle_thin.pack (with base)" {
   let base_pack = load_fixture("oracle_thin_base.pack", oracle_thin_base_hex)
-  let base_objects = parse_packfile(base_pack)
+  let base_objects = @bit_pack.parse_packfile(base_pack)
   let packfile = load_fixture("oracle_thin.pack", oracle_thin_hex)
-  let objects = parse_packfile_with_bases(packfile, base_objects)
+  let objects = @bit_pack.parse_packfile_with_bases(packfile, base_objects)
   assert_true(objects.length() == 3)
   let ids = collect_object_ids(objects)
   assert_true(ids.contains("3a76cfa1c53d259541847fc7f35de3d6a673ef1d"))
@@ -94,7 +94,7 @@ test "packfile fixture: oracle_thin.pack (with base)" {
 ///|
 test "packfile fixture: oracle_after_delta.pack (base after delta)" {
   let packfile = load_fixture("oracle_after_delta.pack", oracle_after_delta_hex)
-  let objects = parse_packfile(packfile)
+  let objects = @bit_pack.parse_packfile(packfile)
   assert_true(objects.length() == 6)
   assert_true(count_type(objects, @bit.ObjectType::Commit) == 2)
   assert_true(count_type(objects, @bit.ObjectType::Tree) == 2)

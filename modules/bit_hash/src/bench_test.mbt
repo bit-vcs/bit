@@ -28,7 +28,7 @@ let bench_input_64k : Bytes = bench_make_bytes(64 * 1024)
 ///|
 test "bench sha1_raw 64 bytes" (b : @bench.T) {
   b.bench(fn() {
-    let h = sha1_raw(bench_input_64)
+    let h = @bit_hash.sha1_raw(bench_input_64)
     b.keep(h.length())
   })
 }
@@ -36,7 +36,7 @@ test "bench sha1_raw 64 bytes" (b : @bench.T) {
 ///|
 test "bench sha1_raw 1 KiB" (b : @bench.T) {
   b.bench(fn() {
-    let h = sha1_raw(bench_input_1k)
+    let h = @bit_hash.sha1_raw(bench_input_1k)
     b.keep(h.length())
   })
 }
@@ -44,7 +44,7 @@ test "bench sha1_raw 1 KiB" (b : @bench.T) {
 ///|
 test "bench sha1_raw 8 KiB" (b : @bench.T) {
   b.bench(fn() {
-    let h = sha1_raw(bench_input_8k)
+    let h = @bit_hash.sha1_raw(bench_input_8k)
     b.keep(h.length())
   })
 }
@@ -52,7 +52,7 @@ test "bench sha1_raw 8 KiB" (b : @bench.T) {
 ///|
 test "bench sha1_raw 64 KiB" (b : @bench.T) {
   b.bench(fn() {
-    let h = sha1_raw(bench_input_64k)
+    let h = @bit_hash.sha1_raw(bench_input_64k)
     b.keep(h.length())
   })
 }
@@ -60,7 +60,7 @@ test "bench sha1_raw 64 KiB" (b : @bench.T) {
 ///|
 test "bench sha256_raw 64 bytes" (b : @bench.T) {
   b.bench(fn() {
-    let h = sha256_raw(bench_input_64)
+    let h = @bit_hash.sha256_raw(bench_input_64)
     b.keep(h.length())
   })
 }
@@ -68,7 +68,7 @@ test "bench sha256_raw 64 bytes" (b : @bench.T) {
 ///|
 test "bench sha256_raw 1 KiB" (b : @bench.T) {
   b.bench(fn() {
-    let h = sha256_raw(bench_input_1k)
+    let h = @bit_hash.sha256_raw(bench_input_1k)
     b.keep(h.length())
   })
 }
@@ -76,7 +76,7 @@ test "bench sha256_raw 1 KiB" (b : @bench.T) {
 ///|
 test "bench sha256_raw 8 KiB" (b : @bench.T) {
   b.bench(fn() {
-    let h = sha256_raw(bench_input_8k)
+    let h = @bit_hash.sha256_raw(bench_input_8k)
     b.keep(h.length())
   })
 }

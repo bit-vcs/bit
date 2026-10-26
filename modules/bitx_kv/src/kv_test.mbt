@@ -149,18 +149,18 @@ impl @lib.ObjectStore for CountingTestObjectStore with fn has(self, id) {
 fn make_test_kv(
   node_id : String,
   git_dir : String,
-) -> (Kv, @bit.TestFs) raise @bit.GitError {
+) -> (@bitx_kv.Kv, @bit.TestFs) raise @bit.GitError {
   let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   let bitfs = @fs.Fs::empty(git_dir)
   let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
   let store : TestObjectStore = { backing_fs: fs, write_fs: fs, git_dir }
-  let kv = Kv::new(NodeId::new(node_id), tree, store, @bit.ObjectId::zero())
+  let kv = @bitx_kv.Kv::new(@bitx_kv.NodeId::new(node_id), tree, store, @bit.ObjectId::zero())
   (kv, fs)
 }
 
 ///|
-fn make_test_kv_simple(node_id : String) -> Kv {
+fn make_test_kv_simple(node_id : String) -> @bitx_kv.Kv {
   let fs = @bit.TestFs::new()
   let bitfs = @fs.Fs::empty("/repo/.git")
   let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
@@ -169,14 +169,14 @@ fn make_test_kv_simple(node_id : String) -> Kv {
     write_fs: fs,
     git_dir: "/repo/.git",
   }
-  Kv::new(NodeId::new(node_id), tree, store, @bit.ObjectId::zero())
+  @bitx_kv.Kv::new(@bitx_kv.NodeId::new(node_id), tree, store, @bit.ObjectId::zero())
 }
 
 ///|
 fn make_counting_test_kv(
   node_id : String,
   git_dir : String,
-) -> (Kv, @bit.TestFs, String) raise @bit.GitError {
+) -> (@bitx_kv.Kv, @bit.TestFs, String) raise @bit.GitError {
   let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   let bitfs = @fs.Fs::empty(git_dir)
@@ -188,7 +188,7 @@ fn make_counting_test_kv(
     git_dir,
     counter_path,
   }
-  let kv = Kv::new(NodeId::new(node_id), tree, store, @bit.ObjectId::zero())
+  let kv = @bitx_kv.Kv::new(@bitx_kv.NodeId::new(node_id), tree, store, @bit.ObjectId::zero())
   (kv, fs, counter_path)
 }
 
@@ -206,10 +206,10 @@ fn reset_counter(fs : @bit.TestFs, counter_path : String) -> Unit {
 ///|
 /// Tests for Kv
 test "VectorClock: increment and merge" {
-  let node1 = NodeId::new("node1")
-  let node2 = NodeId::new("node2")
-  let clock1 = VectorClock::new().increment(node1).increment(node1)
-  let clock2 = VectorClock::new().increment(node2)
+  let node1 = @bitx_kv.NodeId::new("node1")
+  let node2 = @bitx_kv.NodeId::new("node2")
+  let clock1 = @bitx_kv.VectorClock::new().increment(node1).increment(node1)
+  let clock2 = @bitx_kv.VectorClock::new().increment(node2)
   // clock1 has node1=2, clock2 has node2=1
   @test.assert_eq(clock1.clocks.get("node1"), Some(2L))
   @test.assert_eq(clock2.clocks.get("node2"), Some(1L))
@@ -221,17 +221,17 @@ test "VectorClock: increment and merge" {
 
 ///|
 test "VectorClock: compare" {
-  let node1 = NodeId::new("node1")
-  let node2 = NodeId::new("node2")
+  let node1 = @bitx_kv.NodeId::new("node1")
+  let node2 = @bitx_kv.NodeId::new("node2")
   // clock1: {node1: 2}
-  let clock1 = VectorClock::new().increment(node1).increment(node1)
+  let clock1 = @bitx_kv.VectorClock::new().increment(node1).increment(node1)
   // clock2: {node1: 1}
-  let clock2 = VectorClock::new().increment(node1)
+  let clock2 = @bitx_kv.VectorClock::new().increment(node1)
   // clock1 is after clock2
   @test.assert_eq(clock1.compare(clock2), 1)
   @test.assert_eq(clock2.compare(clock1), -1)
   // Concurrent clocks
-  let clock3 = VectorClock::new().increment(node2)
+  let clock3 = @bitx_kv.VectorClock::new().increment(node2)
   @test.assert_eq(clock1.compare(clock3), 0) // Concurrent
 }
 
@@ -295,14 +295,14 @@ test "Kv: gossip state" {
 test "Kv: peer management" {
   let db = make_test_kv_simple("node1")
   // Add peers
-  let peer1 : PeerInfo = {
-    node_id: NodeId::new("peer1"),
+  let peer1 : @bitx_kv.PeerInfo = {
+    node_id: @bitx_kv.NodeId::new("peer1"),
     last_seen: 1000L,
     head: @bit.ObjectId::zero(),
     endpoint: "wss://peer1.example.com",
   }
-  let peer2 : PeerInfo = {
-    node_id: NodeId::new("peer2"),
+  let peer2 : @bitx_kv.PeerInfo = {
+    node_id: @bitx_kv.NodeId::new("peer2"),
     last_seen: 2000L,
     head: @bit.ObjectId::zero(),
     endpoint: "wss://peer2.example.com",
@@ -312,7 +312,7 @@ test "Kv: peer management" {
   let peers = db.get_peers()
   @test.assert_eq(peers.length(), 2)
   // Remove peer
-  let removed = db.remove_peer(NodeId::new("peer1"))
+  let removed = db.remove_peer(@bitx_kv.NodeId::new("peer1"))
   assert_true(removed)
   let peers2 = db.get_peers()
   @test.assert_eq(peers2.length(), 1)
@@ -323,8 +323,8 @@ test "Kv: select gossip peers" {
   let db = make_test_kv_simple("node1")
   // Add several peers
   for i = 0; i < 10; i = i + 1 {
-    let peer : PeerInfo = {
-      node_id: NodeId::new("peer" + i.to_string()),
+    let peer : @bitx_kv.PeerInfo = {
+      node_id: @bitx_kv.NodeId::new("peer" + i.to_string()),
       last_seen: i.to_int64() * 1000L,
       head: @bit.ObjectId::zero(),
       endpoint: "wss://peer" + i.to_string() + ".example.com",
@@ -353,7 +353,7 @@ test "Kv: select gossip peers" {
 }
 
 ///|
-fn peers_contains(peers : Array[PeerInfo], node_id : String) -> Bool {
+fn peers_contains(peers : Array[@bitx_kv.PeerInfo], node_id : String) -> Bool {
   for peer in peers {
     if peer.node_id.id == node_id {
       return true
@@ -365,36 +365,36 @@ fn peers_contains(peers : Array[PeerInfo], node_id : String) -> Bool {
 ///|
 test "Kv: sync cursor roundtrip" {
   let db = make_test_kv_simple("node1")
-  let peer : PeerInfo = {
-    node_id: NodeId::new("peer1"),
+  let peer : @bitx_kv.PeerInfo = {
+    node_id: @bitx_kv.NodeId::new("peer1"),
     last_seen: 1000L,
     head: @bit.ObjectId::zero(),
     endpoint: "wss://peer1.example.com",
   }
   db.add_peer(peer)
-  @test.assert_eq(db.get_peer_cursor(NodeId::new("peer1")), None)
-  db.set_peer_cursor(NodeId::new("peer1"), 42L)
-  @test.assert_eq(db.get_peer_cursor(NodeId::new("peer1")), Some(42L))
+  @test.assert_eq(db.get_peer_cursor(@bitx_kv.NodeId::new("peer1")), None)
+  db.set_peer_cursor(@bitx_kv.NodeId::new("peer1"), 42L)
+  @test.assert_eq(db.get_peer_cursor(@bitx_kv.NodeId::new("peer1")), Some(42L))
 }
 
 ///|
 test "Kv: failed peer is throttled until retry window" {
   let db = make_test_kv_simple("node1")
-  let peer1 : PeerInfo = {
-    node_id: NodeId::new("peer1"),
+  let peer1 : @bitx_kv.PeerInfo = {
+    node_id: @bitx_kv.NodeId::new("peer1"),
     last_seen: 1000L,
     head: @bit.ObjectId::zero(),
     endpoint: "wss://peer1.example.com",
   }
-  let peer2 : PeerInfo = {
-    node_id: NodeId::new("peer2"),
+  let peer2 : @bitx_kv.PeerInfo = {
+    node_id: @bitx_kv.NodeId::new("peer2"),
     last_seen: 1000L,
     head: @bit.ObjectId::zero(),
     endpoint: "wss://peer2.example.com",
   }
   db.add_peer(peer1)
   db.add_peer(peer2)
-  db.record_peer_sync_result(NodeId::new("peer1"), false, 1000L)
+  db.record_peer_sync_result(@bitx_kv.NodeId::new("peer1"), false, 1000L)
   let early = db.select_gossip_peers(2, 123L, timestamp=1500L)
   assert_false(peers_contains(early, "peer1"))
   let late = db.select_gossip_peers(2, 123L, timestamp=2500L)
@@ -404,8 +404,8 @@ test "Kv: failed peer is throttled until retry window" {
 ///|
 test "Kv: sync_round success increments peer cursor" {
   let db = make_test_kv_simple("node1")
-  let peer : PeerInfo = {
-    node_id: NodeId::new("peer1"),
+  let peer : @bitx_kv.PeerInfo = {
+    node_id: @bitx_kv.NodeId::new("peer1"),
     last_seen: 1000L,
     head: @bit.ObjectId::zero(),
     endpoint: "wss://peer1.example.com",
@@ -426,7 +426,7 @@ test "Kv: sync_round success increments peer cursor" {
   @test.assert_eq(result.failed, 0)
   @test.assert_eq(result.messages_sent, 1)
   @test.assert_eq(result.messages_received, 0)
-  @test.assert_eq(db.get_peer_cursor(NodeId::new("peer1")), Some(1L))
+  @test.assert_eq(db.get_peer_cursor(@bitx_kv.NodeId::new("peer1")), Some(1L))
 }
 
 ///|
@@ -437,14 +437,14 @@ test "Kv: sync_round processes response and follow-up message" {
   ) catch {
     _ => fail("invalid remote head")
   }
-  let remote_state : GossipState = {
-    node_id: NodeId::new("peer1"),
+  let remote_state : @bitx_kv.GossipState = {
+    node_id: @bitx_kv.NodeId::new("peer1"),
     head: remote_head,
-    clock: VectorClock::new().increment(NodeId::new("peer1")),
+    clock: @bitx_kv.VectorClock::new().increment(@bitx_kv.NodeId::new("peer1")),
     timestamp: 1000L,
   }
-  let peer : PeerInfo = {
-    node_id: NodeId::new("peer1"),
+  let peer : @bitx_kv.PeerInfo = {
+    node_id: @bitx_kv.NodeId::new("peer1"),
     last_seen: 1000L,
     head: remote_head,
     endpoint: "wss://peer1.example.com",
@@ -469,8 +469,8 @@ test "Kv: sync_round processes response and follow-up message" {
 ///|
 test "Kv: sync_round failure applies retry backoff" {
   let db = make_test_kv_simple("node1")
-  let peer : PeerInfo = {
-    node_id: NodeId::new("peer1"),
+  let peer : @bitx_kv.PeerInfo = {
+    node_id: @bitx_kv.NodeId::new("peer1"),
     last_seen: 1000L,
     head: @bit.ObjectId::zero(),
     endpoint: "wss://peer1.example.com",
@@ -481,7 +481,7 @@ test "Kv: sync_round failure applies retry backoff" {
   })
   @test.assert_eq(result.succeeded, 0)
   @test.assert_eq(result.failed, 1)
-  @test.assert_eq(db.get_peer_cursor(NodeId::new("peer1")), None)
+  @test.assert_eq(db.get_peer_cursor(@bitx_kv.NodeId::new("peer1")), None)
   let early = db.select_gossip_peers(1, 77L, timestamp=1500L)
   assert_false(peers_contains(early, "peer1"))
   let late = db.select_gossip_peers(1, 77L, timestamp=2500L)

@@ -7,6 +7,12 @@ pub(all) enum ClaimAction {
 } derive(Eq, Debug)
 
 ///|
+pub extend ClaimAction with Eq::{not_equal, equal}
+
+///|
+pub extend ClaimAction with Debug::{to_repr}
+
+///|
 pub fn ClaimAction::to_string(self : ClaimAction) -> String {
   match self {
     Claim => "claim"
@@ -18,6 +24,9 @@ pub fn ClaimAction::to_string(self : ClaimAction) -> String {
 pub impl Show for ClaimAction with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
+
+///|
+pub extend ClaimAction with Show::{output}
 
 ///|
 pub fn parse_claim_action(s : String) -> ClaimAction? {
@@ -35,6 +44,12 @@ pub struct ClaimMessage {
   claimer : String
   timestamp : Int64
 } derive(Eq, Debug)
+
+///|
+pub extend ClaimMessage with Eq::{not_equal, equal}
+
+///|
+pub extend ClaimMessage with Debug::{to_repr}
 
 ///|
 fn claim_show_string(value : String) -> String {
@@ -73,6 +88,9 @@ pub impl Show for ClaimMessage with fn output(self, logger) {
     "}",
   )
 }
+
+///|
+pub extend ClaimMessage with Show::{to_string, output}
 
 ///|
 pub fn ClaimMessage::new(

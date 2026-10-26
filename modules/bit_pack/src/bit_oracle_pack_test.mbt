@@ -152,7 +152,7 @@ fn find_blob_hash_in_verify_output(output : String) -> String? {
 async test "git oracle: index-pack accepts blob packfile" {
   let temp_dir = create_temp_dir("moonbit-git-pack-oracle")
   let content = @utf8.encode("hello\n")
-  let packfile = create_blob_packfile(content)
+  let packfile = @bit_pack.create_blob_packfile(content)
   let pack_path = "\{temp_dir}/test.pack"
   let idx_path = "\{temp_dir}/test.idx"
   @fs.write_bytes_to_file(pack_path, packfile) catch {
@@ -241,7 +241,7 @@ async test "git oracle: parse pack-objects output" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let objects = parse_packfile(pack_out) catch {
+  let objects = @bit_pack.parse_packfile(pack_out) catch {
     _ => {
       remove_dir_recursive(repo_dir)
       return ()
@@ -366,7 +366,7 @@ async test "git oracle: parse delta packfile from git" {
     return ()
   }
   // Parse the packfile
-  let objects = parse_packfile(pack_out) catch {
+  let objects = @bit_pack.parse_packfile(pack_out) catch {
     _ => {
       remove_dir_recursive(repo_dir)
       return ()
@@ -407,7 +407,7 @@ async test "git oracle: verify MoonBit packfile with git verify-pack" {
   let target = @utf8.encode("Hello, World! This is a test modified.\n")
   let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, base)
   let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, target)
-  let pack = create_packfile_with_delta(
+  let pack = @bit_pack.create_packfile_with_delta(
     [obj1, obj2],
     @bit.PackDeltaMode::OfsDelta,
   )
@@ -442,7 +442,7 @@ async test "git oracle: verify REF_DELTA packfile" {
   let target = @utf8.encode("Base content line 1\nModified line 2\n")
   let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, base)
   let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, target)
-  let pack = create_packfile_with_delta(
+  let pack = @bit_pack.create_packfile_with_delta(
     [obj1, obj2],
     @bit.PackDeltaMode::RefDelta,
   )
@@ -484,7 +484,7 @@ async test "git oracle: verify packfile with commit+tree+blob" {
     "+0000",
     "Test commit\n",
   )
-  let (_, pack) = create_commit_packfile(blob_content, "hello.txt", commit)
+  let (_, pack) = @bit_pack.create_commit_packfile(blob_content, "hello.txt", commit)
   let pack_path = "\{temp_dir}/full.pack"
   let idx_path = "\{temp_dir}/full.idx"
   @fs.write_bytes_to_file(pack_path, pack) catch {
@@ -532,9 +532,9 @@ async test "git oracle: pack index verified by git" {
   let blob2 = @utf8.encode("world\n")
   let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, blob1)
   let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, blob2)
-  let pack = create_packfile([obj1, obj2])
+  let pack = @bit_pack.create_packfile([obj1, obj2])
   // Build pack index using MoonBit
-  let idx = build_pack_index_from_objects(pack, [obj1, obj2])
+  let idx = @bit_pack.build_pack_index_from_objects(pack, [obj1, obj2])
   let pack_path = "\{temp_dir}/test.pack"
   let idx_path = "\{temp_dir}/test.idx"
   @fs.write_bytes_to_file(pack_path, pack) catch {
@@ -1375,7 +1375,7 @@ async test "git oracle: MoonBit packfile unpack with git unpack-objects" {
   let blob2 = @utf8.encode("second file content\n")
   let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, blob1)
   let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, blob2)
-  let pack = create_packfile([obj1, obj2])
+  let pack = @bit_pack.create_packfile([obj1, obj2])
 
   // Save packfile
   let pack_path = "\{temp_dir}/test.pack"

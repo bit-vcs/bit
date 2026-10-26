@@ -2152,6 +2152,9 @@ enum ParseoptOptType {
 } derive(Eq)
 
 ///|
+pub extend ParseoptOptType with Eq::{not_equal, equal}
+
+///|
 struct ParseoptOpt {
   opt_type : ParseoptOptType
   short_name : Char

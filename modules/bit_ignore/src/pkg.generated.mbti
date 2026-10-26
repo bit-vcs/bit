@@ -11,15 +11,15 @@ pub fn parse(String, String) -> Array[Rule]
 // Types and methods
 pub struct Matcher {
   rules : Array[Rule]
-  mut negation_count : Int
+  mut negation_count : Int32
 }
 pub fn Matcher::add_rules(Self, String, String) -> Unit
 pub fn Matcher::could_negate_under(Self, String) -> Bool
 pub fn Matcher::has_negation(Self) -> Bool
 pub fn Matcher::is_ignored(Self, String, Bool) -> Bool
-pub fn Matcher::len(Self) -> Int
+pub fn Matcher::len(Self) -> Int32
 pub fn Matcher::new() -> Self
-pub fn Matcher::truncate(Self, Int) -> Unit
+pub fn Matcher::truncate(Self, Int32) -> Unit
 
 pub struct Rule {
   base : String
@@ -30,10 +30,9 @@ pub struct Rule {
   dir_only : Bool
   anchored : Bool
   has_slash : Bool
-  base_len : Int
+  base_len : Int32
 }
 
 // Type aliases
 
 // Traits
-

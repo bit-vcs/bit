@@ -156,6 +156,12 @@ pub(all) enum FastImportFileOp {
 } derive(Eq, Debug)
 
 ///|
+pub extend FastImportFileOp with Eq::{not_equal, equal}
+
+///|
+pub extend FastImportFileOp with Debug::{to_repr}
+
+///|
 fn fast_import_show_string(value : String) -> String {
   let buf = StringBuilder()
   buf.write_char('"')
@@ -212,6 +218,9 @@ pub impl Show for FastImportFileOp with fn output(self, logger) {
       )
   }
 }
+
+///|
+pub extend FastImportFileOp with Show::{to_string, output}
 
 ///|
 /// Parse a single file operation line from a fast-import stream.

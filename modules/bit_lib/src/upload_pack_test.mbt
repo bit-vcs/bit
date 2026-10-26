@@ -14,10 +14,10 @@ fn test_concat_bytes(chunks : Array[Bytes]) -> Bytes {
 ///|
 test "build_upload_pack_advertisement: empty repo" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
-  let adv = build_upload_pack_advertisement(fs, "/repo")
+  let adv = @bit_lib.build_upload_pack_advertisement(fs, "/repo")
   // Should have capabilities^{} line for empty repo
   let text = @utf8.decode_lossy(adv[:])
   assert_true(text.contains("capabilities^{}"))
@@ -27,16 +27,16 @@ test "build_upload_pack_advertisement: empty repo" {
 ///|
 test "build_upload_pack_advertisement: with refs" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
   // Create a commit to get a real ref
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let commit_id = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let commit_id = @bit_lib.commit(
     fs, fs, "/repo", "initial\n", "Test <t@example.com>", 1700000000L,
   )
-  let adv = build_upload_pack_advertisement(fs, "/repo")
+  let adv = @bit_lib.build_upload_pack_advertisement(fs, "/repo")
   let text = @utf8.decode_lossy(adv[:])
   assert_true(text.contains(commit_id.to_hex()))
   assert_true(text.contains("refs/heads/main"))
@@ -51,7 +51,7 @@ test "parse_upload_pack_request: simple want" {
     @protocol.pktline_flush(),
     @protocol.pktline_encode("done\n"),
   ])
-  let req = parse_upload_pack_request(req_bytes)
+  let req = @bit_lib.parse_upload_pack_request(req_bytes)
   assert_true(req.wants.length() == 1)
   assert_true(
     req.wants[0].to_hex() == "ce013625030ba8dba906f756967f9e9ca394464a",
@@ -68,7 +68,7 @@ test "parse_upload_pack_request: want with capabilities" {
     @protocol.pktline_flush(),
     @protocol.pktline_encode("done\n"),
   ])
-  let req = parse_upload_pack_request(req_bytes)
+  let req = @bit_lib.parse_upload_pack_request(req_bytes)
   assert_true(req.wants.length() == 1)
   assert_true(req.capabilities.length() == 2)
   assert_true(req.capabilities[0] == "ofs-delta")
@@ -87,7 +87,7 @@ test "parse_upload_pack_request: multiple wants and haves" {
     @protocol.pktline_encode(have1),
     @protocol.pktline_encode("done\n"),
   ])
-  let req = parse_upload_pack_request(req_bytes)
+  let req = @bit_lib.parse_upload_pack_request(req_bytes)
   assert_true(req.wants.length() == 2)
   assert_true(req.haves.length() == 1)
   assert_true(req.done)
@@ -134,7 +134,7 @@ test "detect_protocol_version: v1 format (want line)" {
     @protocol.pktline_encode(want_line),
     @protocol.pktline_flush(),
   ])
-  let version = detect_protocol_version(req_bytes)
+  let version = @bit_lib.detect_protocol_version(req_bytes)
   debug_inspect(version, content="1")
 }
 
@@ -147,7 +147,7 @@ test "detect_protocol_version: v2 format (command=fetch)" {
     test_pktline_v2("done"),
     @protocol.pktline_flush(),
   ])
-  let version = detect_protocol_version(req_bytes)
+  let version = @bit_lib.detect_protocol_version(req_bytes)
   debug_inspect(version, content="2")
 }
 
@@ -161,7 +161,7 @@ test "parse_upload_pack_request_v2: simple fetch" {
     test_pktline_v2("done"),
     @protocol.pktline_flush(),
   ])
-  let req = parse_upload_pack_request_v2(req_bytes)
+  let req = @bit_lib.parse_upload_pack_request_v2(req_bytes)
   debug_inspect(
     req.command,
     content=(
@@ -182,7 +182,7 @@ test "parse_upload_pack_request_v2: with packfile-uris" {
     test_pktline_v2("done"),
     @protocol.pktline_flush(),
   ])
-  let req = parse_upload_pack_request_v2(req_bytes)
+  let req = @bit_lib.parse_upload_pack_request_v2(req_bytes)
   debug_inspect(
     req.command,
     content=(
@@ -207,7 +207,7 @@ test "parse_upload_pack_request_v2: with filter" {
     test_pktline_v2("done"),
     @protocol.pktline_flush(),
   ])
-  let req = parse_upload_pack_request_v2(req_bytes)
+  let req = @bit_lib.parse_upload_pack_request_v2(req_bytes)
   debug_inspect(
     req.filter,
     content=(
@@ -226,7 +226,7 @@ test "parse_upload_pack_request_v2: want-ref" {
     test_pktline_v2("done"),
     @protocol.pktline_flush(),
   ])
-  let req = parse_upload_pack_request_v2(req_bytes)
+  let req = @bit_lib.parse_upload_pack_request_v2(req_bytes)
   debug_inspect(req.want_refs.length(), content="1")
   debug_inspect(
     req.want_refs[0],
@@ -244,7 +244,7 @@ test "parse_upload_pack_request_v2: extra delimiter" {
     test_delimiter(),
     test_delimiter(),
   ])
-  try parse_upload_pack_request_v2(req_bytes) catch {
+  try @bit_lib.parse_upload_pack_request_v2(req_bytes) catch {
     err =>
       debug_inspect(
         err.to_string().contains("expected flush after fetch arguments"),

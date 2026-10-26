@@ -187,6 +187,12 @@ pub(all) struct PackedRefEntry {
 } derive(Debug, Eq)
 
 ///|
+pub extend PackedRefEntry with Debug::{to_repr}
+
+///|
+pub extend PackedRefEntry with Eq::{not_equal, equal}
+
+///|
 /// Parse packed-refs text into entries. Header (`#`) and blank lines are
 /// dropped; a `^` line is attached to the entry that precedes it.
 pub fn parse_packed_refs_text(text : String) -> Array[PackedRefEntry] {

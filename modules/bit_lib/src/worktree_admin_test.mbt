@@ -17,14 +17,14 @@ fn setup_worktree_admin_fs() -> @bit.TestFs {
 ///|
 fn setup_worktree_repo_fs() -> @bit.TestFs {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
   fs.write_string("/repo/init.t", "main\n")
-  add_paths(fs, fs, "/repo", ["init.t"]) catch {
+  @bit_lib.add_paths(fs, fs, "/repo", ["init.t"]) catch {
     _ => ()
   }
-  ignore(commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000700L)) catch {
+  ignore(@bit_lib.commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000700L)) catch {
     _ => ()
   }
   fs
@@ -57,7 +57,7 @@ fn remove_test_dir(fs : @bit.TestFs, path : String) -> Unit {
 ///|
 test "worktree admin: list main worktree only" {
   let fs = setup_worktree_admin_fs()
-  let worktrees = list_worktrees(fs, "/repo")
+  let worktrees = @bit_lib.list_worktrees(fs, "/repo")
   @test.assert_eq(worktrees.length(), 1)
   @test.assert_eq(worktrees[0].path, "/repo")
   @test.assert_eq(worktrees[0].branch, Some("main"))
@@ -77,7 +77,7 @@ test "worktree admin: list with linked worktree" {
   fs.write_string(
     "/repo/.git/refs/heads/feature", "2222222222222222222222222222222222222222\n",
   )
-  let worktrees = list_worktrees(fs, "/repo")
+  let worktrees = @bit_lib.list_worktrees(fs, "/repo")
   @test.assert_eq(worktrees.length(), 2)
   // Main worktree
   @test.assert_eq(worktrees[0].path, "/repo")
@@ -100,7 +100,7 @@ test "worktree admin: list detached head worktree" {
     "/repo/.git/worktrees/wt-detached/HEAD", "3333333333333333333333333333333333333333\n",
   )
   fs.write_string("/repo/.git/worktrees/wt-detached/commondir", "../..\n")
-  let worktrees = list_worktrees(fs, "/repo")
+  let worktrees = @bit_lib.list_worktrees(fs, "/repo")
   @test.assert_eq(worktrees.length(), 2)
   @test.assert_eq(worktrees[1].path, "/detached-wt")
   @test.assert_eq(worktrees[1].branch, None)
@@ -118,7 +118,7 @@ test "worktree admin: list locked worktree" {
   )
   fs.write_string("/repo/.git/worktrees/locked-wt/commondir", "../..\n")
   fs.write_string("/repo/.git/worktrees/locked-wt/locked", "")
-  let worktrees = list_worktrees(fs, "/repo")
+  let worktrees = @bit_lib.list_worktrees(fs, "/repo")
   @test.assert_eq(worktrees.length(), 2)
   assert_true(worktrees[1].locked)
 }
@@ -126,14 +126,14 @@ test "worktree admin: list locked worktree" {
 ///|
 test "worktree admin: is_branch_checked_out main" {
   let fs = setup_worktree_admin_fs()
-  let result = is_branch_checked_out(fs, "/repo", "main")
+  let result = @bit_lib.is_branch_checked_out(fs, "/repo", "main")
   @test.assert_eq(result, Some("/repo"))
 }
 
 ///|
 test "worktree admin: is_branch_checked_out untracked" {
   let fs = setup_worktree_admin_fs()
-  let result = is_branch_checked_out(fs, "/repo", "nonexistent")
+  let result = @bit_lib.is_branch_checked_out(fs, "/repo", "nonexistent")
   @test.assert_eq(result, None)
 }
 
@@ -147,7 +147,7 @@ test "worktree admin: is_branch_checked_out in linked worktree" {
   fs.write_string(
     "/repo/.git/refs/heads/feature", "2222222222222222222222222222222222222222\n",
   )
-  let result = is_branch_checked_out(fs, "/repo", "feature")
+  let result = @bit_lib.is_branch_checked_out(fs, "/repo", "feature")
   @test.assert_eq(result, Some("/worktree1"))
 }
 
@@ -162,7 +162,7 @@ test "worktree admin: prune missing worktree" {
   )
   fs.write_string("/repo/.git/worktrees/missing/commondir", "../..\n")
   // Prune should remove it
-  let pruned = prune_worktrees(fs, fs, "/repo")
+  let pruned = @bit_lib.prune_worktrees(fs, fs, "/repo")
   @test.assert_eq(pruned.length(), 1)
   @test.assert_eq(pruned[0], "missing")
   // Admin dir should be removed
@@ -175,7 +175,7 @@ test "worktree admin: prune invalid file entry reports reason" {
   fs.mkdir_p("/repo/.git/worktrees")
   fs.write_string("/repo/.git/worktrees/abc", "")
 
-  let pruned = prune_worktrees_detailed(fs, fs, "/repo")
+  let pruned = @bit_lib.prune_worktrees_detailed(fs, fs, "/repo")
   @test.assert_eq(pruned.length(), 1)
   @test.assert_eq(pruned[0].name, "abc")
   @test.assert_eq(pruned[0].reason, "not a valid directory")
@@ -191,7 +191,7 @@ test "worktree admin: prune duplicate linked worktree keeps lexical first entry"
   fs.write_string("/repo/.git/worktrees/w2/gitdir", "/repo/w1/.git\n")
   fs.write_string("/repo/w1/.git", "gitdir: /repo/.git/worktrees/w1\n")
 
-  let pruned = prune_worktrees_detailed(fs, fs, "/repo", dry_run=true)
+  let pruned = @bit_lib.prune_worktrees_detailed(fs, fs, "/repo", dry_run=true)
   @test.assert_eq(pruned.length(), 1)
   @test.assert_eq(pruned[0].name, "w2")
   @test.assert_eq(pruned[0].reason, "duplicate entry")
@@ -203,7 +203,7 @@ test "worktree admin: prune linked entry duplicated by main git dir" {
   fs.mkdir_p("/repo/.git/worktrees/wt")
   fs.write_string("/repo/.git/worktrees/wt/gitdir", "/repo/.git\n")
 
-  let pruned = prune_worktrees_detailed(fs, fs, "/repo", dry_run=true)
+  let pruned = @bit_lib.prune_worktrees_detailed(fs, fs, "/repo", dry_run=true)
   @test.assert_eq(pruned.length(), 1)
   @test.assert_eq(pruned[0].name, "wt")
   @test.assert_eq(pruned[0].reason, "duplicate entry")
@@ -219,7 +219,7 @@ test "worktree admin: prune dry run" {
   )
   fs.write_string("/repo/.git/worktrees/missing/commondir", "../..\n")
   // Dry run should not remove
-  let pruned = prune_worktrees(fs, fs, "/repo", dry_run=true)
+  let pruned = @bit_lib.prune_worktrees(fs, fs, "/repo", dry_run=true)
   @test.assert_eq(pruned.length(), 1)
   // Admin dir should still exist
   assert_true(fs.is_dir("/repo/.git/worktrees/missing"))
@@ -238,7 +238,7 @@ test "worktree admin: prune locked worktree not pruned" {
   fs.write_string("/repo/.git/worktrees/locked-missing/commondir", "../..\n")
   fs.write_string("/repo/.git/worktrees/locked-missing/locked", "")
   // Locked worktrees should not be pruned even if missing
-  let pruned = prune_worktrees(fs, fs, "/repo")
+  let pruned = @bit_lib.prune_worktrees(fs, fs, "/repo")
   @test.assert_eq(pruned.length(), 0)
   assert_true(fs.is_dir("/repo/.git/worktrees/locked-missing"))
 }
@@ -259,7 +259,7 @@ test "worktree admin: bare repo includes pseudo main worktree" {
   fs.write_string(
     "/bare/refs/heads/wt", "2222222222222222222222222222222222222222\n",
   )
-  let worktrees = list_worktrees(fs, "/bare")
+  let worktrees = @bit_lib.list_worktrees(fs, "/bare")
   @test.assert_eq(worktrees.length(), 2)
   @test.assert_eq(worktrees[0].path, "/bare")
   assert_true(worktrees[0].is_main)
@@ -271,7 +271,7 @@ test "worktree admin: bare repo includes pseudo main worktree" {
 ///|
 test "worktree admin: list from .git directory reports main worktree" {
   let fs = setup_worktree_admin_fs()
-  let worktrees = list_worktrees(fs, "/repo/.git")
+  let worktrees = @bit_lib.list_worktrees(fs, "/repo/.git")
   @test.assert_eq(worktrees.length(), 1)
   @test.assert_eq(worktrees[0].path, "/repo")
   assert_false(worktrees[0].is_bare)
@@ -296,7 +296,7 @@ test "worktree admin: linked worktree with bare main shows bare root first" {
     "/bare/refs/heads/wt", "2222222222222222222222222222222222222222\n",
   )
 
-  let worktrees = list_worktrees(fs, "/there")
+  let worktrees = @bit_lib.list_worktrees(fs, "/there")
   @test.assert_eq(worktrees.length(), 2)
   @test.assert_eq(worktrees[0].path, "/bare")
   assert_true(worktrees[0].is_bare)
@@ -329,7 +329,7 @@ test "worktree admin: linked worktrees are sorted lexically by path" {
     "/repo/.git/refs/heads/locked_crlf", "3333333333333333333333333333333333333333\n",
   )
 
-  let worktrees = list_worktrees(fs, "/repo")
+  let worktrees = @bit_lib.list_worktrees(fs, "/repo")
   @test.assert_eq(worktrees[1].path, "/repo/locked_crlf")
   @test.assert_eq(worktrees[2].path, "/repo/locked_lf")
 }
@@ -337,23 +337,23 @@ test "worktree admin: linked worktrees are sorted lexically by path" {
 ///|
 test "worktree admin: create_worktree resolves dash to previous checkout branch" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
   fs.write_string("/repo/init.t", "main\n")
-  add_paths(fs, fs, "/repo", ["init.t"])
-  ignore(commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000400L))
+  @bit_lib.add_paths(fs, fs, "/repo", ["init.t"])
+  ignore(@bit_lib.commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000400L))
 
-  switch_branch(fs, fs, "/repo", "newbranch", create=true, checkout_files=true)
+  @bit_lib.switch_branch(fs, fs, "/repo", "newbranch", create=true, checkout_files=true)
   fs.write_string("/repo/init.t", "newbranch\n")
-  add_paths(fs, fs, "/repo", ["init.t"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["init.t"])
   ignore(
-    commit(fs, fs, "/repo", "newbranch\n", "Test <t@example.com>", 1700000401L),
+    @bit_lib.commit(fs, fs, "/repo", "newbranch\n", "Test <t@example.com>", 1700000401L),
   )
-  ignore(checkout(fs, fs, "/repo", "main"))
+  ignore(@bit_lib.checkout(fs, fs, "/repo", "main"))
   fs.write_string("/repo/.git/bit-prev-checkout", "newbranch\n")
 
-  create_worktree(fs, fs, "/repo", "short-hand", Some("-"), new_branch=None)
+  @bit_lib.create_worktree(fs, fs, "/repo", "short-hand", Some("-"), new_branch=None)
 
   @test.assert_eq(
     fs.read_string("/repo/.git/worktrees/short-hand/HEAD"),
@@ -366,27 +366,27 @@ test "worktree admin: create_worktree resolves dash to previous checkout branch"
 test "worktree admin: create_worktree with new branch writes branch and HEAD reflogs" {
   let fs = setup_worktree_repo_fs()
 
-  create_worktree(fs, fs, "/repo", "wt", Some("main"), new_branch=Some("wt"))
+  @bit_lib.create_worktree(fs, fs, "/repo", "wt", Some("main"), new_branch=Some("wt"))
 
-  let branch_entries = read_reflog(fs, "/repo/.git", "refs/heads/wt")
+  let branch_entries = @bit_lib.read_reflog(fs, "/repo/.git", "refs/heads/wt")
   @test.assert_eq(branch_entries.length(), 1)
   @test.assert_eq(branch_entries[0].message, "branch: Created from main")
 
-  let head_entries = read_reflog(fs, "/repo/.git/worktrees/wt", "HEAD")
+  let head_entries = @bit_lib.read_reflog(fs, "/repo/.git/worktrees/wt", "HEAD")
   @test.assert_eq(head_entries.length(), 1)
 }
 
 ///|
 test "worktree admin: create_worktree resolves HEAD to detached commit" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
   fs.write_string("/repo/init.t", "main\n")
-  add_paths(fs, fs, "/repo", ["init.t"])
-  ignore(commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000450L))
+  @bit_lib.add_paths(fs, fs, "/repo", ["init.t"])
+  ignore(@bit_lib.commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000450L))
 
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -403,16 +403,16 @@ test "worktree admin: create_worktree resolves HEAD to detached commit" {
 ///|
 test "worktree admin: create_worktree rejects nonempty existing directory" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
   fs.write_string("/repo/init.t", "main\n")
-  add_paths(fs, fs, "/repo", ["init.t"])
-  ignore(commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000500L))
+  @bit_lib.add_paths(fs, fs, "/repo", ["init.t"])
+  ignore(@bit_lib.commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000500L))
   fs.mkdir_p("/repo/existing/subtree")
 
   let err = try {
-    create_worktree(fs, fs, "/repo", "existing", Some("main"), new_branch=None)
+    @bit_lib.create_worktree(fs, fs, "/repo", "existing", Some("main"), new_branch=None)
     None
   } catch {
     err => Some(err.to_string())
@@ -425,15 +425,15 @@ test "worktree admin: create_worktree rejects nonempty existing directory" {
 ///|
 test "worktree admin: create_worktree disambiguates duplicate basename" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
   fs.write_string("/repo/init.t", "main\n")
-  add_paths(fs, fs, "/repo", ["init.t"])
-  ignore(commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000600L))
+  @bit_lib.add_paths(fs, fs, "/repo", ["init.t"])
+  ignore(@bit_lib.commit(fs, fs, "/repo", "main\n", "Test <t@example.com>", 1700000600L))
   fs.mkdir_p("/repo/sub")
 
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -442,7 +442,7 @@ test "worktree admin: create_worktree disambiguates duplicate basename" {
     detach=true,
     new_branch=None,
   )
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -463,7 +463,7 @@ test "worktree admin: create_worktree disambiguates duplicate basename" {
 ///|
 test "worktree admin: move_worktree nests destination under existing directory" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -474,7 +474,7 @@ test "worktree admin: move_worktree nests destination under existing directory" 
   )
   fs.mkdir_p("/repo/some-dir")
 
-  move_worktree(fs, fs, "/repo", "source", "some-dir")
+  @bit_lib.move_worktree(fs, fs, "/repo", "source", "some-dir")
 
   assert_false(fs.is_dir("/repo/source"))
   assert_true(fs.is_dir("/repo/some-dir/source"))
@@ -491,7 +491,7 @@ test "worktree admin: move_worktree nests destination under existing directory" 
 ///|
 test "worktree admin: move_worktree requires force for missing destination admin" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -500,7 +500,7 @@ test "worktree admin: move_worktree requires force for missing destination admin
     detach=true,
     new_branch=None,
   )
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -512,17 +512,17 @@ test "worktree admin: move_worktree requires force for missing destination admin
   remove_test_dir(fs, "/repo/pneu")
 
   let err = try {
-    move_worktree(fs, fs, "/repo", "gnoo", "pneu")
+    @bit_lib.move_worktree(fs, fs, "/repo", "gnoo", "pneu")
     None
   } catch {
     err => Some(err.to_string())
   }
   assert_true(err.unwrap_or("").contains("already exists"))
 
-  move_worktree(fs, fs, "/repo", "gnoo", "pneu", force_level=1)
+  @bit_lib.move_worktree(fs, fs, "/repo", "gnoo", "pneu", force_level=1)
   assert_true(fs.is_dir("/repo/pneu"))
 
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -531,25 +531,25 @@ test "worktree admin: move_worktree requires force for missing destination admin
     detach=true,
     new_branch=None,
   )
-  lock_worktree(fs, fs, "/repo", "nu", reason=None)
+  @bit_lib.lock_worktree(fs, fs, "/repo", "nu", reason=None)
   remove_test_dir(fs, "/repo/nu")
 
   let locked_err = try {
-    move_worktree(fs, fs, "/repo", "pneu", "nu", force_level=1)
+    @bit_lib.move_worktree(fs, fs, "/repo", "pneu", "nu", force_level=1)
     None
   } catch {
     err => Some(err.to_string())
   }
   assert_true(locked_err.unwrap_or("").contains("locked"))
 
-  move_worktree(fs, fs, "/repo", "pneu", "nu", force_level=2)
+  @bit_lib.move_worktree(fs, fs, "/repo", "pneu", "nu", force_level=2)
   assert_true(fs.is_dir("/repo/nu"))
 }
 
 ///|
 test "worktree admin: move_worktree refuses initialized submodule" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -562,7 +562,7 @@ test "worktree admin: move_worktree refuses initialized submodule" {
   fs.write_string("/repo/third/sub/.git", "gitdir: /repo/.git/modules/sub\n")
 
   let err = try {
-    move_worktree(fs, fs, "/repo", "third", "forth")
+    @bit_lib.move_worktree(fs, fs, "/repo", "third", "forth")
     None
   } catch {
     err => Some(err.to_string())
@@ -576,7 +576,7 @@ test "worktree admin: move_worktree refuses initialized submodule" {
 ///|
 test "worktree admin: remove_worktree rejects dirty and untracked unless forced" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -588,7 +588,7 @@ test "worktree admin: remove_worktree rejects dirty and untracked unless forced"
   fs.write_string("/repo/destination/init.t", "main\ndirty\n")
 
   let dirty_err = try {
-    remove_worktree(fs, fs, "/repo", "destination")
+    @bit_lib.remove_worktree(fs, fs, "/repo", "destination")
     None
   } catch {
     err => Some(err.to_string())
@@ -600,21 +600,21 @@ test "worktree admin: remove_worktree rejects dirty and untracked unless forced"
   fs.write_string("/repo/destination/untracked", "")
 
   let untracked_err = try {
-    remove_worktree(fs, fs, "/repo", "destination")
+    @bit_lib.remove_worktree(fs, fs, "/repo", "destination")
     None
   } catch {
     err => Some(err.to_string())
   }
   assert_true(untracked_err.unwrap_or("").contains("modified or untracked"))
 
-  remove_worktree(fs, fs, "/repo", "destination", force=true)
+  @bit_lib.remove_worktree(fs, fs, "/repo", "destination", force=true)
   assert_false(fs.is_dir("/repo/destination"))
 }
 
 ///|
 test "worktree admin: remove_worktree requires double force for locked worktree" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -623,10 +623,10 @@ test "worktree admin: remove_worktree requires double force for locked worktree"
     detach=true,
     new_branch=None,
   )
-  lock_worktree(fs, fs, "/repo", "gumby", reason=None)
+  @bit_lib.lock_worktree(fs, fs, "/repo", "gumby", reason=None)
 
   let err = try {
-    remove_worktree(fs, fs, "/repo", "gumby", force=true)
+    @bit_lib.remove_worktree(fs, fs, "/repo", "gumby", force=true)
     None
   } catch {
     err => Some(err.to_string())
@@ -634,7 +634,7 @@ test "worktree admin: remove_worktree requires double force for locked worktree"
 
   assert_true(err.unwrap_or("").contains("locked"))
 
-  remove_worktree(fs, fs, "/repo", "gumby", force_level=2)
+  @bit_lib.remove_worktree(fs, fs, "/repo", "gumby", force_level=2)
   assert_false(fs.is_dir("/repo/gumby"))
   assert_false(fs.is_dir("/repo/.git/worktrees"))
 }
@@ -643,7 +643,7 @@ test "worktree admin: remove_worktree requires double force for locked worktree"
 test "worktree admin: missing worktree errors say not a working tree" {
   let fs = setup_worktree_repo_fs()
   let err = try {
-    lock_worktree(fs, fs, "/repo", "noodle", reason=None)
+    @bit_lib.lock_worktree(fs, fs, "/repo", "noodle", reason=None)
     None
   } catch {
     err => Some(err.to_string())
@@ -654,7 +654,7 @@ test "worktree admin: missing worktree errors say not a working tree" {
 ///|
 test "worktree admin: relative gitdir entries resolve linked worktree paths" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -664,7 +664,7 @@ test "worktree admin: relative gitdir entries resolve linked worktree paths" {
     new_branch=None,
   )
 
-  move_worktree(
+  @bit_lib.move_worktree(
     fs,
     fs,
     "/repo",
@@ -673,10 +673,10 @@ test "worktree admin: relative gitdir entries resolve linked worktree paths" {
     relative_paths=Some(true),
   )
 
-  let worktrees = list_worktrees(fs, "/repo")
+  let worktrees = @bit_lib.list_worktrees(fs, "/repo")
   @test.assert_eq(worktrees.length(), 2)
   @test.assert_eq(worktrees[1].path, "/repo/relative")
-  remove_worktree(fs, fs, "/repo", "relative")
+  @bit_lib.remove_worktree(fs, fs, "/repo", "relative")
   assert_false(fs.is_dir("/repo/relative"))
   assert_false(fs.is_dir("/repo/.git/worktrees/source"))
 }
@@ -690,7 +690,7 @@ test "worktree admin: create_worktree honors worktree.useRelativePaths" {
     "[worktree]\n\tuseRelativePaths = true\n",
   )
 
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -716,7 +716,7 @@ test "worktree admin: create_worktree honors worktree.useRelativePaths" {
 ///|
 test "worktree admin: create_worktree sanitizes funny basename" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -735,7 +735,7 @@ test "worktree admin: create_worktree rejects existing orphan branch" {
     "/repo/.git/refs/heads/existingbranch", "0123456789abcdef0123456789abcdef01234567\n",
   )
   let err = try {
-    create_worktree(
+    @bit_lib.create_worktree(
       fs,
       fs,
       "/repo",
@@ -754,7 +754,7 @@ test "worktree admin: create_worktree rejects existing orphan branch" {
 ///|
 test "worktree admin: remove_worktree ignores empty uninitialized submodule directory" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -764,12 +764,12 @@ test "worktree admin: remove_worktree ignores empty uninitialized submodule dire
     new_branch=None,
   )
   let admin_dir = "/repo/.git/worktrees/destination"
-  let entries = read_index_entries(fs, admin_dir)
-  entries.push(IndexEntry::new("sub", entries[0].id, 0o160000, 0))
-  write_index_entries(fs, admin_dir, entries)
+  let entries = @bit_lib.read_index_entries(fs, admin_dir)
+  entries.push(@bit_lib.IndexEntry::new("sub", entries[0].id, 0o160000, 0))
+  @bit_lib.write_index_entries(fs, admin_dir, entries)
   fs.mkdir_p("/repo/destination/sub")
 
-  remove_worktree(fs, fs, "/repo", "destination")
+  @bit_lib.remove_worktree(fs, fs, "/repo", "destination")
 
   assert_false(fs.is_dir("/repo/destination"))
   assert_false(fs.is_dir(admin_dir))
@@ -778,7 +778,7 @@ test "worktree admin: remove_worktree ignores empty uninitialized submodule dire
 ///|
 test "worktree admin: repair rejects explicit path that is not a directory" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -791,7 +791,7 @@ test "worktree admin: repair rejects explicit path that is not a directory" {
   fs.write_string("/repo/notdir", "file\n")
 
   let err = try {
-    ignore(repair_worktree_detailed(fs, fs, "/repo", worktree_paths=["notdir"]))
+    ignore(@bit_lib.repair_worktree_detailed(fs, fs, "/repo", worktree_paths=["notdir"]))
     None
   } catch {
     err => Some(err.to_string())
@@ -806,7 +806,7 @@ test "worktree admin: repair rejects invalid explicit path without linked worktr
 
   let err = try {
     ignore(
-      repair_worktree_detailed(fs, fs, "/repo", worktree_paths=["/notvalid"]),
+      @bit_lib.repair_worktree_detailed(fs, fs, "/repo", worktree_paths=["/notvalid"]),
     )
     None
   } catch {
@@ -819,7 +819,7 @@ test "worktree admin: repair rejects invalid explicit path without linked worktr
 ///|
 test "worktree admin: repair rejects explicit path whose .git is a directory" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -829,12 +829,12 @@ test "worktree admin: repair rejects explicit path whose .git is a directory" {
     new_branch=None,
   )
   remove_test_dir(fs, "/repo/repo")
-  ignore(init_repo(fs, "/repo/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo/repo")) catch {
     _ => ()
   }
 
   let err = try {
-    ignore(repair_worktree_detailed(fs, fs, "/repo", worktree_paths=["repo"]))
+    ignore(@bit_lib.repair_worktree_detailed(fs, fs, "/repo", worktree_paths=["repo"]))
     None
   } catch {
     err => Some(err.to_string())
@@ -846,7 +846,7 @@ test "worktree admin: repair rejects explicit path whose .git is a directory" {
 ///|
 test "worktree admin: repair rejects implicit path that is not a directory" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -859,7 +859,7 @@ test "worktree admin: repair rejects implicit path that is not a directory" {
   fs.write_string("/repo/notdir", "file\n")
 
   let err = try {
-    ignore(repair_worktree_detailed(fs, fs, "/repo"))
+    ignore(@bit_lib.repair_worktree_detailed(fs, fs, "/repo"))
     None
   } catch {
     err => Some(err.to_string())
@@ -871,7 +871,7 @@ test "worktree admin: repair rejects implicit path that is not a directory" {
 ///|
 test "worktree admin: repair recreates missing gitfile with warning" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -882,7 +882,7 @@ test "worktree admin: repair recreates missing gitfile with warning" {
   )
   fs.remove_file("/repo/corrupt/.git")
 
-  let result = repair_worktree_detailed(fs, fs, "/repo")
+  let result = @bit_lib.repair_worktree_detailed(fs, fs, "/repo")
 
   assert_true(result.warnings.contains(".git file broken: /repo/corrupt"))
   assert_true(result.repaired.contains(".git: /repo/corrupt"))
@@ -895,7 +895,7 @@ test "worktree admin: repair recreates missing gitfile with warning" {
 ///|
 test "worktree admin: repair explicit moved path updates stale gitdir" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -908,7 +908,7 @@ test "worktree admin: repair explicit moved path updates stale gitdir" {
   fs.write_string("/repo/moved/.git", fs.read_string("/repo/orig/.git"))
   remove_test_dir(fs, "/repo/orig")
 
-  let result = repair_worktree_detailed(fs, fs, "/repo", worktree_paths=[
+  let result = @bit_lib.repair_worktree_detailed(fs, fs, "/repo", worktree_paths=[
     "moved",
   ])
 
@@ -935,7 +935,7 @@ test "worktree admin: repair respects configured relative paths for missing gitf
     fs.read_string("/repo/.git/config") +
     "[worktree]\n\tuseRelativePaths = true\n",
   )
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -946,7 +946,7 @@ test "worktree admin: repair respects configured relative paths for missing gitf
   )
   fs.remove_file("/repo/wt/.git")
 
-  let result = repair_worktree_detailed(fs, fs, "/repo")
+  let result = @bit_lib.repair_worktree_detailed(fs, fs, "/repo")
 
   assert_true(result.warnings.contains(".git file broken: /repo/wt"))
   @test.assert_eq(
@@ -958,7 +958,7 @@ test "worktree admin: repair respects configured relative paths for missing gitf
 ///|
 test "worktree admin: repair defaults relative repository to absolute paths" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -972,7 +972,7 @@ test "worktree admin: repair defaults relative repository to absolute paths" {
   fs.write_string("/repo/sidemoved/.git", fs.read_string("/repo/side/.git"))
   remove_test_dir(fs, "/repo/side")
 
-  let result = repair_worktree_detailed(fs, fs, "/repo", worktree_paths=[
+  let result = @bit_lib.repair_worktree_detailed(fs, fs, "/repo", worktree_paths=[
     "sidemoved",
   ])
 
@@ -994,7 +994,7 @@ test "worktree admin: repair defaults relative repository to absolute paths" {
 ///|
 test "worktree admin: repair rejects explicit path whose gitfile points to non repository" {
   let fs = setup_worktree_repo_fs()
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -1007,7 +1007,7 @@ test "worktree admin: repair rejects explicit path whose gitfile points to non r
   fs.write_string("/repo/side/.git", "gitdir: /repo/not-a-repo\n")
 
   let err = try {
-    ignore(repair_worktree_detailed(fs, fs, "/repo", worktree_paths=["side"]))
+    ignore(@bit_lib.repair_worktree_detailed(fs, fs, "/repo", worktree_paths=["side"]))
     None
   } catch {
     err => Some(err.to_string())

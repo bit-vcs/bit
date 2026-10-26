@@ -1,17 +1,17 @@
 ///|
 fn raw_to_hex(raw : FixedArray[Byte]) -> String {
-  hex_encode(raw)
+  @bit_hash.hex_encode(raw)
 }
 
 ///|
 test "sha1_raw empty" {
-  let got = sha1_raw(Bytes::from_array([])) |> raw_to_hex
+  let got = @bit_hash.sha1_raw(Bytes::from_array([])) |> raw_to_hex
   inspect(got, content="da39a3ee5e6b4b0d3255bfef95601890afd80709")
 }
 
 ///|
 test "sha1_raw abc" {
-  let got = sha1_raw(Bytes::from_array([b'a', b'b', b'c'])) |> raw_to_hex
+  let got = @bit_hash.sha1_raw(Bytes::from_array([b'a', b'b', b'c'])) |> raw_to_hex
   inspect(got, content="a9993e364706816aba3e25717850c26c9cd0d89d")
 }
 
@@ -19,13 +19,13 @@ test "sha1_raw abc" {
 test "sha1_prefixed_raw: git blob object" {
   let prefix = Bytes::from_array([b'b', b'l', b'o', b'b', b' ', b'3', b'\x00'])
   let content = Bytes::from_array([b'a', b'b', b'c'])
-  let got = sha1_prefixed_raw(prefix, content) |> raw_to_hex
+  let got = @bit_hash.sha1_prefixed_raw(prefix, content) |> raw_to_hex
   inspect(got, content="f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f")
 }
 
 ///|
 test "Sha1State: abc" {
-  let state = Sha1State::new()
+  let state = @bit_hash.Sha1State::new()
   state.update(Bytes::from_array([b'a', b'b', b'c']))
   let got = state.finish_raw() |> raw_to_hex
   inspect(got, content="a9993e364706816aba3e25717850c26c9cd0d89d")
@@ -38,8 +38,8 @@ test "Sha1State: large input matches sha1_raw" {
   let bytes = Bytes::from_array(
     long_str.to_array().map(fn(c) { c.to_int().to_byte() }),
   )
-  let expected = sha1_raw(bytes) |> raw_to_hex
-  let state = Sha1State::new()
+  let expected = @bit_hash.sha1_raw(bytes) |> raw_to_hex
+  let state = @bit_hash.Sha1State::new()
   state.update(bytes)
   let got = state.finish_raw() |> raw_to_hex
   inspect(got == expected, content="true")
@@ -62,8 +62,8 @@ test "sha1_raw: one-shot matches Sha1State across padding boundaries" {
       data.push(((i * 31 + 7) % 251).to_byte())
     }
     let input = Bytes::from_array(data)
-    let one_shot = sha1_raw(input) |> raw_to_hex
-    let state = Sha1State::new()
+    let one_shot = @bit_hash.sha1_raw(input) |> raw_to_hex
+    let state = @bit_hash.Sha1State::new()
     state.update(input)
     let incremental = state.finish_raw() |> raw_to_hex
     inspect(one_shot == incremental, content="true")
@@ -82,6 +82,6 @@ test "sha1_raw: 35-byte input" {
   for c in key {
     data.push(c.to_int().to_byte())
   }
-  let got = sha1_raw(Bytes::from_array(data)) |> raw_to_hex
+  let got = @bit_hash.sha1_raw(Bytes::from_array(data)) |> raw_to_hex
   inspect(got, content="11db444b9672b9977348f8f051eb3288d6dbea0c")
 }

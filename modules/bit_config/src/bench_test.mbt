@@ -40,7 +40,7 @@ let bench_large_config : String = bench_make_large_config(100)
 ///|
 test "bench config_lines_from_content small" (b : @bench.T) {
   b.bench(fn() {
-    let lines = config_lines_from_content(bench_small_config)
+    let lines = @bit_config.config_lines_from_content(bench_small_config)
     b.keep(lines.length())
   })
 }
@@ -48,7 +48,7 @@ test "bench config_lines_from_content small" (b : @bench.T) {
 ///|
 test "bench config_lines_from_content 100 remotes" (b : @bench.T) {
   b.bench(fn() {
-    let lines = config_lines_from_content(bench_large_config)
+    let lines = @bit_config.config_lines_from_content(bench_large_config)
     b.keep(lines.length())
   })
 }
@@ -56,7 +56,7 @@ test "bench config_lines_from_content 100 remotes" (b : @bench.T) {
 ///|
 test "bench get_config_value_from_content small" (b : @bench.T) {
   b.bench(fn() {
-    let v = get_config_value_from_content(
+    let v = @bit_config.get_config_value_from_content(
       bench_small_config,
       "remote.origin.url",
       None,
@@ -70,7 +70,7 @@ test "bench get_config_value_from_content small" (b : @bench.T) {
 test "bench get_config_value_from_content miss" (b : @bench.T) {
   // Worst case: scan the entire file without finding the key.
   b.bench(fn() {
-    let v = get_config_value_from_content(
+    let v = @bit_config.get_config_value_from_content(
       bench_large_config,
       "branch.does-not-exist.remote",
       None,
@@ -83,7 +83,7 @@ test "bench get_config_value_from_content miss" (b : @bench.T) {
 ///|
 test "bench get_all_config_values_from_content remote.*.url" (b : @bench.T) {
   b.bench(fn() {
-    let values = get_all_config_values_from_content(
+    let values = @bit_config.get_all_config_values_from_content(
       bench_large_config,
       "remote.url",
       None,
@@ -97,7 +97,7 @@ test "bench get_all_config_values_from_content remote.*.url" (b : @bench.T) {
 test "bench parse_section_header_line subsection" (b : @bench.T) {
   let line = "[submodule \"vendored/library/path\"]"
   b.bench(fn() {
-    let parsed = parse_section_header_line(line)
+    let parsed = @bit_config.parse_section_header_line(line)
     b.keep(parsed is Some(_))
   })
 }
@@ -106,7 +106,7 @@ test "bench parse_section_header_line subsection" (b : @bench.T) {
 test "bench parse_config_key dotted" (b : @bench.T) {
   let key = "remote.origin.fetch"
   b.bench(fn() {
-    let parsed = parse_config_key(key)
+    let parsed = @bit_config.parse_config_key(key)
     b.keep(parsed is Some(_))
   })
 }
@@ -114,7 +114,7 @@ test "bench parse_config_key dotted" (b : @bench.T) {
 ///|
 test "bench parse_bool_keyword_value" (b : @bench.T) {
   b.bench(fn() {
-    let v = parse_bool_keyword_value("true")
+    let v = @bit_config.parse_bool_keyword_value("true")
     b.keep(v is Some(_))
   })
 }
@@ -122,7 +122,7 @@ test "bench parse_bool_keyword_value" (b : @bench.T) {
 ///|
 test "bench config_parse_size_value 1M" (b : @bench.T) {
   b.bench(fn() {
-    let v = config_parse_size_value("1m")
+    let v = @bit_config.config_parse_size_value("1m")
     b.keep(v is Some(_))
   })
 }

@@ -23,4 +23,3 @@ pub fn collect_reachable_objects_from_commits(@bit_lib.ObjectDb, &@bit_types.Rep
 // Type aliases
 
 // Traits
-

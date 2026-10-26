@@ -33,11 +33,11 @@ pub fn bisect_mark_ancestors(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.O
 
 pub fn bisect_shell_quote_args(Array[String]) -> String
 
-pub fn bisect_steps(Int) -> Int
+pub fn bisect_steps(Int32) -> Int32
 
-pub fn build_receive_pack_advertisement(&@bit_types.RepoFileSystem, String, agent? : String, protocol_version? : Int, extra_haves? : Array[@bit_object.ObjectId], git_dir_override? : String, advertise_push_options? : Bool, cert_nonce? : String) -> Bytes raise @bit_object.GitError
+pub fn build_receive_pack_advertisement(&@bit_types.RepoFileSystem, String, agent? : String, protocol_version? : Int32, extra_haves? : Array[@bit_object.ObjectId], git_dir_override? : String, advertise_push_options? : Bool, cert_nonce? : String) -> Bytes raise @bit_object.GitError
 
-pub fn build_upload_pack_advertisement(&@bit_types.RepoFileSystem, String, agent? : String, protocol_version? : Int, git_dir_override? : String) -> Bytes raise @bit_object.GitError
+pub fn build_upload_pack_advertisement(&@bit_types.RepoFileSystem, String, agent? : String, protocol_version? : Int32, git_dir_override? : String) -> Bytes raise @bit_object.GitError
 
 pub fn build_upload_pack_config_with_overrides(&@bit_types.RepoFileSystem, String, Map[String, String]) -> UploadPackConfig
 
@@ -131,7 +131,7 @@ pub fn delete_tag(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, St
 
 pub fn detect_git_dir(&@bit_types.RepoFileSystem, String) -> (String, Bool)?
 
-pub fn detect_protocol_version(Bytes) -> Int
+pub fn detect_protocol_version(Bytes) -> Int32
 
 pub fn diff_index(&@bit_types.RepoFileSystem, String, db? : ObjectDb) -> Array[DiffFile] raise @bit_object.GitError
 
@@ -139,7 +139,7 @@ pub fn diff_stat(Array[DiffFile]) -> Array[String]
 
 pub fn diff_text(Array[DiffFile]) -> Array[String]
 
-pub fn diff_tree_abbrev_hex(String, Int?) -> String
+pub fn diff_tree_abbrev_hex(String, Int32?) -> String
 
 pub fn diff_tree_filter_matches(String?, String) -> Bool
 
@@ -147,7 +147,7 @@ pub fn diff_trees(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId?, @bi
 
 pub async fn diff_worktree(&@bit_types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> Array[DiffFile] raise @bit_object.GitError
 
-pub async fn execute_interactive_todo(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, InteractiveRebaseState, async (String) -> String?, exec_runner? : (async (String) -> Int)?) -> InteractiveRebaseResult raise @bit_object.GitError
+pub async fn execute_interactive_todo(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, InteractiveRebaseState, async (String) -> String?, exec_runner? : (async (String) -> Int32)?) -> InteractiveRebaseResult raise @bit_object.GitError
 
 pub fn expand_sparse_index_entries(&@bit_types.RepoFileSystem, String, Array[IndexEntry]) -> Array[IndexEntry] raise @bit_object.GitError
 
@@ -159,7 +159,7 @@ pub fn find_tree_entry(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectI
 
 pub fn format_remove_warning(Array[String]) -> String
 
-pub fn fsck_connectivity_check(ObjectDb, &@bit_types.RepoFileSystem, Array[@bit_object.ObjectId], collect_extra? : Bool) -> FsckResult
+pub fn fsck_connectivity_check(ObjectDb, &@bit_types.RepoFileSystem, Array[@bit_object.ObjectId], collect_extra? : Bool, shallow? : Array[@bit_object.ObjectId]) -> FsckResult
 
 pub fn fsck_enumerate_objects(ObjectDb) -> Array[String]
 
@@ -173,7 +173,7 @@ pub fn generate_interactive_todo_text(ObjectDb, &@bit_types.RepoFileSystem, Arra
 
 pub fn get_effective_remote_url(&@bit_types.RepoFileSystem, String) -> String?
 
-pub fn get_protocol_version() -> Int
+pub fn get_protocol_version() -> Int32
 
 pub fn get_reflog_path(String, String) -> String
 
@@ -203,11 +203,11 @@ pub fn insert_exec_after_picks(Array[InteractiveTodoEntry], Array[String]) -> Ar
 
 pub fn interactive_rebase_abort_impl(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit raise @bit_object.GitError
 
-pub async fn interactive_rebase_continue_impl(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, async (String) -> String?, exec_runner? : (async (String) -> Int)?) -> InteractiveRebaseResult raise @bit_object.GitError
+pub async fn interactive_rebase_continue_impl(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, async (String) -> String?, exec_runner? : (async (String) -> Int32)?) -> InteractiveRebaseResult raise @bit_object.GitError
 
-pub async fn interactive_rebase_skip_impl(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, async (String) -> String?, exec_runner? : (async (String) -> Int)?) -> InteractiveRebaseResult raise @bit_object.GitError
+pub async fn interactive_rebase_skip_impl(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, async (String) -> String?, exec_runner? : (async (String) -> Int32)?) -> InteractiveRebaseResult raise @bit_object.GitError
 
-pub async fn interactive_rebase_start(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId, async (String) -> String?, async (String) -> String?, autosquash? : Bool, exec_runner? : (async (String) -> Int)?, exec_cmds? : Array[String], update_refs? : Bool, root_mode? : Bool, rebase_merges? : Bool) -> InteractiveRebaseResult raise @bit_object.GitError
+pub async fn interactive_rebase_start(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId, async (String) -> String?, async (String) -> String?, autosquash? : Bool, exec_runner? : (async (String) -> Int32)?, exec_cmds? : Array[String], update_refs? : Bool, root_mode? : Bool, rebase_merges? : Bool) -> InteractiveRebaseResult raise @bit_object.GitError
 
 pub fn is_ancestor_of(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId) -> Bool
 
@@ -241,11 +241,11 @@ pub fn is_subdir_clone(&@bit_types.RepoFileSystem, String) -> Bool
 
 pub fn is_valid_remote_name(String) -> Bool
 
-pub fn last_modified_collect_entries(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String, Int, Int, Bool, Array[String], Array[LmPath]) -> Unit raise @bit_object.GitError
+pub fn last_modified_collect_entries(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String, Int32, Int32, Bool, Array[String], Array[LmPath]) -> Unit raise @bit_object.GitError
 
 pub fn last_modified_committer_ts(Bytes) -> Int64
 
-pub fn last_modified_compute(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String, Int, Bool, Int, Array[@bit_object.ObjectId], Array[String]) -> Array[LmResult] raise @bit_object.GitError
+pub fn last_modified_compute(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String, Int32, Bool, Int32, Array[@bit_object.ObjectId], Array[String]) -> Array[LmResult] raise @bit_object.GitError
 
 pub fn last_modified_pathspec_matches(String, Array[String]) -> Bool
 
@@ -297,9 +297,9 @@ pub fn load_rebase_state(&@bit_types.RepoFileSystem, String) -> RebaseState? rai
 
 pub fn lock_worktree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, reason~ : String?) -> Unit raise @bit_object.GitError
 
-pub fn log_head(&@bit_types.RepoFileSystem, String, max_count? : Int, since? : Int64, until? : Int64, include_parent_tree? : Bool) -> Array[LogEntry] raise @bit_object.GitError
+pub fn log_head(&@bit_types.RepoFileSystem, String, max_count? : Int32, since? : Int64, until? : Int64, include_parent_tree? : Bool) -> Array[LogEntry] raise @bit_object.GitError
 
-pub fn log_head_oneline(&@bit_types.RepoFileSystem, String, max_count? : Int, since? : Int64, until? : Int64) -> Array[String] raise @bit_object.GitError
+pub fn log_head_oneline(&@bit_types.RepoFileSystem, String, max_count? : Int32, since? : Int64, until? : Int64) -> Array[String] raise @bit_object.GitError
 
 pub fn ls_refs_v2(&@bit_types.RepoFileSystem, String, UploadPackRequestV2, git_dir_override? : String) -> Bytes raise @bit_object.GitError
 
@@ -321,7 +321,7 @@ pub fn move_tree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Str
 
 pub fn move_tree_safe(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit raise @bit_object.GitError
 
-pub fn move_worktree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, force? : Bool, force_level? : Int, relative_paths? : Bool?) -> Unit raise @bit_object.GitError
+pub fn move_worktree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, force? : Bool, force_level? : Int32, relative_paths? : Bool?) -> Unit raise @bit_object.GitError
 
 pub fn mv_path(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, force? : Bool) -> Unit raise @bit_object.GitError
 
@@ -337,7 +337,7 @@ pub fn normalize_track_ref(String) -> String
 
 pub fn normalize_worktree_content(Bytes, AutoCrlf) -> Bytes
 
-pub fn parse_at_minus_prefix(String) -> (Int, String)?
+pub fn parse_at_minus_prefix(String) -> (Int32, String)?
 
 pub fn parse_config_blocks(String) -> Array[ConfigBlock]
 
@@ -353,7 +353,7 @@ pub fn parse_fetch_refspecs(Array[String]) -> Array[FetchRefspec]
 
 pub fn parse_github_shorthand(String) -> GitHubShorthand?
 
-pub fn parse_index_pathspec(String) -> (Int, String?)
+pub fn parse_index_pathspec(String) -> (Int32, String?)
 
 pub fn parse_interactive_todo(String) -> Array[InteractiveTodoEntry]
 
@@ -367,13 +367,13 @@ pub fn parse_receive_pack_request(Bytes) -> ReceivePackRequest raise @bit_object
 
 pub fn parse_reflog_date_selector(String) -> (String, String)?
 
-pub fn parse_reflog_selector(String) -> (String, Int)?
+pub fn parse_reflog_selector(String) -> (String, Int32)?
 
 pub fn parse_refspec_pair(String) -> (String, String)
 
 pub fn parse_remote_config(String) -> (Map[String, RemoteConfig], Map[String, BranchConfig])
 
-pub fn parse_rev_parse_short_length(String) -> Int?
+pub fn parse_rev_parse_short_length(String) -> Int32?
 
 pub fn parse_section_header(String) -> (String, String?)
 
@@ -383,11 +383,11 @@ pub fn parse_upload_pack_request(Bytes) -> UploadPackRequest raise @bit_object.G
 
 pub fn parse_upload_pack_request_v2(Bytes) -> UploadPackRequestV2 raise @bit_object.GitError
 
-pub fn parseopt_find_char(String, Char) -> Int?
+pub fn parseopt_find_char(String, Char) -> Int32?
 
-pub fn parseopt_find_flags(String) -> Int
+pub fn parseopt_find_flags(String) -> Int32
 
-pub fn parseopt_find_space(String) -> Int?
+pub fn parseopt_find_space(String) -> Int32?
 
 pub fn parseopt_skipspaces(String) -> String
 
@@ -399,7 +399,7 @@ pub fn prune_worktrees(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, Strin
 
 pub fn prune_worktrees_detailed(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, dry_run? : Bool, expire_before_sec? : Int64?) -> Array[PrunedWorktreeEntry] raise @bit_object.GitError
 
-pub fn read_assume_unchanged_paths(&@bit_types.RepoFileSystem, String, hash_size? : Int) -> Map[String, Bool]
+pub fn read_assume_unchanged_paths(&@bit_types.RepoFileSystem, String, hash_size? : Int32) -> Map[String, Bool]
 
 pub fn read_autocrlf_setting(&@bit_types.RepoFileSystem, String) -> AutoCrlf
 
@@ -437,7 +437,7 @@ pub fn read_repo_config(&@bit_types.RepoFileSystem, String) -> (Map[String, Remo
 
 pub fn read_resolve_undo_entries(&@bit_types.RepoFileSystem, String) -> Array[ResolveUndoEntry] raise @bit_object.GitError
 
-pub fn read_skip_worktree_paths(&@bit_types.RepoFileSystem, String, hash_size? : Int) -> Map[String, Bool]
+pub fn read_skip_worktree_paths(&@bit_types.RepoFileSystem, String, hash_size? : Int32) -> Map[String, Bool]
 
 pub fn read_sparse_display_patterns(&@bit_types.RepoFileSystem, String) -> Array[String] raise @bit_object.GitError
 
@@ -491,7 +491,7 @@ pub fn remove_remote_refs(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, St
 
 pub fn remove_tree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit
 
-pub fn remove_worktree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, force? : Bool, force_level? : Int) -> Unit raise @bit_object.GitError
+pub fn remove_worktree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, force? : Bool, force_level? : Int32) -> Unit raise @bit_object.GitError
 
 pub fn rename_branch(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, force? : Bool, author? : String, email? : String, timestamp? : Int64, timezone? : String) -> Unit raise @bit_object.GitError
 
@@ -535,15 +535,15 @@ pub fn resolve_ref_for_subdir(&@bit_types.RepoFileSystem, String, String) -> @bi
 
 pub fn restore_paths(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[String]) -> Unit raise @bit_object.GitError
 
-pub fn rev_list_find_range_dots(String) -> (Int, Bool)?
+pub fn rev_list_find_range_dots(String) -> (Int32, Bool)?
 
 pub fn rev_list_glob_match(String, String) -> Bool
 
-pub fn rev_list_normalize_max_count(Int?) -> Int?
+pub fn rev_list_normalize_max_count(Int32?) -> Int32?
 
-pub fn rev_list_normalize_skip(Int) -> Int
+pub fn rev_list_normalize_skip(Int32) -> Int32
 
-pub fn rev_list_window(Int, Int, Int?) -> (Int, Int)
+pub fn rev_list_window(Int32, Int32, Int32?) -> (Int32, Int32)
 
 pub fn rev_parse(&@bit_types.RepoFileSystem, String, String) -> @bit_object.ObjectId? raise @bit_object.GitError
 
@@ -579,7 +579,7 @@ pub fn set_config_key(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String
 
 pub fn shell_single_quote(String) -> String
 
-pub fn shorten_oid_hex(String, Int) -> String
+pub fn shorten_oid_hex(String, Int32) -> String
 
 pub fn should_log_ref(&@bit_types.RepoFileSystem, String, String, Bool) -> (Bool, Bool) raise @bit_object.GitError
 
@@ -615,19 +615,19 @@ pub fn split_config_key(String, String) -> (String, String)?
 
 pub fn split_whitespace_all(String) -> Array[String]
 
-pub fn stash_apply(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Int, Bool) -> Unit raise @bit_object.GitError
+pub fn stash_apply(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Int32, Bool) -> Unit raise @bit_object.GitError
 
 pub fn stash_collect_paths(Map[String, TreeFileEntry], Map[String, TreeFileEntry]) -> Array[String]
 
-pub fn stash_drop(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Int) -> Unit raise @bit_object.GitError
+pub fn stash_drop(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Int32) -> Unit raise @bit_object.GitError
 
 pub fn stash_list(&@bit_types.RepoFileSystem, String) -> Array[StashEntry] raise @bit_object.GitError
 
-pub fn stash_mode_str(Int) -> String
+pub fn stash_mode_str(Int32) -> String
 
 pub async fn stash_push(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, Int64) -> @bit_object.ObjectId? raise @bit_object.GitError
 
-pub async fn stash_push_patch(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, Int64, async (StashPatchHunk, Int, Int) -> Bool) -> @bit_object.ObjectId? raise @bit_object.GitError
+pub async fn stash_push_patch(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, Int64, async (StashPatchHunk, Int32, Int32) -> Bool) -> @bit_object.ObjectId? raise @bit_object.GitError
 
 pub async fn status(&@bit_types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> Status raise @bit_object.GitError
 
@@ -659,17 +659,17 @@ pub fn upload_pack_v2(&@bit_types.RepoFileSystem, String, UploadPackRequestV2, U
 
 pub fn working_files_cache(String) -> Array[String]?
 
-pub fn write_index_entries(&@bit_types.FileSystem, String, Array[IndexEntry], hash_size? : Int) -> Unit raise @bit_object.GitError
+pub fn write_index_entries(&@bit_types.FileSystem, String, Array[IndexEntry], hash_size? : Int32) -> Unit raise @bit_object.GitError
 
 pub fn write_index_entries_preserving_cache_tree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[IndexEntry]) -> Unit raise @bit_object.GitError
 
-pub fn write_index_entries_with_flags(&@bit_types.FileSystem, String, Array[IndexEntry], Map[String, Bool], Map[String, Bool], hash_size? : Int) -> Unit raise @bit_object.GitError
+pub fn write_index_entries_with_flags(&@bit_types.FileSystem, String, Array[IndexEntry], Map[String, Bool], Map[String, Bool], hash_size? : Int32) -> Unit raise @bit_object.GitError
 
-pub fn write_index_entries_with_skip_worktree(&@bit_types.FileSystem, String, Array[IndexEntry], Map[String, Bool], hash_size? : Int) -> Unit raise @bit_object.GitError
+pub fn write_index_entries_with_skip_worktree(&@bit_types.FileSystem, String, Array[IndexEntry], Map[String, Bool], hash_size? : Int32) -> Unit raise @bit_object.GitError
 
 pub fn write_index_entries_with_tree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[IndexEntry], @bit_object.ObjectId) -> Unit raise @bit_object.GitError
 
-pub fn write_index_stage_entries(&@bit_types.FileSystem, String, Array[IndexStageEntry], hash_size? : Int) -> Unit raise @bit_object.GitError
+pub fn write_index_stage_entries(&@bit_types.FileSystem, String, Array[IndexStageEntry], hash_size? : Int32) -> Unit raise @bit_object.GitError
 
 pub fn write_loose_object(&@bit_types.FileSystem, String, @bit_object.ObjectType, Bytes, algo? : @bit_object.HashAlgorithm) -> @bit_object.ObjectId raise @bit_object.GitError
 
@@ -730,19 +730,19 @@ pub(all) struct CommitGraphCommitInfo {
 
 pub struct CommitGraphFile {
   data : Bytes
-  hash_size : Int
-  num_commits : Int
-  oidf_offset : Int
-  oidl_offset : Int
-  cdat_offset : Int
-  edge_offset : Int
+  hash_size : Int32
+  num_commits : Int32
+  oidf_offset : Int32
+  oidl_offset : Int32
+  cdat_offset : Int32
+  edge_offset : Int32
 }
-pub fn CommitGraphFile::find_commit(Self, @bit_object.ObjectId) -> Int
-pub fn CommitGraphFile::get_oid(Self, Int) -> @bit_object.ObjectId
+pub fn CommitGraphFile::find_commit(Self, @bit_object.ObjectId) -> Int32
+pub fn CommitGraphFile::get_oid(Self, Int32) -> @bit_object.ObjectId
 pub fn CommitGraphFile::load(&@bit_types.RepoFileSystem, String) -> Self? raise @bit_object.GitError
-pub fn CommitGraphFile::read_commit(Self, Int) -> (@bit_object.ObjectId, Array[@bit_object.ObjectId], Int64)
-pub fn CommitGraphFile::read_commit_info(Self, Int) -> CommitGraphCommitInfo
-pub fn CommitGraphFile::synthesize_commit_object(Self, Int, @bit_object.ObjectId) -> @bit_object.PackObject
+pub fn CommitGraphFile::read_commit(Self, Int32) -> (@bit_object.ObjectId, Array[@bit_object.ObjectId], Int64)
+pub fn CommitGraphFile::read_commit_info(Self, Int32) -> CommitGraphCommitInfo
+pub fn CommitGraphFile::synthesize_commit_object(Self, Int32, @bit_object.ObjectId) -> @bit_object.PackObject
 
 pub(all) struct ConfigBlock {
   mut header : String?
@@ -756,8 +756,8 @@ pub struct DiffFile {
   kind : DiffKind
   old_content : Bytes?
   new_content : Bytes?
-  old_mode : Int?
-  new_mode : Int?
+  old_mode : Int32?
+  new_mode : Int32?
 }
 
 pub enum DiffKind {
@@ -789,7 +789,7 @@ pub(all) struct FilterCmd {
 }
 
 pub struct FsckResult {
-  errors : Int
+  errors : Int32
   reachable : Map[String, Bool]
   missing : Map[String, Bool]
   root_commits : Array[String]
@@ -806,6 +806,11 @@ pub(all) enum GitHubShorthand {
   Subdir(String, String, String?)
   File(String, String)
 } derive(Eq, @debug.Debug)
+pub fn GitHubShorthand::equal(Self, Self) -> Bool
+pub fn GitHubShorthand::not_equal(Self, Self) -> Bool
+pub fn GitHubShorthand::output(Self, &Logger) -> Unit
+pub fn GitHubShorthand::to_repr(Self) -> @debug.Repr
+pub fn GitHubShorthand::to_string(Self) -> String
 pub impl Show for GitHubShorthand
 
 pub enum HeadRef {
@@ -818,6 +823,8 @@ pub(all) enum HistoryEmptyAction {
   Keep
   Abort
 } derive(Eq)
+pub fn HistoryEmptyAction::equal(Self, Self) -> Bool
+pub fn HistoryEmptyAction::not_equal(Self, Self) -> Bool
 
 pub(all) struct HistoryFixupResult {
   updates : Array[HistoryRefUpdate]
@@ -829,9 +836,11 @@ pub(all) struct HistoryRefUpdate {
   old_id : @bit_object.ObjectId
   new_id : @bit_object.ObjectId
 } derive(Eq)
+pub fn HistoryRefUpdate::equal(Self, Self) -> Bool
+pub fn HistoryRefUpdate::not_equal(Self, Self) -> Bool
 
 pub struct HttpResponse {
-  status : Int
+  status : Int32
   headers : Map[String, String]
   body : Bytes
 }
@@ -839,23 +848,23 @@ pub struct HttpResponse {
 pub struct IndexEntry {
   path : String
   id : @bit_object.ObjectId
-  mode : Int
-  size : Int
-  mtime_sec : Int
-  mtime_nsec : Int
+  mode : Int32
+  size : Int32
+  mtime_sec : Int32
+  mtime_nsec : Int32
   intent_to_add : Bool
-  dev : Int
-  ino : Int
-  uid : Int
-  gid : Int
+  dev : Int32
+  ino : Int32
+  uid : Int32
+  gid : Int32
 }
-pub fn IndexEntry::new(String, @bit_object.ObjectId, Int, Int, mtime_sec? : Int, mtime_nsec? : Int, intent_to_add? : Bool, dev? : Int, ino? : Int, uid? : Int, gid? : Int) -> Self
+pub fn IndexEntry::new(String, @bit_object.ObjectId, Int32, Int32, mtime_sec? : Int32, mtime_nsec? : Int32, intent_to_add? : Bool, dev? : Int32, ino? : Int32, uid? : Int32, gid? : Int32) -> Self
 
 pub struct IndexStageEntry {
   entry : IndexEntry
-  stage : Int
+  stage : Int32
 }
-pub fn IndexStageEntry::new(IndexEntry, Int) -> Self
+pub fn IndexStageEntry::new(IndexEntry, Int32) -> Self
 
 pub(all) struct InitOptions {
   default_branch : String
@@ -875,7 +884,7 @@ pub struct InteractiveRebaseResult {
   status : InteractiveRebaseStatus
   commit_id : @bit_object.ObjectId?
   message : String
-  exit_code : Int
+  exit_code : Int32
 }
 
 pub struct InteractiveRebaseState {
@@ -903,6 +912,9 @@ pub struct InteractiveTodoEntry {
   commit_hex : String
   subject : String
 } derive(Eq, @debug.Debug)
+pub fn InteractiveTodoEntry::equal(Self, Self) -> Bool
+pub fn InteractiveTodoEntry::not_equal(Self, Self) -> Bool
+pub fn InteractiveTodoEntry::to_repr(Self) -> @debug.Repr
 
 pub struct LazyPackIndex {
   idx_path : String
@@ -918,6 +930,9 @@ pub struct LfsPointer {
   oid : String
   size : Int64
 } derive(Eq, @debug.Debug)
+pub fn LfsPointer::equal(Self, Self) -> Bool
+pub fn LfsPointer::not_equal(Self, Self) -> Bool
+pub fn LfsPointer::to_repr(Self) -> @debug.Repr
 
 pub(all) struct LmCommit {
   id : @bit_object.ObjectId
@@ -968,11 +983,11 @@ pub struct ObjectDb {
   lazy_packs : Array[LazyPackIndex]
   pack_cache : Map[String, Bytes]
   pack_cache_order : Array[String]
-  pack_cache_limit : Int
+  pack_cache_limit : Int32
   decoded_cache : Map[String, @bit_object.PackObject]
   decoded_cache_order : Array[String]
-  mut decoded_cache_bytes : Int
-  decoded_cache_limit : Int
+  mut decoded_cache_bytes : Int32
+  decoded_cache_limit : Int32
   mut prefer_packed : Bool
   mut saw_corrupt_pack : Bool
   mut skip_verify : Bool
@@ -981,7 +996,7 @@ pub struct ObjectDb {
 pub fn ObjectDb::disable_commit_graph(Self) -> Unit
 pub fn ObjectDb::enable_commit_graph(Self, &@bit_types.RepoFileSystem, String) -> Unit
 pub fn ObjectDb::find_delta_base(Self, &@bit_types.RepoFileSystem, @bit_object.ObjectId) -> @bit_object.ObjectId? raise @bit_object.GitError
-pub fn ObjectDb::find_object_disk_size(Self, &@bit_types.RepoFileSystem, @bit_object.ObjectId) -> Int? raise @bit_object.GitError
+pub fn ObjectDb::find_object_disk_size(Self, &@bit_types.RepoFileSystem, @bit_object.ObjectId) -> Int32? raise @bit_object.GitError
 pub fn ObjectDb::get(Self, &@bit_types.RepoFileSystem, @bit_object.ObjectId) -> @bit_object.PackObject? raise @bit_object.GitError
 pub fn ObjectDb::get_commit_graph_commit(Self, @bit_object.ObjectId) -> CommitGraphCommitInfo?
 pub fn ObjectDb::load(&@bit_types.RepoFileSystem, String) -> Self raise @bit_object.GitError
@@ -994,20 +1009,20 @@ pub fn ObjectDb::set_skip_verify(Self, Bool) -> Unit
 pub struct PackIndex {
   pack_path : String
   id_bytes : Bytes
-  hash_size : Int
+  hash_size : Int32
   offsets : Array[Int64]
-  version : Int
+  version : Int32
   mut hex_ids_cache : Array[String]?
-  mut offset_index_cache : Map[Int64, Int]?
+  mut offset_index_cache : Map[Int64, Int32]?
   mut sorted_offsets_cache : Array[Int64]?
 }
 pub fn PackIndex::find_id_by_offset(Self, Int64) -> String?
 pub fn PackIndex::find_offset(Self, @bit_object.ObjectId) -> Int64?
 pub fn PackIndex::find_offset_hex(Self, String) -> Int64?
 pub fn PackIndex::hex_ids(Self) -> Array[String]
-pub fn PackIndex::id_at(Self, Int) -> @bit_object.ObjectId
-pub fn PackIndex::id_count(Self) -> Int
-pub fn PackIndex::id_hex_at(Self, Int) -> String
+pub fn PackIndex::id_at(Self, Int32) -> @bit_object.ObjectId
+pub fn PackIndex::id_count(Self) -> Int32
+pub fn PackIndex::id_hex_at(Self, Int32) -> String
 
 pub struct PromisorDb {
   db : ObjectDb
@@ -1135,8 +1150,8 @@ pub enum RemoteHeadState {
 
 pub struct RepackResult {
   pack_id : @bit_object.ObjectId
-  object_count : Int
-  pack_bytes : Int
+  object_count : Int32
+  pack_bytes : Int32
 }
 
 pub(all) enum ResetMode {
@@ -1153,7 +1168,7 @@ pub struct ResolveUndoEntry {
 }
 
 pub struct ResolveUndoStage {
-  mode : Int
+  mode : Int32
   id : @bit_object.ObjectId
 }
 
@@ -1196,11 +1211,16 @@ pub enum TodoCommand {
   Reset
   Merge
 } derive(Eq, @debug.Debug)
+pub fn TodoCommand::equal(Self, Self) -> Bool
+pub fn TodoCommand::not_equal(Self, Self) -> Bool
+pub fn TodoCommand::output(Self, &Logger) -> Unit
+pub fn TodoCommand::to_repr(Self) -> @debug.Repr
+pub fn TodoCommand::to_string(Self) -> String
 pub impl Show for TodoCommand
 
 pub struct TreeFileEntry {
   id : @bit_object.ObjectId
-  mode : Int
+  mode : Int32
 }
 
 pub(all) struct UploadPackConfig {
@@ -1217,7 +1237,7 @@ pub struct UploadPackRequest {
   capabilities : Array[String]
   done : Bool
   shallow : Array[@bit_object.ObjectId]
-  deepen : Int?
+  deepen : Int32?
 }
 
 pub struct UploadPackRequestV2 {
@@ -1248,6 +1268,9 @@ pub(all) struct WorktreeRepairResult {
   repaired : Array[String]
   warnings : Array[String]
 } derive(Eq, @debug.Debug)
+pub fn WorktreeRepairResult::equal(Self, Self) -> Bool
+pub fn WorktreeRepairResult::not_equal(Self, Self) -> Bool
+pub fn WorktreeRepairResult::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

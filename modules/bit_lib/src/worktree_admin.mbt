@@ -719,6 +719,12 @@ pub(all) struct WorktreeRepairResult {
 } derive(Eq, Debug)
 
 ///|
+pub extend WorktreeRepairResult with Eq::{not_equal, equal}
+
+///|
+pub extend WorktreeRepairResult with Debug::{to_repr}
+
+///|
 fn worktree_repair_resolve_requested_path(
   root : String,
   path : String,

@@ -4,8 +4,8 @@
 ///|
 test "packfile parse: blob roundtrip" {
   let content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'])
-  let packfile = create_blob_packfile(content)
-  let objects = parse_packfile(packfile)
+  let packfile = @bit_pack.create_blob_packfile(content)
+  let objects = @bit_pack.parse_packfile(packfile)
   assert_true(objects.length() == 1)
   let obj = objects[0]
   assert_true(obj.obj_type == @bit.ObjectType::Blob)
@@ -29,8 +29,8 @@ test "packfile parse: commit packfile order" {
     "+0000",
     "Test commit\n",
   )
-  let (_, packfile) = create_commit_packfile(blob_content, "hello.txt", commit)
-  let objects = parse_packfile(packfile)
+  let (_, packfile) = @bit_pack.create_commit_packfile(blob_content, "hello.txt", commit)
+  let objects = @bit_pack.parse_packfile(packfile)
   assert_true(objects.length() == 3)
   assert_true(objects[0].obj_type == @bit.ObjectType::Blob)
   assert_true(objects[1].obj_type == @bit.ObjectType::Tree)
@@ -40,7 +40,7 @@ test "packfile parse: commit packfile order" {
 ///|
 test "packfile parse: trailer mismatch" {
   let content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'])
-  let packfile = create_blob_packfile(content)
+  let packfile = @bit_pack.create_blob_packfile(content)
   let bytes : Array[Byte] = []
   for b in packfile {
     bytes.push(b)
@@ -50,7 +50,7 @@ test "packfile parse: trailer mismatch" {
   let tampered = Bytes::from_array(
     FixedArray::makei(bytes.length(), fn(i) { bytes[i] }),
   )
-  try ignore(parse_packfile(tampered)) catch {
+  try ignore(@bit_pack.parse_packfile(tampered)) catch {
     @bit.GitError::HashMismatch(_, _) => ()
     _ => assert_true(false)
   } noraise {

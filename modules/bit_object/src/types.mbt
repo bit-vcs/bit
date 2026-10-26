@@ -124,9 +124,15 @@ pub impl Show for ObjectId with fn output(self, logger) {
 }
 
 ///|
+pub extend ObjectId with Show::{to_string, output}
+
+///|
 pub impl @debug.Debug for ObjectId with fn to_repr(self) {
   @debug.Repr::string(self.to_hex())
 }
+
+///|
+pub extend ObjectId with @debug.Debug::{to_repr}
 
 ///|
 pub impl Eq for ObjectId with fn equal(self, other) {
@@ -140,6 +146,9 @@ pub impl Eq for ObjectId with fn equal(self, other) {
   }
   true
 }
+
+///|
+pub extend ObjectId with Eq::{not_equal, equal}
 
 ///|
 /// Check if a hex string represents the zero (null) object id.
@@ -158,6 +167,9 @@ pub impl Hash for ObjectId with fn hash_combine(self, hasher) {
 }
 
 ///|
+pub extend ObjectId with Hash::{hash, hash_combine}
+
+///|
 /// Git object types
 pub(all) enum ObjectType {
   Blob
@@ -165,6 +177,12 @@ pub(all) enum ObjectType {
   Commit
   Tag
 } derive(Eq, Debug)
+
+///|
+pub extend ObjectType with Eq::{not_equal, equal}
+
+///|
+pub extend ObjectType with @debug.Debug::{to_repr}
 
 ///|
 pub fn ObjectType::to_string(self : ObjectType) -> String {
@@ -192,6 +210,9 @@ pub impl Show for ObjectType with fn output(self, logger) {
 }
 
 ///|
+pub extend ObjectType with Show::{output}
+
+///|
 /// Git operation errors
 pub(all) suberror GitError {
   InvalidObject(String)
@@ -200,6 +221,12 @@ pub(all) suberror GitError {
   ProtocolError(String)
   IoError(String)
 } derive(Debug, Eq)
+
+///|
+pub extend GitError with @debug.Debug::{to_repr}
+
+///|
+pub extend GitError with Eq::{not_equal, equal}
 
 ///|
 fn git_error_show_string(value : String) -> String {
@@ -251,6 +278,9 @@ pub impl Show for GitError with fn output(self, logger) {
       logger.write_string("IoError(" + git_error_show_string(message) + ")")
   }
 }
+
+///|
+pub extend GitError with Show::{to_string, output}
 
 ///|
 /// Tree entry in a Git tree object

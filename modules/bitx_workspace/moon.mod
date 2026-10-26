@@ -10,9 +10,9 @@ import {
   "mizchi/bit_fingerprint@0.48.0",
   "mizchi/bit_osfs@0.48.0",
   "mizchi/bit_utils@0.48.0",
-  "mizchi/bitflow@0.4.1",
-  "moonbitlang/async@0.22.1",
-  "moonbitlang/x@0.5.5",
+  "mizchi/bitflow@0.4.2",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/x@0.5.6",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"

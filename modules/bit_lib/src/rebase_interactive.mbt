@@ -20,6 +20,12 @@ pub enum TodoCommand {
 } derive(Debug, Eq)
 
 ///|
+pub extend TodoCommand with Debug::{to_repr}
+
+///|
+pub extend TodoCommand with Eq::{not_equal, equal}
+
+///|
 pub impl Show for TodoCommand with fn output(self, logger) {
   match self {
     Pick => logger.write_string("Pick")
@@ -37,11 +43,20 @@ pub impl Show for TodoCommand with fn output(self, logger) {
 }
 
 ///|
+pub extend TodoCommand with Show::{to_string, output}
+
+///|
 pub struct InteractiveTodoEntry {
   command : TodoCommand
   commit_hex : String
   subject : String
 } derive(Debug, Eq)
+
+///|
+pub extend InteractiveTodoEntry with Debug::{to_repr}
+
+///|
+pub extend InteractiveTodoEntry with Eq::{not_equal, equal}
 
 ///|
 fn parse_todo_command(s : String) -> TodoCommand? {

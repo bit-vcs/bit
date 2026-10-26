@@ -56,12 +56,18 @@ pub struct LfsDownloadAction {
   href : String
   headers : Map[String, String]
 } derive(Eq, @debug.Debug)
+pub fn LfsDownloadAction::equal(Self, Self) -> Bool
+pub fn LfsDownloadAction::not_equal(Self, Self) -> Bool
+pub fn LfsDownloadAction::to_repr(Self) -> @debug.Repr
 
 pub struct LfsDownloadError {
   oid : String
-  code : Int
+  code : Int32
   message : String
 } derive(Eq, @debug.Debug)
+pub fn LfsDownloadError::equal(Self, Self) -> Bool
+pub fn LfsDownloadError::not_equal(Self, Self) -> Bool
+pub fn LfsDownloadError::to_repr(Self) -> @debug.Repr
 
 pub struct LfsUploadAction {
   oid : String
@@ -69,14 +75,19 @@ pub struct LfsUploadAction {
   href : String
   headers : Map[String, String]
 } derive(Eq, @debug.Debug)
+pub fn LfsUploadAction::equal(Self, Self) -> Bool
+pub fn LfsUploadAction::not_equal(Self, Self) -> Bool
+pub fn LfsUploadAction::to_repr(Self) -> @debug.Repr
 
 pub struct LfsUploadError {
   oid : String
-  code : Int
+  code : Int32
   message : String
 } derive(Eq, @debug.Debug)
+pub fn LfsUploadError::equal(Self, Self) -> Bool
+pub fn LfsUploadError::not_equal(Self, Self) -> Bool
+pub fn LfsUploadError::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 
 // Traits
-

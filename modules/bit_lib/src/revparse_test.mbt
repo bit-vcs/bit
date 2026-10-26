@@ -12,14 +12,14 @@ fn setup_rev_repo() -> @bit.TestFs {
 test "rev-parse: HEAD and show-ref" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let id = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let id = @bit_lib.commit(
     fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L,
   )
-  let head = rev_parse(fs, "/repo/.git", "HEAD")
+  let head = @bit_lib.rev_parse(fs, "/repo/.git", "HEAD")
   assert_true(head is Some(_))
   assert_true(head.unwrap().to_hex() == id.to_hex())
-  let refs = show_ref_text(fs, "/repo/.git")
+  let refs = @bit_lib.show_ref_text(fs, "/repo/.git")
   assert_true(refs.length() == 1)
   assert_true(refs[0].contains("refs/heads/main"))
 }
@@ -28,11 +28,11 @@ test "rev-parse: HEAD and show-ref" {
 test "log: oneline" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L),
+    @bit_lib.commit(fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L),
   )
-  let lines = log_head_oneline(fs, "/repo/.git", max_count=10)
+  let lines = @bit_lib.log_head_oneline(fs, "/repo/.git", max_count=10)
   assert_true(lines.length() == 1)
   assert_true(lines[0].contains("first"))
 }
@@ -42,21 +42,21 @@ test "rev-parse: HEAD^ parent reference" {
   let fs = setup_rev_repo()
   // First commit
   fs.write_string("/repo/a.txt", "first\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let first = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let first = @bit_lib.commit(
     fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L,
   )
   // Second commit
   fs.write_string("/repo/a.txt", "second\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let second = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let second = @bit_lib.commit(
     fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L,
   )
   // HEAD should be second commit
-  let head = rev_parse(fs, "/repo/.git", "HEAD")
+  let head = @bit_lib.rev_parse(fs, "/repo/.git", "HEAD")
   assert_eq(head.unwrap().to_hex(), second.to_hex())
   // HEAD^ should be first commit
-  let parent = rev_parse(fs, "/repo/.git", "HEAD^")
+  let parent = @bit_lib.rev_parse(fs, "/repo/.git", "HEAD^")
   assert_eq(parent.unwrap().to_hex(), first.to_hex())
 }
 
@@ -64,17 +64,17 @@ test "rev-parse: HEAD^ parent reference" {
 test "rev-parse: @ and @^ aliases HEAD" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "first\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let first = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let first = @bit_lib.commit(
     fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L,
   )
   fs.write_string("/repo/a.txt", "second\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let second = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let second = @bit_lib.commit(
     fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L,
   )
-  let at = rev_parse(fs, "/repo/.git", "@")
-  let at_parent = rev_parse(fs, "/repo/.git", "@^")
+  let at = @bit_lib.rev_parse(fs, "/repo/.git", "@")
+  let at_parent = @bit_lib.rev_parse(fs, "/repo/.git", "@^")
   assert_eq(at.unwrap().to_hex(), second.to_hex())
   assert_eq(at_parent.unwrap().to_hex(), first.to_hex())
 }
@@ -84,25 +84,25 @@ test "rev-parse: HEAD^^ and HEAD~2 are equivalent" {
   let fs = setup_rev_repo()
   // Three commits
   fs.write_string("/repo/a.txt", "first\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let first = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let first = @bit_lib.commit(
     fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L,
   )
   fs.write_string("/repo/a.txt", "second\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L),
+    @bit_lib.commit(fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L),
   )
   fs.write_string("/repo/a.txt", "third\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(fs, fs, "/repo", "third\n", "Test <test@example.com>", 1700000002L),
+    @bit_lib.commit(fs, fs, "/repo", "third\n", "Test <test@example.com>", 1700000002L),
   )
   // HEAD^^ should be first commit
-  let caret_caret = rev_parse(fs, "/repo/.git", "HEAD^^")
+  let caret_caret = @bit_lib.rev_parse(fs, "/repo/.git", "HEAD^^")
   assert_eq(caret_caret.unwrap().to_hex(), first.to_hex())
   // HEAD~2 should also be first commit
-  let tilde_2 = rev_parse(fs, "/repo/.git", "HEAD~2")
+  let tilde_2 = @bit_lib.rev_parse(fs, "/repo/.git", "HEAD~2")
   assert_eq(tilde_2.unwrap().to_hex(), first.to_hex())
 }
 
@@ -110,24 +110,24 @@ test "rev-parse: HEAD^^ and HEAD~2 are equivalent" {
 test "rev-parse: HEAD^2 resolves second parent" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/base.txt", "base\n")
-  add_paths(fs, fs, "/repo", ["base.txt"])
-  let c0 = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["base.txt"])
+  let c0 = @bit_lib.commit(
     fs, fs, "/repo", "base\n", "Test <test@example.com>", 1700000000L,
   )
   fs.write_string("/repo/main.txt", "main\n")
-  add_paths(fs, fs, "/repo", ["main.txt"])
-  let c1 = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["main.txt"])
+  let c1 = @bit_lib.commit(
     fs, fs, "/repo", "main\n", "Test <test@example.com>", 1700000001L,
   )
-  ignore(reset(fs, fs, "/repo", c0.to_hex(), ResetMode::Hard))
+  ignore(@bit_lib.reset(fs, fs, "/repo", c0.to_hex(), @bit_lib.ResetMode::Hard))
   fs.write_string("/repo/side.txt", "side\n")
-  add_paths(fs, fs, "/repo", ["side.txt"])
-  let c2 = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["side.txt"])
+  let c2 = @bit_lib.commit(
     fs, fs, "/repo", "side\n", "Test <test@example.com>", 1700000002L,
   )
-  ignore(reset(fs, fs, "/repo", c1.to_hex(), ResetMode::Hard))
-  let entries = read_index_entries(fs, "/repo/.git")
-  let tree_id = write_tree_from_index(fs, fs, "/repo/.git", entries)
+  ignore(@bit_lib.reset(fs, fs, "/repo", c1.to_hex(), @bit_lib.ResetMode::Hard))
+  let entries = @bit_lib.read_index_entries(fs, "/repo/.git")
+  let tree_id = @bit_lib.write_tree_from_index(fs, fs, "/repo/.git", entries)
   let merge_commit = @bit.Commit::new(
     tree_id,
     [c1, c2],
@@ -140,10 +140,10 @@ test "rev-parse: HEAD^2 resolves second parent" {
     "merge\n",
   )
   let (merge_id, merge_data) = @bit.create_commit(merge_commit)
-  write_object_bytes(fs, "/repo/.git", merge_id, merge_data)
-  update_head_ref(fs, fs, "/repo/.git", merge_id)
-  let first_parent = rev_parse(fs, "/repo/.git", "HEAD^")
-  let second_parent = rev_parse(fs, "/repo/.git", "HEAD^2")
+  @bit_lib.write_object_bytes(fs, "/repo/.git", merge_id, merge_data)
+  @bit_lib.update_head_ref(fs, fs, "/repo/.git", merge_id)
+  let first_parent = @bit_lib.rev_parse(fs, "/repo/.git", "HEAD^")
+  let second_parent = @bit_lib.rev_parse(fs, "/repo/.git", "HEAD^2")
   assert_eq(first_parent.unwrap().to_hex(), c1.to_hex())
   assert_eq(second_parent.unwrap().to_hex(), c2.to_hex())
 }
@@ -152,12 +152,12 @@ test "rev-parse: HEAD^2 resolves second parent" {
 test "rev-parse: 40-char hex without suffix" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let id = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let id = @bit_lib.commit(
     fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L,
   )
   // Parse by full hex should work
-  let parsed = rev_parse(fs, "/repo/.git", id.to_hex())
+  let parsed = @bit_lib.rev_parse(fs, "/repo/.git", id.to_hex())
   assert_eq(parsed.unwrap().to_hex(), id.to_hex())
 }
 
@@ -165,17 +165,17 @@ test "rev-parse: 40-char hex without suffix" {
 test "rev-parse: HEAD~1 equals HEAD^" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "first\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let first = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let first = @bit_lib.commit(
     fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L,
   )
   fs.write_string("/repo/a.txt", "second\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L),
+    @bit_lib.commit(fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L),
   )
-  let caret = rev_parse(fs, "/repo/.git", "HEAD^")
-  let tilde_1 = rev_parse(fs, "/repo/.git", "HEAD~1")
+  let caret = @bit_lib.rev_parse(fs, "/repo/.git", "HEAD^")
+  let tilde_1 = @bit_lib.rev_parse(fs, "/repo/.git", "HEAD~1")
   assert_eq(caret.unwrap().to_hex(), first.to_hex())
   assert_eq(tilde_1.unwrap().to_hex(), first.to_hex())
 }
@@ -184,14 +184,14 @@ test "rev-parse: HEAD~1 equals HEAD^" {
 test "rev-parse: tag^{commit} peels annotated tag" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let id = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let id = @bit_lib.commit(
     fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L,
   )
-  create_annotated_tag(
+  @bit_lib.create_annotated_tag(
     fs, fs, "/repo/.git", "v1", id, "annotated", "Test <test@example.com>", 1700000001L,
   )
-  let parsed = rev_parse(fs, "/repo/.git", "v1^{commit}")
+  let parsed = @bit_lib.rev_parse(fs, "/repo/.git", "v1^{commit}")
   assert_eq(parsed.unwrap().to_hex(), id.to_hex())
 }
 
@@ -199,16 +199,16 @@ test "rev-parse: tag^{commit} peels annotated tag" {
 test "rev-parse: :/message finds commit from HEAD history" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "first\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(fs, fs, "/repo", "initial\n", "Test <test@example.com>", 1700000000L),
+    @bit_lib.commit(fs, fs, "/repo", "initial\n", "Test <test@example.com>", 1700000000L),
   )
   fs.write_string("/repo/a.txt", "second\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let target = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let target = @bit_lib.commit(
     fs, fs, "/repo", "needle message\n", "Test <test@example.com>", 1700000001L,
   )
-  let parsed = rev_parse(fs, "/repo/.git", ":/needle")
+  let parsed = @bit_lib.rev_parse(fs, "/repo/.git", ":/needle")
   assert_eq(parsed.unwrap().to_hex(), target.to_hex())
 }
 
@@ -216,23 +216,23 @@ test "rev-parse: :/message finds commit from HEAD history" {
 test "rev-parse: :/message searches commits reachable from all refs" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "one\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let first = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let first = @bit_lib.commit(
     fs, fs, "/repo", "one\n", "Test <test@example.com>", 1700000000L,
   )
   fs.write_string("/repo/a.txt", "two\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let target = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let target = @bit_lib.commit(
     fs, fs, "/repo", "two\n", "Test <test@example.com>", 1700000001L,
   )
   fs.write_string("/repo/.git/refs/heads/side", first.to_hex() + "\n")
   fs.write_string("/repo/.git/HEAD", "ref: refs/heads/side\n")
   fs.write_string("/repo/a.txt", "three\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(fs, fs, "/repo", "three\n", "Test <test@example.com>", 1700000002L),
+    @bit_lib.commit(fs, fs, "/repo", "three\n", "Test <test@example.com>", 1700000002L),
   )
-  let parsed = rev_parse(fs, "/repo/.git", ":/two")
+  let parsed = @bit_lib.rev_parse(fs, "/repo/.git", ":/two")
   assert_eq(parsed.unwrap().to_hex(), target.to_hex())
 }
 
@@ -240,16 +240,16 @@ test "rev-parse: :/message searches commits reachable from all refs" {
 test "rev-parse: base^{/message} finds reachable commit" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "first\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let first = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let first = @bit_lib.commit(
     fs, fs, "/repo", "first target\n", "Test <test@example.com>", 1700000000L,
   )
   fs.write_string("/repo/a.txt", "second\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L),
+    @bit_lib.commit(fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L),
   )
-  let parsed = rev_parse(fs, "/repo/.git", "HEAD^{/first target}")
+  let parsed = @bit_lib.rev_parse(fs, "/repo/.git", "HEAD^{/first target}")
   assert_eq(parsed.unwrap().to_hex(), first.to_hex())
 }
 
@@ -257,24 +257,24 @@ test "rev-parse: base^{/message} finds reachable commit" {
 test "create_annotated_tag: nested target writes tag type header" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let commit_id = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let commit_id = @bit_lib.commit(
     fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L,
   )
-  create_annotated_tag(
+  @bit_lib.create_annotated_tag(
     fs, fs, "/repo/.git", "base", commit_id, "base", "Test <test@example.com>", 1700000001L,
   )
-  let base_tag = resolve_ref(fs, "/repo/.git", "refs/tags/base").unwrap()
-  create_annotated_tag(
+  let base_tag = @bit_lib.resolve_ref(fs, "/repo/.git", "refs/tags/base").unwrap()
+  @bit_lib.create_annotated_tag(
     fs, fs, "/repo/.git", "double", base_tag, "double", "Test <test@example.com>",
     1700000002L,
   )
-  let double_tag = resolve_ref(fs, "/repo/.git", "refs/tags/double").unwrap()
-  let db = ObjectDb::load(fs, "/repo/.git")
+  let double_tag = @bit_lib.resolve_ref(fs, "/repo/.git", "refs/tags/double").unwrap()
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git")
   let obj = db.get(fs, double_tag).unwrap()
   let text = @utf8.decode_lossy(obj.data[:])
   assert_true(text.contains("\ntype tag\n"))
-  let peeled = rev_parse(fs, "/repo/.git", "double^{commit}")
+  let peeled = @bit_lib.rev_parse(fs, "/repo/.git", "double^{commit}")
   assert_eq(peeled.unwrap().to_hex(), commit_id.to_hex())
 }
 
@@ -282,16 +282,16 @@ test "create_annotated_tag: nested target writes tag type header" {
 async test "status porcelain + diff" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  let st1 = status_porcelain(fs, "/repo")
+  let st1 = @bit_lib.status_porcelain(fs, "/repo")
   assert_true(st1.contains("?? a.txt"))
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let st2 = status_porcelain(fs, "/repo")
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let st2 = @bit_lib.status_porcelain(fs, "/repo")
   assert_true(st2.contains("A  a.txt"))
   ignore(
-    commit(fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L),
+    @bit_lib.commit(fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L),
   )
   fs.write_string("/repo/a.txt", "changed\n")
-  let diffs = diff_worktree(fs, "/repo")
-  let text = diff_text(diffs)
+  let diffs = @bit_lib.diff_worktree(fs, "/repo")
+  let text = @bit_lib.diff_text(diffs)
   assert_true(text.contains("diff --git a/a.txt b/a.txt"))
 }

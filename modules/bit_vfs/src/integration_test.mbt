@@ -42,7 +42,7 @@ test "integration: mount helix repo (lazy)" {
   let commit_id = get_helix_head()
 
   // Create lazy snapshot - should be fast (default config uses lazy_load: true)
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
   assert_true(bitfs.is_lazy()) // Verify lazy mode is enabled
   assert_false(bitfs.is_dirty())
 
@@ -74,8 +74,8 @@ test "integration: mount helix repo (eager)" {
   let commit_id = get_helix_head()
 
   // Create eager snapshot - loads all pack indexes upfront
-  let config = FsConfig::eager()
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id, config~)
+  let config = @bit_vfs.FsConfig::eager()
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id, config~)
   assert_false(bitfs.is_lazy()) // Verify eager mode
   assert_false(bitfs.is_dirty())
 
@@ -95,7 +95,7 @@ test "integration: mount, modify, get changes" {
     return
   }
   let commit_id = get_helix_head()
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
 
   // Read original content
   let original = bitfs.read_file(osfs, "README.md")
@@ -150,7 +150,7 @@ test "integration: generate diff" {
     return
   }
   let commit_id = get_helix_head()
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
 
   // Make some changes
   bitfs.write_string(
@@ -192,7 +192,7 @@ struct FileChange {
 ///|
 /// Collect all changes from the working layer
 fn collect_changes(
-  bitfs : Fs,
+  bitfs : @bit_vfs.Fs,
   osfs : &@bit.RepoFileSystem,
 ) -> Array[FileChange] {
   let changes : Array[FileChange] = []
@@ -218,7 +218,7 @@ fn collect_changes(
 ///|
 /// Check if file exists in base tree (without creating new Fs)
 fn file_exists_in_base(
-  bitfs : Fs,
+  bitfs : @bit_vfs.Fs,
   osfs : &@bit.RepoFileSystem,
   path : String,
 ) -> Bool {
@@ -257,7 +257,7 @@ test "integration: demo workflow output" {
   println("HEAD: \{commit_id.to_hex()}")
 
   // Mount
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
   println("Mounted helix repo (lazy)")
 
   // Read some files
@@ -288,7 +288,7 @@ test "bench_integration: helix lazy mount" (b : @bench.T) {
     return
   }
   let commit_id = try! get_helix_head()
-  b.bench(fn() { b.keep(try! Fs::from_commit(osfs, git_dir, commit_id)) })
+  b.bench(fn() { b.keep(try! @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)) })
 }
 
 ///|
@@ -300,7 +300,7 @@ test "bench_integration: helix read files" (b : @bench.T) {
     return
   }
   let commit_id = try! get_helix_head()
-  let bitfs = try! Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = try! @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
 
   // Warm up cache
   let _ = try! bitfs.read_file(osfs, "README.md")
@@ -323,7 +323,7 @@ test "bench_integration: helix full workflow" (b : @bench.T) {
   let content = Bytes::make(1000, b'x')
   b.bench(fn() {
     // Mount
-    let bitfs = try! Fs::from_commit(osfs, git_dir, commit_id)
+    let bitfs = try! @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
 
     // Read
     let _ = try! bitfs.readdir(osfs, "")

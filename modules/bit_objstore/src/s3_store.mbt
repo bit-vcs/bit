@@ -267,3 +267,6 @@ pub impl ObjectStore for S3Store with fn list(self, prefix, after) {
 pub impl ObjectStore for S3Store with fn supports_cas(_self) {
   true
 }
+
+///|
+pub extend S3Store with ObjectStore::{get_if_none_match, put, list, get_range, get, delete, supports_cas}

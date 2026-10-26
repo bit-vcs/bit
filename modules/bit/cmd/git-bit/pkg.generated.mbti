@@ -26,7 +26,7 @@ type HubWorkItemListOptions
 type OsClock
 
 pub struct OsFs {
-  dummy : Int
+  dummy : Int32
 }
 pub fn OsFs::new() -> Self
 pub impl @bit_types.FileSystem for OsFs
@@ -39,4 +39,3 @@ type OsRefStore
 // Type aliases
 
 // Traits
-

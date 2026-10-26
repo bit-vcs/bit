@@ -25,7 +25,7 @@ pub fn create_tree(Array[TreeEntry]) -> (ObjectId, Bytes)
 
 pub fn create_tree_with_algo(HashAlgorithm, Array[TreeEntry]) -> (ObjectId, Bytes)
 
-pub fn hash_array_prefix(Array[Byte], Int, hash_size? : Int) -> ObjectId
+pub fn hash_array_prefix(Array[Byte], Int32, hash_size? : Int32) -> ObjectId
 
 pub fn hash_blob(Bytes) -> ObjectId
 
@@ -35,7 +35,7 @@ pub fn hash_object_content(ObjectType, Bytes) -> ObjectId
 
 pub fn hash_object_content_with_algo(HashAlgorithm, ObjectType, Bytes) -> ObjectId
 
-pub fn hash_prefix(Bytes, Int, hash_size? : Int) -> ObjectId
+pub fn hash_prefix(Bytes, Int32, hash_size? : Int32) -> ObjectId
 
 pub fn serialize_commit_content(Commit) -> Bytes
 
@@ -45,17 +45,17 @@ pub fn sha1(Bytes) -> ObjectId
 
 pub fn sha1_array(Array[Byte]) -> ObjectId
 
-pub fn sha1_array_prefix(Array[Byte], Int) -> ObjectId
+pub fn sha1_array_prefix(Array[Byte], Int32) -> ObjectId
 
-pub fn sha1_prefix(Bytes, Int) -> ObjectId
+pub fn sha1_prefix(Bytes, Int32) -> ObjectId
 
 pub fn sha256(Bytes) -> ObjectId
 
 pub fn sha256_array(Array[Byte]) -> ObjectId
 
-pub fn sha256_array_prefix(Array[Byte], Int) -> ObjectId
+pub fn sha256_array_prefix(Array[Byte], Int32) -> ObjectId
 
-pub fn sha256_prefix(Bytes, Int) -> ObjectId
+pub fn sha256_prefix(Bytes, Int32) -> ObjectId
 
 // Errors
 pub(all) suberror GitError {
@@ -65,6 +65,11 @@ pub(all) suberror GitError {
   ProtocolError(String)
   IoError(String)
 } derive(Eq, @debug.Debug)
+pub fn GitError::equal(Self, Self) -> Bool
+pub fn GitError::not_equal(Self, Self) -> Bool
+pub fn GitError::output(Self, &Logger) -> Unit
+pub fn GitError::to_repr(Self) -> @debug.Repr
+pub fn GitError::to_string(Self) -> String
 pub impl Show for GitError
 
 // Types and methods
@@ -87,10 +92,15 @@ pub(all) enum HashAlgorithm {
   Sha1
   Sha256
 } derive(Eq, @debug.Debug)
+pub fn HashAlgorithm::equal(Self, Self) -> Bool
 pub fn HashAlgorithm::from_string(String) -> Self raise GitError
-pub fn HashAlgorithm::hash_size(Self) -> Int
-pub fn HashAlgorithm::hex_size(Self) -> Int
+pub fn HashAlgorithm::hash_size(Self) -> Int32
+pub fn HashAlgorithm::hex_size(Self) -> Int32
 pub fn HashAlgorithm::name(Self) -> String
+pub fn HashAlgorithm::not_equal(Self, Self) -> Bool
+pub fn HashAlgorithm::output(Self, &Logger) -> Unit
+pub fn HashAlgorithm::to_repr(Self) -> @debug.Repr
+pub fn HashAlgorithm::to_string(Self) -> String
 pub fn HashAlgorithm::zero_hex(Self) -> String
 pub impl Show for HashAlgorithm
 
@@ -103,21 +113,28 @@ pub fn HashState::new(HashAlgorithm) -> Self
 pub fn HashState::reset(Self) -> Unit
 pub fn HashState::update(Self, Bytes) -> Unit
 pub fn HashState::update_byte(Self, Byte) -> Unit
-pub fn HashState::update_slice(Self, Bytes, Int, Int) -> Unit
+pub fn HashState::update_slice(Self, Bytes, Int32, Int32) -> Unit
 pub fn HashState::update_string(Self, String) -> Unit
 
 pub struct ObjectId {
   bytes : FixedArray[Byte]
 }
+pub fn ObjectId::equal(Self, Self) -> Bool
 pub fn ObjectId::from_bytes(Bytes) -> Self raise GitError
-pub fn ObjectId::from_bytes_at(Bytes, Int, hash_size? : Int) -> Self
+pub fn ObjectId::from_bytes_at(Bytes, Int32, hash_size? : Int32) -> Self
 pub fn ObjectId::from_hex(String) -> Self raise GitError
-pub fn ObjectId::hash_size(Self) -> Int
+pub fn ObjectId::hash(Self) -> Int32
+pub fn ObjectId::hash_combine(Self, Hasher) -> Unit
+pub fn ObjectId::hash_size(Self) -> Int32
 pub fn ObjectId::is_zero(Self) -> Bool
 pub fn ObjectId::is_zero_hex(String) -> Bool
 pub fn ObjectId::new(FixedArray[Byte]) -> Self
+pub fn ObjectId::not_equal(Self, Self) -> Bool
+pub fn ObjectId::output(Self, &Logger) -> Unit
 pub fn ObjectId::to_bytes(Self) -> Bytes
 pub fn ObjectId::to_hex(Self) -> String
+pub fn ObjectId::to_repr(Self) -> @debug.Repr
+pub fn ObjectId::to_string(Self) -> String
 pub fn ObjectId::zero(algo? : HashAlgorithm) -> Self
 pub impl Eq for ObjectId
 pub impl Hash for ObjectId
@@ -130,7 +147,11 @@ pub(all) enum ObjectType {
   Commit
   Tag
 } derive(Eq, @debug.Debug)
-pub fn ObjectType::to_packfile_type(Self) -> Int
+pub fn ObjectType::equal(Self, Self) -> Bool
+pub fn ObjectType::not_equal(Self, Self) -> Bool
+pub fn ObjectType::output(Self, &Logger) -> Unit
+pub fn ObjectType::to_packfile_type(Self) -> Int32
+pub fn ObjectType::to_repr(Self) -> @debug.Repr
 pub fn ObjectType::to_string(Self) -> String
 pub impl Show for ObjectType
 
@@ -149,11 +170,11 @@ pub struct PackObject {
   obj_type : ObjectType
   data : Bytes
   id : ObjectId
-  offset : Int
-  crc32 : UInt
+  offset : Int32
+  crc32 : UInt32
 }
 pub fn PackObject::new(ObjectType, Bytes) -> Self
-pub fn PackObject::with_metadata(ObjectType, Bytes, ObjectId, Int, UInt) -> Self
+pub fn PackObject::with_metadata(ObjectType, Bytes, ObjectId, Int32, UInt32) -> Self
 
 pub struct Sha1State {
   inner : @bit_hash.Sha1State
@@ -163,7 +184,7 @@ pub fn Sha1State::new() -> Self
 pub fn Sha1State::reset(Self) -> Unit
 pub fn Sha1State::update(Self, Bytes) -> Unit
 pub fn Sha1State::update_byte(Self, Byte) -> Unit
-pub fn Sha1State::update_slice(Self, Bytes, Int, Int) -> Unit
+pub fn Sha1State::update_slice(Self, Bytes, Int32, Int32) -> Unit
 pub fn Sha1State::update_string(Self, String) -> Unit
 
 pub struct Sha256State {
@@ -174,7 +195,7 @@ pub fn Sha256State::new() -> Self
 pub fn Sha256State::reset(Self) -> Unit
 pub fn Sha256State::update(Self, Bytes) -> Unit
 pub fn Sha256State::update_byte(Self, Byte) -> Unit
-pub fn Sha256State::update_slice(Self, Bytes, Int, Int) -> Unit
+pub fn Sha256State::update_slice(Self, Bytes, Int32, Int32) -> Unit
 pub fn Sha256State::update_string(Self, String) -> Unit
 
 pub struct TreeEntry {
@@ -187,4 +208,3 @@ pub fn TreeEntry::new(String, String, ObjectId) -> Self
 // Type aliases
 
 // Traits
-

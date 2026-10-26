@@ -80,6 +80,9 @@ pub impl @bit.FileSystem for OsFs with fn remove_dir(_self, path) {
 }
 
 ///|
+pub extend OsFs with @bit.FileSystem::{mkdir_p, write_file, write_string, remove_file, remove_dir}
+
+///|
 pub impl @bit.RepoFileSystem for OsFs with fn read_file(_self, path) {
   @fs.read_file_to_bytes(path) catch {
     err => raise io_error(err)
@@ -114,3 +117,6 @@ pub impl @bit.RepoFileSystem for OsFs with fn mtime(self, path) {
     None => raise @bit.GitError::IoError("Unable to stat path: \{path}")
   }
 }
+
+///|
+pub extend OsFs with @bit.RepoFileSystem::{is_file, mtime, is_dir, read_file, readdir}

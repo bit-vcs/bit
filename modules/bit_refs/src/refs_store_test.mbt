@@ -9,7 +9,7 @@ test "refs/store: list refs merges loose and packed" {
     "/repo/.git/packed-refs",
     "# pack-refs with: peeled fully-peeled\n\{id2.to_hex()} refs/tags/v1\n",
   )
-  let refs = list_refs_with_ids(fs, "/repo/.git", None)
+  let refs = @bit_refs.list_refs_with_ids(fs, "/repo/.git", None)
   @test.assert_eq(refs.get("refs/heads/main"), Some(id))
   @test.assert_eq(refs.get("refs/tags/v1"), Some(id2))
 }
@@ -21,7 +21,7 @@ test "refs/store: remove remote refs drops refs and logs trees" {
   fs.write_string("/repo/.git/refs/remotes/origin/main", "dummy")
   fs.mkdir_p("/repo/.git/logs/refs/remotes/origin")
   fs.write_string("/repo/.git/logs/refs/remotes/origin/main", "dummy")
-  remove_remote_refs(fs, fs, "/repo/.git", "origin")
+  @bit_refs.remove_remote_refs(fs, fs, "/repo/.git", "origin")
   assert_false(fs.is_dir("/repo/.git/refs/remotes/origin"))
   assert_false(fs.is_dir("/repo/.git/logs/refs/remotes/origin"))
 }
@@ -31,7 +31,7 @@ test "refs/store: serialize_packed_refs_entries sorts, dedupes, and keeps peel l
   // Unsorted input with a duplicate refname (old value first, new value last)
   // and a peeled tag: the canonical form must be sorted, last-wins, with
   // git's exact header.
-  let entries = parse_packed_refs_text(
+  let entries = @bit_refs.parse_packed_refs_text(
     "# pack-refs with: peeled fully-peeled sorted \n" +
     "1111111111111111111111111111111111111111 refs/tags/v1\n" +
     "^2222222222222222222222222222222222222222\n" +
@@ -39,7 +39,7 @@ test "refs/store: serialize_packed_refs_entries sorts, dedupes, and keeps peel l
     "4444444444444444444444444444444444444444 refs/heads/main\n" +
     "5555555555555555555555555555555555555555 refs/notes/bit-hub\n",
   )
-  let out = serialize_packed_refs_entries(entries)
+  let out = @bit_refs.serialize_packed_refs_entries(entries)
   @test.assert_eq(
     out,
     "# pack-refs with: peeled fully-peeled sorted \n" +
@@ -52,7 +52,7 @@ test "refs/store: serialize_packed_refs_entries sorts, dedupes, and keeps peel l
 
 ///|
 test "refs/store: parse_packed_refs_text attaches peel lines and skips header" {
-  let entries = parse_packed_refs_text(
+  let entries = @bit_refs.parse_packed_refs_text(
     "# pack-refs with: peeled fully-peeled sorted \n" +
     "1111111111111111111111111111111111111111 refs/tags/v1\n" +
     "^2222222222222222222222222222222222222222\n" +

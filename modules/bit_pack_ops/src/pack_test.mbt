@@ -10,6 +10,6 @@ async test "pack package: collect reachable objects" {
     fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L,
   )
   let db = @bitlib.ObjectDb::load(fs, "/repo/.git")
-  let objs = collect_reachable_objects(db, fs, commit_id)
+  let objs = @bit_pack_ops.collect_reachable_objects(db, fs, commit_id)
   assert_true(objs.length() > 0)
 }

@@ -15,7 +15,7 @@ pub fn lstat_entry_meta(String) -> WorktreeEntryMeta?
 
 pub fn read_symlink_target_path(String) -> String?
 
-pub fn readdir_typed(String) -> Array[(String, Int)]?
+pub fn readdir_typed(String) -> Array[(String, Int32)]?
 
 pub fn set_env_provider(EnvProvider) -> Unit
 
@@ -45,6 +45,7 @@ pub fn TestFs::exists(Self, String) -> Bool
 pub fn TestFs::is_dir(Self, String) -> Bool
 pub fn TestFs::is_file(Self, String) -> Bool
 pub fn TestFs::mkdir_p(Self, String) -> Unit
+pub fn TestFs::mtime(Self, String) -> (Int32, Int32) raise @bit_object.GitError
 pub fn TestFs::new() -> Self
 pub fn TestFs::read_file(Self, String) -> Bytes raise @bit_object.GitError
 pub fn TestFs::read_string(Self, String) -> String raise @bit_object.GitError
@@ -60,25 +61,25 @@ pub impl @bit_types.RepoFileSystem for TestFs
 
 pub struct WorktreeEntry {
   kind : WorktreeKind
-  mode : Int
-  size : Int?
-  mtime_sec : Int?
-  mtime_nsec : Int?
+  mode : Int32
+  size : Int32?
+  mtime_sec : Int32?
+  mtime_nsec : Int32?
 }
 
 pub struct WorktreeEntryMeta {
   kind : WorktreeKindMeta
-  mode : Int
-  size : Int?
-  mtime_sec : Int?
-  mtime_nsec : Int?
-  dev : Int?
-  ino : Int?
-  uid : Int?
-  gid : Int?
+  mode : Int32
+  size : Int32?
+  mtime_sec : Int32?
+  mtime_nsec : Int32?
+  dev : Int32?
+  ino : Int32?
+  uid : Int32?
+  gid : Int32?
 }
-pub fn WorktreeEntryMeta::mtime(Self) -> (Int, Int)
-pub fn WorktreeEntryMeta::new(WorktreeKindMeta, Int, Int?, Int?, Int?, dev? : Int?, ino? : Int?, uid? : Int?, gid? : Int?) -> Self
+pub fn WorktreeEntryMeta::mtime(Self) -> (Int32, Int32)
+pub fn WorktreeEntryMeta::new(WorktreeKindMeta, Int32, Int32?, Int32?, Int32?, dev? : Int32?, ino? : Int32?, uid? : Int32?, gid? : Int32?) -> Self
 
 pub enum WorktreeKind {
   Regular
@@ -97,9 +98,9 @@ pub struct WorktreeProbeProvider {
   entry_meta_sync : (&@bit_types.RepoFileSystem, String) -> WorktreeEntryMeta?
   lstat : (String) -> WorktreeEntryMeta?
   symlink_target : (String) -> String?
-  readdir_typed : (String) -> Array[(String, Int)]?
+  readdir_typed : (String) -> Array[(String, Int32)]?
 }
-pub fn WorktreeProbeProvider::new(async (&@bit_types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise, (String) -> String?, entry_meta_sync? : (&@bit_types.RepoFileSystem, String) -> WorktreeEntryMeta?, lstat? : (String) -> WorktreeEntryMeta?, readdir_typed? : (String) -> Array[(String, Int)]?) -> Self
+pub fn WorktreeProbeProvider::new(async (&@bit_types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise, (String) -> String?, entry_meta_sync? : (&@bit_types.RepoFileSystem, String) -> WorktreeEntryMeta?, lstat? : (String) -> WorktreeEntryMeta?, readdir_typed? : (String) -> Array[(String, Int32)]?) -> Self
 pub fn WorktreeProbeProvider::none() -> Self
 
 // Type aliases
@@ -120,4 +121,3 @@ pub using @bit_types {trait HttpClient}
 pub using @bit_types {trait RepoFileSystem}
 
 // Traits
-

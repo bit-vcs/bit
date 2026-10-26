@@ -2,7 +2,7 @@
 /// Tests for Git packfile generation
 test "packfile magic and version" {
   let content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'])
-  let packfile = create_blob_packfile(content)
+  let packfile = @bit_pack.create_blob_packfile(content)
 
   // Check magic: "PACK"
   inspect(packfile[0], content="b'\\x50'") // 'P'
@@ -20,7 +20,7 @@ test "packfile magic and version" {
 ///|
 test "packfile object count" {
   let content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'])
-  let packfile = create_blob_packfile(content)
+  let packfile = @bit_pack.create_blob_packfile(content)
 
   // Check object count: 1
   inspect(packfile[8], content="b'\\x00'")
@@ -32,7 +32,7 @@ test "packfile object count" {
 ///|
 test "packfile blob type encoding" {
   let content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'])
-  let packfile = create_blob_packfile(content)
+  let packfile = @bit_pack.create_blob_packfile(content)
 
   // First object byte: type=3 (blob), size=5
   // Format: [MSB=0 | type=011 | size=0101] = 0b00110101 = 0x35
@@ -46,7 +46,7 @@ test "packfile with larger size" {
   for i = 0; i < 100; i = i + 1 {
     content.push(b'x')
   }
-  let packfile = create_blob_packfile(
+  let packfile = @bit_pack.create_blob_packfile(
     Bytes::from_array(FixedArray::makei(content.length(), fn(i) { content[i] })),
   )
 
@@ -60,7 +60,7 @@ test "packfile with larger size" {
 ///|
 test "packfile trailer is 20 bytes" {
   let content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'])
-  let packfile = create_blob_packfile(content)
+  let packfile = @bit_pack.create_blob_packfile(content)
 
   // The packfile should end with a 20-byte SHA-1
   // Total = 12 (header) + object_data + 20 (trailer)
@@ -77,7 +77,7 @@ test "packfile multiple objects" {
     @bit.ObjectType::Blob,
     Bytes::from_array([b'b']),
   )
-  let packfile = create_packfile([obj1, obj2])
+  let packfile = @bit_pack.create_packfile([obj1, obj2])
 
   // Check object count: 2
   inspect(packfile[8], content="b'\\x00'")
@@ -96,7 +96,7 @@ test "packfile writer metadata builds the same index without reparsing" {
     @bit.ObjectType::Blob,
     Bytes::from_array([b'b']),
   )
-  let (pack, _, written) = create_packfile_with_delta_stats_compression_reuse_and_metadata(
+  let (pack, _, written) = @bit_pack.create_packfile_with_delta_stats_compression_reuse_and_metadata(
     [obj1, obj2],
     @bit.PackDeltaMode::NoDelta,
     @bit.PackCompression::Default,
@@ -109,8 +109,8 @@ test "packfile writer metadata builds the same index without reparsing" {
   assert_true(written[0].offset >= 12)
   assert_true(written[1].offset > written[0].offset)
   assert_true(written[0].crc32 != 0U)
-  let expected = build_pack_index(pack)
-  let actual = build_pack_index_from_objects(pack, written)
+  let expected = @bit_pack.build_pack_index(pack)
+  let actual = @bit_pack.build_pack_index_from_objects(pack, written)
   assert_true(actual.length() == expected.length())
   for i in 0..<actual.length() {
     assert_true(actual[i] == expected[i])
@@ -127,7 +127,7 @@ test "size-limited pack writer metadata builds indexes without reparsing" {
     @bit.ObjectType::Blob,
     Bytes::from_array([b'b', b'b', b'b', b'b', b'b', b'b', b'b', b'b']),
   )
-  let (entries, _) = create_packfiles_with_size_limit_and_metadata(
+  let (entries, _) = @bit_pack.create_packfiles_with_size_limit_and_metadata(
     [obj1, obj2],
     @bit.PackDeltaMode::NoDelta,
     @bit.PackCompression::Stored,
@@ -139,8 +139,8 @@ test "size-limited pack writer metadata builds indexes without reparsing" {
 
   assert_true(entries.length() == 2)
   for entry in entries {
-    let expected = build_pack_index(entry.0)
-    let actual = build_pack_index_from_objects(entry.0, entry.1)
+    let expected = @bit_pack.build_pack_index(entry.0)
+    let actual = @bit_pack.build_pack_index_from_objects(entry.0, entry.1)
     assert_true(actual.length() == expected.length())
     for i in 0..<actual.length() {
       assert_true(actual[i] == expected[i])
@@ -154,7 +154,7 @@ test "packfile writer metadata uses the requested SHA-256 object IDs" {
     @bit.ObjectType::Blob,
     Bytes::from_array([b's', b'h', b'a', b'2', b'5', b'6']),
   )
-  let (pack, _, written) = create_packfile_with_delta_stats_compression_reuse_and_metadata(
+  let (pack, _, written) = @bit_pack.create_packfile_with_delta_stats_compression_reuse_and_metadata(
     [obj],
     @bit.PackDeltaMode::NoDelta,
     @bit.PackCompression::Default,
@@ -164,8 +164,8 @@ test "packfile writer metadata uses the requested SHA-256 object IDs" {
     hash_size=32,
   )
 
-  let expected = build_pack_index(pack, hash_size=32)
-  let actual = build_pack_index_from_objects(pack, written, hash_size=32)
+  let expected = @bit_pack.build_pack_index(pack, hash_size=32)
+  let actual = @bit_pack.build_pack_index_from_objects(pack, written, hash_size=32)
   assert_true(written[0].id.bytes.length() == 32)
   assert_true(actual.length() == expected.length())
   for i in 0..<actual.length() {
@@ -187,7 +187,7 @@ test "create commit packfile" {
     "+0000",
     "Test commit\n",
   )
-  let (commit_id, packfile) = create_commit_packfile(
+  let (commit_id, packfile) = @bit_pack.create_commit_packfile(
     content, "hello.txt", commit,
   )
 
@@ -204,7 +204,7 @@ test "create commit packfile" {
 ///|
 test "encode type and size small" {
   let result : Array[Byte] = []
-  encode_type_and_size(3, 5, result) // blob, size=5
+  @bit_pack.encode_type_and_size(3, 5, result) // blob, size=5
   inspect(result.length(), content="1")
   // 0b00110101 = 0x35
   inspect(result[0], content="b'\\x35'")
@@ -213,7 +213,7 @@ test "encode type and size small" {
 ///|
 test "encode type and size medium" {
   let result : Array[Byte] = []
-  encode_type_and_size(3, 100, result) // blob, size=100
+  @bit_pack.encode_type_and_size(3, 100, result) // blob, size=100
   inspect(result.length(), content="2")
   // First: 0b10110100 = 0xb4
   // Second: 0b00000110 = 0x06
@@ -224,7 +224,7 @@ test "encode type and size medium" {
 ///|
 test "encode type and size large" {
   let result : Array[Byte] = []
-  encode_type_and_size(3, 0x1234, result) // blob, size=4660
+  @bit_pack.encode_type_and_size(3, 0x1234, result) // blob, size=4660
   inspect(result.length(), content="3")
   // size=0x1234
   // First: MSB=1, type=3, size&0xf=4 → 0b10110100 = 0xb4
@@ -248,7 +248,7 @@ test "packfile: OFS_DELTA mode creates delta" {
   let target = @utf8.encode("Hello, World! This is a test changed.\n")
   let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, base)
   let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, target)
-  let (pack, delta_count) = create_packfile_with_delta_stats(
+  let (pack, delta_count) = @bit_pack.create_packfile_with_delta_stats(
     [obj1, obj2],
     @bit.PackDeltaMode::OfsDelta,
   )
@@ -256,7 +256,7 @@ test "packfile: OFS_DELTA mode creates delta" {
   // (depends on delta efficiency)
   assert_true(pack.length() > 32)
   // Parse back and verify
-  let objects = parse_packfile(pack)
+  let objects = @bit_pack.parse_packfile(pack)
   assert_true(objects.length() == 2)
   assert_true(objects[0].data.length() == base.length())
   assert_true(objects[1].data.length() == target.length())
@@ -269,12 +269,12 @@ test "packfile: REF_DELTA mode creates delta" {
   let target = @utf8.encode("Hello, World! This is a test changed.\n")
   let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, base)
   let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, target)
-  let (pack, _) = create_packfile_with_delta_stats(
+  let (pack, _) = @bit_pack.create_packfile_with_delta_stats(
     [obj1, obj2],
     @bit.PackDeltaMode::RefDelta,
   )
   assert_true(pack.length() > 32)
-  let objects = parse_packfile(pack)
+  let objects = @bit_pack.parse_packfile(pack)
   assert_true(objects.length() == 2)
   assert_true(objects[0].data.length() == base.length())
   assert_true(objects[1].data.length() == target.length())
@@ -286,14 +286,14 @@ test "packfile: sha256 REF_DELTA mode creates delta" {
   let target = @utf8.encode("Hello, World! This is a test changed.\n")
   let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, base)
   let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, target)
-  let (pack, _) = create_packfile_with_delta_stats_compression(
+  let (pack, _) = @bit_pack.create_packfile_with_delta_stats_compression(
     [obj1, obj2],
     @bit.PackDeltaMode::RefDelta,
     @bit.PackCompression::Default,
     hash_size=32,
   )
   assert_true(pack.length() > 44)
-  let objects = parse_packfile(pack, hash_size=32)
+  let objects = @bit_pack.parse_packfile(pack, hash_size=32)
   let ids : Array[String] = []
   for obj in objects {
     ids.push(obj.id.to_hex())
@@ -319,11 +319,11 @@ test "packfile: NoDelta mode preserves all objects" {
   let target = @utf8.encode("Hello, World! This is a test changed.\n")
   let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, base)
   let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, target)
-  let (pack, delta_count) = create_packfile_with_delta_stats(
+  let (pack, delta_count) = @bit_pack.create_packfile_with_delta_stats(
     [obj1, obj2],
     @bit.PackDeltaMode::NoDelta,
   )
   assert_true(delta_count == 0)
-  let objects = parse_packfile(pack)
+  let objects = @bit_pack.parse_packfile(pack)
   assert_true(objects.length() == 2)
 }

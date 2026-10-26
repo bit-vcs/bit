@@ -33,7 +33,7 @@ pub fn Fs::base_commit(Self) -> @bit_object.ObjectId?
 pub fn Fs::base_tree(Self) -> @bit_object.ObjectId
 pub fn Fs::checkout_snapshot(Self, &@bit_types.RepoFileSystem, @bit_object.ObjectId) -> Unit raise @bit_object.GitError
 pub fn Fs::clear_layers(Self) -> Unit
-pub fn Fs::collect_files_bfs(Self, &@bit_types.RepoFileSystem, Int) -> Array[String] raise @bit_object.GitError
+pub fn Fs::collect_files_bfs(Self, &@bit_types.RepoFileSystem, Int32) -> Array[String] raise @bit_object.GitError
 pub fn Fs::discard_changes(Self) -> Unit
 pub fn Fs::empty(String, config? : FsConfig) -> Self
 pub fn Fs::exists_in_base(Self, &@bit_types.RepoFileSystem, String) -> Bool
@@ -43,7 +43,7 @@ pub fn Fs::from_commit(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId,
 pub fn Fs::from_tree(String, @bit_object.ObjectId, config? : FsConfig) -> Self
 pub fn Fs::get_db(Self, &@bit_types.RepoFileSystem) -> @bit_lib.ObjectDb raise @bit_object.GitError
 pub fn Fs::get_deleted_files(Self) -> Array[String]
-pub fn Fs::get_pending_fetches(Self, &@bit_types.RepoFileSystem, Int) -> Array[String] raise @bit_object.GitError
+pub fn Fs::get_pending_fetches(Self, &@bit_types.RepoFileSystem, Int32) -> Array[String] raise @bit_object.GitError
 pub fn Fs::get_promisor_db(Self, &@bit_types.RepoFileSystem) -> @bit_lib.PromisorDb? raise @bit_object.GitError
 pub fn Fs::get_promisor_remote(Self, &@bit_types.RepoFileSystem) -> String?
 pub fn Fs::get_working_files(Self) -> Array[String]
@@ -56,12 +56,12 @@ pub fn Fs::is_file(Self, &@bit_types.RepoFileSystem, String) -> Bool
 pub fn Fs::is_lazy(Self) -> Bool
 pub fn Fs::is_promisor_enabled(Self) -> Bool
 pub fn Fs::list_layers(Self) -> Array[Layer]
-pub fn Fs::list_snapshots(Self, &@bit_types.RepoFileSystem, max_count? : Int) -> Array[Snapshot] raise @bit_object.GitError
+pub fn Fs::list_snapshots(Self, &@bit_types.RepoFileSystem, max_count? : Int32) -> Array[Snapshot] raise @bit_object.GitError
 pub fn Fs::mkdir_p(Self, String) -> Unit
 pub fn Fs::needs_fetch(Self, &@bit_types.RepoFileSystem, String) -> Bool raise @bit_object.GitError
-pub async fn Fs::prefetch(Self, &@bit_types.RepoFileSystem, &@bit_types.FileSystem, Array[String]) -> Int raise @bit_object.GitError
-pub async fn Fs::prefetch_bfs(Self, &@bit_types.RepoFileSystem, &@bit_types.FileSystem, Int) -> Int raise @bit_object.GitError
-pub async fn Fs::prefetch_glob(Self, &@bit_types.RepoFileSystem, &@bit_types.FileSystem, String) -> Int raise @bit_object.GitError
+pub async fn Fs::prefetch(Self, &@bit_types.RepoFileSystem, &@bit_types.FileSystem, Array[String]) -> Int32 raise @bit_object.GitError
+pub async fn Fs::prefetch_bfs(Self, &@bit_types.RepoFileSystem, &@bit_types.FileSystem, Int32) -> Int32 raise @bit_object.GitError
+pub async fn Fs::prefetch_glob(Self, &@bit_types.RepoFileSystem, &@bit_types.FileSystem, String) -> Int32 raise @bit_object.GitError
 pub fn Fs::read_file(Self, &@bit_types.RepoFileSystem, String) -> Bytes raise @bit_object.GitError
 pub async fn Fs::read_file_async(Self, &@bit_types.RepoFileSystem, &@bit_types.FileSystem, String) -> Bytes raise @bit_object.GitError
 pub fn Fs::readdir(Self, &@bit_types.RepoFileSystem, String) -> Array[String] raise @bit_object.GitError
@@ -74,8 +74,8 @@ pub fn Fs::write_file(Self, String, Bytes) -> Unit
 pub fn Fs::write_string(Self, String, String) -> Unit
 
 pub struct FsConfig {
-  max_cache_bytes : Int
-  max_cache_entries : Int
+  max_cache_bytes : Int32
+  max_cache_entries : Int32
   lazy_load : Bool
   enable_promisor : Bool
 }
@@ -92,19 +92,19 @@ pub(all) struct Layer {
 pub struct LruCache[V] {
   mut hot : Map[String, V]
   mut cold : Map[String, V]
-  mut hot_bytes : Int
-  mut cold_bytes : Int
-  max_bytes : Int
-  size_fn : (V) -> Int
+  mut hot_bytes : Int32
+  mut cold_bytes : Int32
+  max_bytes : Int32
+  size_fn : (V) -> Int32
 }
 pub fn[V] LruCache::clear(Self[V]) -> Unit
 pub fn[V] LruCache::contains(Self[V], String) -> Bool
 pub fn[V] LruCache::get(Self[V], String) -> V?
-pub fn[V] LruCache::length(Self[V]) -> Int
-pub fn[V] LruCache::new(Int, (V) -> Int) -> Self[V]
+pub fn[V] LruCache::length(Self[V]) -> Int32
+pub fn[V] LruCache::new(Int32, (V) -> Int32) -> Self[V]
 pub fn[V] LruCache::remove(Self[V], String) -> Unit
 pub fn[V] LruCache::set(Self[V], String, V) -> Unit
-pub fn[V] LruCache::total_bytes(Self[V]) -> Int
+pub fn[V] LruCache::total_bytes(Self[V]) -> Int32
 
 pub(all) struct ObjectCache {
   blob_cache : LruCache[Bytes]
@@ -116,7 +116,7 @@ pub fn ObjectCache::get_blob(Self, String) -> Bytes?
 pub fn ObjectCache::get_path(Self, String) -> @bit_object.ObjectId??
 pub fn ObjectCache::get_tree(Self, @bit_object.ObjectId) -> Array[@bit_object.TreeEntry]?
 pub fn ObjectCache::invalidate_path(Self, String) -> Unit
-pub fn ObjectCache::new(Int) -> Self
+pub fn ObjectCache::new(Int32) -> Self
 pub fn ObjectCache::set_blob(Self, String, Bytes) -> Unit
 pub fn ObjectCache::set_path(Self, String, @bit_object.ObjectId?) -> Unit
 pub fn ObjectCache::set_tree(Self, @bit_object.ObjectId, Array[@bit_object.TreeEntry]) -> Unit
@@ -143,4 +143,3 @@ pub fn WorkingLayer::new() -> Self
 // Type aliases
 
 // Traits
-

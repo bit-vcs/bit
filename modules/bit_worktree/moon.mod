@@ -8,7 +8,7 @@ import {
   "mizchi/bit_lib@0.48.0",
   "mizchi/bit_object@0.48.0",
   "mizchi/bit_types@0.48.0",
-  "moonbitlang/async@0.22.1",
+  "moonbitlang/async@0.22.5",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"

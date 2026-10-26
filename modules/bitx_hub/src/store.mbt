@@ -126,12 +126,21 @@ pub(all) enum RecordTriggerClass {
 } derive(Eq, Debug)
 
 ///|
+pub extend RecordTriggerClass with Eq::{not_equal, equal}
+
+///|
+pub extend RecordTriggerClass with Debug::{to_repr}
+
+///|
 pub impl Show for RecordTriggerClass with fn output(self, logger) {
   match self {
     Full => logger.write_string("Full")
     NotifyOnly => logger.write_string("NotifyOnly")
   }
 }
+
+///|
+pub extend RecordTriggerClass with Show::{to_string, output}
 
 ///|
 pub fn classify_record_trigger(record : HubRecord) -> RecordTriggerClass {

@@ -19,22 +19,22 @@ pub(all) struct ContentMergeOptions {
   ours_label : String
   base_label : String
   theirs_label : String
-  marker_size : Int
+  marker_size : Int32
   favor : MergeFavor
 }
 pub fn ContentMergeOptions::default() -> Self
 pub fn ContentMergeOptions::favor_ours() -> Self
 pub fn ContentMergeOptions::favor_theirs() -> Self
 pub fn ContentMergeOptions::favor_union() -> Self
-pub fn ContentMergeOptions::new(conflict_style? : ConflictStyle, ours_label? : String, base_label? : String, theirs_label? : String, marker_size? : Int, favor? : MergeFavor) -> Self
+pub fn ContentMergeOptions::new(conflict_style? : ConflictStyle, ours_label? : String, base_label? : String, theirs_label? : String, marker_size? : Int32, favor? : MergeFavor) -> Self
 pub fn ContentMergeOptions::with_diff3(Self) -> Self
 pub fn ContentMergeOptions::with_labels(Self, ours~ : String, base~ : String, theirs~ : String) -> Self
-pub fn ContentMergeOptions::with_marker_size(Self, Int) -> Self
+pub fn ContentMergeOptions::with_marker_size(Self, Int32) -> Self
 
 pub(all) struct ContentMergeResult {
   content : String
   has_conflicts : Bool
-  conflict_count : Int
+  conflict_count : Int32
 }
 
 pub(all) enum MergeFavor {
@@ -47,4 +47,3 @@ pub(all) enum MergeFavor {
 // Type aliases
 
 // Traits
-

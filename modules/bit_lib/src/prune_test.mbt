@@ -3,7 +3,7 @@
 ///|
 fn setup_repo_prune() -> @bit.TestFs {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
   fs
@@ -22,10 +22,10 @@ fn test_join_path(root : String, path : String) -> String {
 test "prune: removes unreachable loose objects" {
   let fs = setup_repo_prune()
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  ignore(commit(fs, fs, "/repo", "msg\n", "Test <t@example.com>", 1700000000L))
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(@bit_lib.commit(fs, fs, "/repo", "msg\n", "Test <t@example.com>", 1700000000L))
   let git_dir = "/repo/.git"
-  let orphan = write_loose_object(
+  let orphan = @bit_lib.write_loose_object(
     fs,
     git_dir,
     @bit.ObjectType::Blob,
@@ -39,7 +39,7 @@ test "prune: removes unreachable loose objects" {
     name,
   )
   assert_true(fs.is_file(obj_path))
-  let result = prune_repo(fs, fs, "/repo")
+  let result = @bit_lib.prune_repo(fs, fs, "/repo")
   assert_true(result.pruned.contains(orphan))
   assert_true(!fs.is_file(obj_path))
 }

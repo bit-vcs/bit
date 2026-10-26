@@ -39,6 +39,8 @@ pub fn write_git_metadata(ObjectStore, @bit_object.ObjectId, String, String, &@b
 
 pub async fn[FS : @bit_types.AsyncFileSystem + @bit_types.AsyncRepoFileSystem] write_git_metadata_async(ObjectStore, @bit_object.ObjectId, String, String, FS, String) -> Unit raise @bit_object.GitError
 
+pub async fn[FS : @bit_types.AsyncFileSystem] write_shallow_boundaries_async(FS, String, Array[@bit_object.ObjectId]) -> Unit raise @bit_object.GitError
+
 // Errors
 
 // Types and methods
@@ -59,4 +61,3 @@ pub fn ObjectStore::new() -> Self
 // Type aliases
 
 // Traits
-

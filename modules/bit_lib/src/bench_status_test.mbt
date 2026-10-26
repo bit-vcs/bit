@@ -13,15 +13,15 @@ fn setup_status_repo(
   dirty_count : Int,
 ) -> @bit.TestFs raise @bit.GitError {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, bench_root)) catch {
+  ignore(@bit_lib.init_repo(fs, bench_root)) catch {
     _ => ()
   }
   for i in 0..<file_count {
     fs.write_string(bench_root + "/file_\{i}.txt", "content\n")
   }
-  add_paths(fs, fs, bench_root, ["."])
+  @bit_lib.add_paths(fs, fs, bench_root, ["."])
   ignore(
-    commit(
+    @bit_lib.commit(
       fs, fs, bench_root, "msg\n", "Bench <bench@example.com>", 1700000000L,
     ),
   )
@@ -45,7 +45,7 @@ test "bench status clean small" (b : @bench.T) {
   b.bench(fn() {
     let mut out = 0
     @async.run_async_main(async fn() {
-      let st = status(bench_status_clean_small, bench_root)
+      let st = @bit_lib.status(bench_status_clean_small, bench_root)
       out = st.untracked.length()
     })
     b.keep(out)
@@ -57,7 +57,7 @@ test "bench status dirty small" (b : @bench.T) {
   b.bench(fn() {
     let mut out = 0
     @async.run_async_main(async fn() {
-      let st = status(bench_status_dirty_small, bench_root)
+      let st = @bit_lib.status(bench_status_dirty_small, bench_root)
       out = st.unstaged_modified.length()
     })
     b.keep(out)
@@ -69,7 +69,7 @@ test "bench status clean large" (b : @bench.T) {
   b.bench(fn() {
     let mut out = 0
     @async.run_async_main(async fn() {
-      let st = status(bench_status_clean_large, bench_root)
+      let st = @bit_lib.status(bench_status_clean_large, bench_root)
       out = st.untracked.length()
     })
     b.keep(out)
@@ -79,10 +79,10 @@ test "bench status clean large" (b : @bench.T) {
 ///|
 // Pre-computed Status snapshots: the bench only measures the formatter so we
 // hoist the (slow) async status() call to package init.
-let bench_status_dirty_small_snapshot : Status = {
+let bench_status_dirty_small_snapshot : @bit_lib.Status = {
   let mut snapshot = None
   @async.run_async_main(async fn() {
-    snapshot = Some(status(bench_status_dirty_small, bench_root))
+    snapshot = Some(@bit_lib.status(bench_status_dirty_small, bench_root))
   })
   snapshot.unwrap()
 }
@@ -90,7 +90,7 @@ let bench_status_dirty_small_snapshot : Status = {
 ///|
 test "bench status_porcelain_from dirty small" (b : @bench.T) {
   b.bench(fn() {
-    let lines = status_porcelain_from(bench_status_dirty_small_snapshot)
+    let lines = @bit_lib.status_porcelain_from(bench_status_dirty_small_snapshot)
     b.keep(lines.length())
   })
 }
@@ -98,12 +98,12 @@ test "bench status_porcelain_from dirty small" (b : @bench.T) {
 ///|
 async test "racy_git: unchanged file is not reported" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  ignore(commit(fs, fs, "/repo", "msg\n", "Test <t@example.com>", 1700000000L))
-  let st = status(fs, "/repo")
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(@bit_lib.commit(fs, fs, "/repo", "msg\n", "Test <t@example.com>", 1700000000L))
+  let st = @bit_lib.status(fs, "/repo")
   assert_true(st.unstaged_modified.length() == 0)
 }

@@ -23,7 +23,7 @@ test "branch: list with current" {
   fs.write_string(
     "/repo/.git/packed-refs", "# pack-refs with: peeled\n3333333333333333333333333333333333333333 refs/heads/dev\n",
   )
-  let lines = list_branches_text(fs, "/repo/.git")
+  let lines = @bit_lib.list_branches_text(fs, "/repo/.git")
   assert_true(lines.contains("* main"))
   assert_true(lines.contains("  dev"))
   assert_true(lines.contains("  feature/x"))
@@ -38,7 +38,7 @@ test "branch: detached head" {
   fs.write_string(
     "/repo/.git/refs/heads/main", "1111111111111111111111111111111111111111\n",
   )
-  let lines = list_branches_text(fs, "/repo/.git")
+  let lines = @bit_lib.list_branches_text(fs, "/repo/.git")
   assert_true(lines[0].has_prefix("* (HEAD detached at 4444444"))
   assert_true(lines.contains("  main"))
 }
@@ -50,7 +50,7 @@ test "branch: create branch" {
   fs.write_string(
     "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
   )
-  create_branch(fs, fs, "/repo", "feature")
+  @bit_lib.create_branch(fs, fs, "/repo", "feature")
   let content = fs.read_string("/repo/.git/refs/heads/feature")
   assert_true(content.has_prefix("aaaaaaaaaa"))
 }
@@ -62,7 +62,7 @@ test "branch: switch branch updates head" {
   fs.write_string(
     "/repo/.git/refs/heads/main", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
   )
-  switch_branch(fs, fs, "/repo", "feature", create=true, checkout_files=false)
+  @bit_lib.switch_branch(fs, fs, "/repo", "feature", create=true, checkout_files=false)
   let head = fs.read_string("/repo/.git/HEAD")
   assert_true(head.has_prefix("ref: refs/heads/feature"))
   let feature = fs.read_string("/repo/.git/refs/heads/feature")
@@ -73,7 +73,7 @@ test "branch: switch branch updates head" {
 test "branch: create branch in unborn repo does not create empty ref file" {
   let fs = setup_branch_fs()
   fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
-  create_branch(fs, fs, "/repo", "main")
+  @bit_lib.create_branch(fs, fs, "/repo", "main")
   assert_true(!fs.is_file("/repo/.git/refs/heads/main"))
 }
 
@@ -81,8 +81,8 @@ test "branch: create branch in unborn repo does not create empty ref file" {
 test "branch: switching unborn branches does not fail on empty refs" {
   let fs = setup_branch_fs()
   fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
-  switch_branch(fs, fs, "/repo", "main", create=true, checkout_files=false)
-  switch_branch(
+  @bit_lib.switch_branch(fs, fs, "/repo", "main", create=true, checkout_files=false)
+  @bit_lib.switch_branch(
     fs,
     fs,
     "/repo",
@@ -102,7 +102,7 @@ test "branch: resolve_ref follows linked worktree commondir" {
   fs.write_string(
     "/repo/.git/refs/heads/new-wt", "cccccccccccccccccccccccccccccccccccccccc\n",
   )
-  let resolved = resolve_ref(fs, "/repo/.git/worktrees/wt", "refs/heads/new-wt")
+  let resolved = @bit_lib.resolve_ref(fs, "/repo/.git/worktrees/wt", "refs/heads/new-wt")
   match resolved {
     Some(id) =>
       assert_eq(id.to_hex(), "cccccccccccccccccccccccccccccccccccccccc")
@@ -116,7 +116,7 @@ test "branch: create_branch_at writes refs in bare repository root" {
   fs.mkdir_p("/bare/refs/heads")
   fs.mkdir_p("/bare/objects")
   fs.write_string("/bare/HEAD", "ref: refs/heads/main\n")
-  create_branch_at(
+  @bit_lib.create_branch_at(
     fs,
     fs,
     "/bare",
@@ -135,9 +135,9 @@ test "branch: create_branch writes reflog from current branch" {
     "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
   )
 
-  create_branch(fs, fs, "/repo", "topic")
+  @bit_lib.create_branch(fs, fs, "/repo", "topic")
 
-  let entries = read_reflog(fs, "/repo/.git", "refs/heads/topic")
+  let entries = @bit_lib.read_reflog(fs, "/repo/.git", "refs/heads/topic")
   assert_eq(entries.length(), 1)
   assert_eq(
     entries[0].new_id.to_hex(),
@@ -154,7 +154,7 @@ test "branch: create_branch_at writes reflog with explicit start point" {
     "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
   )
 
-  create_branch_at(
+  @bit_lib.create_branch_at(
     fs,
     fs,
     "/repo",
@@ -163,7 +163,7 @@ test "branch: create_branch_at writes reflog with explicit start point" {
     start_point=Some("main^"),
   )
 
-  let entries = read_reflog(fs, "/repo/.git", "refs/heads/topic")
+  let entries = @bit_lib.read_reflog(fs, "/repo/.git", "refs/heads/topic")
   assert_eq(entries.length(), 1)
   assert_eq(
     entries[0].new_id.to_hex(),
@@ -180,7 +180,7 @@ test "branch: create_branch_at rejects checked out branch" {
     "/repo/.git/refs/heads/topic", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
   )
   try
-    create_branch_at(
+    @bit_lib.create_branch_at(
       fs,
       fs,
       "/repo",
@@ -213,7 +213,7 @@ test "branch: create_branch_at rejects branch checked out in linked worktree" {
   fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/topic\n")
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
   try
-    create_branch_at(
+    @bit_lib.create_branch_at(
       fs,
       fs,
       "/repo",
@@ -238,7 +238,7 @@ test "branch: delete_branch prunes empty parent directories for nested refs" {
   fs.write_string(
     "/repo/.git/refs/heads/branch/conflict", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
   )
-  delete_branch(fs, fs, "/repo", "branch/conflict", force=true)
+  @bit_lib.delete_branch(fs, fs, "/repo", "branch/conflict", force=true)
   assert_true(!fs.is_file("/repo/.git/refs/heads/branch/conflict"))
   assert_true(!fs.is_dir("/repo/.git/refs/heads/branch"))
 }
@@ -257,7 +257,7 @@ test "branch: delete_branch rejects branch checked out in linked worktree" {
   fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree1/.git\n")
   fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/topic\n")
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
-  try delete_branch(fs, fs, "/repo", "topic", force=true) catch {
+  try @bit_lib.delete_branch(fs, fs, "/repo", "topic", force=true) catch {
     _ => () // expected
   } noraise {
     _ => fail("expected delete_branch to raise")
@@ -278,7 +278,7 @@ test "branch: delete_branch removes reflog for deleted ref" {
   fs.write_string(
     "/repo/.git/logs/refs/heads/topic", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb Test <test@example.com> 0 +0000\tbranch: Created from main\n",
   )
-  delete_branch(fs, fs, "/repo", "topic", force=true)
+  @bit_lib.delete_branch(fs, fs, "/repo", "topic", force=true)
   assert_true(!fs.is_file("/repo/.git/logs/refs/heads/topic"))
 }
 
@@ -299,7 +299,7 @@ test "branch: rename_branch rejects target checked out in linked worktree" {
   fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree1/.git\n")
   fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/foo\n")
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
-  try rename_branch(fs, fs, "/repo", "bar", "foo", force=true) catch {
+  try @bit_lib.rename_branch(fs, fs, "/repo", "bar", "foo", force=true) catch {
     _ => () // expected
   } noraise {
     _ => fail("expected rename_branch to raise")
@@ -319,7 +319,7 @@ test "branch: rename_branch can move parent ref to nested child" {
   fs.write_string(
     "/repo/.git/logs/refs/heads/m", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb Test <test@example.com> 0 +0000\tbranch: Created from main\n",
   )
-  rename_branch(fs, fs, "/repo", "m", "m/m")
+  @bit_lib.rename_branch(fs, fs, "/repo", "m", "m/m")
   assert_true(!fs.is_file("/repo/.git/refs/heads/m"))
   assert_eq(
     fs.read_string("/repo/.git/refs/heads/m/m"),
@@ -342,7 +342,7 @@ test "branch: rename_branch updates linked worktree HEADs" {
   fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree1/.git\n")
   fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/baz\n")
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
-  rename_branch(fs, fs, "/repo", "baz", "bam")
+  @bit_lib.rename_branch(fs, fs, "/repo", "baz", "bam")
   assert_eq(
     fs.read_string("/repo/.git/worktrees/wt1/HEAD"),
     "ref: refs/heads/bam\n",
@@ -364,7 +364,7 @@ test "branch: rename_branch from linked worktree root updates common refs" {
   fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/baz\n")
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
   fs.write_string("/worktree/.git", "gitdir: /repo/.git/worktrees/wt1\n")
-  rename_branch(fs, fs, "/worktree", "baz", "bam")
+  @bit_lib.rename_branch(fs, fs, "/worktree", "baz", "bam")
   assert_true(!fs.is_file("/repo/.git/refs/heads/baz"))
   assert_eq(
     fs.read_string("/repo/.git/refs/heads/bam"),
@@ -390,7 +390,7 @@ test "branch: rename_branch can move nested child to parent" {
   fs.write_string(
     "/repo/.git/logs/refs/heads/n/n", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb Test <test@example.com> 0 +0000\tbranch: Created from main\n",
   )
-  rename_branch(fs, fs, "/repo", "n/n", "n")
+  @bit_lib.rename_branch(fs, fs, "/repo", "n/n", "n")
   assert_true(!fs.is_dir("/repo/.git/refs/heads/n/n"))
   assert_eq(
     fs.read_string("/repo/.git/refs/heads/n"),
@@ -412,7 +412,7 @@ test "branch: rename_branch replaces dangling symref target" {
   fs.write_string(
     "/repo/.git/refs/heads/broken_symref", "ref: refs/heads/i_am_broken\n",
   )
-  rename_branch(fs, fs, "/repo", "m", "broken_symref")
+  @bit_lib.rename_branch(fs, fs, "/repo", "m", "broken_symref")
   assert_eq(
     fs.read_string("/repo/.git/refs/heads/broken_symref"),
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
@@ -428,7 +428,7 @@ test "branch: create_lightweight_tag rejects conflicting parent ref path" {
     "/repo/.git/refs/tags/foo/bar", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
   )
   try
-    create_lightweight_tag(
+    @bit_lib.create_lightweight_tag(
       fs,
       fs,
       "/repo/.git",
@@ -451,7 +451,7 @@ test "branch: create_lightweight_tag rejects conflicting packed ref path" {
     "/repo/.git/packed-refs", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/foo/bar\n",
   )
   try
-    create_lightweight_tag(
+    @bit_lib.create_lightweight_tag(
       fs,
       fs,
       "/repo/.git",
@@ -469,7 +469,7 @@ test "branch: create_lightweight_tag rejects conflicting packed ref path" {
 ///|
 test "branch: create_lightweight_tag creates parent directories for nested refs" {
   let fs = @bit.TestFs::new()
-  create_lightweight_tag(
+  @bit_lib.create_lightweight_tag(
     fs,
     fs,
     "/repo/.git",
@@ -495,7 +495,7 @@ test "branch: delete_tag removes reflog and prunes empty parent directories" {
     "/repo/.git/logs/refs/tags/foo/bar", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb A U Thor <a@example.com> 1 +0000\ttag: tagging\n",
   )
 
-  delete_tag(fs, fs, "/repo/.git", "foo/bar")
+  @bit_lib.delete_tag(fs, fs, "/repo/.git", "foo/bar")
 
   assert_true(!fs.exists("/repo/.git/refs/tags/foo/bar"))
   assert_true(!fs.exists("/repo/.git/logs/refs/tags/foo/bar"))
@@ -507,8 +507,8 @@ test "branch: delete_tag removes reflog and prunes empty parent directories" {
 test "branch: create_annotated_tag uses storage hash and records compat mapping" {
   let fs = setup_sha256_compat_repo()
   fs.write_string("/repo/hello", "Hello World!\n")
-  add_paths(fs, fs, "/repo", ["hello"])
-  let commit_id = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["hello"])
+  let commit_id = @bit_lib.commit(
     fs,
     fs,
     "/repo",
@@ -519,7 +519,7 @@ test "branch: create_annotated_tag uses storage hash and records compat mapping"
     committer_timestamp=1112354055L,
     timezone="+0200",
   )
-  create_annotated_tag(
+  @bit_lib.create_annotated_tag(
     fs,
     fs,
     "/repo/.git",
@@ -530,9 +530,9 @@ test "branch: create_annotated_tag uses storage hash and records compat mapping"
     1112354055L,
     timezone="+0200",
   )
-  let tag_id = resolve_ref(fs, "/repo/.git", "refs/tags/v1").unwrap()
+  let tag_id = @bit_lib.resolve_ref(fs, "/repo/.git", "refs/tags/v1").unwrap()
   assert_true(fs.is_file(worktree_test_object_path("/repo/.git", tag_id)))
-  let compat = compat_lookup_loose_object_idx(fs, "/repo/.git", tag_id.to_hex())
+  let compat = @bit_lib.compat_lookup_loose_object_idx(fs, "/repo/.git", tag_id.to_hex())
   assert_true(compat is Some(_))
   assert_true(compat.unwrap().length() == 40)
 }

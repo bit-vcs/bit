@@ -9,11 +9,23 @@ pub struct LfsDownloadAction {
 } derive(Debug, Eq)
 
 ///|
+pub extend LfsDownloadAction with Debug::{to_repr}
+
+///|
+pub extend LfsDownloadAction with Eq::{not_equal, equal}
+
+///|
 pub struct LfsDownloadError {
   oid : String
   code : Int
   message : String
 } derive(Debug, Eq)
+
+///|
+pub extend LfsDownloadError with Debug::{to_repr}
+
+///|
+pub extend LfsDownloadError with Eq::{not_equal, equal}
 
 ///|
 pub struct LfsUploadAction {
@@ -24,11 +36,23 @@ pub struct LfsUploadAction {
 } derive(Debug, Eq)
 
 ///|
+pub extend LfsUploadAction with Debug::{to_repr}
+
+///|
+pub extend LfsUploadAction with Eq::{not_equal, equal}
+
+///|
 pub struct LfsUploadError {
   oid : String
   code : Int
   message : String
 } derive(Debug, Eq)
+
+///|
+pub extend LfsUploadError with Debug::{to_repr}
+
+///|
+pub extend LfsUploadError with Eq::{not_equal, equal}
 
 ///|
 fn lfs_build_batch_request_json_for_operation(

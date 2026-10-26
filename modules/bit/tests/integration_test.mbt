@@ -258,7 +258,9 @@ test "integration: receive-pack body format" {
 test "integration: parse successful push response" {
   // Simulate server response: unpack ok, ref ok
   let response = build_test_response(["unpack ok\n", "ok refs/heads/main\n"])
-  let result = @protocol.parse_receive_pack_response(response)
+  let result = try Ok(@protocol.parse_receive_pack_response(response)) catch {
+    e => Err(e)
+  }
   match result {
     Ok(msg) => assert_true(msg == "Push successful")
     Err(_) => assert_true(false)
@@ -269,7 +271,9 @@ test "integration: parse successful push response" {
 test "integration: parse failed push response" {
   // Simulate server response: unpack error
   let response = build_test_response(["unpack error - bad pack\n"])
-  let result = @protocol.parse_receive_pack_response(response)
+  let result = try Ok(@protocol.parse_receive_pack_response(response)) catch {
+    e => Err(e)
+  }
   match result {
     Ok(_) => assert_true(false)
     Err(@bit.GitError::ProtocolError(msg)) =>

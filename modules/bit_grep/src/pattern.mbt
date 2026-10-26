@@ -7,10 +7,22 @@ pub(all) enum GrepPatternType {
 } derive(Eq, Debug)
 
 ///|
+pub extend GrepPatternType with Eq::{not_equal, equal}
+
+///|
+pub extend GrepPatternType with Debug::{to_repr}
+
+///|
 pub(all) struct GrepMatchSpan {
   start_column : Int
   end_column : Int
 } derive(Eq, Debug)
+
+///|
+pub extend GrepMatchSpan with Eq::{not_equal, equal}
+
+///|
+pub extend GrepMatchSpan with Debug::{to_repr}
 
 ///|
 pub(all) enum GrepExprToken {
@@ -23,6 +35,12 @@ pub(all) enum GrepExprToken {
 } derive(Eq, Debug)
 
 ///|
+pub extend GrepExprToken with Eq::{not_equal, equal}
+
+///|
+pub extend GrepExprToken with Debug::{to_repr}
+
+///|
 pub(all) enum GrepExpr {
   Pattern(String)
   And(GrepExpr, GrepExpr)
@@ -31,10 +49,22 @@ pub(all) enum GrepExpr {
 } derive(Eq, Debug)
 
 ///|
+pub extend GrepExpr with Eq::{not_equal, equal}
+
+///|
+pub extend GrepExpr with Debug::{to_repr}
+
+///|
 pub(all) struct GrepExprMatch {
   matched : Bool
   span : GrepMatchSpan?
 } derive(Eq, Debug)
+
+///|
+pub extend GrepExprMatch with Eq::{not_equal, equal}
+
+///|
+pub extend GrepExprMatch with Debug::{to_repr}
 
 ///|
 fn grep_pattern_show_string(value : String) -> String {
@@ -70,6 +100,9 @@ pub impl Show for GrepPatternType with fn output(self, logger) {
 }
 
 ///|
+pub extend GrepPatternType with Show::{to_string, output}
+
+///|
 pub impl Show for GrepMatchSpan with fn output(self, logger) {
   logger.write_string(
     "{start_column: " +
@@ -79,6 +112,9 @@ pub impl Show for GrepMatchSpan with fn output(self, logger) {
     "}",
   )
 }
+
+///|
+pub extend GrepMatchSpan with Show::{to_string, output}
 
 ///|
 pub impl Show for GrepExprToken with fn output(self, logger) {
@@ -92,6 +128,9 @@ pub impl Show for GrepExprToken with fn output(self, logger) {
     RParen => logger.write_string("RParen")
   }
 }
+
+///|
+pub extend GrepExprToken with Show::{to_string, output}
 
 ///|
 pub impl Show for GrepExpr with fn output(self, logger) {
@@ -111,6 +150,9 @@ pub impl Show for GrepExpr with fn output(self, logger) {
 }
 
 ///|
+pub extend GrepExpr with Show::{to_string, output}
+
+///|
 pub impl Show for GrepExprMatch with fn output(self, logger) {
   logger.write_string(
     "{matched: " +
@@ -120,6 +162,9 @@ pub impl Show for GrepExprMatch with fn output(self, logger) {
     "}",
   )
 }
+
+///|
+pub extend GrepExprMatch with Show::{to_string, output}
 
 ///|
 priv enum GrepRegexAtom {

@@ -8,7 +8,7 @@ pub fn parse_diff_git_header(String) -> (String, String)
 
 pub fn parse_patches(String) -> Array[PatchInfo]
 
-pub fn parse_pct(String) -> Int
+pub fn parse_pct(String) -> Int32
 
 pub fn reverse_patch(String) -> String
 
@@ -17,8 +17,8 @@ pub fn reverse_patch(String) -> String
 // Types and methods
 pub(all) struct PatchInfo {
   display_name : String
-  additions : Int
-  deletions : Int
+  additions : Int32
+  deletions : Int32
   is_rename : Bool
   is_copy : Bool
   is_new : Bool
@@ -27,11 +27,10 @@ pub(all) struct PatchInfo {
   new_name : String
   old_mode : String
   new_mode : String
-  similarity_index : Int
-  dissimilarity_index : Int
+  similarity_index : Int32
+  dissimilarity_index : Int32
 }
 
 // Type aliases
 
 // Traits
-

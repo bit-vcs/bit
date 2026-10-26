@@ -6,19 +6,19 @@ import {
 }
 
 // Values
-pub fn fast_import_parse_data(Array[String], Int) -> FastImportDataResult
+pub fn fast_import_parse_data(Array[String], Int32) -> FastImportDataResult
 
-pub fn fast_import_parse_dataref(String) -> (Int, String)
+pub fn fast_import_parse_dataref(String) -> (Int32, String)
 
 pub fn fast_import_parse_file_op(String) -> FastImportFileOp?
 
 pub fn fast_import_parse_ident(String) -> FastImportIdent?
 
-pub fn fast_import_parse_marks(String) -> Array[(Int, String)]
+pub fn fast_import_parse_marks(String) -> Array[(Int32, String)]
 
 pub fn fast_import_parse_split_two_paths(String) -> (String, String)?
 
-pub fn fast_import_parse_string_byte_count(String) -> Int
+pub fn fast_import_parse_string_byte_count(String) -> Int32
 
 pub fn fast_import_parse_trim(String) -> String
 
@@ -29,7 +29,7 @@ pub fn fast_import_parse_unquote_path(String) -> String
 // Types and methods
 pub(all) struct FastImportDataResult {
   content : Bytes
-  next_line : Int
+  next_line : Int32
 }
 
 pub(all) enum FastImportFileOp {
@@ -39,6 +39,11 @@ pub(all) enum FastImportFileOp {
   Rename(old_path~ : String, new_path~ : String)
   Copy(old_path~ : String, new_path~ : String)
 } derive(Eq, @debug.Debug)
+pub fn FastImportFileOp::equal(Self, Self) -> Bool
+pub fn FastImportFileOp::not_equal(Self, Self) -> Bool
+pub fn FastImportFileOp::output(Self, &Logger) -> Unit
+pub fn FastImportFileOp::to_repr(Self) -> @debug.Repr
+pub fn FastImportFileOp::to_string(Self) -> String
 pub impl Show for FastImportFileOp
 
 pub(all) struct FastImportIdent {
@@ -50,4 +55,3 @@ pub(all) struct FastImportIdent {
 // Type aliases
 
 // Traits
-

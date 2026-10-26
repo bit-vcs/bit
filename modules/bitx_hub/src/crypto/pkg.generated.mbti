@@ -50,4 +50,3 @@ pub struct RelayPublishHttpSignature {
 // Type aliases
 
 // Traits
-

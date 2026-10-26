@@ -22,6 +22,12 @@ pub(all) enum PutCondition {
 } derive(Eq, Debug)
 
 ///|
+pub extend PutCondition with Eq::{not_equal, equal}
+
+///|
+pub extend PutCondition with Debug::{to_repr}
+
+///|
 /// Result of a write.
 ///
 /// `Unknown` is not an error and must not be retried blindly: the write may
@@ -37,6 +43,12 @@ pub(all) enum PutOutcome {
 } derive(Eq, Debug)
 
 ///|
+pub extend PutOutcome with Eq::{not_equal, equal}
+
+///|
+pub extend PutOutcome with Debug::{to_repr}
+
+///|
 /// Result of a read.
 pub(all) enum GetOutcome {
   /// Body plus the version tag it was read at.
@@ -48,12 +60,24 @@ pub(all) enum GetOutcome {
 } derive(Eq, Debug)
 
 ///|
+pub extend GetOutcome with Eq::{not_equal, equal}
+
+///|
+pub extend GetOutcome with Debug::{to_repr}
+
+///|
 /// One entry in a listing.
 pub(all) struct ObjEntry {
   key : String
   size : Int64
   etag : String
 } derive(Eq, Debug)
+
+///|
+pub extend ObjEntry with Eq::{not_equal, equal}
+
+///|
+pub extend ObjEntry with Debug::{to_repr}
 
 ///|
 /// A page of a listing. `next` carries the continuation token when the store
@@ -64,11 +88,23 @@ pub(all) struct ObjListing {
 } derive(Eq, Debug)
 
 ///|
+pub extend ObjListing with Eq::{not_equal, equal}
+
+///|
+pub extend ObjListing with Debug::{to_repr}
+
+///|
 /// Inclusive byte range, matching HTTP `Range: bytes=<start>-<end>`.
 pub(all) struct ByteRange {
   start : Int64
   end : Int64
 } derive(Eq, Debug)
+
+///|
+pub extend ByteRange with Eq::{not_equal, equal}
+
+///|
+pub extend ByteRange with Debug::{to_repr}
 
 ///|
 /// Extract the body of a successful read, raising when the key is absent.
@@ -106,6 +142,9 @@ pub impl Show for PutCondition with fn output(self, logger) {
 }
 
 ///|
+pub extend PutCondition with Show::{to_string, output}
+
+///|
 pub impl Show for PutOutcome with fn output(self, logger) {
   match self {
     Applied(etag) => logger.write_string("Applied(\{etag})")
@@ -113,6 +152,9 @@ pub impl Show for PutOutcome with fn output(self, logger) {
     Unknown => logger.write_string("Unknown")
   }
 }
+
+///|
+pub extend PutOutcome with Show::{to_string, output}
 
 ///|
 /// Bodies are shown by length, not content: a `GetOutcome` in a failing test
@@ -125,3 +167,6 @@ pub impl Show for GetOutcome with fn output(self, logger) {
     Missing => logger.write_string("Missing")
   }
 }
+
+///|
+pub extend GetOutcome with Show::{to_string, output}

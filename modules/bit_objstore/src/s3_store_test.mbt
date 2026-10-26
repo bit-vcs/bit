@@ -3,19 +3,19 @@
 /// queue of canned replies. Lets the status-code mapping be tested exactly,
 /// including the cases a live bucket will not produce on demand.
 struct FakeTransport {
-  replies : Array[HttpReply]
+  replies : Array[@bit_objstore.HttpReply]
   seen : Array[(String, String, Map[String, String])]
   mut next : Int
 }
 
 ///|
-fn FakeTransport::new(replies : Array[HttpReply]) -> FakeTransport {
+fn FakeTransport::new(replies : Array[@bit_objstore.HttpReply]) -> FakeTransport {
   { replies, seen: [], next: 0 }
 }
 
 ///|
-fn FakeTransport::store(self : FakeTransport, path_style : Bool) -> S3Store {
-  let config : S3Config = {
+fn FakeTransport::store(self : FakeTransport, path_style : Bool) -> @bit_objstore.S3Store {
+  let config : @bit_objstore.S3Config = {
     endpoint: "https://s3.us-east-1.amazonaws.com",
     region: "us-east-1",
     bucket: "b",
@@ -24,7 +24,7 @@ fn FakeTransport::store(self : FakeTransport, path_style : Bool) -> S3Store {
     session_token: None,
     path_style,
   }
-  S3Store::new(
+  @bit_objstore.S3Store::new(
     config,
     (verb, url, headers, _body) => {
       self.seen.push((verb, url, headers))
@@ -44,7 +44,7 @@ fn reply(
   status : Int,
   headers? : Map[String, String] = Map([]),
   body? : String = "",
-) -> HttpReply {
+) -> @bit_objstore.HttpReply {
   { status, headers, body: @utf8.encode(body) }
 }
 
@@ -109,7 +109,7 @@ async test "s3: create-only write sends If-None-Match: *" {
   let fake = FakeTransport::new([reply(200, headers={ "ETag": "\"new\"" })])
   let store = fake.store(true)
   inspect(
-    store.put("wal/p.pack", @utf8.encode("x"), PutCondition::IfNotExists),
+    store.put("wal/p.pack", @utf8.encode("x"), @bit_objstore.PutCondition::IfNotExists),
     content="Applied(new)",
   )
   let (_, _, headers) = fake.seen[0]
@@ -121,7 +121,7 @@ async test "s3: compare-and-swap sends If-Match and maps 412 to NotApplied" {
   let fake = FakeTransport::new([reply(412, body="PreconditionFailed")])
   let store = fake.store(true)
   inspect(
-    store.put("manifest.json", @utf8.encode("{}"), PutCondition::IfMatch("v1")),
+    store.put("manifest.json", @utf8.encode("{}"), @bit_objstore.PutCondition::IfMatch("v1")),
     content="NotApplied",
   )
   let (_, _, headers) = fake.seen[0]
@@ -135,7 +135,7 @@ async test "s3: 409 is a lost race, not a failure" {
   let fake = FakeTransport::new([reply(409)])
   let store = fake.store(true)
   inspect(
-    store.put("manifest.json", @utf8.encode("{}"), PutCondition::IfMatch("v1")),
+    store.put("manifest.json", @utf8.encode("{}"), @bit_objstore.PutCondition::IfMatch("v1")),
     content="NotApplied",
   )
 }
@@ -146,7 +146,7 @@ async test "s3: 5xx and 429 leave the write indeterminate" {
     let fake = FakeTransport::new([reply(status)])
     let store = fake.store(true)
     inspect(
-      store.put("k", @utf8.encode("v"), PutCondition::Unconditional),
+      store.put("k", @utf8.encode("v"), @bit_objstore.PutCondition::Unconditional),
       content="Unknown",
     )
   }
@@ -158,7 +158,7 @@ async test "s3: a transport failure is indeterminate, not an error" {
   let fake = FakeTransport::new([])
   let store = fake.store(true)
   inspect(
-    store.put("k", @utf8.encode("v"), PutCondition::Unconditional),
+    store.put("k", @utf8.encode("v"), @bit_objstore.PutCondition::Unconditional),
     content="Unknown",
   )
 }
@@ -169,7 +169,7 @@ async test "s3: a 200 without an ETag is Unknown rather than a guessed version" 
   let fake = FakeTransport::new([reply(200)])
   let store = fake.store(true)
   inspect(
-    store.put("k", @utf8.encode("v"), PutCondition::Unconditional),
+    store.put("k", @utf8.encode("v"), @bit_objstore.PutCondition::Unconditional),
     content="Unknown",
   )
 }
@@ -179,7 +179,7 @@ async test "s3: a store that rejects conditional writes fails loudly" {
   let fake = FakeTransport::new([reply(400, body="InvalidArgument")])
   let store = fake.store(true)
   let message = try {
-    let _ = store.put("k", @utf8.encode("v"), PutCondition::IfMatch("v1"))
+    let _ = store.put("k", @utf8.encode("v"), @bit_objstore.PutCondition::IfMatch("v1"))
     "<no error>"
   } catch {
     e => e.to_string()

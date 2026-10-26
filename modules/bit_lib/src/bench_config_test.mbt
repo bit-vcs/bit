@@ -38,7 +38,7 @@ let bench_config_fs_large : @bit.TestFs = bench_setup_config_repo(100)
 test "bench read_config_value small config single key" (b : @bench.T) {
   let config_path = bench_config_root + "/.git/config"
   b.bench(fn() {
-    let v = read_config_value(
+    let v = @bit_lib.read_config_value(
       bench_config_fs_small, config_path, "core", "autocrlf",
     )
     b.keep(v is Some(_))
@@ -51,16 +51,16 @@ test "bench read_config_value 4 keys (sequential, re-reads each)" (b : @bench.T)
   // re-open + re-parse the same config.
   let config_path = bench_config_root + "/.git/config"
   b.bench(fn() {
-    let v1 = read_config_value(
+    let v1 = @bit_lib.read_config_value(
       bench_config_fs_small, config_path, "extensions", "objectformat",
     )
-    let v2 = read_config_value(
+    let v2 = @bit_lib.read_config_value(
       bench_config_fs_small, config_path, "extensions", "compatobjectformat",
     )
-    let v3 = read_config_value(
+    let v3 = @bit_lib.read_config_value(
       bench_config_fs_small, config_path, "extensions", "refstorage",
     )
-    let v4 = read_config_value(
+    let v4 = @bit_lib.read_config_value(
       bench_config_fs_small, config_path, "core", "repositoryformatversion",
     )
     b.keep(v1 is Some(_) || v2 is Some(_) || v3 is Some(_) || v4 is Some(_))
@@ -71,16 +71,16 @@ test "bench read_config_value 4 keys (sequential, re-reads each)" (b : @bench.T)
 test "bench read_config_value 4 keys on 100-remote config" (b : @bench.T) {
   let config_path = bench_config_root + "/.git/config"
   b.bench(fn() {
-    let v1 = read_config_value(
+    let v1 = @bit_lib.read_config_value(
       bench_config_fs_large, config_path, "extensions", "objectformat",
     )
-    let v2 = read_config_value(
+    let v2 = @bit_lib.read_config_value(
       bench_config_fs_large, config_path, "extensions", "compatobjectformat",
     )
-    let v3 = read_config_value(
+    let v3 = @bit_lib.read_config_value(
       bench_config_fs_large, config_path, "extensions", "refstorage",
     )
-    let v4 = read_config_value(
+    let v4 = @bit_lib.read_config_value(
       bench_config_fs_large, config_path, "core", "repositoryformatversion",
     )
     b.keep(v1 is Some(_) || v2 is Some(_) || v3 is Some(_) || v4 is Some(_))
@@ -96,18 +96,18 @@ test "bench read_config_value_from_content 4 keys on 100-remote config" (
   b : @bench.T,
 ) {
   b.bench(fn() {
-    let content = read_config_content(
+    let content = @bit_lib.read_config_content(
       bench_config_fs_large,
       bench_config_root + "/.git",
     )
-    let v1 = read_config_value_from_content(
+    let v1 = @bit_lib.read_config_value_from_content(
       content, "extensions", "objectformat",
     )
-    let v2 = read_config_value_from_content(
+    let v2 = @bit_lib.read_config_value_from_content(
       content, "extensions", "compatobjectformat",
     )
-    let v3 = read_config_value_from_content(content, "extensions", "refstorage")
-    let v4 = read_config_value_from_content(
+    let v3 = @bit_lib.read_config_value_from_content(content, "extensions", "refstorage")
+    let v4 = @bit_lib.read_config_value_from_content(
       content, "core", "repositoryformatversion",
     )
     b.keep(v1 is Some(_) || v2 is Some(_) || v3 is Some(_) || v4 is Some(_))

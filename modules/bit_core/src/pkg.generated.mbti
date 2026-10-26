@@ -25,7 +25,7 @@ pub fn create_object(@bit_object.ObjectType, Bytes) -> (@bit_object.ObjectId, By
 
 pub fn create_tree(Array[@bit_object.TreeEntry]) -> (@bit_object.ObjectId, Bytes)
 
-pub fn hash_array_prefix(Array[Byte], Int, hash_size? : Int) -> @bit_object.ObjectId
+pub fn hash_array_prefix(Array[Byte], Int32, hash_size? : Int32) -> @bit_object.ObjectId
 
 pub fn hash_blob(Bytes) -> @bit_object.ObjectId
 
@@ -35,7 +35,7 @@ pub fn hash_object_content(@bit_object.ObjectType, Bytes) -> @bit_object.ObjectI
 
 pub fn hash_object_content_with_algo(@bit_object.HashAlgorithm, @bit_object.ObjectType, Bytes) -> @bit_object.ObjectId
 
-pub fn hash_prefix(Bytes, Int, hash_size? : Int) -> @bit_object.ObjectId
+pub fn hash_prefix(Bytes, Int32, hash_size? : Int32) -> @bit_object.ObjectId
 
 pub fn join_path(String, String) -> String
 
@@ -55,13 +55,13 @@ pub fn sha1(Bytes) -> @bit_object.ObjectId
 
 pub fn sha1_array(Array[Byte]) -> @bit_object.ObjectId
 
-pub fn sha1_array_prefix(Array[Byte], Int) -> @bit_object.ObjectId
+pub fn sha1_array_prefix(Array[Byte], Int32) -> @bit_object.ObjectId
 
-pub fn sha1_prefix(Bytes, Int) -> @bit_object.ObjectId
+pub fn sha1_prefix(Bytes, Int32) -> @bit_object.ObjectId
 
-pub fn sha256_array_prefix(Array[Byte], Int) -> @bit_object.ObjectId
+pub fn sha256_array_prefix(Array[Byte], Int32) -> @bit_object.ObjectId
 
-pub fn sha256_prefix(Bytes, Int) -> @bit_object.ObjectId
+pub fn sha256_prefix(Bytes, Int32) -> @bit_object.ObjectId
 
 pub fn verify_tree_entry_name(String) -> Unit raise @bit_object.GitError
 
@@ -121,4 +121,3 @@ pub using @bit_types {trait HttpClient}
 pub using @bit_types {trait RepoFileSystem}
 
 // Traits
-

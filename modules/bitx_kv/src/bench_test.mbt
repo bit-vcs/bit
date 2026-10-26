@@ -17,15 +17,15 @@ priv enum KvBenchBackend {
 
 ///|
 priv enum KvBenchFixture {
-  MemFixture(Kv, @bit.TestFs)
-  FsFixture(Kv, @osfs.OsFs)
+  MemFixture(@bitx_kv.Kv, @bit.TestFs)
+  FsFixture(@bitx_kv.Kv, @osfs.OsFs)
 }
 
 ///|
 let bench_native_root_base : String = "/tmp/bit_bench_kv_backend_v1"
 
 ///|
-fn KvBenchFixture::kv(self : KvBenchFixture) -> Kv {
+fn KvBenchFixture::kv(self : KvBenchFixture) -> @bitx_kv.Kv {
   match self {
     MemFixture(db, _fs) => db
     FsFixture(db, _fs) => db
@@ -58,7 +58,7 @@ fn bench_ensure_dir(path : String) -> Unit {
 
 ///|
 fn bench_seed_files(
-  db : Kv,
+  db : @bitx_kv.Kv,
   file_count : Int,
   file_size : Int,
 ) -> Unit raise @bit.GitError {
@@ -90,7 +90,7 @@ fn create_cached_bench_db(
   write_fs : &@bit.FileSystem,
   git_dir : String,
   head : @bit.ObjectId,
-) -> Kv raise @bit.GitError {
+) -> @bitx_kv.Kv raise @bit.GitError {
   let bitfs = @fs.Fs::empty(git_dir)
   let tree : TestWorkingTree = { fs: bitfs, backing_fs, write_fs }
   let obj_db = @lib.ObjectDb::load(backing_fs, git_dir)
@@ -100,7 +100,7 @@ fn create_cached_bench_db(
     write_fs,
     git_dir,
   }
-  Kv::new(NodeId::new("bench-node"), tree, cached_store, head)
+  @bitx_kv.Kv::new(@bitx_kv.NodeId::new("bench-node"), tree, cached_store, head)
 }
 
 ///|
@@ -128,15 +128,15 @@ impl @lib.ObjectStore for CachedTestObjectStore with fn has(self, id) {
 fn create_bench_db(
   file_count : Int,
   file_size : Int,
-) -> (Kv, @bit.TestFs) raise @bit.GitError {
+) -> (@bitx_kv.Kv, @bit.TestFs) raise @bit.GitError {
   let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   let git_dir = "/repo/.git"
   let bitfs = @fs.Fs::empty(git_dir)
   let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
   let store : TestObjectStore = { backing_fs: fs, write_fs: fs, git_dir }
-  let db = Kv::new(
-    NodeId::new("bench-node"),
+  let db = @bitx_kv.Kv::new(
+    @bitx_kv.NodeId::new("bench-node"),
     tree,
     store,
     @bit.ObjectId::zero(),
@@ -182,8 +182,8 @@ fn ensure_native_bench_repo(
   let bitfs = @fs.Fs::empty(git_dir)
   let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
   let store : TestObjectStore = { backing_fs: fs, write_fs: fs, git_dir }
-  let db = Kv::new(
-    NodeId::new("bench-node"),
+  let db = @bitx_kv.Kv::new(
+    @bitx_kv.NodeId::new("bench-node"),
     tree,
     store,
     @bit.ObjectId::zero(),
@@ -198,7 +198,7 @@ fn ensure_native_bench_repo(
 fn create_bench_db_native(
   file_count : Int,
   file_size : Int,
-) -> (Kv, @osfs.OsFs) raise @bit.GitError {
+) -> (@bitx_kv.Kv, @osfs.OsFs) raise @bit.GitError {
   let root = native_bench_repo_root(file_count, file_size)
   ensure_native_bench_repo(root, file_count, file_size)
   let fs = @osfs.OsFs::new()
@@ -254,7 +254,7 @@ fn bench_roundtrip_backend(
   b.bench(fn() {
     let snapshot = db.serialize_snapshot(mode=TreeAndBlobOnly)
     let bytes = snapshot.to_bytes()
-    b.keep(SerializedSnapshot::from_bytes(bytes))
+    b.keep(@bitx_kv.SerializedSnapshot::from_bytes(bytes))
   })
 }
 
@@ -313,7 +313,7 @@ test "bench: bytes to snapshot (10 files x 1KB)" (b : @bench.T) {
   let (db, _fs) = try! create_bench_db(10, 1024)
   let snapshot = db.serialize_snapshot()
   let bytes = snapshot.to_bytes()
-  b.bench(fn() { b.keep(SerializedSnapshot::from_bytes(bytes)) })
+  b.bench(fn() { b.keep(@bitx_kv.SerializedSnapshot::from_bytes(bytes)) })
 }
 
 ///|
@@ -322,7 +322,7 @@ test "bench: bytes to snapshot (100 files x 1KB)" (b : @bench.T) {
   let (db, _fs) = try! create_bench_db(100, 1024)
   let snapshot = db.serialize_snapshot()
   let bytes = snapshot.to_bytes()
-  b.bench(fn() { b.keep(SerializedSnapshot::from_bytes(bytes)) })
+  b.bench(fn() { b.keep(@bitx_kv.SerializedSnapshot::from_bytes(bytes)) })
 }
 
 ///|
@@ -332,7 +332,7 @@ test "bench: round-trip (10 files x 1KB)" (b : @bench.T) {
   b.bench(fn() {
     let snapshot = db.serialize_snapshot()
     let bytes = snapshot.to_bytes()
-    b.keep(SerializedSnapshot::from_bytes(bytes))
+    b.keep(@bitx_kv.SerializedSnapshot::from_bytes(bytes))
   })
 }
 
@@ -343,7 +343,7 @@ test "bench: round-trip (100 files x 1KB)" (b : @bench.T) {
   b.bench(fn() {
     let snapshot = db.serialize_snapshot()
     let bytes = snapshot.to_bytes()
-    b.keep(SerializedSnapshot::from_bytes(bytes))
+    b.keep(@bitx_kv.SerializedSnapshot::from_bytes(bytes))
   })
 }
 
@@ -400,7 +400,7 @@ test "serialization: round-trip preserves data" {
   let snapshot = db.serialize_snapshot()
   let bytes = snapshot.to_bytes()
   // Deserialize
-  let restored = SerializedSnapshot::from_bytes(bytes)
+  let restored = @bitx_kv.SerializedSnapshot::from_bytes(bytes)
   // Verify
   assert_eq(restored.version, 1)
   assert_eq(restored.node_id, "test-node")

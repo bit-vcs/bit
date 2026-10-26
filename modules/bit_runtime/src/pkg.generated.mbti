@@ -57,7 +57,7 @@ pub(all) struct StorageInitArgs {
 
 pub(all) struct StorageLogArgs {
   oneline : Bool
-  max_count : Int
+  max_count : Int32
 }
 
 pub(all) struct StorageStatusArgs {
@@ -81,4 +81,3 @@ pub(all) struct StorageWriteTreeArgs {
 // Type aliases
 
 // Traits
-

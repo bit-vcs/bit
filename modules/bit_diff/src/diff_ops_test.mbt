@@ -20,5 +20,5 @@ test "diff_index resolves linked worktree gitdir" {
     new_branch=Some("feature"),
   )
 
-  inspect(diff_index(fs, "/worker").length(), content="0")
+  inspect(@bit_diff.diff_index(fs, "/worker").length(), content="0")
 }

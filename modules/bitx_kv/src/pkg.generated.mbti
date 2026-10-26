@@ -40,11 +40,11 @@ pub struct Kv {
   mut head : @bit_object.ObjectId
   sync_engine : SyncEngine
   pending_objects : Map[String, GitObject]
-  snapshot_cache : Map[Int, SerializedSnapshot]
-  snapshot_bytes_cache : Map[Int, Bytes]
+  snapshot_cache : Map[Int32, SerializedSnapshot]
+  snapshot_bytes_cache : Map[Int32, Bytes]
 }
 pub fn Kv::add_peer(Self, PeerInfo) -> Unit
-pub fn Kv::apply_pending_objects(Self) -> Int raise @bit_object.GitError
+pub fn Kv::apply_pending_objects(Self) -> Int32 raise @bit_object.GitError
 pub fn Kv::clock(Self) -> VectorClock
 pub fn Kv::commit(Self, String, Int64) -> @bit_object.ObjectId raise @bit_object.GitError
 pub fn Kv::delete(Self, String) -> Unit
@@ -62,23 +62,23 @@ pub fn Kv::list_recursive(Self, String) -> Array[String]
 pub fn Kv::merge(Self, @bit_object.ObjectId, VectorClock, MergeStrategy, Int64) -> MergeResult raise @bit_object.GitError
 pub fn Kv::new(NodeId, &@bit_lib.WorkingTree, &@bit_lib.ObjectStore, @bit_object.ObjectId) -> Self
 pub fn Kv::node_id(Self) -> NodeId
-pub fn Kv::pending_object_count(Self) -> Int
+pub fn Kv::pending_object_count(Self) -> Int32
 pub fn Kv::record_peer_sync_result(Self, NodeId, Bool, Int64) -> Unit
 pub fn Kv::remove_peer(Self, NodeId) -> Bool
 pub fn Kv::rollback(Self) -> Unit
-pub fn Kv::select_gossip_peers(Self, Int, Int64, timestamp? : Int64) -> Array[PeerInfo]
+pub fn Kv::select_gossip_peers(Self, Int32, Int64, timestamp? : Int64) -> Array[PeerInfo]
 pub fn Kv::serialize_snapshot(Self, mode? : SnapshotMode) -> SerializedSnapshot
 pub fn Kv::serialize_snapshot_bytes(Self, mode? : SnapshotMode) -> Bytes
 pub fn Kv::set(Self, String, Bytes) -> Unit
 pub fn Kv::set_peer_cursor(Self, NodeId, Int64) -> Unit
 pub fn Kv::set_string(Self, String, String) -> Unit
-pub fn Kv::sync_round(Self, Int, Int64, Int64, (PeerInfo, GossipMessage) -> Result[GossipMessage?, String]) -> SyncRoundResult
+pub fn Kv::sync_round(Self, Int32, Int64, Int64, (PeerInfo, GossipMessage) -> Result[GossipMessage?, String]) -> SyncRoundResult
 
 pub(all) struct KvConfig {
   node_id : NodeId
-  max_peers : Int
-  gossip_interval_ms : Int
-  sync_batch_size : Int
+  max_peers : Int32
+  gossip_interval_ms : Int32
+  sync_batch_size : Int32
 }
 pub fn KvConfig::default(NodeId) -> Self
 
@@ -98,7 +98,13 @@ pub(all) enum MergeStrategy {
 pub(all) struct NodeId {
   id : String
 }
+pub fn NodeId::equal(Self, Self) -> Bool
+pub fn NodeId::hash(Self) -> Int32
+pub fn NodeId::hash_combine(Self, Hasher) -> Unit
 pub fn NodeId::new(String) -> Self
+pub fn NodeId::not_equal(Self, Self) -> Bool
+pub fn NodeId::output(Self, &Logger) -> Unit
+pub fn NodeId::to_string(Self) -> String
 pub impl Eq for NodeId
 pub impl Hash for NodeId
 pub impl Show for NodeId
@@ -115,33 +121,33 @@ pub(all) struct PeerSyncState {
   cursor : Int64?
   last_sync_at : Int64?
   last_attempt_at : Int64?
-  retry_count : Int
+  retry_count : Int32
   next_retry_at : Int64
 }
 
 pub(all) struct SerializationStats {
-  total_bytes : Int
-  object_count : Int
-  commit_count : Int
-  tree_count : Int
-  blob_count : Int
-  blob_bytes : Int
+  total_bytes : Int32
+  object_count : Int32
+  commit_count : Int32
+  tree_count : Int32
+  blob_count : Int32
+  blob_bytes : Int32
 }
 
 pub(all) struct SerializedObject {
   id : Bytes
-  obj_type : Int
+  obj_type : Int32
   data : Bytes
 }
 
 pub(all) struct SerializedSnapshot {
-  version : Int
+  version : Int32
   node_id : String
   head : Bytes
   clock : Array[(String, Int64)]
   objects : Array[SerializedObject]
 }
-pub fn SerializedSnapshot::byte_size(Self) -> Int
+pub fn SerializedSnapshot::byte_size(Self) -> Int32
 pub fn SerializedSnapshot::from_bytes(Bytes) -> Self
 pub fn SerializedSnapshot::stats(Self) -> SerializationStats
 pub fn SerializedSnapshot::to_bytes(Self) -> Bytes
@@ -161,7 +167,7 @@ pub fn SyncEngine::get_peers(Self) -> Array[PeerInfo]
 pub fn SyncEngine::new(config? : SyncEngineConfig) -> Self
 pub fn SyncEngine::record_sync_result(Self, NodeId, Bool, Int64) -> Unit
 pub fn SyncEngine::remove_peer(Self, NodeId) -> Bool
-pub fn SyncEngine::select_peers(Self, Int, Int64, Int64) -> Array[PeerInfo]
+pub fn SyncEngine::select_peers(Self, Int32, Int64, Int64) -> Array[PeerInfo]
 pub fn SyncEngine::set_cursor(Self, NodeId, Int64) -> Unit
 pub fn SyncEngine::upsert_peer(Self, PeerInfo) -> Unit
 
@@ -173,25 +179,25 @@ pub(all) struct SyncEngineConfig {
 pub fn SyncEngineConfig::default() -> Self
 
 pub(all) struct SyncResult {
-  objects_sent : Int
-  objects_received : Int
+  objects_sent : Int32
+  objects_received : Int32
   conflicts : Array[String]
   new_head : @bit_object.ObjectId
 }
 
 pub(all) struct SyncRoundResult {
-  selected : Int
-  attempted : Int
-  succeeded : Int
-  failed : Int
-  messages_sent : Int
-  messages_received : Int
+  selected : Int32
+  attempted : Int32
+  succeeded : Int32
+  failed : Int32
+  messages_sent : Int32
+  messages_received : Int32
 }
 
 pub(all) struct VectorClock {
   clocks : Map[String, Int64]
 }
-pub fn VectorClock::compare(Self, Self) -> Int
+pub fn VectorClock::compare(Self, Self) -> Int32
 pub fn VectorClock::increment(Self, NodeId) -> Self
 pub fn VectorClock::merge(Self, Self) -> Self
 pub fn VectorClock::new() -> Self
@@ -199,4 +205,3 @@ pub fn VectorClock::new() -> Self
 // Type aliases
 
 // Traits
-

@@ -3,16 +3,16 @@ name = "mizchi/bit"
 version = "0.48.0"
 
 import {
-  "moonbitlang/async@0.22.1",
-  "moonbitlang/x@0.5.5",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/x@0.5.6",
   "mizchi/simd@0.6.1",
-  "mizchi/tempfile@0.1.2",
+  "mizchi/tempfile@0.1.3",
   "mizchi/llm@0.3.2",
-  "mizchi/bitflow@0.4.1",
+  "mizchi/bitflow@0.4.2",
   "mizchi/x@0.6.1",
-  "bobzhang/toml@0.4.3",
-  "mizchi/libgit2@0.1.0",
-  "mizchi/zlib@0.4.9",
+  "moonbitlang/regexp@0.3.6",
+  "moonbit-community/toml@0.5.0",
+  "mizchi/zlib@0.4.10",
   "mizchi/experimental_crypto@0.0.2",
   "mizchi/bitx_openpgp@0.48.0",
   "mizchi/bit_apply@0.48.0",

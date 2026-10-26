@@ -60,7 +60,7 @@ let bench_packed_large : @bit.TestFs = setup_packed_refs_repo(2000)
 test "bench list_refs_with_ids loose 20 branches + 20 remotes" (b : @bench.T) {
   let git_dir = bench_refs_root + "/.git"
   b.bench(fn() {
-    let refs = list_refs_with_ids(bench_loose_small, git_dir, None)
+    let refs = @bit_refs.list_refs_with_ids(bench_loose_small, git_dir, None)
     b.keep(refs.length())
   })
 }
@@ -69,7 +69,7 @@ test "bench list_refs_with_ids loose 20 branches + 20 remotes" (b : @bench.T) {
 test "bench list_refs_with_ids loose 200 branches + 200 remotes" (b : @bench.T) {
   let git_dir = bench_refs_root + "/.git"
   b.bench(fn() {
-    let refs = list_refs_with_ids(bench_loose_large, git_dir, None)
+    let refs = @bit_refs.list_refs_with_ids(bench_loose_large, git_dir, None)
     b.keep(refs.length())
   })
 }
@@ -82,7 +82,7 @@ test "bench list_refs_with_ids loose 200+200 filtered refs/heads/" (
   // subtree-pruning early exit.
   let git_dir = bench_refs_root + "/.git"
   b.bench(fn() {
-    let refs = list_refs_with_ids(
+    let refs = @bit_refs.list_refs_with_ids(
       bench_loose_large,
       git_dir,
       Some("refs/heads/"),
@@ -95,7 +95,7 @@ test "bench list_refs_with_ids loose 200+200 filtered refs/heads/" (
 test "bench list_refs_with_ids packed 50 refs" (b : @bench.T) {
   let git_dir = bench_refs_root + "/.git"
   b.bench(fn() {
-    let refs = list_refs_with_ids(bench_packed_small, git_dir, None)
+    let refs = @bit_refs.list_refs_with_ids(bench_packed_small, git_dir, None)
     b.keep(refs.length())
   })
 }
@@ -104,7 +104,7 @@ test "bench list_refs_with_ids packed 50 refs" (b : @bench.T) {
 test "bench list_refs_with_ids packed 2000 refs" (b : @bench.T) {
   let git_dir = bench_refs_root + "/.git"
   b.bench(fn() {
-    let refs = list_refs_with_ids(bench_packed_large, git_dir, None)
+    let refs = @bit_refs.list_refs_with_ids(bench_packed_large, git_dir, None)
     b.keep(refs.length())
   })
 }
@@ -113,7 +113,7 @@ test "bench list_refs_with_ids packed 2000 refs" (b : @bench.T) {
 test "bench list_refs_with_ids packed 2000 filtered by prefix" (b : @bench.T) {
   let git_dir = bench_refs_root + "/.git"
   b.bench(fn() {
-    let refs = list_refs_with_ids(
+    let refs = @bit_refs.list_refs_with_ids(
       bench_packed_large,
       git_dir,
       Some("refs/heads/"),

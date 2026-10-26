@@ -30,7 +30,7 @@ test "verify: lazy loading on helix repo" {
 
   // Test lazy loading (default)
   println("\n=== Lazy Loading (default) ===")
-  let bitfs_lazy = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs_lazy = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
   println("is_lazy: \{bitfs_lazy.is_lazy()}")
 
   // Read root directory
@@ -69,8 +69,8 @@ test "verify: lazy loading on helix repo" {
 
   // Test eager loading for comparison
   println("\n=== Eager Loading ===")
-  let config = FsConfig::eager()
-  let bitfs_eager = Fs::from_commit(osfs, git_dir, commit_id, config~)
+  let config = @bit_vfs.FsConfig::eager()
+  let bitfs_eager = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id, config~)
   println("is_lazy: \{bitfs_eager.is_lazy()}")
   let root_eager = bitfs_eager.readdir(osfs, "")
   println("Root entries: \{root_eager.length()}")
@@ -114,7 +114,7 @@ test "verify: lazy loading on this repo" {
     @bit.ObjectId::from_hex(head_str)
   }
   println("HEAD: \{commit_id}")
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
   println("is_lazy: \{bitfs.is_lazy()}")
 
   // Read root

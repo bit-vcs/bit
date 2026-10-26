@@ -366,6 +366,9 @@ pub impl @types.AsyncHttpClient for NativeHttpClient with fn post(
 }
 
 ///|
+pub extend NativeHttpClient with @types.AsyncHttpClient::{post, get}
+
+///|
 pub async fn native_http_put(
   url : String,
   body : Bytes,

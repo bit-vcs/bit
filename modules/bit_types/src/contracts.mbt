@@ -124,3 +124,6 @@ pub impl AsyncHttpClient for MockHttpClient with fn post(
 ) {
   HttpClient::post(self, url, body, headers)
 }
+
+///|
+pub extend MockHttpClient with HttpClient::{get, post}
