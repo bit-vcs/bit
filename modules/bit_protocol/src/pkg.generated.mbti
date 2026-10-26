@@ -87,6 +87,8 @@ pub async fn upload_pack_info_refs_with_http(String, Bool, async (String, Map[St
 
 pub async fn upload_pack_request_with_http(String, Bytes, Bool, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> Bytes raise @bit_object.GitError
 
+pub fn v2_fetch_supports_filter(Array[String]) -> Bool
+
 // Errors
 
 // Types and methods
