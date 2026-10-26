@@ -8,11 +8,11 @@ pub fn config_novalue() -> String
 
 pub fn config_parse_size_value(String) -> Int64?
 
-pub fn config_preprocess_lines_with_line_numbers(Array[String]) -> Array[(String, Int)]
+pub fn config_preprocess_lines_with_line_numbers(Array[String]) -> Array[(String, Int32)]
 
 pub fn encode_config_value(String) -> String
 
-pub fn find_config_key_line_from_content(String, String) -> Int?
+pub fn find_config_key_line_from_content(String, String) -> Int32?
 
 pub fn get_all_config_values_from_content(String, String, String?, Bool) -> Array[String]
 
@@ -41,4 +41,3 @@ pub fn section_matches_for_insert(String, String?, String, String?, Bool) -> Boo
 // Type aliases
 
 // Traits
-

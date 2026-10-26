@@ -4,19 +4,19 @@
 test "shallow: collect_commit_tree_only works with shallow depth=1" {
   // Simulate shallow clone: only the tip commit exists, no parents
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/file.txt", b"content")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Shallow", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
   // In shallow clone, we might not have parent objects
   // collect_commit_tree_only should still work
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let objects = collect_commit_tree_only(db, fs, commit1) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let objects = @bit_lib.collect_commit_tree_only(db, fs, commit1) catch {
     _ => return ()
   }
   // Should have: commit, tree, blob
@@ -39,23 +39,23 @@ test "shallow: collect_commit_tree_only works with shallow depth=1" {
 ///|
 test "shallow: diff collection with missing parent" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create a commit chain
   fs.write_file("/repo/v1.txt", b"v1")
-  let commit1 = commit(fs, fs, "/repo", "v1", "test <test@test.com>", 1000L) catch {
+  let commit1 = @bit_lib.commit(fs, fs, "/repo", "v1", "test <test@test.com>", 1000L) catch {
     _ => return ()
   }
   fs.write_file("/repo/v2.txt", b"v2")
-  let commit2 = commit(fs, fs, "/repo", "v2", "test <test@test.com>", 2000L) catch {
+  let commit2 = @bit_lib.commit(fs, fs, "/repo", "v2", "test <test@test.com>", 2000L) catch {
     _ => return ()
   }
   // Simulate shallow clone by removing parent commit's tree references
   // (In real shallow clone, parent might be a shallow boundary)
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
   // collect_diff_objects should handle missing objects gracefully
-  let diff = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let diff = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should still produce valid diff
@@ -65,18 +65,18 @@ test "shallow: diff collection with missing parent" {
 ///|
 test "shallow: single commit push (no parent history)" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/only.txt", b"only file")
-  let only_commit = commit(
+  let only_commit = @bit_lib.commit(
     fs, fs, "/repo", "Only", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
   // collect_commit_tree_only should work for root commit
-  let objects = collect_commit_tree_only(db, fs, only_commit) catch {
+  let objects = @bit_lib.collect_commit_tree_only(db, fs, only_commit) catch {
     _ => return ()
   }
   assert_true(objects.length() > 0)
@@ -93,7 +93,7 @@ test "shallow: single commit push (no parent history)" {
 test "sparse: diff collection with partial tree" {
   // Simulate sparse checkout: some trees/blobs might be missing
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create full tree
@@ -101,16 +101,16 @@ test "sparse: diff collection with partial tree" {
   fs.mkdir_p("/repo/excluded")
   fs.write_file("/repo/included/file.txt", b"included")
   fs.write_file("/repo/excluded/file.txt", b"excluded")
-  let commit1 = commit(fs, fs, "/repo", "Full", "test <test@test.com>", 1000L) catch {
+  let commit1 = @bit_lib.commit(fs, fs, "/repo", "Full", "test <test@test.com>", 1000L) catch {
     _ => return ()
   }
   // Modify included file only
   fs.write_file("/repo/included/file.txt", b"included modified")
-  let commit2 = commit(fs, fs, "/repo", "Modify", "test <test@test.com>", 2000L) catch {
+  let commit2 = @bit_lib.commit(fs, fs, "/repo", "Modify", "test <test@test.com>", 2000L) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should only include the modified blob, not the excluded
@@ -134,7 +134,7 @@ test "sparse: diff collection with partial tree" {
 ///|
 test "sparse: collect objects respects cone pattern" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create structure matching cone pattern
@@ -143,18 +143,18 @@ test "sparse: collect objects respects cone pattern" {
   fs.write_file("/repo/packages/core/index.mbt", b"core")
   fs.write_file("/repo/packages/utils/index.mbt", b"utils")
   fs.write_file("/repo/root.txt", b"root")
-  let base = commit(fs, fs, "/repo", "Base", "test <test@test.com>", 1000L) catch {
+  let base = @bit_lib.commit(fs, fs, "/repo", "Base", "test <test@test.com>", 1000L) catch {
     _ => return ()
   }
   // Modify only packages/core (simulating cone checkout of packages/core)
   fs.write_file("/repo/packages/core/index.mbt", b"core modified")
-  let updated = commit(
+  let updated = @bit_lib.commit(
     fs, fs, "/repo", "Update core", "test <test@test.com>", 2000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff = collect_diff_objects(db, fs, base, updated) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff = @bit_lib.collect_diff_objects(db, fs, base, updated) catch {
     _ => return ()
   }
   // Verify only core blob is in diff
@@ -184,7 +184,7 @@ test "sparse: collect objects respects cone pattern" {
 test "sparse: multiple sparse patterns" {
   // Test with multiple include patterns
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.mkdir_p("/repo/src")
@@ -193,17 +193,17 @@ test "sparse: multiple sparse patterns" {
   fs.write_file("/repo/src/main.mbt", b"src")
   fs.write_file("/repo/tests/test.mbt", b"tests")
   fs.write_file("/repo/docs/readme.md", b"docs")
-  let commit1 = commit(fs, fs, "/repo", "Full", "test <test@test.com>", 1000L) catch {
+  let commit1 = @bit_lib.commit(fs, fs, "/repo", "Full", "test <test@test.com>", 1000L) catch {
     _ => return ()
   }
   // Modify src and tests (simulating sparse checkout of src/ and tests/)
   fs.write_file("/repo/src/main.mbt", b"src modified")
   fs.write_file("/repo/tests/test.mbt", b"tests modified")
-  let commit2 = commit(fs, fs, "/repo", "Modify", "test <test@test.com>", 2000L) catch {
+  let commit2 = @bit_lib.commit(fs, fs, "/repo", "Modify", "test <test@test.com>", 2000L) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should include both modified blobs
@@ -232,53 +232,53 @@ test "sparse: multiple sparse patterns" {
 ///|
 test "sparse: root directory negation excludes nested paths" {
   let patterns = ["/*", "!/*/"]
-  assert_true(matches_sparse_pattern("a", patterns))
-  assert_false(matches_sparse_pattern("folder1/c", patterns))
+  assert_true(@bit_lib.matches_sparse_pattern("a", patterns))
+  assert_false(@bit_lib.matches_sparse_pattern("folder1/c", patterns))
 }
 
 ///|
 test "sparse: wildcard substring matches nested folder paths" {
   let patterns = ["/*", "!/*/", "*folder*"]
-  assert_true(matches_sparse_pattern("folder1/c", patterns))
-  assert_true(matches_sparse_pattern("nested/folder2/d", patterns))
+  assert_true(@bit_lib.matches_sparse_pattern("folder1/c", patterns))
+  assert_true(@bit_lib.matches_sparse_pattern("nested/folder2/d", patterns))
 }
 
 ///|
 test "sparse: leading slash pattern is normalized" {
   let patterns = ["/src/"]
-  assert_true(matches_sparse_pattern("src/main.mbt", patterns))
-  assert_true(matches_sparse_pattern("src/utils/helper.mbt", patterns))
-  assert_false(matches_sparse_pattern("tests/test.mbt", patterns))
+  assert_true(@bit_lib.matches_sparse_pattern("src/main.mbt", patterns))
+  assert_true(@bit_lib.matches_sparse_pattern("src/utils/helper.mbt", patterns))
+  assert_false(@bit_lib.matches_sparse_pattern("tests/test.mbt", patterns))
 }
 
 ///|
 test "sparse: leading slash negation is normalized" {
   let patterns = ["/src/", "!/src/vendor/"]
-  assert_true(matches_sparse_pattern("src/core/main.mbt", patterns))
-  assert_false(matches_sparse_pattern("src/vendor/lib.mbt", patterns))
-  assert_false(matches_sparse_pattern("docs/readme.md", patterns))
+  assert_true(@bit_lib.matches_sparse_pattern("src/core/main.mbt", patterns))
+  assert_false(@bit_lib.matches_sparse_pattern("src/vendor/lib.mbt", patterns))
+  assert_false(@bit_lib.matches_sparse_pattern("docs/readme.md", patterns))
 }
 
 ///|
 test "sparse: unanchored directory pattern matches nested path" {
   let patterns = ["y/"]
-  assert_true(matches_sparse_pattern("x/y/file.txt", patterns))
-  assert_true(matches_sparse_pattern("y/file.txt", patterns))
-  assert_false(matches_sparse_pattern("x/z/file.txt", patterns))
+  assert_true(@bit_lib.matches_sparse_pattern("x/y/file.txt", patterns))
+  assert_true(@bit_lib.matches_sparse_pattern("y/file.txt", patterns))
+  assert_false(@bit_lib.matches_sparse_pattern("x/z/file.txt", patterns))
 }
 
 ///|
 test "sparse: unanchored negation excludes nested path" {
   let patterns = ["y/", "!x/y/z"]
-  assert_true(matches_sparse_pattern("x/y/file.txt", patterns))
-  assert_false(matches_sparse_pattern("x/y/z/file.txt", patterns))
+  assert_true(@bit_lib.matches_sparse_pattern("x/y/file.txt", patterns))
+  assert_false(@bit_lib.matches_sparse_pattern("x/y/z/file.txt", patterns))
 }
 
 ///|
 test "shallow_sparse: combined scenario" {
   // Shallow clone + sparse checkout: minimal local objects
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create a structure
@@ -286,26 +286,26 @@ test "shallow_sparse: combined scenario" {
   fs.mkdir_p("/repo/excluded")
   fs.write_file("/repo/sparse/file.txt", b"sparse original")
   fs.write_file("/repo/excluded/file.txt", b"excluded")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
   // Modify only sparse directory (simulating sparse checkout)
   fs.write_file("/repo/sparse/file.txt", b"sparse modified")
-  let commit2 = commit(
+  let commit2 = @bit_lib.commit(
     fs, fs, "/repo", "Update sparse", "test <test@test.com>", 2000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
   // collect_commit_tree_only for minimal push
-  let tree_objects = collect_commit_tree_only(db, fs, commit2) catch {
+  let tree_objects = @bit_lib.collect_commit_tree_only(db, fs, commit2) catch {
     _ => return ()
   }
   assert_true(tree_objects.length() > 0)
   // collect_diff_objects for efficient push
-  let diff_objects = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let diff_objects = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Diff should be smaller than full tree
@@ -317,17 +317,17 @@ test "blob_none: filter simulates no blob fetch" {
   // blob:none filter means no blobs are initially fetched
   // But we should still be able to work with commits and trees
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.mkdir_p("/repo/src")
   fs.write_file("/repo/src/main.mbt", b"main content")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
   // collect_object_ids_only should work even if some objects are missing
   let seen : Map[String, Bool] = Map([])
   collect_object_ids_only(db, fs, commit1, seen)
@@ -340,18 +340,18 @@ test "treeless: filter simulates tree:0" {
   // tree:0 filter means no trees are initially fetched
   // We test that collect functions handle this gracefully
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/file.txt", b"content")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
   // Should still work
-  let objects = collect_reachable_objects(db, fs, commit1) catch {
+  let objects = @bit_lib.collect_reachable_objects(db, fs, commit1) catch {
     _ => return ()
   }
   assert_true(objects.length() > 0)
@@ -361,7 +361,7 @@ test "treeless: filter simulates tree:0" {
 test "subdir_shallow: clone subdirectory with depth=1" {
   // Simulates: bit clone --depth=1 @user/repo/src
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create upstream-like structure
@@ -369,23 +369,23 @@ test "subdir_shallow: clone subdirectory with depth=1" {
   fs.mkdir_p("/repo/docs")
   fs.write_file("/repo/src/lib/main.mbt", b"main")
   fs.write_file("/repo/docs/readme.md", b"docs")
-  let _upstream = commit(fs, fs, "/repo", "Upstream", "up <up@test.com>", 1000L) catch {
+  let _upstream = @bit_lib.commit(fs, fs, "/repo", "Upstream", "up <up@test.com>", 1000L) catch {
     _ => return ()
   }
   // Create "shallow" subdir clone
-  init_repo(fs, "/subdir") catch {
+  @bit_lib.init_repo(fs, "/subdir") catch {
     _ => ()
   }
   fs.mkdir_p("/subdir/lib")
   fs.write_file("/subdir/lib/main.mbt", b"main modified")
-  let subdir_commit = commit(
+  let subdir_commit = @bit_lib.commit(
     fs, fs, "/subdir", "Modify", "local <l@test.com>", 2000L,
   ) catch {
     _ => return ()
   }
   // Verify we can collect objects from the shallow subdir
-  let db = ObjectDb::load(fs, "/subdir/.git") catch { _ => return () }
-  let objects = collect_commit_tree_only(db, fs, subdir_commit) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/subdir/.git") catch { _ => return () }
+  let objects = @bit_lib.collect_commit_tree_only(db, fs, subdir_commit) catch {
     _ => return ()
   }
   // Should include commit, tree (root), tree (lib), blob
@@ -401,7 +401,7 @@ test "subdir_shallow: clone subdirectory with depth=1" {
 
 ///|
 fn collect_object_ids_only(
-  db : ObjectDb,
+  db : @bit_lib.ObjectDb,
   fs : &@bit.RepoFileSystem,
   commit_id : @bit.ObjectId,
   seen : Map[String, Bool],
@@ -427,7 +427,7 @@ fn collect_object_ids_only(
 
 ///|
 fn collect_tree_ids_local(
-  db : ObjectDb,
+  db : @bit_lib.ObjectDb,
   fs : &@bit.RepoFileSystem,
   tree_id : @bit.ObjectId,
   seen : Map[String, Bool],

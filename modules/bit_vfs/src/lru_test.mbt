@@ -1,7 +1,7 @@
 ///|
 /// Tests for LruCache
 test "lru: basic get/set" {
-  let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
+  let cache : @bit_vfs.LruCache[Int] = @bit_vfs.LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
   cache.set("b", 20)
   @test.assert_eq(cache.get("a"), Some(10))
@@ -11,7 +11,7 @@ test "lru: basic get/set" {
 
 ///|
 test "lru: eviction" {
-  let cache : LruCache[Int] = LruCache::new(50, fn(x) { x })
+  let cache : @bit_vfs.LruCache[Int] = @bit_vfs.LruCache::new(50, fn(x) { x })
   // Fill cache
   cache.set("a", 20)
   cache.set("b", 20)
@@ -25,7 +25,7 @@ test "lru: eviction" {
 
 ///|
 test "lru: promotion from cold to hot" {
-  let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
+  let cache : @bit_vfs.LruCache[Int] = @bit_vfs.LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
   cache.set("b", 10)
   // Force a to cold by evicting
@@ -38,7 +38,7 @@ test "lru: promotion from cold to hot" {
 
 ///|
 test "lru: remove" {
-  let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
+  let cache : @bit_vfs.LruCache[Int] = @bit_vfs.LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
   cache.set("b", 20)
   cache.remove("a")
@@ -49,7 +49,7 @@ test "lru: remove" {
 
 ///|
 test "lru: clear" {
-  let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
+  let cache : @bit_vfs.LruCache[Int] = @bit_vfs.LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
   cache.set("b", 20)
   cache.clear()
@@ -60,7 +60,7 @@ test "lru: clear" {
 
 ///|
 test "lru: oversized item rejected" {
-  let cache : LruCache[Int] = LruCache::new(10, fn(x) { x })
+  let cache : @bit_vfs.LruCache[Int] = @bit_vfs.LruCache::new(10, fn(x) { x })
   cache.set("a", 20) // Too large
   @test.assert_eq(cache.get("a"), None)
   @test.assert_eq(cache.total_bytes(), 0)
@@ -68,7 +68,7 @@ test "lru: oversized item rejected" {
 
 ///|
 test "lru: update existing key" {
-  let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
+  let cache : @bit_vfs.LruCache[Int] = @bit_vfs.LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
   cache.set("a", 30)
   @test.assert_eq(cache.get("a"), Some(30))
@@ -77,7 +77,7 @@ test "lru: update existing key" {
 
 ///|
 test "lru: contains" {
-  let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
+  let cache : @bit_vfs.LruCache[Int] = @bit_vfs.LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
   assert_true(cache.contains("a"))
   assert_false(cache.contains("b"))
@@ -85,7 +85,7 @@ test "lru: contains" {
 
 ///|
 test "lru: length" {
-  let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
+  let cache : @bit_vfs.LruCache[Int] = @bit_vfs.LruCache::new(100, fn(x) { x })
   @test.assert_eq(cache.length(), 0)
   cache.set("a", 10)
   cache.set("b", 20)

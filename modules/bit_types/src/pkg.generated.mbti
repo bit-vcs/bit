@@ -11,17 +11,19 @@ import {
 
 // Types and methods
 pub struct HttpResponse {
-  code : Int
+  code : Int32
   headers : Map[String, String]
 }
-pub fn HttpResponse::new(Int) -> Self
-pub fn HttpResponse::with_headers(Int, Map[String, String]) -> Self
+pub fn HttpResponse::new(Int32) -> Self
+pub fn HttpResponse::with_headers(Int32, Map[String, String]) -> Self
 
 pub struct MockHttpClient {
-  responses : Map[String, (Int, Bytes)]
+  responses : Map[String, (Int32, Bytes)]
 }
-pub fn MockHttpClient::add_response(Self, String, Int, Bytes) -> Unit
+pub fn MockHttpClient::add_response(Self, String, Int32, Bytes) -> Unit
+pub fn MockHttpClient::get(Self, String, Map[String, String]) -> (HttpResponse, Bytes) raise @bit_object.GitError
 pub fn MockHttpClient::new() -> Self
+pub fn MockHttpClient::post(Self, String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise @bit_object.GitError
 pub impl AsyncHttpClient for MockHttpClient
 pub impl HttpClient for MockHttpClient
 
@@ -69,7 +71,7 @@ pub(open) trait AsyncRepoFileSystem {
   async fn readdir(Self, String) -> Array[String] raise @bit_object.GitError
   async fn is_dir(Self, String) -> Bool raise @bit_object.GitError
   async fn is_file(Self, String) -> Bool raise @bit_object.GitError
-  async fn mtime(Self, String) -> (Int, Int) raise @bit_object.GitError
+  async fn mtime(Self, String) -> (Int32, Int32) raise @bit_object.GitError
 }
 
 pub(open) trait FileSystem {
@@ -90,6 +92,5 @@ pub(open) trait RepoFileSystem {
   fn readdir(Self, String) -> Array[String] raise @bit_object.GitError
   fn is_dir(Self, String) -> Bool
   fn is_file(Self, String) -> Bool
-  fn mtime(Self, String) -> (Int, Int) raise @bit_object.GitError
+  fn mtime(Self, String) -> (Int32, Int32) raise @bit_object.GitError
 }
-

@@ -57,7 +57,7 @@ let bench_blob_text_100kb : Bytes = {
 ///|
 test "bench split_lines 100 KiB" (b : @bench.T) {
   b.bench(fn() {
-    let lines = split_lines(bench_blob_text_100kb)
+    let lines = @bit_diff_core.split_lines(bench_blob_text_100kb)
     b.keep(lines.length())
   })
 }
@@ -65,7 +65,7 @@ test "bench split_lines 100 KiB" (b : @bench.T) {
 ///|
 test "bench count_lines 100 KiB" (b : @bench.T) {
   b.bench(fn() {
-    let n = count_lines(bench_blob_text_100kb)
+    let n = @bit_diff_core.count_lines(bench_blob_text_100kb)
     b.keep(n)
   })
 }
@@ -73,7 +73,7 @@ test "bench count_lines 100 KiB" (b : @bench.T) {
 ///|
 test "bench myers_diff identical 100 lines" (b : @bench.T) {
   b.bench(fn() {
-    let ops = myers_diff(bench_lines_a_100, bench_lines_a_100)
+    let ops = @bit_diff_core.myers_diff(bench_lines_a_100, bench_lines_a_100)
     b.keep(ops.length())
   })
 }
@@ -81,7 +81,7 @@ test "bench myers_diff identical 100 lines" (b : @bench.T) {
 ///|
 test "bench myers_diff 10pct changed 100 lines" (b : @bench.T) {
   b.bench(fn() {
-    let ops = myers_diff(bench_lines_a_100, bench_lines_b_100_10pct)
+    let ops = @bit_diff_core.myers_diff(bench_lines_a_100, bench_lines_b_100_10pct)
     b.keep(ops.length())
   })
 }
@@ -89,7 +89,7 @@ test "bench myers_diff 10pct changed 100 lines" (b : @bench.T) {
 ///|
 test "bench myers_diff identical 1000 lines" (b : @bench.T) {
   b.bench(fn() {
-    let ops = myers_diff(bench_lines_a_1000, bench_lines_a_1000)
+    let ops = @bit_diff_core.myers_diff(bench_lines_a_1000, bench_lines_a_1000)
     b.keep(ops.length())
   })
 }
@@ -97,7 +97,7 @@ test "bench myers_diff identical 1000 lines" (b : @bench.T) {
 ///|
 test "bench myers_diff 10pct changed 1000 lines" (b : @bench.T) {
   b.bench(fn() {
-    let ops = myers_diff(bench_lines_a_1000, bench_lines_b_1000_10pct)
+    let ops = @bit_diff_core.myers_diff(bench_lines_a_1000, bench_lines_b_1000_10pct)
     b.keep(ops.length())
   })
 }

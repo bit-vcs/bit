@@ -7,6 +7,12 @@ pub(all) enum HashAlgorithm {
 } derive(Eq, Debug)
 
 ///|
+pub extend HashAlgorithm with Eq::{not_equal, equal}
+
+///|
+pub extend HashAlgorithm with Debug::{to_repr}
+
+///|
 pub fn HashAlgorithm::hash_size(self : HashAlgorithm) -> Int {
   match self {
     Sha1 => 20
@@ -51,3 +57,6 @@ pub fn HashAlgorithm::from_string(s : String) -> HashAlgorithm raise GitError {
 pub impl Show for HashAlgorithm with fn output(self, logger) {
   logger.write_string(self.name())
 }
+
+///|
+pub extend HashAlgorithm with Show::{to_string, output}

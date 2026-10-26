@@ -10,6 +10,12 @@ pub(all) enum GitHubShorthand {
 } derive(Eq, Debug)
 
 ///|
+pub extend GitHubShorthand with Eq::{not_equal, equal}
+
+///|
+pub extend GitHubShorthand with Debug::{to_repr}
+
+///|
 fn remote_shorthand_show_string(value : String) -> String {
   let buf = StringBuilder()
   buf.write_char('"')
@@ -71,6 +77,9 @@ pub impl Show for GitHubShorthand with fn output(self, logger) {
       )
   }
 }
+
+///|
+pub extend GitHubShorthand with Show::{to_string, output}
 
 ///|
 /// Parse clone shorthand or GitHub browser URL.

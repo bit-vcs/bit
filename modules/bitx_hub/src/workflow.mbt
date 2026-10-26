@@ -9,6 +9,12 @@ pub(all) enum PrWorkflowStatus {
 } derive(Eq, Debug)
 
 ///|
+pub extend PrWorkflowStatus with Eq::{not_equal, equal}
+
+///|
+pub extend PrWorkflowStatus with Debug::{to_repr}
+
+///|
 pub fn PrWorkflowStatus::to_string(self : PrWorkflowStatus) -> String {
   match self {
     Pending => "pending"
@@ -22,6 +28,9 @@ pub fn PrWorkflowStatus::to_string(self : PrWorkflowStatus) -> String {
 pub impl Show for PrWorkflowStatus with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
+
+///|
+pub extend PrWorkflowStatus with Show::{output}
 
 ///|
 pub fn parse_pr_workflow_status(value : String) -> PrWorkflowStatus? {

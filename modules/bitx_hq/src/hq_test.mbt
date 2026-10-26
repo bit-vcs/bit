@@ -1,6 +1,6 @@
 ///|
 test "RepoPath::parse: user/repo shorthand" {
-  let result = parse_repo_url("mizchi/git")
+  let result = @bitx_hq.parse_repo_url("mizchi/git")
   let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(
@@ -13,7 +13,7 @@ test "RepoPath::parse: user/repo shorthand" {
 
 ///|
 test "RepoPath::parse: user/repo:subdir shorthand" {
-  let result = parse_repo_url("mizchi/monorepo:packages/core")
+  let result = @bitx_hq.parse_repo_url("mizchi/monorepo:packages/core")
   let _expected =
     #|Some({host: None, user: "mizchi", repo: "monorepo", subdir: Some("packages/core")})
   debug_inspect(
@@ -33,7 +33,7 @@ test "RepoPath::parse: user/repo:subdir shorthand" {
 
 ///|
 test "RepoPath::parse: user/repo/path subdir" {
-  let result = parse_repo_url("mizchi/monorepo/packages/core")
+  let result = @bitx_hq.parse_repo_url("mizchi/monorepo/packages/core")
   let _expected =
     #|Some({host: None, user: "mizchi", repo: "monorepo", subdir: Some("packages/core")})
   debug_inspect(
@@ -53,7 +53,7 @@ test "RepoPath::parse: user/repo/path subdir" {
 
 ///|
 test "RepoPath::parse: github.com/user/repo/path subdir" {
-  let result = parse_repo_url("github.com/mizchi/monorepo/packages/core")
+  let result = @bitx_hq.parse_repo_url("github.com/mizchi/monorepo/packages/core")
   let _expected =
     #|Some({host: None, user: "mizchi", repo: "monorepo", subdir: Some("packages/core")})
   debug_inspect(
@@ -73,7 +73,7 @@ test "RepoPath::parse: github.com/user/repo/path subdir" {
 
 ///|
 test "RepoPath::parse: gitlab.com/user/repo/path subdir" {
-  let result = parse_repo_url("gitlab.com/user/monorepo/packages/core")
+  let result = @bitx_hq.parse_repo_url("gitlab.com/user/monorepo/packages/core")
   let _expected =
     #|Some({host: Some("gitlab.com"), user: "user", repo: "monorepo", subdir: Some("packages/core")})
   debug_inspect(
@@ -93,7 +93,7 @@ test "RepoPath::parse: gitlab.com/user/repo/path subdir" {
 
 ///|
 test "RepoPath::parse: github.com/user/repo (normalized)" {
-  let result = parse_repo_url("github.com/mizchi/git")
+  let result = @bitx_hq.parse_repo_url("github.com/mizchi/git")
   let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(
@@ -106,7 +106,7 @@ test "RepoPath::parse: github.com/user/repo (normalized)" {
 
 ///|
 test "RepoPath::parse: gitlab.com/user/repo (other host)" {
-  let result = parse_repo_url("gitlab.com/user/project")
+  let result = @bitx_hq.parse_repo_url("gitlab.com/user/project")
   let _expected =
     #|Some({host: Some("gitlab.com"), user: "user", repo: "project", subdir: None})
   debug_inspect(
@@ -126,7 +126,7 @@ test "RepoPath::parse: gitlab.com/user/repo (other host)" {
 
 ///|
 test "RepoPath::parse: https URL" {
-  let result = parse_repo_url("https://github.com/mizchi/git")
+  let result = @bitx_hq.parse_repo_url("https://github.com/mizchi/git")
   let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(
@@ -139,7 +139,7 @@ test "RepoPath::parse: https URL" {
 
 ///|
 test "RepoPath::parse: https URL with .git" {
-  let result = parse_repo_url("https://github.com/mizchi/git.git")
+  let result = @bitx_hq.parse_repo_url("https://github.com/mizchi/git.git")
   let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(
@@ -152,7 +152,7 @@ test "RepoPath::parse: https URL with .git" {
 
 ///|
 test "RepoPath::parse: https URL with tree path" {
-  let result = parse_repo_url(
+  let result = @bitx_hq.parse_repo_url(
     "https://github.com/mizchi/monorepo/tree/main/packages/core",
   )
   let _expected =
@@ -174,7 +174,7 @@ test "RepoPath::parse: https URL with tree path" {
 
 ///|
 test "RepoPath::parse: SSH URL" {
-  let result = parse_repo_url("git@github.com:mizchi/git.git")
+  let result = @bitx_hq.parse_repo_url("git@github.com:mizchi/git.git")
   let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(
@@ -187,7 +187,7 @@ test "RepoPath::parse: SSH URL" {
 
 ///|
 test "RepoPath::parse: SSH URL gitlab" {
-  let result = parse_repo_url("git@gitlab.com:user/project.git")
+  let result = @bitx_hq.parse_repo_url("git@gitlab.com:user/project.git")
   let _expected =
     #|Some({host: Some("gitlab.com"), user: "user", repo: "project", subdir: None})
   debug_inspect(
@@ -207,7 +207,7 @@ test "RepoPath::parse: SSH URL gitlab" {
 
 ///|
 test "RepoPath::clone_url: HTTPS" {
-  let repo = RepoPath::new("mizchi", "git")
+  let repo = @bitx_hq.RepoPath::new("mizchi", "git")
   debug_inspect(
     repo.clone_url(),
     content=(
@@ -218,7 +218,7 @@ test "RepoPath::clone_url: HTTPS" {
 
 ///|
 test "RepoPath::clone_url: SSH" {
-  let repo = RepoPath::new("mizchi", "git")
+  let repo = @bitx_hq.RepoPath::new("mizchi", "git")
   debug_inspect(
     repo.clone_url(ssh=true),
     content=(
@@ -229,7 +229,7 @@ test "RepoPath::clone_url: SSH" {
 
 ///|
 test "RepoPath::clone_url: other host" {
-  let repo = RepoPath::new("user", "project", host=Some("gitlab.com"))
+  let repo = @bitx_hq.RepoPath::new("user", "project", host=Some("gitlab.com"))
   debug_inspect(
     repo.clone_url(),
     content=(
@@ -240,7 +240,7 @@ test "RepoPath::clone_url: other host" {
 
 ///|
 test "RepoPath::local_path: github.com normalized" {
-  let repo = RepoPath::new("mizchi", "git")
+  let repo = @bitx_hq.RepoPath::new("mizchi", "git")
   debug_inspect(
     repo.local_path("/home/user/bhq"),
     content=(
@@ -251,7 +251,7 @@ test "RepoPath::local_path: github.com normalized" {
 
 ///|
 test "RepoPath::local_path: explicit github.com also normalized" {
-  let repo = parse_repo_url("github.com/mizchi/git").unwrap()
+  let repo = @bitx_hq.parse_repo_url("github.com/mizchi/git").unwrap()
   debug_inspect(
     repo.local_path("/home/user/bhq"),
     content=(
@@ -262,7 +262,7 @@ test "RepoPath::local_path: explicit github.com also normalized" {
 
 ///|
 test "RepoPath::local_path: other host includes host" {
-  let repo = RepoPath::new("user", "project", host=Some("gitlab.com"))
+  let repo = @bitx_hq.RepoPath::new("user", "project", host=Some("gitlab.com"))
   let _expected = "/home/user/bhq/gitlab.com/user/project"
   debug_inspect(
     repo.local_path("/home/user/bhq"),
@@ -274,8 +274,8 @@ test "RepoPath::local_path: other host includes host" {
 
 ///|
 test "RepoPath::needs_sparse" {
-  let repo1 = RepoPath::new("mizchi", "git")
-  let repo2 = RepoPath::new("mizchi", "monorepo", subdir=Some("packages/core"))
+  let repo1 = @bitx_hq.RepoPath::new("mizchi", "git")
+  let repo2 = @bitx_hq.RepoPath::new("mizchi", "monorepo", subdir=Some("packages/core"))
   debug_inspect(repo1.needs_sparse(), content="false")
   debug_inspect(repo2.needs_sparse(), content="true")
 }
@@ -294,7 +294,7 @@ test "load_config: BHQ_ROOT environment variable" {
     None
   }
 
-  let config = load_config(env_get, bit_config_get)
+  let config = @bitx_hq.load_config(env_get, bit_config_get)
   debug_inspect(
     config.root,
     content=(
@@ -313,7 +313,7 @@ test "load_config: default bhq root" {
     None
   }
 
-  let config = load_config(env_get, bit_config_get)
+  let config = @bitx_hq.load_config(env_get, bit_config_get)
   // Default is ~/bhq, but ~ is expanded to /home/user in tests
   debug_inspect(
     config.root,
@@ -325,7 +325,7 @@ test "load_config: default bhq root" {
 
 ///|
 test "expand_home: with tilde" {
-  let result = expand_home("~/repos")
+  let result = @bitx_hq.expand_home("~/repos")
   // In tests, home is /home/user
   debug_inspect(
     result,
@@ -337,7 +337,7 @@ test "expand_home: with tilde" {
 
 ///|
 test "expand_home: without tilde" {
-  let result = expand_home("/absolute/path")
+  let result = @bitx_hq.expand_home("/absolute/path")
   debug_inspect(
     result,
     content=(
@@ -348,7 +348,7 @@ test "expand_home: without tilde" {
 
 ///|
 test "contract_home: with matching home" {
-  let result = contract_home("/home/user/repos", "/home/user")
+  let result = @bitx_hq.contract_home("/home/user/repos", "/home/user")
   debug_inspect(
     result,
     content=(
@@ -359,9 +359,9 @@ test "contract_home: with matching home" {
 
 ///|
 test "build_clone_command: simple" {
-  let repo = RepoPath::new("mizchi", "git")
-  let options = HqGetOptions::default()
-  let cmd = build_clone_command(repo, "/home/user/bhq/mizchi/git", options)
+  let repo = @bitx_hq.RepoPath::new("mizchi", "git")
+  let options = @bitx_hq.HqGetOptions::default()
+  let cmd = @bitx_hq.build_clone_command(repo, "/home/user/bhq/mizchi/git", options)
   let _expected = "git clone https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
   debug_inspect(
     cmd,
@@ -373,9 +373,9 @@ test "build_clone_command: simple" {
 
 ///|
 test "build_clone_command: shallow" {
-  let repo = RepoPath::new("mizchi", "git")
-  let options = HqGetOptions::new(shallow=true)
-  let cmd = build_clone_command(repo, "/home/user/bhq/mizchi/git", options)
+  let repo = @bitx_hq.RepoPath::new("mizchi", "git")
+  let options = @bitx_hq.HqGetOptions::new(shallow=true)
+  let cmd = @bitx_hq.build_clone_command(repo, "/home/user/bhq/mizchi/git", options)
   let _expected = "git clone --depth=1 https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
   debug_inspect(
     cmd,
@@ -387,9 +387,9 @@ test "build_clone_command: shallow" {
 
 ///|
 test "build_clone_command: explicit depth" {
-  let repo = RepoPath::new("mizchi", "git")
-  let options = HqGetOptions::new(depth=3)
-  let cmd = build_clone_command(repo, "/home/user/bhq/mizchi/git", options)
+  let repo = @bitx_hq.RepoPath::new("mizchi", "git")
+  let options = @bitx_hq.HqGetOptions::new(depth=3)
+  let cmd = @bitx_hq.build_clone_command(repo, "/home/user/bhq/mizchi/git", options)
   let _expected = "git clone --depth=3 https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
   debug_inspect(
     cmd,
@@ -401,9 +401,9 @@ test "build_clone_command: explicit depth" {
 
 ///|
 test "build_clone_command: sparse checkout" {
-  let repo = RepoPath::new("mizchi", "monorepo", subdir=Some("packages/core"))
-  let options = HqGetOptions::default()
-  let cmd = build_clone_command(repo, "/home/user/bhq/mizchi/monorepo", options)
+  let repo = @bitx_hq.RepoPath::new("mizchi", "monorepo", subdir=Some("packages/core"))
+  let options = @bitx_hq.HqGetOptions::default()
+  let cmd = @bitx_hq.build_clone_command(repo, "/home/user/bhq/mizchi/monorepo", options)
   let _expected = "git clone --no-checkout https://github.com/mizchi/monorepo.git /home/user/bhq/mizchi/monorepo && cd /home/user/bhq/mizchi/monorepo && git sparse-checkout init --cone && git sparse-checkout set /packages/core/"
   debug_inspect(
     cmd,
@@ -415,9 +415,9 @@ test "build_clone_command: sparse checkout" {
 
 ///|
 test "build_clone_command: sparse checkout with depth" {
-  let repo = RepoPath::new("mizchi", "monorepo", subdir=Some("packages/core"))
-  let options = HqGetOptions::new(depth=2)
-  let cmd = build_clone_command(repo, "/home/user/bhq/mizchi/monorepo", options)
+  let repo = @bitx_hq.RepoPath::new("mizchi", "monorepo", subdir=Some("packages/core"))
+  let options = @bitx_hq.HqGetOptions::new(depth=2)
+  let cmd = @bitx_hq.build_clone_command(repo, "/home/user/bhq/mizchi/monorepo", options)
   let _expected = "git clone --no-checkout --depth=2 https://github.com/mizchi/monorepo.git /home/user/bhq/mizchi/monorepo && cd /home/user/bhq/mizchi/monorepo && git sparse-checkout init --cone && git sparse-checkout set /packages/core/"
   debug_inspect(
     cmd,
@@ -429,9 +429,9 @@ test "build_clone_command: sparse checkout with depth" {
 
 ///|
 test "hq_get: clone new repository" {
-  let repo = RepoPath::new("mizchi", "git")
-  let config = HqConfig::new("/tmp/bhq")
-  let options = HqGetOptions::default()
+  let repo = @bitx_hq.RepoPath::new("mizchi", "git")
+  let config = @bitx_hq.HqConfig::new("/tmp/bhq")
+  let options = @bitx_hq.HqGetOptions::default()
   fn exec(_cmd : String) -> (Int, String, String) {
     (0, "", "")
   }
@@ -440,15 +440,15 @@ test "hq_get: clone new repository" {
     false
   }
 
-  let result = hq_get(repo, config, options, exec, path_exists)
+  let result = @bitx_hq.hq_get(repo, config, options, exec, path_exists)
   debug_inspect(result, content="Cloned(\"/tmp/bhq/mizchi/git\")")
 }
 
 ///|
 test "hq_get: clone new repository with explicit depth" {
-  let repo = RepoPath::new("mizchi", "git")
-  let config = HqConfig::new("/tmp/bhq")
-  let options = HqGetOptions::new(depth=2)
+  let repo = @bitx_hq.RepoPath::new("mizchi", "git")
+  let config = @bitx_hq.HqConfig::new("/tmp/bhq")
+  let options = @bitx_hq.HqGetOptions::new(depth=2)
   let commands : Array[String] = []
   fn exec(cmd : String) -> (Int, String, String) {
     commands.push(cmd)
@@ -459,7 +459,7 @@ test "hq_get: clone new repository with explicit depth" {
     false
   }
 
-  let result = hq_get(repo, config, options, exec, path_exists)
+  let result = @bitx_hq.hq_get(repo, config, options, exec, path_exists)
   debug_inspect(result, content="Cloned(\"/tmp/bhq/mizchi/git\")")
   @test.assert_eq(commands.length(), 1)
   @test.assert_eq(
@@ -470,9 +470,9 @@ test "hq_get: clone new repository with explicit depth" {
 
 ///|
 test "hq_get: skip existing without update" {
-  let repo = RepoPath::new("mizchi", "git")
-  let config = HqConfig::new("/tmp/bhq")
-  let options = HqGetOptions::default()
+  let repo = @bitx_hq.RepoPath::new("mizchi", "git")
+  let config = @bitx_hq.HqConfig::new("/tmp/bhq")
+  let options = @bitx_hq.HqGetOptions::default()
   fn exec(_cmd : String) -> (Int, String, String) {
     (0, "", "")
   }
@@ -481,15 +481,15 @@ test "hq_get: skip existing without update" {
     true
   }
 
-  let result = hq_get(repo, config, options, exec, path_exists)
+  let result = @bitx_hq.hq_get(repo, config, options, exec, path_exists)
   debug_inspect(result, content="Skipped(\"/tmp/bhq/mizchi/git\")")
 }
 
 ///|
 test "hq_get: unshallow existing repository before update" {
-  let repo = RepoPath::new("mizchi", "git")
-  let config = HqConfig::new("/tmp/bhq")
-  let options = HqGetOptions::new(update=true, unshallow=true)
+  let repo = @bitx_hq.RepoPath::new("mizchi", "git")
+  let config = @bitx_hq.HqConfig::new("/tmp/bhq")
+  let options = @bitx_hq.HqGetOptions::new(update=true, unshallow=true)
   let commands : Array[String] = []
   fn exec(cmd : String) -> (Int, String, String) {
     commands.push(cmd)
@@ -500,7 +500,7 @@ test "hq_get: unshallow existing repository before update" {
     true
   }
 
-  let result = hq_get(repo, config, options, exec, path_exists)
+  let result = @bitx_hq.hq_get(repo, config, options, exec, path_exists)
   debug_inspect(result, content="Updated(\"/tmp/bhq/mizchi/git\")")
   @test.assert_eq(commands.length(), 2)
   @test.assert_eq(
@@ -512,9 +512,9 @@ test "hq_get: unshallow existing repository before update" {
 
 ///|
 test "hq_get: update existing with -u" {
-  let repo = RepoPath::new("mizchi", "git")
-  let config = HqConfig::new("/tmp/bhq")
-  let options = HqGetOptions::new(update=true)
+  let repo = @bitx_hq.RepoPath::new("mizchi", "git")
+  let config = @bitx_hq.HqConfig::new("/tmp/bhq")
+  let options = @bitx_hq.HqGetOptions::new(update=true)
   fn exec(_cmd : String) -> (Int, String, String) {
     (0, "", "")
   }
@@ -523,13 +523,13 @@ test "hq_get: update existing with -u" {
     true
   }
 
-  let result = hq_get(repo, config, options, exec, path_exists)
+  let result = @bitx_hq.hq_get(repo, config, options, exec, path_exists)
   debug_inspect(result, content="Updated(\"/tmp/bhq/mizchi/git\")")
 }
 
 ///|
 test "parse_repo_path: user/repo" {
-  let result = parse_repo_path("mizchi/git")
+  let result = @bitx_hq.parse_repo_path("mizchi/git")
   let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(
@@ -542,7 +542,7 @@ test "parse_repo_path: user/repo" {
 
 ///|
 test "parse_repo_path: host/user/repo" {
-  let result = parse_repo_path("gitlab.com/user/project")
+  let result = @bitx_hq.parse_repo_path("gitlab.com/user/project")
   let _expected =
     #|Some({host: Some("gitlab.com"), user: "user", repo: "project", subdir: None})
   debug_inspect(

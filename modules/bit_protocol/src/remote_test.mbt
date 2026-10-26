@@ -1,7 +1,7 @@
 ///|
 /// Tests for Git HTTP push protocol
 test "Remote info_refs_url" {
-  let remote = Remote::new("https://github.com/user/repo.git")
+  let remote = @bit_protocol.Remote::new("https://github.com/user/repo.git")
   debug_inspect(
     remote.info_refs_url(),
     content=(
@@ -12,7 +12,7 @@ test "Remote info_refs_url" {
 
 ///|
 test "Remote info_refs_url without .git" {
-  let remote = Remote::new("https://github.com/user/repo")
+  let remote = @bit_protocol.Remote::new("https://github.com/user/repo")
   debug_inspect(
     remote.info_refs_url(),
     content=(
@@ -23,7 +23,7 @@ test "Remote info_refs_url without .git" {
 
 ///|
 test "Remote receive_pack_url" {
-  let remote = Remote::new("https://github.com/user/repo.git")
+  let remote = @bit_protocol.Remote::new("https://github.com/user/repo.git")
   debug_inspect(
     remote.receive_pack_url(),
     content=(
@@ -39,8 +39,8 @@ test "build_receive_pack_body" {
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
   let packfile = Bytes::from_array([b'P', b'A', b'C', b'K'])
-  let req = PushRequest::new(old_id, new_id, "refs/heads/main", packfile)
-  let body = build_receive_pack_body(req)
+  let req = @bit_protocol.PushRequest::new(old_id, new_id, "refs/heads/main", packfile)
+  let body = @bit_protocol.build_receive_pack_body(req)
 
   // Should start with pkt-line
   assert_true(body.length() > 4)
@@ -79,26 +79,28 @@ test "parse_receive_pack_response success" {
   let lines : Array[Byte] = []
 
   // "unpack ok\n"
-  let unpack_ok = pktline_encode("unpack ok\n")
+  let unpack_ok = @bit_protocol.pktline_encode("unpack ok\n")
   for b in unpack_ok {
     lines.push(b)
   }
 
   // "ok refs/heads/main\n"
-  let ref_ok = pktline_encode("ok refs/heads/main\n")
+  let ref_ok = @bit_protocol.pktline_encode("ok refs/heads/main\n")
   for b in ref_ok {
     lines.push(b)
   }
 
   // flush
-  let flush = pktline_flush()
+  let flush = @bit_protocol.pktline_flush()
   for b in flush {
     lines.push(b)
   }
   let data = Bytes::from_array(
     FixedArray::makei(lines.length(), fn(i) { lines[i] }),
   )
-  let result = parse_receive_pack_response(data)
+  let result = try Ok(@bit_protocol.parse_receive_pack_response(data)) catch {
+    e => Err(e)
+  }
   match result {
     Ok(msg) =>
       debug_inspect(
@@ -119,18 +121,20 @@ test "parse_receive_pack_response failure" {
   let lines : Array[Byte] = []
 
   // "unpack error - invalid pack"
-  let unpack_err = pktline_encode("unpack error - invalid pack\n")
+  let unpack_err = @bit_protocol.pktline_encode("unpack error - invalid pack\n")
   for b in unpack_err {
     lines.push(b)
   }
-  let flush = pktline_flush()
+  let flush = @bit_protocol.pktline_flush()
   for b in flush {
     lines.push(b)
   }
   let data = Bytes::from_array(
     FixedArray::makei(lines.length(), fn(i) { lines[i] }),
   )
-  let result = parse_receive_pack_response(data)
+  let result = try Ok(@bit_protocol.parse_receive_pack_response(data)) catch {
+    e => Err(e)
+  }
   match result {
     Ok(_) => assert_true(false)
     Err(@bit.GitError::ProtocolError(msg)) =>
@@ -143,7 +147,7 @@ test "parse_receive_pack_response failure" {
 test "parse_sideband" {
   // Channel 1 with data
   let data = Bytes::from_array([b'\x01', b'h', b'e', b'l', b'l', b'o'])
-  let (channel, content) = parse_sideband(data)
+  let (channel, content) = @bit_protocol.parse_sideband(data)
   debug_inspect(channel, content="1")
   debug_inspect(content.length(), content="5")
 }
@@ -151,7 +155,7 @@ test "parse_sideband" {
 ///|
 test "parse_sideband empty" {
   let data = Bytes::from_array([])
-  let (channel, content) = parse_sideband(data)
+  let (channel, content) = @bit_protocol.parse_sideband(data)
   debug_inspect(channel, content="0")
   debug_inspect(content.length(), content="0")
 }
@@ -160,8 +164,8 @@ test "parse_sideband empty" {
 test "extract_capabilities" {
   // Simulate refs response with capabilities
   let line = "ce013625030ba8dba906f756967f9e9ca394464a refs/heads/main\u0000report-status side-band-64k\n"
-  let pkt = pktline_encode(line)
-  let flush = pktline_flush()
+  let pkt = @bit_protocol.pktline_encode(line)
+  let flush = @bit_protocol.pktline_flush()
   let data : Array[Byte] = []
   for b in pkt {
     data.push(b)
@@ -169,7 +173,7 @@ test "extract_capabilities" {
   for b in flush {
     data.push(b)
   }
-  let caps = extract_capabilities(
+  let caps = @bit_protocol.extract_capabilities(
     Bytes::from_array(FixedArray::makei(data.length(), fn(i) { data[i] })),
   )
   assert_true(caps.length() >= 2)
@@ -179,7 +183,7 @@ test "extract_capabilities" {
 
 ///|
 test "parse_symrefs_from_capabilities parses symref pairs" {
-  let symrefs = parse_symrefs_from_capabilities([
+  let symrefs = @bit_protocol.parse_symrefs_from_capabilities([
     "report-status", "symref=HEAD:refs/heads/main", "symref=refs/remotes/origin/HEAD:refs/remotes/origin/main",
   ])
   @test.assert_eq(symrefs.get("HEAD"), Some("refs/heads/main"))
@@ -191,7 +195,7 @@ test "parse_symrefs_from_capabilities parses symref pairs" {
 
 ///|
 test "parse_symrefs_from_capabilities accepts symref-target capability" {
-  let symrefs = parse_symrefs_from_capabilities([
+  let symrefs = @bit_protocol.parse_symrefs_from_capabilities([
     "ls-refs=unborn", "symref-target:refs/heads/main",
   ])
   @test.assert_eq(symrefs.get("HEAD"), Some("refs/heads/main"))
@@ -200,7 +204,7 @@ test "parse_symrefs_from_capabilities accepts symref-target capability" {
 ///|
 test "ssh_remote_to_https converts scp-style ssh remote" {
   debug_inspect(
-    ssh_remote_to_https("git@github.com:user/repo.git"),
+    @bit_protocol.ssh_remote_to_https("git@github.com:user/repo.git"),
     content=(
       #|Some("https://github.com/user/repo.git")
     ),
@@ -210,7 +214,7 @@ test "ssh_remote_to_https converts scp-style ssh remote" {
 ///|
 test "ssh_remote_to_https converts ssh:// remote" {
   debug_inspect(
-    ssh_remote_to_https("ssh://git@github.com/user/repo.git"),
+    @bit_protocol.ssh_remote_to_https("ssh://git@github.com/user/repo.git"),
     content=(
       #|Some("https://github.com/user/repo.git")
     ),
@@ -220,7 +224,7 @@ test "ssh_remote_to_https converts ssh:// remote" {
 ///|
 test "ssh_remote_to_https drops explicit ssh port" {
   debug_inspect(
-    ssh_remote_to_https("ssh://git@github.com:2222/user/repo.git"),
+    @bit_protocol.ssh_remote_to_https("ssh://git@github.com:2222/user/repo.git"),
     content=(
       #|Some("https://github.com/user/repo.git")
     ),
@@ -230,10 +234,10 @@ test "ssh_remote_to_https drops explicit ssh port" {
 ///|
 test "ssh_remote_to_https returns none for non-ssh remotes" {
   debug_inspect(
-    ssh_remote_to_https("https://github.com/user/repo.git"),
+    @bit_protocol.ssh_remote_to_https("https://github.com/user/repo.git"),
     content="None",
   )
-  debug_inspect(ssh_remote_to_https("file:///tmp/repo.git"), content="None")
+  debug_inspect(@bit_protocol.ssh_remote_to_https("file:///tmp/repo.git"), content="None")
 }
 
 ///|
@@ -244,7 +248,7 @@ test "select_default_wants ignores zero oid refs in empty repo" {
     (zero, "refs/heads/main"),
   ]
   let symrefs : Map[String, String] = { "HEAD": "refs/heads/main" }
-  let wants = select_default_wants(refs, symrefs)
+  let wants = @bit_protocol.select_default_wants(refs, symrefs)
   @test.assert_eq(wants.length(), 0)
 }
 
@@ -256,7 +260,7 @@ test "select_default_ref ignores zero oid refs in empty repo" {
     (zero, "refs/heads/main"),
   ]
   let symrefs : Map[String, String] = { "HEAD": "refs/heads/main" }
-  @test.assert_eq(select_default_ref(refs, symrefs), None)
+  @test.assert_eq(@bit_protocol.select_default_ref(refs, symrefs), None)
 }
 
 ///|
@@ -271,10 +275,10 @@ test "select_default_ref keeps non-zero symref target" {
   ]
   let symrefs : Map[String, String] = { "HEAD": "refs/heads/main" }
   @test.assert_eq(
-    select_default_ref(refs, symrefs),
+    @bit_protocol.select_default_ref(refs, symrefs),
     Some(("refs/heads/main", main_id)),
   )
-  let wants = select_default_wants(refs, symrefs)
+  let wants = @bit_protocol.select_default_wants(refs, symrefs)
   @test.assert_eq(wants.length(), 1)
   @test.assert_eq(wants[0].to_hex(), main_id.to_hex())
 }

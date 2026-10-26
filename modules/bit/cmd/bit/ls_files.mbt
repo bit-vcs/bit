@@ -746,6 +746,12 @@ pub(all) struct SubmoduleInfo {
 } derive(Eq, Debug)
 
 ///|
+pub extend SubmoduleInfo with Eq::{not_equal, equal}
+
+///|
+pub extend SubmoduleInfo with Debug::{to_repr}
+
+///|
 fn submodule_info_show_string(value : String) -> String {
   let buf = StringBuilder()
   buf.write_char('"')
@@ -780,6 +786,9 @@ pub impl Show for SubmoduleInfo with fn output(self, logger) {
     "}",
   )
 }
+
+///|
+pub extend SubmoduleInfo with Show::{to_string, output}
 
 ///|
 struct LsFilesTrackedEntry {

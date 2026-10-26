@@ -3,7 +3,7 @@
 ///|
 test "subdir_push: transform single commit tree structure" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create upstream-like structure
@@ -14,31 +14,31 @@ test "subdir_push: transform single commit tree structure" {
   fs.write_file("/repo/src/x/kv/kv.mbt", b"kv content")
   fs.write_file("/repo/docs/README.md", b"docs")
   fs.write_file("/repo/README.md", b"root readme")
-  let upstream_commit = commit(
+  let upstream_commit = @bit_lib.commit(
     fs, fs, "/repo", "Upstream", "upstream <up@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
   // Get the fs subtree
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
   let upstream_obj = db.get(fs, upstream_commit) catch { _ => return () }
   guard upstream_obj is Some(obj) else { return () }
   let upstream_info = @bit.parse_commit(obj.data) catch { _ => return () }
   // Simulate subdir-clone: extract fs subtree and create new repo
-  init_repo(fs, "/subdir") catch {
+  @bit_lib.init_repo(fs, "/subdir") catch {
     _ => ()
   }
   // Copy fs content
   fs.mkdir_p("/subdir")
   fs.write_file("/subdir/fs.mbt", b"fs modified")
   fs.write_file("/subdir/new.mbt", b"new file")
-  let subdir_commit = commit(
+  let subdir_commit = @bit_lib.commit(
     fs, fs, "/subdir", "Local change", "local <local@test.com>", 2000L,
   ) catch {
     _ => return ()
   }
   // Now simulate the transform: replace src/x/fs in upstream tree with subdir tree
-  let subdir_db = ObjectDb::load(fs, "/subdir/.git") catch { _ => return () }
+  let subdir_db = @bit_lib.ObjectDb::load(fs, "/subdir/.git") catch { _ => return () }
   let subdir_obj = subdir_db.get(fs, subdir_commit) catch { _ => return () }
   guard subdir_obj is Some(so) else { return () }
   let subdir_info = @bit.parse_commit(so.data) catch { _ => return () }
@@ -74,7 +74,7 @@ test "subdir_push: transform single commit tree structure" {
 ///|
 test "subdir_push: collect diff correctly excludes base objects" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Base commit with multiple files
@@ -82,18 +82,18 @@ test "subdir_push: collect diff correctly excludes base objects" {
   fs.write_file("/repo/src/lib/a.mbt", b"a original")
   fs.write_file("/repo/src/lib/b.mbt", b"b original")
   fs.write_file("/repo/other.txt", b"other content")
-  let base = commit(fs, fs, "/repo", "Base", "test <test@test.com>", 1000L) catch {
+  let base = @bit_lib.commit(fs, fs, "/repo", "Base", "test <test@test.com>", 1000L) catch {
     _ => return ()
   }
   // Modify only lib/a.mbt
   fs.write_file("/repo/src/lib/a.mbt", b"a modified")
-  let new_commit = commit(
+  let new_commit = @bit_lib.commit(
     fs, fs, "/repo", "Modify a", "test <test@test.com>", 2000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff = collect_diff_objects(db, fs, base, new_commit) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff = @bit_lib.collect_diff_objects(db, fs, base, new_commit) catch {
     _ => return ()
   }
   // Check what's included
@@ -123,27 +123,27 @@ test "subdir_push: collect diff correctly excludes base objects" {
 ///|
 test "subdir_push: multiple commits transform correctly" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create base
   fs.write_file("/repo/file.txt", b"v1")
-  let commit1 = commit(fs, fs, "/repo", "v1", "test <test@test.com>", 1000L) catch {
+  let commit1 = @bit_lib.commit(fs, fs, "/repo", "v1", "test <test@test.com>", 1000L) catch {
     _ => return ()
   }
   // Second commit
   fs.write_file("/repo/file.txt", b"v2")
-  let _ = commit(fs, fs, "/repo", "v2", "test <test@test.com>", 2000L) catch {
+  let _ = @bit_lib.commit(fs, fs, "/repo", "v2", "test <test@test.com>", 2000L) catch {
     _ => return ()
   }
   // Third commit
   fs.write_file("/repo/file.txt", b"v3")
-  let tip = commit(fs, fs, "/repo", "v3", "test <test@test.com>", 3000L) catch {
+  let tip = @bit_lib.commit(fs, fs, "/repo", "v3", "test <test@test.com>", 3000L) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
   // Diff from v1 to v3 should include v2 and v3 commits, not v1
-  let diff = collect_diff_objects(db, fs, commit1, tip) catch { _ => return () }
+  let diff = @bit_lib.collect_diff_objects(db, fs, commit1, tip) catch { _ => return () }
   let mut commit_count = 0
   for obj in diff {
     if obj.obj_type == @bit.ObjectType::Commit {
@@ -157,7 +157,7 @@ test "subdir_push: multiple commits transform correctly" {
 ///|
 test "subdir_push: handles binary files" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create binary-like content
@@ -166,7 +166,7 @@ test "subdir_push: handles binary files" {
   ])
   fs.write_file("/repo/binary.bin", binary_data)
   fs.write_file("/repo/text.txt", b"text")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
@@ -174,13 +174,13 @@ test "subdir_push: handles binary files" {
   // Modify binary file
   let new_binary = Bytes::from_array([b'\x00', b'\x00', b'\x00', b'\x00'])
   fs.write_file("/repo/binary.bin", new_binary)
-  let commit2 = commit(
+  let commit2 = @bit_lib.commit(
     fs, fs, "/repo", "Update binary", "test <test@test.com>", 2000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should include the modified binary blob
@@ -198,12 +198,12 @@ test "subdir_push: handles binary files" {
 ///|
 test "subdir_push: empty tree handling" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.mkdir_p("/repo/dir")
   fs.write_file("/repo/dir/file.txt", b"content")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
@@ -211,13 +211,13 @@ test "subdir_push: empty tree handling" {
   // Remove all files from dir (Git doesn't track empty dirs, so add a placeholder)
   fs.remove_file("/repo/dir/file.txt")
   fs.write_file("/repo/dir/.gitkeep", b"")
-  let commit2 = commit(
+  let commit2 = @bit_lib.commit(
     fs, fs, "/repo", "Empty dir", "test <test@test.com>", 2000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should work without error
@@ -227,27 +227,27 @@ test "subdir_push: empty tree handling" {
 ///|
 test "subdir_push: deeply nested changes" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create deep nesting
   fs.mkdir_p("/repo/a/b/c/d/e")
   fs.write_file("/repo/a/b/c/d/e/deep.txt", b"deep original")
   fs.write_file("/repo/a/shallow.txt", b"shallow")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
   // Modify only the deep file
   fs.write_file("/repo/a/b/c/d/e/deep.txt", b"deep modified")
-  let commit2 = commit(
+  let commit2 = @bit_lib.commit(
     fs, fs, "/repo", "Modify deep", "test <test@test.com>", 2000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should include the modified blob and all changed trees in the path
@@ -278,7 +278,7 @@ test "subdir_push: deeply nested changes" {
 ///|
 test "subdir_push: large number of unchanged files" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create many files
@@ -288,20 +288,20 @@ test "subdir_push: large number of unchanged files" {
       string_to_bytes("content " + i.to_string()),
     )
   }
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Many files", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
   // Modify only one file
   fs.write_file("/repo/file5.txt", b"modified content 5")
-  let commit2 = commit(
+  let commit2 = @bit_lib.commit(
     fs, fs, "/repo", "Modify one", "test <test@test.com>", 2000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should only include: commit, root tree, modified blob
@@ -319,22 +319,22 @@ test "subdir_push: large number of unchanged files" {
 test "subdir_push: file mode changes" {
   // This tests that we correctly handle mode changes even when content is same
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/script.sh", b"#!/bin/sh\necho hello")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
   // Change content (simulating mode + content change)
   fs.write_file("/repo/script.sh", b"#!/bin/sh\necho goodbye")
-  let commit2 = commit(fs, fs, "/repo", "Modify", "test <test@test.com>", 2000L) catch {
+  let commit2 = @bit_lib.commit(fs, fs, "/repo", "Modify", "test <test@test.com>", 2000L) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should include the modified blob

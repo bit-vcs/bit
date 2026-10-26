@@ -7,6 +7,12 @@ pub struct LfsPointer {
 } derive(Debug, Eq)
 
 ///|
+pub extend LfsPointer with Debug::{to_repr}
+
+///|
+pub extend LfsPointer with Eq::{not_equal, equal}
+
+///|
 let lfs_version_prefix : String = "version https://git-lfs.github.com/spec/v1\n"
 
 ///|

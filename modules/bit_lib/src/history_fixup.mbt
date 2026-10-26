@@ -13,11 +13,17 @@ pub(all) enum HistoryEmptyAction {
 } derive(Eq)
 
 ///|
+pub extend HistoryEmptyAction with Eq::{not_equal, equal}
+
+///|
 pub(all) struct HistoryRefUpdate {
   refname : String
   old_id : @bit.ObjectId
   new_id : @bit.ObjectId
 } derive(Eq)
+
+///|
+pub extend HistoryRefUpdate with Eq::{not_equal, equal}
 
 ///|
 pub(all) struct HistoryFixupResult {

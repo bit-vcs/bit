@@ -29,14 +29,23 @@ pub impl Show for NodeId with fn output(self, logger) {
 }
 
 ///|
+pub extend NodeId with Show::{to_string, output}
+
+///|
 pub impl Eq for NodeId with fn equal(self, other) {
   self.id == other.id
 }
 
 ///|
+pub extend NodeId with Eq::{not_equal, equal}
+
+///|
 pub impl Hash for NodeId with fn hash_combine(self, hasher) {
   Hash::hash_combine(self.id, hasher)
 }
+
+///|
+pub extend NodeId with Hash::{hash, hash_combine}
 
 ///|
 /// Vector clock for causal ordering

@@ -210,6 +210,9 @@ pub impl RepoFileSystem for TestFs with fn mtime(_self, _path) {
 }
 
 ///|
+pub extend TestFs with RepoFileSystem::{mtime}
+
+///|
 pub impl AsyncRepoFileSystem for TestFs with fn read_file(self, path) {
   TestFs::read_file(self, path)
 }

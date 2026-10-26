@@ -10,9 +10,9 @@ import {
 // Values
 pub fn collect_reftable_refs(&@bit_types.RepoFileSystem, String) -> Array[(String, @bit_object.ObjectId)] raise @bit_object.GitError
 
-pub fn decode_ref_record(Bytes, Int, String, ReftableHeader) -> (RefRecord, Int)?
+pub fn decode_ref_record(Bytes, Int32, String, ReftableHeader) -> (RefRecord, Int32)?
 
-pub fn decode_varint(Bytes, Int) -> (UInt64, Int)
+pub fn decode_varint(Bytes, Int32) -> (UInt64, Int32)
 
 pub fn encode_varint(Array[Byte], UInt64) -> Unit
 
@@ -32,11 +32,11 @@ pub fn read_refs(Bytes) -> Array[RefRecord]?
 
 pub fn read_tables_list(&@bit_types.RepoFileSystem, String) -> Array[String] raise @bit_object.GitError
 
-pub fn reftable_hash_size(algo? : @bit_object.HashAlgorithm) -> Int
+pub fn reftable_hash_size(algo? : @bit_object.HashAlgorithm) -> Int32
 
 pub fn resolve_ref_reftable(&@bit_types.RepoFileSystem, String, String) -> @bit_object.ObjectId? raise @bit_object.GitError
 
-pub fn write_reftable(Array[RefRecord], Int, UInt64, UInt64) -> Bytes
+pub fn write_reftable(Array[RefRecord], Int32, UInt64, UInt64) -> Bytes
 
 // Errors
 
@@ -46,6 +46,10 @@ pub(all) struct RefRecord {
   update_index : UInt64
   value : RefValue
 } derive(Eq)
+pub fn RefRecord::equal(Self, Self) -> Bool
+pub fn RefRecord::not_equal(Self, Self) -> Bool
+pub fn RefRecord::output(Self, &Logger) -> Unit
+pub fn RefRecord::to_string(Self) -> String
 pub impl Show for RefRecord
 
 pub(all) enum RefValue {
@@ -54,18 +58,28 @@ pub(all) enum RefValue {
   Val2(@bit_object.ObjectId, @bit_object.ObjectId)
   Symref(String)
 } derive(Eq, @debug.Debug)
+pub fn RefValue::equal(Self, Self) -> Bool
+pub fn RefValue::not_equal(Self, Self) -> Bool
+pub fn RefValue::output(Self, &Logger) -> Unit
+pub fn RefValue::to_repr(Self) -> @debug.Repr
+pub fn RefValue::to_string(Self) -> String
 pub impl Show for RefValue
 
 type ReftableFooter derive(Eq, @debug.Debug)
+pub fn ReftableFooter::equal(Self, Self) -> Bool
+pub fn ReftableFooter::not_equal(Self, Self) -> Bool
+pub fn ReftableFooter::to_repr(Self) -> @debug.Repr
 
 pub struct ReftableHeader {
-  version : Int
-  block_size : Int
+  version : Int32
+  block_size : Int32
   min_update_index : UInt64
   max_update_index : UInt64
 } derive(Eq, @debug.Debug)
+pub fn ReftableHeader::equal(Self, Self) -> Bool
+pub fn ReftableHeader::not_equal(Self, Self) -> Bool
+pub fn ReftableHeader::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 
 // Traits
-

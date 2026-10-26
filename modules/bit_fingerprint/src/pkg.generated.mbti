@@ -24,9 +24,13 @@ pub(all) enum FingerprintMode {
   Fast
   GitCompat
 } derive(Eq, @debug.Debug)
+pub fn FingerprintMode::equal(Self, Self) -> Bool
+pub fn FingerprintMode::not_equal(Self, Self) -> Bool
+pub fn FingerprintMode::output(Self, &Logger) -> Unit
+pub fn FingerprintMode::to_repr(Self) -> @debug.Repr
+pub fn FingerprintMode::to_string(Self) -> String
 pub impl Show for FingerprintMode
 
 // Type aliases
 
 // Traits
-

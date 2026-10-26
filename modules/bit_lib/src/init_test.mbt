@@ -3,8 +3,8 @@
 ///|
 test "init: default options use files ref format" {
   let fs = @bit.TestFs::new()
-  let opts = InitOptions::new()
-  init_repo_with_options(fs, "/repo", opts)
+  let opts = @bit_lib.InitOptions::new()
+  @bit_lib.init_repo_with_options(fs, "/repo", opts)
   let config = fs.read_string("/repo/.git/config")
   assert_false(config.contains("refStorage = reftable"))
   assert_false(fs.is_dir("/repo/.git/reftable"))
@@ -13,7 +13,7 @@ test "init: default options use files ref format" {
 ///|
 test "init: reftable ref format writes extensions and metadata directory" {
   let fs = @bit.TestFs::new()
-  init_repo_with_options(fs, "/repo", {
+  @bit_lib.init_repo_with_options(fs, "/repo", {
     default_branch: "main",
     bare: false,
     separate_git_dir: None,
@@ -35,7 +35,7 @@ test "init: reftable ref format writes extensions and metadata directory" {
 ///|
 test "init: sha256 object format writes objectFormat extension" {
   let fs = @bit.TestFs::new()
-  init_repo_with_options(fs, "/repo", {
+  @bit_lib.init_repo_with_options(fs, "/repo", {
     default_branch: "main",
     bare: false,
     separate_git_dir: None,
@@ -55,7 +55,7 @@ test "init: sha256 object format writes objectFormat extension" {
 ///|
 test "init: reinit to move existing .git directory to separate gitdir" {
   let fs = @bit.TestFs::new()
-  init_repo_with_options(fs, "/repo", {
+  @bit_lib.init_repo_with_options(fs, "/repo", {
     default_branch: "main",
     bare: false,
     separate_git_dir: None,
@@ -67,7 +67,7 @@ test "init: reinit to move existing .git directory to separate gitdir" {
     work_tree: None,
     shared: None,
   })
-  init_repo_with_options_with_repo_fs(fs, fs, "/repo", {
+  @bit_lib.init_repo_with_options_with_repo_fs(fs, fs, "/repo", {
     default_branch: "main",
     bare: false,
     separate_git_dir: Some("/separate"),
@@ -89,7 +89,7 @@ test "init: reinit to move existing .git directory to separate gitdir" {
 ///|
 test "init: reinit to move existing separate gitdir path from .git file" {
   let fs = @bit.TestFs::new()
-  init_repo_with_options_with_repo_fs(fs, fs, "/repo", {
+  @bit_lib.init_repo_with_options_with_repo_fs(fs, fs, "/repo", {
     default_branch: "main",
     bare: false,
     separate_git_dir: Some("/real-git-dir"),
@@ -101,7 +101,7 @@ test "init: reinit to move existing separate gitdir path from .git file" {
     work_tree: None,
     shared: None,
   })
-  init_repo_with_options_with_repo_fs(fs, fs, "/repo", {
+  @bit_lib.init_repo_with_options_with_repo_fs(fs, fs, "/repo", {
     default_branch: "main",
     bare: false,
     separate_git_dir: Some("/surreal-git-dir"),

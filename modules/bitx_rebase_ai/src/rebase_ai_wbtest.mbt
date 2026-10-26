@@ -191,7 +191,7 @@ async test "rebase-ai: agent-loop mode resolves conflict with repo-scoped read/w
       @llmlib.MessageStart,
       @llmlib.ToolCallStart(id="call_1", name="read_file"),
       @llmlib.ToolCallEnd(id="call_1", name="read_file", input={
-        "path": "conflicted.txt".to_json(),
+        "path": Json("conflicted.txt"),
       }),
       @llmlib.MessageEnd(
         finish_reason=@llmlib.FinishReason::ToolUse,
@@ -202,8 +202,8 @@ async test "rebase-ai: agent-loop mode resolves conflict with repo-scoped read/w
       @llmlib.MessageStart,
       @llmlib.ToolCallStart(id="call_2", name="write_file"),
       @llmlib.ToolCallEnd(id="call_2", name="write_file", input={
-        "path": "conflicted.txt".to_json(),
-        "content": "merged-line\n".to_json(),
+        "path": Json("conflicted.txt"),
+        "content": Json("merged-line\n"),
       }),
       @llmlib.MessageEnd(
         finish_reason=@llmlib.FinishReason::ToolUse,

@@ -8,9 +8,11 @@ import { pathToFileURL } from "node:url";
 // for the AsyncFileSystem/AsyncRepoFileSystem/AsyncHttpClient types, which
 // hit the same tree-shaking limitation. Rebaselined again in #179 when the
 // toolchain moved to moonc 0.10.13 with moonbitlang/x 0.5 / async 0.22: the
-// same exports now emit ~174_500 raw / ~40_300 gzip bytes. Headroom is
+// same exports now emit ~174_500 raw / ~40_300 gzip bytes. Rebaselined to
+// 186_000 when the toolchain moved to moonc 0.10.17 with moonbitlang/x 0.5.6
+// / async 0.22.5: the same exports now emit ~180_700 raw bytes. Headroom is
 // intentional so small future additions don't require another bump.
-const MAX_MINIMAL_RAW_BYTES = 180_000;
+const MAX_MINIMAL_RAW_BYTES = 186_000;
 const MAX_MINIMAL_GZIP_BYTES = 44_000;
 const MAX_MINIMAL_RATIO = 0.70;
 

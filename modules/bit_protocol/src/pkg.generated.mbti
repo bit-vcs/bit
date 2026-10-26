@@ -7,9 +7,9 @@ import {
 }
 
 // Values
-pub fn build_fetch_request_v0(String, Array[@bit_object.ObjectId], Array[String], depth? : Int, filter? : FilterSpec, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Bytes
+pub fn build_fetch_request_v0(String, Array[@bit_object.ObjectId], Array[String], depth? : Int32, filter? : FilterSpec, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Bytes
 
-pub fn build_fetch_request_v2(String, Array[@bit_object.ObjectId], Int, filter? : FilterSpec, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Bytes
+pub fn build_fetch_request_v2(String, Array[@bit_object.ObjectId], Int32, filter? : FilterSpec, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Bytes
 
 pub fn build_ls_refs_request(String, Array[String]) -> Bytes
 
@@ -19,11 +19,11 @@ pub fn build_ref_update(@bit_object.ObjectId, @bit_object.ObjectId, String, Stri
 
 pub fn build_ref_update_simple(@bit_object.ObjectId, @bit_object.ObjectId, String) -> String
 
-pub async fn[FS : @bit_types.AsyncFileSystem + @bit_types.AsyncRepoFileSystem, Client : @bit_types.AsyncHttpClient] clone_to_async_fs_with_http(String, Bool, Int, FilterSpec, FS, String, Client, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+pub async fn[FS : @bit_types.AsyncFileSystem + @bit_types.AsyncRepoFileSystem, Client : @bit_types.AsyncHttpClient] clone_to_async_fs_with_http(String, Bool, Int32, FilterSpec, FS, String, Client, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
 
-pub async fn clone_to_fs_with_http(String, Bool, Int, FilterSpec, &@bit_types.FileSystem, String, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, &@bit_types.RepoFileSystem, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+pub async fn clone_to_fs_with_http(String, Bool, Int32, FilterSpec, &@bit_types.FileSystem, String, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, &@bit_types.RepoFileSystem, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
 
-pub async fn clone_with_http(String, Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
+pub async fn clone_with_http(String, Bool, Int32, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
 
 pub fn detect_protocol_version(Bytes) -> ProtocolVersion raise @bit_object.GitError
 
@@ -37,11 +37,11 @@ pub fn extract_pack_from_v0_response(Bytes) -> Bytes raise @bit_object.GitError
 
 pub fn extract_pack_from_v2_response(Bytes) -> Bytes raise @bit_object.GitError
 
-pub async fn fetch_objects_with_http(String, Array[@bit_object.ObjectId], Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Array[@bit_object.PackObject] raise @bit_object.GitError
+pub async fn fetch_objects_with_http(String, Array[@bit_object.ObjectId], Bool, Int32, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Array[@bit_object.PackObject] raise @bit_object.GitError
 
-pub async fn fetch_pack_with_http(String, Array[@bit_object.ObjectId], Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Bytes raise @bit_object.GitError
+pub async fn fetch_pack_with_http(String, Array[@bit_object.ObjectId], Bool, Int32, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> Bytes raise @bit_object.GitError
 
-pub async fn fetch_pack_with_http_result(String, Array[@bit_object.ObjectId], Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> FetchPackResult raise @bit_object.GitError
+pub async fn fetch_pack_with_http_result(String, Array[@bit_object.ObjectId], Bool, Int32, FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, haves? : Array[@bit_object.ObjectId], shallow? : Array[@bit_object.ObjectId]) -> FetchPackResult raise @bit_object.GitError
 
 pub fn parse_fetch_response_v0(Bytes) -> FetchPackResult raise @bit_object.GitError
 
@@ -49,13 +49,13 @@ pub fn parse_fetch_response_v2(Bytes) -> FetchPackResult raise @bit_object.GitEr
 
 pub fn parse_ls_refs_response(Bytes) -> LsRefsResult raise @bit_object.GitError
 
-pub fn parse_receive_pack_response(Bytes) -> Result[String, @bit_object.GitError]
+pub fn parse_receive_pack_response(Bytes) -> String raise @bit_object.GitError
 
 pub fn parse_refs(Bytes) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
 
 pub fn parse_remote(String) -> RemoteSpec
 
-pub fn parse_sideband(Bytes) -> (Int, Bytes)
+pub fn parse_sideband(Bytes) -> (Int32, Bytes)
 
 pub fn parse_symrefs_from_capabilities(Array[String]) -> Map[String, String]
 
@@ -100,7 +100,7 @@ pub(all) enum FilterSpec {
   NoFilter
   BlobNone
   BlobLimit(Int64)
-  TreeDepth(Int)
+  TreeDepth(Int32)
   SparseOid(String)
   SparsePathUnsupported
 }
@@ -116,6 +116,8 @@ pub(all) enum ProtocolVersion {
   V0
   V2
 } derive(Eq)
+pub fn ProtocolVersion::equal(Self, Self) -> Bool
+pub fn ProtocolVersion::not_equal(Self, Self) -> Bool
 
 pub struct PushRequest {
   old_id : @bit_object.ObjectId
@@ -137,6 +139,8 @@ pub(all) enum RemoteKind {
   Ssh
   File
 } derive(Eq)
+pub fn RemoteKind::equal(Self, Self) -> Bool
+pub fn RemoteKind::not_equal(Self, Self) -> Bool
 
 pub struct RemoteSpec {
   kind : RemoteKind
@@ -149,4 +153,3 @@ pub struct RemoteSpec {
 // Type aliases
 
 // Traits
-

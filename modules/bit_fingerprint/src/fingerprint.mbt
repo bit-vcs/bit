@@ -5,12 +5,21 @@ pub(all) enum FingerprintMode {
 } derive(Eq, Debug)
 
 ///|
+pub extend FingerprintMode with Eq::{not_equal, equal}
+
+///|
+pub extend FingerprintMode with Debug::{to_repr}
+
+///|
 pub impl Show for FingerprintMode with fn output(self, logger) {
   match self {
     Fast => logger.write_string("Fast")
     GitCompat => logger.write_string("GitCompat")
   }
 }
+
+///|
+pub extend FingerprintMode with Show::{to_string, output}
 
 ///|
 pub fn parse_fingerprint_mode(raw : String) -> FingerprintMode? {

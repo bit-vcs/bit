@@ -1,6 +1,6 @@
 ///|
 test "remote/shorthand: parse repo ref shorthand" {
-  let parsed = parse_github_shorthand("user/repo@main")
+  let parsed = @bit_remote.parse_github_shorthand("user/repo@main")
   debug_inspect(
     parsed,
     content="Some(Repo(\"https://github.com/user/repo\", Some(\"main\")))",
@@ -9,6 +9,6 @@ test "remote/shorthand: parse repo ref shorthand" {
 
 ///|
 test "remote/shorthand: ambiguity detects first path segment" {
-  let result = check_shorthand_ambiguity("user/repo:src", p => p == "user")
+  let result = @bit_remote.check_shorthand_ambiguity("user/repo:src", p => p == "user")
   @test.assert_eq(result, Some("user"))
 }

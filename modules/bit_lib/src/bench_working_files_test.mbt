@@ -117,7 +117,7 @@ test "bench list_working_files small" (b : @bench.T) {
   ensure_bench_repo(bench_small_root, 200, 4)
   let fs = @osfs.OsFs::new()
   b.bench(fn() {
-    let files = try! list_working_files(fs, bench_small_root)
+    let files = try! @bit_lib.list_working_files(fs, bench_small_root)
     b.keep(files.length())
   })
 }
@@ -127,7 +127,7 @@ test "bench list_working_files large" (b : @bench.T) {
   ensure_bench_repo(bench_large_root, 2000, 20)
   let fs = @osfs.OsFs::new()
   b.bench(fn() {
-    let files = try! list_working_files(fs, bench_large_root)
+    let files = try! @bit_lib.list_working_files(fs, bench_large_root)
     b.keep(files.length())
   })
 }

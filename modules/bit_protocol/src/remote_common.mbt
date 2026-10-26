@@ -95,8 +95,8 @@ pub fn build_receive_pack_body(req : PushRequest) -> Bytes {
 /// Parse receive-pack response
 pub fn parse_receive_pack_response(
   data : Bytes,
-) -> Result[String, @bit.GitError] {
-  let decoded = pktline_decode(data) catch { e => return Err(e) }
+) -> String raise @bit.GitError {
+  let decoded = pktline_decode(data)
   let mut unpack_ok = false
   let mut ref_ok = false
   let mut error_msg = ""
@@ -138,10 +138,10 @@ pub fn parse_receive_pack_response(
   }
   if sideband {
     if error_msg.length() > 0 {
-      return error_msg |> @bit.GitError::ProtocolError |> Err
+      raise @bit.GitError::ProtocolError(error_msg)
     }
     let band1 = remote_array_to_bytes(band1_bytes)
-    let band_decoded = pktline_decode(band1) catch { e => return Err(e) }
+    let band_decoded = pktline_decode(band1)
     unpack_ok = false
     ref_ok = false
     error_msg = ""
@@ -163,11 +163,11 @@ pub fn parse_receive_pack_response(
     }
   }
   if unpack_ok && ref_ok {
-    Ok("Push successful")
+    "Push successful"
   } else if error_msg.length() > 0 {
-    error_msg |> @bit.GitError::ProtocolError |> Err
+    raise @bit.GitError::ProtocolError(error_msg)
   } else {
-    "Unknown response" |> @bit.GitError::ProtocolError |> Err
+    raise @bit.GitError::ProtocolError("Unknown response")
   }
 }
 
@@ -357,8 +357,5 @@ pub async fn push_with_http(
   if response.code != 200 {
     raise @bit.GitError::ProtocolError("Failed to push: HTTP \{response.code}")
   }
-  match parse_receive_pack_response(response_data) {
-    Ok(msg) => msg
-    Err(e) => raise e
-  }
+  parse_receive_pack_response(response_data)
 }

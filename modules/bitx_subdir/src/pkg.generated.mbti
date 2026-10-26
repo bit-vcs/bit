@@ -116,11 +116,10 @@ pub fn SubdirRepo::from_head(&@bit_types.RepoFileSystem, String, String, config?
 pub fn SubdirRepo::fs(Self) -> @bit_vfs.Fs
 pub fn SubdirRepo::is_dirty(Self) -> Bool
 pub fn SubdirRepo::load_workdir(Self, &@bit_types.RepoFileSystem, String) -> Unit
-pub fn SubdirRepo::log(Self, &@bit_types.RepoFileSystem, max_count? : Int) -> Array[SubdirCommit] raise SubdirError
+pub fn SubdirRepo::log(Self, &@bit_types.RepoFileSystem, max_count? : Int32) -> Array[SubdirCommit] raise SubdirError
 pub fn SubdirRepo::path(Self) -> String
 pub fn SubdirRepo::tree_id(Self) -> @bit_object.ObjectId?
 
 // Type aliases
 
 // Traits
-

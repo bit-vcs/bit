@@ -6,10 +6,22 @@ pub(all) struct GrepLineMatch {
 } derive(Eq, Debug)
 
 ///|
+pub extend GrepLineMatch with Eq::{not_equal, equal}
+
+///|
+pub extend GrepLineMatch with Debug::{to_repr}
+
+///|
 pub(all) struct GrepFileMatch {
   path : String
   matches : Array[GrepLineMatch]
 } derive(Eq, Debug)
+
+///|
+pub extend GrepFileMatch with Eq::{not_equal, equal}
+
+///|
+pub extend GrepFileMatch with Debug::{to_repr}
 
 ///|
 fn grep_search_show_string(value : String) -> String {
@@ -48,6 +60,9 @@ pub impl Show for GrepLineMatch with fn output(self, logger) {
 }
 
 ///|
+pub extend GrepLineMatch with Show::{to_string, output}
+
+///|
 pub impl Show for GrepFileMatch with fn output(self, logger) {
   logger.write_string(
     "{path: " +
@@ -57,6 +72,9 @@ pub impl Show for GrepFileMatch with fn output(self, logger) {
     "}",
   )
 }
+
+///|
+pub extend GrepFileMatch with Show::{to_string, output}
 
 ///|
 priv struct GrepBlobSource {

@@ -14,11 +14,20 @@ import {
 pub struct OsFs {
   // private fields
 }
+pub fn OsFs::is_dir(Self, String) -> Bool
+pub fn OsFs::is_file(Self, String) -> Bool
+pub fn OsFs::mkdir_p(Self, String) -> Unit raise @bit_object.GitError
+pub fn OsFs::mtime(Self, String) -> (Int32, Int32) raise @bit_object.GitError
 pub fn OsFs::new() -> Self
+pub fn OsFs::read_file(Self, String) -> Bytes raise @bit_object.GitError
+pub fn OsFs::readdir(Self, String) -> Array[String] raise @bit_object.GitError
+pub fn OsFs::remove_dir(Self, String) -> Unit raise @bit_object.GitError
+pub fn OsFs::remove_file(Self, String) -> Unit raise @bit_object.GitError
+pub fn OsFs::write_file(Self, String, Bytes) -> Unit raise @bit_object.GitError
+pub fn OsFs::write_string(Self, String, String) -> Unit raise @bit_object.GitError
 pub impl @bit_types.FileSystem for OsFs
 pub impl @bit_types.RepoFileSystem for OsFs
 
 // Type aliases
 
 // Traits
-

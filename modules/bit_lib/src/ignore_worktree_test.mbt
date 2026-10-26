@@ -17,7 +17,7 @@ test "ignore: basic ignore and .git skip" {
   fs.write_string("/repo/sub/info.log", "ng")
   fs.mkdir_p("/repo/.git")
   fs.write_string("/repo/.git/config", "[core]\n")
-  let files = list_working_files(fs, "/repo")
+  let files = @bit_lib.list_working_files(fs, "/repo")
   assert_true(files.contains("keep.txt"))
   assert_true(!files.contains("debug.log"))
   assert_true(!files.contains("sub/info.log"))
@@ -32,7 +32,7 @@ test "ignore: negation and dir ignore" {
   fs.write_string("/repo/build/out.txt", "ng")
   fs.write_string("/repo/important.log", "ok")
   fs.write_string("/repo/other.log", "ng")
-  let files = list_working_files(fs, "/repo")
+  let files = @bit_lib.list_working_files(fs, "/repo")
   assert_true(files.contains("important.log"))
   assert_true(!files.contains("other.log"))
   assert_true(!files.contains("build/out.txt"))
@@ -46,7 +46,7 @@ test "ignore: nested gitignore" {
   fs.write_string("/repo/src/.gitignore", "!keep.tmp\n")
   fs.write_string("/repo/src/keep.tmp", "ok")
   fs.write_string("/repo/src/drop.tmp", "ng")
-  let files = list_working_files(fs, "/repo")
+  let files = @bit_lib.list_working_files(fs, "/repo")
   assert_true(files.contains("src/keep.tmp"))
   assert_true(!files.contains("src/drop.tmp"))
 }
@@ -55,6 +55,6 @@ test "ignore: nested gitignore" {
 test "ignore: is_ignored_path" {
   let fs = setup_repo_fs()
   fs.write_string("/repo/.gitignore", "*.log\n")
-  assert_true(is_ignored_path(fs, "/repo", "a.log", false))
-  assert_true(!is_ignored_path(fs, "/repo", "a.txt", false))
+  assert_true(@bit_lib.is_ignored_path(fs, "/repo", "a.log", false))
+  assert_true(!@bit_lib.is_ignored_path(fs, "/repo", "a.txt", false))
 }

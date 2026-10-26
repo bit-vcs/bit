@@ -37,16 +37,15 @@ pub struct AiConflictResolution {
 
 pub struct AiRebaseOptions {
   model : String
-  max_auto_rounds : Int
-  agent_max_steps : Int
+  max_auto_rounds : Int32
+  agent_max_steps : Int32
   use_agent_loop : Bool
   verbose : Bool
   provider : @llm.BoxedProvider?
 }
 pub fn AiRebaseOptions::default() -> Self
-pub fn AiRebaseOptions::new(model? : String, max_auto_rounds? : Int, agent_max_steps? : Int, use_agent_loop? : Bool, verbose? : Bool, provider~ : @llm.BoxedProvider?) -> Self
+pub fn AiRebaseOptions::new(model? : String, max_auto_rounds? : Int32, agent_max_steps? : Int32, use_agent_loop? : Bool, verbose? : Bool, provider~ : @llm.BoxedProvider?) -> Self
 
 // Type aliases
 
 // Traits
-

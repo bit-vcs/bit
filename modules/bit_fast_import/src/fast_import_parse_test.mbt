@@ -3,7 +3,7 @@
 ///|
 test "fast_import_parse_data: byte-count mode" {
   let lines = ["data 5", "hello"]
-  let result = fast_import_parse_data(lines, 0)
+  let result = @bit_fast_import.fast_import_parse_data(lines, 0)
   let content = result.content
   @test.assert_eq(content.length(), 5)
   @test.assert_eq(content[0], b'h')
@@ -18,7 +18,7 @@ test "fast_import_parse_data: byte-count mode" {
 test "fast_import_parse_data: byte-count mode with newline in data" {
   // "data 11\nhello\nworld" — 11 bytes: "hello\nworld"
   let lines = ["data 11", "hello", "world"]
-  let result = fast_import_parse_data(lines, 0)
+  let result = @bit_fast_import.fast_import_parse_data(lines, 0)
   let content = result.content
   @test.assert_eq(content.length(), 11)
   // "hello\nworld"
@@ -30,7 +30,7 @@ test "fast_import_parse_data: byte-count mode with newline in data" {
 ///|
 test "fast_import_parse_data: byte-count zero" {
   let lines = ["data 0"]
-  let result = fast_import_parse_data(lines, 0)
+  let result = @bit_fast_import.fast_import_parse_data(lines, 0)
   @test.assert_eq(result.content.length(), 0)
   @test.assert_eq(result.next_line, 1)
 }
@@ -38,7 +38,7 @@ test "fast_import_parse_data: byte-count zero" {
 ///|
 test "fast_import_parse_data: delimited mode" {
   let lines = ["data <<EOF", "hello", "world", "EOF"]
-  let result = fast_import_parse_data(lines, 0)
+  let result = @bit_fast_import.fast_import_parse_data(lines, 0)
   let content = result.content
   // "hello\nworld"
   @test.assert_eq(content.length(), 11)
@@ -51,7 +51,7 @@ test "fast_import_parse_data: delimited mode" {
 ///|
 test "fast_import_parse_data: delimited mode empty" {
   let lines = ["data <<EOF", "EOF"]
-  let result = fast_import_parse_data(lines, 0)
+  let result = @bit_fast_import.fast_import_parse_data(lines, 0)
   @test.assert_eq(result.content.length(), 0)
   @test.assert_eq(result.next_line, 2)
 }
@@ -59,7 +59,7 @@ test "fast_import_parse_data: delimited mode empty" {
 ///|
 test "fast_import_parse_data: not a data line" {
   let lines = ["blob"]
-  let result = fast_import_parse_data(lines, 0)
+  let result = @bit_fast_import.fast_import_parse_data(lines, 0)
   @test.assert_eq(result.content.length(), 0)
   @test.assert_eq(result.next_line, 1)
 }
@@ -67,7 +67,7 @@ test "fast_import_parse_data: not a data line" {
 ///|
 test "fast_import_parse_data: trailing blank line consumed" {
   let lines = ["data 5", "hello", "", "next"]
-  let result = fast_import_parse_data(lines, 0)
+  let result = @bit_fast_import.fast_import_parse_data(lines, 0)
   @test.assert_eq(result.content.length(), 5)
   // Should consume trailing blank line
   @test.assert_eq(result.next_line, 3)
@@ -75,7 +75,7 @@ test "fast_import_parse_data: trailing blank line consumed" {
 
 ///|
 test "fast_import_parse_ident: full author line" {
-  let result = fast_import_parse_ident(
+  let result = @bit_fast_import.fast_import_parse_ident(
     "Test User <test@example.com> 1000 +0000",
   )
   assert_true(result is Some(_))
@@ -87,7 +87,7 @@ test "fast_import_parse_ident: full author line" {
 
 ///|
 test "fast_import_parse_ident: negative timezone" {
-  let result = fast_import_parse_ident(
+  let result = @bit_fast_import.fast_import_parse_ident(
     "Author Name <author@example.com> 1700000000 -0500",
   )
   assert_true(result is Some(_))
@@ -99,7 +99,7 @@ test "fast_import_parse_ident: negative timezone" {
 
 ///|
 test "fast_import_parse_ident: timestamp only no tz" {
-  let result = fast_import_parse_ident("Name <email> 42")
+  let result = @bit_fast_import.fast_import_parse_ident("Name <email> 42")
   assert_true(result is Some(_))
   let id = result.unwrap()
   @test.assert_eq(id.ident, "Name <email>")
@@ -109,17 +109,17 @@ test "fast_import_parse_ident: timestamp only no tz" {
 
 ///|
 test "fast_import_parse_ident: no angle bracket" {
-  let result = fast_import_parse_ident("no brackets here")
+  let result = @bit_fast_import.fast_import_parse_ident("no brackets here")
   assert_true(result is None)
 }
 
 ///|
 test "fast_import_parse_file_op: modify" {
-  let result = fast_import_parse_file_op("M 100644 :1 path/file.txt")
+  let result = @bit_fast_import.fast_import_parse_file_op("M 100644 :1 path/file.txt")
   @test.assert_eq(
     result,
     Some(
-      FastImportFileOp::Modify(
+      @bit_fast_import.FastImportFileOp::Modify(
         mode="100644",
         dataref=":1",
         path="path/file.txt",
@@ -130,13 +130,13 @@ test "fast_import_parse_file_op: modify" {
 
 ///|
 test "fast_import_parse_file_op: modify with hex sha" {
-  let result = fast_import_parse_file_op(
+  let result = @bit_fast_import.fast_import_parse_file_op(
     "M 100755 da39a3ee5e6b4b0d3255bfef95601890afd80709 script.sh",
   )
   @test.assert_eq(
     result,
     Some(
-      FastImportFileOp::Modify(
+      @bit_fast_import.FastImportFileOp::Modify(
         mode="100755",
         dataref="da39a3ee5e6b4b0d3255bfef95601890afd80709",
         path="script.sh",
@@ -147,11 +147,11 @@ test "fast_import_parse_file_op: modify with hex sha" {
 
 ///|
 test "fast_import_parse_file_op: modify inline" {
-  let result = fast_import_parse_file_op("M 100644 inline README.md")
+  let result = @bit_fast_import.fast_import_parse_file_op("M 100644 inline README.md")
   @test.assert_eq(
     result,
     Some(
-      FastImportFileOp::Modify(
+      @bit_fast_import.FastImportFileOp::Modify(
         mode="100644",
         dataref="inline",
         path="README.md",
@@ -162,63 +162,63 @@ test "fast_import_parse_file_op: modify inline" {
 
 ///|
 test "fast_import_parse_file_op: delete" {
-  let result = fast_import_parse_file_op("D path.txt")
-  @test.assert_eq(result, Some(FastImportFileOp::Delete(path="path.txt")))
+  let result = @bit_fast_import.fast_import_parse_file_op("D path.txt")
+  @test.assert_eq(result, Some(@bit_fast_import.FastImportFileOp::Delete(path="path.txt")))
 }
 
 ///|
 test "fast_import_parse_file_op: deleteall" {
-  let result = fast_import_parse_file_op("deleteall")
-  @test.assert_eq(result, Some(FastImportFileOp::DeleteAll))
+  let result = @bit_fast_import.fast_import_parse_file_op("deleteall")
+  @test.assert_eq(result, Some(@bit_fast_import.FastImportFileOp::DeleteAll))
 }
 
 ///|
 test "fast_import_parse_file_op: rename" {
-  let result = fast_import_parse_file_op("R old/path.txt new/path.txt")
+  let result = @bit_fast_import.fast_import_parse_file_op("R old/path.txt new/path.txt")
   @test.assert_eq(
     result,
     Some(
-      FastImportFileOp::Rename(old_path="old/path.txt", new_path="new/path.txt"),
+      @bit_fast_import.FastImportFileOp::Rename(old_path="old/path.txt", new_path="new/path.txt"),
     ),
   )
 }
 
 ///|
 test "fast_import_parse_file_op: copy" {
-  let result = fast_import_parse_file_op("C src/file.txt dst/file.txt")
+  let result = @bit_fast_import.fast_import_parse_file_op("C src/file.txt dst/file.txt")
   @test.assert_eq(
     result,
     Some(
-      FastImportFileOp::Copy(old_path="src/file.txt", new_path="dst/file.txt"),
+      @bit_fast_import.FastImportFileOp::Copy(old_path="src/file.txt", new_path="dst/file.txt"),
     ),
   )
 }
 
 ///|
 test "fast_import_parse_file_op: unrecognized" {
-  let result = fast_import_parse_file_op("commit refs/heads/main")
+  let result = @bit_fast_import.fast_import_parse_file_op("commit refs/heads/main")
   assert_true(result is None)
 }
 
 ///|
 test "fast_import_parse_file_op: quoted path" {
-  let result = fast_import_parse_file_op("D \"path with spaces.txt\"")
+  let result = @bit_fast_import.fast_import_parse_file_op("D \"path with spaces.txt\"")
   @test.assert_eq(
     result,
-    Some(FastImportFileOp::Delete(path="path with spaces.txt")),
+    Some(@bit_fast_import.FastImportFileOp::Delete(path="path with spaces.txt")),
   )
 }
 
 ///|
 test "fast_import_parse_dataref: mark reference" {
-  let (mark, hex) = fast_import_parse_dataref(":42")
+  let (mark, hex) = @bit_fast_import.fast_import_parse_dataref(":42")
   @test.assert_eq(mark, 42)
   @test.assert_eq(hex, "")
 }
 
 ///|
 test "fast_import_parse_dataref: hex sha" {
-  let (mark, hex) = fast_import_parse_dataref(
+  let (mark, hex) = @bit_fast_import.fast_import_parse_dataref(
     "da39a3ee5e6b4b0d3255bfef95601890afd80709",
   )
   @test.assert_eq(mark, 0)
@@ -228,7 +228,7 @@ test "fast_import_parse_dataref: hex sha" {
 ///|
 test "fast_import_parse_marks: parse marks file" {
   let content = ":1 0000000000000000000000000000000000000001\n:2 0000000000000000000000000000000000000002\n"
-  let marks = fast_import_parse_marks(content)
+  let marks = @bit_fast_import.fast_import_parse_marks(content)
   @test.assert_eq(marks.length(), 2)
   @test.assert_eq(marks[0].0, 1)
   @test.assert_eq(marks[0].1, "0000000000000000000000000000000000000001")
@@ -239,61 +239,61 @@ test "fast_import_parse_marks: parse marks file" {
 ///|
 test "fast_import_parse_marks: skip invalid lines" {
   let content = "invalid line\n:0 bad\n:1 0000000000000000000000000000000000000001\n"
-  let marks = fast_import_parse_marks(content)
+  let marks = @bit_fast_import.fast_import_parse_marks(content)
   @test.assert_eq(marks.length(), 1)
   @test.assert_eq(marks[0].0, 1)
 }
 
 ///|
 test "fast_import_parse_trim: basic" {
-  @test.assert_eq(fast_import_parse_trim("  hello  "), "hello")
-  @test.assert_eq(fast_import_parse_trim("hello"), "hello")
-  @test.assert_eq(fast_import_parse_trim("\n\thello\r\n"), "hello")
-  @test.assert_eq(fast_import_parse_trim(""), "")
+  @test.assert_eq(@bit_fast_import.fast_import_parse_trim("  hello  "), "hello")
+  @test.assert_eq(@bit_fast_import.fast_import_parse_trim("hello"), "hello")
+  @test.assert_eq(@bit_fast_import.fast_import_parse_trim("\n\thello\r\n"), "hello")
+  @test.assert_eq(@bit_fast_import.fast_import_parse_trim(""), "")
 }
 
 ///|
 test "fast_import_parse_unquote_path: unquoted" {
-  @test.assert_eq(fast_import_parse_unquote_path("simple/path"), "simple/path")
+  @test.assert_eq(@bit_fast_import.fast_import_parse_unquote_path("simple/path"), "simple/path")
 }
 
 ///|
 test "fast_import_parse_unquote_path: quoted" {
   @test.assert_eq(
-    fast_import_parse_unquote_path("\"path/with spaces\""),
+    @bit_fast_import.fast_import_parse_unquote_path("\"path/with spaces\""),
     "path/with spaces",
   )
 }
 
 ///|
 test "fast_import_parse_unquote_path: escape sequences" {
-  @test.assert_eq(fast_import_parse_unquote_path("\"a\\nb\""), "a\nb")
-  @test.assert_eq(fast_import_parse_unquote_path("\"a\\tb\""), "a\tb")
-  @test.assert_eq(fast_import_parse_unquote_path("\"a\\\\b\""), "a\\b")
-  @test.assert_eq(fast_import_parse_unquote_path("\"a\\\"b\""), "a\"b")
+  @test.assert_eq(@bit_fast_import.fast_import_parse_unquote_path("\"a\\nb\""), "a\nb")
+  @test.assert_eq(@bit_fast_import.fast_import_parse_unquote_path("\"a\\tb\""), "a\tb")
+  @test.assert_eq(@bit_fast_import.fast_import_parse_unquote_path("\"a\\\\b\""), "a\\b")
+  @test.assert_eq(@bit_fast_import.fast_import_parse_unquote_path("\"a\\\"b\""), "a\"b")
 }
 
 ///|
 test "fast_import_parse_split_two_paths: unquoted" {
-  let result = fast_import_parse_split_two_paths("old.txt new.txt")
+  let result = @bit_fast_import.fast_import_parse_split_two_paths("old.txt new.txt")
   @test.assert_eq(result, Some(("old.txt", "new.txt")))
 }
 
 ///|
 test "fast_import_parse_split_two_paths: first quoted" {
-  let result = fast_import_parse_split_two_paths("\"old file.txt\" new.txt")
+  let result = @bit_fast_import.fast_import_parse_split_two_paths("\"old file.txt\" new.txt")
   @test.assert_eq(result, Some(("old file.txt", "new.txt")))
 }
 
 ///|
 test "fast_import_parse_split_two_paths: no space" {
-  let result = fast_import_parse_split_two_paths("single")
+  let result = @bit_fast_import.fast_import_parse_split_two_paths("single")
   assert_true(result is None)
 }
 
 ///|
 test "fast_import_parse_string_byte_count: ascii" {
-  @test.assert_eq(fast_import_parse_string_byte_count("hello"), 5)
-  @test.assert_eq(fast_import_parse_string_byte_count(""), 0)
-  @test.assert_eq(fast_import_parse_string_byte_count("ab cd"), 5)
+  @test.assert_eq(@bit_fast_import.fast_import_parse_string_byte_count("hello"), 5)
+  @test.assert_eq(@bit_fast_import.fast_import_parse_string_byte_count(""), 0)
+  @test.assert_eq(@bit_fast_import.fast_import_parse_string_byte_count("ab cd"), 5)
 }

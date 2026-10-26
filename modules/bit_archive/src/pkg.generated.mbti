@@ -4,15 +4,15 @@ package "mizchi/bit_archive"
 // Values
 pub fn tar_emit_parent_dirs(Array[Byte], String, Int64, Map[String, Bool]) -> Unit
 
-pub fn tar_format_octal(Int64, Int) -> String
+pub fn tar_format_octal(Int64, Int32) -> String
 
-pub fn tar_make_header(String, Int, Int, Int64, Byte, String) -> FixedArray[Byte]
+pub fn tar_make_header(String, Int32, Int32, Int64, Byte, String) -> FixedArray[Byte]
 
 pub fn tar_parse_committer_timestamp(Bytes) -> Int64
 
 pub fn tar_split_path(String) -> (String, String)
 
-pub fn tar_write_string(FixedArray[Byte], Int, String, Int) -> Unit
+pub fn tar_write_string(FixedArray[Byte], Int32, String, Int32) -> Unit
 
 // Errors
 
@@ -21,4 +21,3 @@ pub fn tar_write_string(FixedArray[Byte], Int, String, Int) -> Unit
 // Type aliases
 
 // Traits
-

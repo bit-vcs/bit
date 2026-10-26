@@ -40,7 +40,7 @@ fn bench_index_ensure_repo(root : String, file_count : Int) -> Unit {
   bench_index_ensure_dir(bench_index_root_base)
   bench_index_ensure_dir(root)
   let fs = @osfs.OsFs::new()
-  init_repo(fs, root) catch {
+  @bit_lib.init_repo(fs, root) catch {
     _ => ()
   }
   let paths : Array[String] = []
@@ -51,10 +51,10 @@ fn bench_index_ensure_repo(root : String, file_count : Int) -> Unit {
     }
     paths.push("file_\{i}.txt")
   }
-  add_paths(fs, fs, root, paths) catch {
+  @bit_lib.add_paths(fs, fs, root, paths) catch {
     _ => ()
   }
-  ignore(commit(fs, fs, root, "init", "Author <a@b.com>", 1700000000L)) catch {
+  ignore(@bit_lib.commit(fs, fs, root, "init", "Author <a@b.com>", 1700000000L)) catch {
     _ => ()
   }
   @fs.write_string_to_file(marker, "ok\n") catch {
@@ -78,7 +78,7 @@ test "bench read_index_entries small" (b : @bench.T) {
   let fs = @osfs.OsFs::new()
   let git_dir = bench_index_join_path(bench_index_small_root, ".git")
   b.bench(fn() {
-    let entries = try! read_index_entries(fs, git_dir)
+    let entries = try! @bit_lib.read_index_entries(fs, git_dir)
     b.keep(entries.length())
   })
 }
@@ -89,7 +89,7 @@ test "bench read_index_entries large" (b : @bench.T) {
   let fs = @osfs.OsFs::new()
   let git_dir = bench_index_join_path(bench_index_large_root, ".git")
   b.bench(fn() {
-    let entries = try! read_index_entries(fs, git_dir)
+    let entries = try! @bit_lib.read_index_entries(fs, git_dir)
     b.keep(entries.length())
   })
 }
@@ -99,9 +99,9 @@ test "bench diff_index small" (b : @bench.T) {
   bench_index_ensure_repo(bench_index_small_root, 200)
   let fs = @osfs.OsFs::new()
   let git_dir = bench_index_join_path(bench_index_small_root, ".git")
-  let db = ObjectDb::load_lazy(fs, git_dir)
+  let db = @bit_lib.ObjectDb::load_lazy(fs, git_dir)
   b.bench(fn() {
-    let diffs = try! diff_index(fs, bench_index_small_root, db~)
+    let diffs = try! @bit_lib.diff_index(fs, bench_index_small_root, db~)
     b.keep(diffs.length())
   })
 }
@@ -111,9 +111,9 @@ test "bench diff_index large" (b : @bench.T) {
   bench_index_ensure_repo(bench_index_large_root, 2000)
   let fs = @osfs.OsFs::new()
   let git_dir = bench_index_join_path(bench_index_large_root, ".git")
-  let db = ObjectDb::load_lazy(fs, git_dir)
+  let db = @bit_lib.ObjectDb::load_lazy(fs, git_dir)
   b.bench(fn() {
-    let diffs = try! diff_index(fs, bench_index_large_root, db~)
+    let diffs = try! @bit_lib.diff_index(fs, bench_index_large_root, db~)
     b.keep(diffs.length())
   })
 }

@@ -5,6 +5,6 @@ async test "worktree package: status sees untracked file" {
     _ => ()
   }
   fs.write_string("/repo/a.txt", "hello\n")
-  let st = status(fs, "/repo")
+  let st = @bit_worktree.status(fs, "/repo")
   assert_true(st.untracked.contains("a.txt"))
 }

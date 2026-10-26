@@ -4,7 +4,7 @@ version = "0.48.0"
 
 import {
   "mizchi/bit_hash@0.48.0",
-  "mizchi/zlib@0.4.9",
+  "mizchi/zlib@0.4.10",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"

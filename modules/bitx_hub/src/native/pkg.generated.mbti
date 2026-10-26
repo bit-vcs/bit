@@ -13,11 +13,11 @@ pub async fn github_check_repo_ownership(String) -> Bool raise @bit_object.GitEr
 
 pub async fn github_check_repo_push_permission(String) -> Bool raise @bit_object.GitError
 
-pub async fn github_create_comment(String, Int, String) -> @bitx_hub.GhComment raise @bit_object.GitError
+pub async fn github_create_comment(String, Int32, String) -> @bitx_hub.GhComment raise @bit_object.GitError
 
 pub async fn github_create_issue(String, String, String, Array[String], Array[String]) -> @bitx_hub.GhIssue raise @bit_object.GitError
 
-pub async fn github_delete_comment(String, Int) -> Unit raise @bit_object.GitError
+pub async fn github_delete_comment(String, Int32) -> Unit raise @bit_object.GitError
 
 pub fn github_detect_method() -> String
 
@@ -27,7 +27,7 @@ pub fn github_has_gh_cli() -> Bool
 
 pub fn github_has_token() -> Bool
 
-pub async fn github_list_comments(String, Int, since? : String) -> Array[@bitx_hub.GhComment] raise @bit_object.GitError
+pub async fn github_list_comments(String, Int32, since? : String) -> Array[@bitx_hub.GhComment] raise @bit_object.GitError
 
 pub async fn github_list_issues(String, since? : String, state? : String) -> Array[@bitx_hub.GhIssue] raise @bit_object.GitError
 
@@ -41,17 +41,17 @@ pub fn github_sync_plan_push(@bitx_hub.Hub, &@bit_lib.ObjectStore, String) -> Ar
 
 pub fn github_sync_plan_push_prs(@bitx_hub.Hub, &@bit_lib.ObjectStore, String) -> Array[SyncPushChange]
 
-pub async fn github_sync_pull_comments(@bitx_hub.Hub, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, Int, String) -> CommentSyncResult raise @bit_object.GitError
+pub async fn github_sync_pull_comments(@bitx_hub.Hub, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, Int32, String) -> CommentSyncResult raise @bit_object.GitError
 
 pub async fn github_sync_pull_issues(@bitx_hub.Hub, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, String) -> SyncPullResult raise @bit_object.GitError
 
 pub async fn github_sync_pull_prs(@bitx_hub.Hub, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, String) -> SyncPullResult raise @bit_object.GitError
 
-pub async fn github_sync_push_comments(@bitx_hub.Hub, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, Int, String, Bool) -> CommentSyncResult raise @bit_object.GitError
+pub async fn github_sync_push_comments(@bitx_hub.Hub, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, Int32, String, Bool) -> CommentSyncResult raise @bit_object.GitError
 
-pub async fn github_update_comment(String, Int, String) -> @bitx_hub.GhComment raise @bit_object.GitError
+pub async fn github_update_comment(String, Int32, String) -> @bitx_hub.GhComment raise @bit_object.GitError
 
-pub async fn github_update_issue(String, Int, title? : String, body? : String, state? : String, labels? : Array[String], assignees? : Array[String]) -> @bitx_hub.GhIssue raise @bit_object.GitError
+pub async fn github_update_issue(String, Int32, title? : String, body? : String, state? : String, labels? : Array[String], assignees? : Array[String]) -> @bitx_hub.GhIssue raise @bit_object.GitError
 
 pub async fn hub_fetch(@bitx_hub.Hub, &@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, signing_key~ : String?, require_signed~ : Bool?, auth_token~ : String?, conflict_policy~ : @bitx_hub.RecordMergePolicy?) -> @bitx_hub.PrSyncResult raise @bit_object.GitError
 
@@ -61,7 +61,7 @@ pub async fn relay_list_clone_peers(String, auth_token~ : String?, include_self?
 
 pub async fn relay_poll_claims(String, auth_token~ : String?) -> Array[@bitx_hub.ClaimMessage] raise @bit_object.GitError
 
-pub async fn relay_poll_claims_after(String, Int, Int, auth_token~ : String?) -> (Int, Array[@bitx_hub.ClaimMessage]) raise @bit_object.GitError
+pub async fn relay_poll_claims_after(String, Int32, Int32, auth_token~ : String?) -> (Int32, Array[@bitx_hub.ClaimMessage]) raise @bit_object.GitError
 
 pub async fn relay_publish_claim(String, @bitx_hub.ClaimMessage, auth_token~ : String?) -> Bool raise @bit_object.GitError
 
@@ -75,20 +75,20 @@ pub async fn relay_watch_claims_ws(String, (@bitx_hub.ClaimMessage) -> Unit, aut
 
 // Types and methods
 pub struct CommentSyncResult {
-  created : Int
-  updated : Int
-  deleted : Int
+  created : Int32
+  updated : Int32
+  deleted : Int32
   errors : Array[String]
 }
-pub fn CommentSyncResult::created(Self) -> Int
-pub fn CommentSyncResult::deleted(Self) -> Int
+pub fn CommentSyncResult::created(Self) -> Int32
+pub fn CommentSyncResult::deleted(Self) -> Int32
 pub fn CommentSyncResult::errors(Self) -> Array[String]
-pub fn CommentSyncResult::updated(Self) -> Int
+pub fn CommentSyncResult::updated(Self) -> Int32
 
 pub struct SyncPullResult {
-  created : Int
-  updated : Int
-  skipped : Int
+  created : Int32
+  updated : Int32
+  skipped : Int32
   conflicts : Array[String]
 }
 
@@ -96,7 +96,7 @@ pub struct SyncPushChange {
   action : String
   local_id : String
   title : String
-  remote_number : Int
+  remote_number : Int32
   state_change : String
   title_change : String
   labels_change : String
@@ -104,12 +104,11 @@ pub struct SyncPushChange {
 }
 
 pub struct SyncPushResult {
-  created : Int
-  updated : Int
+  created : Int32
+  updated : Int32
   errors : Array[String]
 }
 
 // Type aliases
 
 // Traits
-

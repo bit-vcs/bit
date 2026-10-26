@@ -41,7 +41,7 @@ fn assert_bytes_equal(actual : Bytes, expected : Bytes) -> Unit raise {
 fn assert_pack_idx_matches(pack_path : String, idx_path : String) -> Unit raise {
   let pack = read_fixture_bytes(pack_path)
   let expected = read_fixture_bytes(idx_path)
-  let actual = build_pack_index(pack)
+  let actual = @bit_pack.build_pack_index(pack)
   assert_bytes_equal(actual, expected)
 }
 

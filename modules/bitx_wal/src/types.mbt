@@ -37,6 +37,9 @@ pub(all) struct WalEntry {
 } derive(Eq)
 
 ///|
+pub extend WalEntry with Eq::{not_equal, equal}
+
+///|
 pub fn WalEntry::new(
   kind : String,
   data : String,
@@ -62,6 +65,9 @@ pub(all) struct WalImage {
   /// the same conditional read that tells it the log moved.
   settings : String
 } derive(Eq)
+
+///|
+pub extend WalImage with Eq::{not_equal, equal}
 
 ///|
 pub fn WalImage::empty() -> WalImage {
@@ -123,12 +129,18 @@ pub(all) enum CommitOutcome {
 } derive(Eq)
 
 ///|
+pub extend CommitOutcome with Eq::{not_equal, equal}
+
+///|
 pub impl Show for CommitOutcome with fn output(self, logger) {
   match self {
     Committed(seq) => logger.write_string("Committed(\{seq})")
     Contended => logger.write_string("Contended")
   }
 }
+
+///|
+pub extend CommitOutcome with Show::{to_string, output}
 
 ///|
 /// How hard `append` tries before reporting contention. Each attempt costs a

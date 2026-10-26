@@ -1,7 +1,7 @@
 ///|
 test "object-db: reuses a decoded packed object without rereading its pack" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
   let obj = @bit.PackObject::new(
@@ -28,7 +28,7 @@ test "object-db: reuses a decoded packed object without rereading its pack" {
     packed_objects,
   )
 
-  let db = ObjectDb::load(fs, "/repo/.git")
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git")
   let id = packed_objects[0].id
   assert_true(db.get(fs, id) is Some(_))
   db.pack_cache.clear()
@@ -40,7 +40,7 @@ test "object-db: reuses a decoded packed object without rereading its pack" {
 ///|
 test "object-db: caches a decoded delta base by pack location" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
   let base = Bytes::from_array(FixedArray::makei(1024, fn(_) { b'a' }))
@@ -77,7 +77,7 @@ test "object-db: caches a decoded delta base by pack location" {
     pack,
     packed_objects,
   )
-  let db = ObjectDb::load(fs, "/repo/.git")
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git")
 
   assert_true(db.get(fs, id) is Some(_))
   assert_true(db.decoded_cache.length() >= 2)

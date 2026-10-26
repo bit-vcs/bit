@@ -9,11 +9,23 @@ pub(all) enum PrState {
 } derive(Eq, Debug)
 
 ///|
+pub extend PrState with Eq::{not_equal, equal}
+
+///|
+pub extend PrState with Debug::{to_repr}
+
+///|
 /// State of an Issue
 pub(all) enum IssueState {
   Open
   Closed
 } derive(Eq, Debug)
+
+///|
+pub extend IssueState with Eq::{not_equal, equal}
+
+///|
+pub extend IssueState with Debug::{to_repr}
 
 ///|
 /// Unified state of an Issue/PullRequest work item
@@ -24,11 +36,23 @@ pub(all) enum WorkItemState {
 } derive(Eq, Debug)
 
 ///|
+pub extend WorkItemState with Eq::{not_equal, equal}
+
+///|
+pub extend WorkItemState with Debug::{to_repr}
+
+///|
 /// Work item kind
 pub(all) enum WorkItemKind {
   Issue
   PullRequest
 } derive(Eq, Debug)
+
+///|
+pub extend WorkItemKind with Eq::{not_equal, equal}
+
+///|
+pub extend WorkItemKind with Debug::{to_repr}
 
 ///|
 pub fn IssueState::to_string(self : IssueState) -> String {
@@ -42,6 +66,9 @@ pub fn IssueState::to_string(self : IssueState) -> String {
 pub impl Show for IssueState with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
+
+///|
+pub extend IssueState with Show::{output}
 
 ///|
 pub fn PrState::to_string(self : PrState) -> String {
@@ -58,6 +85,9 @@ pub impl Show for PrState with fn output(self, logger) {
 }
 
 ///|
+pub extend PrState with Show::{output}
+
+///|
 pub fn WorkItemState::to_string(self : WorkItemState) -> String {
   match self {
     Open => "open"
@@ -72,6 +102,9 @@ pub impl Show for WorkItemState with fn output(self, logger) {
 }
 
 ///|
+pub extend WorkItemState with Show::{output}
+
+///|
 pub fn WorkItemKind::to_string(self : WorkItemKind) -> String {
   match self {
     Issue => "issue"
@@ -83,6 +116,9 @@ pub fn WorkItemKind::to_string(self : WorkItemKind) -> String {
 pub impl Show for WorkItemKind with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
+
+///|
+pub extend WorkItemKind with Show::{output}
 
 ///|
 pub fn PrState::to_work_item_state(self : PrState) -> WorkItemState {
@@ -646,6 +682,12 @@ pub(all) enum ReviewVerdict {
 } derive(Eq, Debug)
 
 ///|
+pub extend ReviewVerdict with Eq::{not_equal, equal}
+
+///|
+pub extend ReviewVerdict with Debug::{to_repr}
+
+///|
 pub fn ReviewVerdict::to_string(self : ReviewVerdict) -> String {
   match self {
     Approved => "approved"
@@ -658,6 +700,9 @@ pub fn ReviewVerdict::to_string(self : ReviewVerdict) -> String {
 pub impl Show for ReviewVerdict with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
+
+///|
+pub extend ReviewVerdict with Show::{output}
 
 ///|
 /// Review on a Pull Request
@@ -727,6 +772,12 @@ pub(all) suberror PrError {
   InvalidState(String)
   MergeConflict(Array[String])
 } derive(Debug, Eq)
+
+///|
+pub extend PrError with Debug::{to_repr}
+
+///|
+pub extend PrError with Eq::{not_equal, equal}
 
 ///|
 /// Issue data

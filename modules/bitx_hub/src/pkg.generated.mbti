@@ -15,7 +15,7 @@ pub fn claim_topic() -> String
 
 pub fn classify_record_trigger(HubRecord) -> RecordTriggerClass
 
-pub fn compare_vector_clocks(Map[String, Int64], Map[String, Int64]) -> Int
+pub fn compare_vector_clocks(Map[String, Int64], Map[String, Int64]) -> Int32
 
 pub fn default_record_merge_policy() -> RecordMergePolicy
 
@@ -124,12 +124,19 @@ pub(all) suberror PrError {
   InvalidState(String)
   MergeConflict(Array[String])
 } derive(Eq, @debug.Debug)
+pub fn PrError::equal(Self, Self) -> Bool
+pub fn PrError::not_equal(Self, Self) -> Bool
+pub fn PrError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 pub(all) enum ClaimAction {
   Claim
   Unclaim
 } derive(Eq, @debug.Debug)
+pub fn ClaimAction::equal(Self, Self) -> Bool
+pub fn ClaimAction::not_equal(Self, Self) -> Bool
+pub fn ClaimAction::output(Self, &Logger) -> Unit
+pub fn ClaimAction::to_repr(Self) -> @debug.Repr
 pub fn ClaimAction::to_string(Self) -> String
 pub impl Show for ClaimAction
 
@@ -141,15 +148,20 @@ pub struct ClaimMessage {
 } derive(Eq, @debug.Debug)
 pub fn ClaimMessage::action(Self) -> ClaimAction
 pub fn ClaimMessage::claimer(Self) -> String
-pub fn ClaimMessage::is_stale(Self, Int64, threshold_hours? : Int) -> Bool
+pub fn ClaimMessage::equal(Self, Self) -> Bool
+pub fn ClaimMessage::is_stale(Self, Int64, threshold_hours? : Int32) -> Bool
 pub fn ClaimMessage::issue_id(Self) -> String
 pub fn ClaimMessage::new(String, ClaimAction, String, Int64) -> Self
+pub fn ClaimMessage::not_equal(Self, Self) -> Bool
+pub fn ClaimMessage::output(Self, &Logger) -> Unit
 pub fn ClaimMessage::timestamp(Self) -> Int64
 pub fn ClaimMessage::to_json(Self) -> Json
+pub fn ClaimMessage::to_repr(Self) -> @debug.Repr
+pub fn ClaimMessage::to_string(Self) -> String
 pub impl Show for ClaimMessage
 
 pub struct GhComment {
-  id : Int
+  id : Int32
   node_id : String
   body : String
   user : String
@@ -159,7 +171,7 @@ pub struct GhComment {
 pub fn GhComment::from_json(Map[String, Json]) -> Self
 
 pub struct GhIssue {
-  number : Int
+  number : Int32
   node_id : String
   title : String
   body : String
@@ -173,7 +185,7 @@ pub struct GhIssue {
 pub fn GhIssue::from_json(Map[String, Json]) -> Self
 
 pub struct GhPullRequest {
-  number : Int
+  number : Int32
   node_id : String
   title : String
   body : String
@@ -193,7 +205,7 @@ pub fn GhPullRequest::from_json(Map[String, Json]) -> Self
 pub struct Hub {
   mut store : HubStore
 }
-pub fn Hub::add_comment(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, reply_to? : String?, file_path? : String?, line_number? : Int?, commit_id? : @bit_object.ObjectId?) -> PrComment raise @bit_object.GitError
+pub fn Hub::add_comment(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, reply_to? : String?, file_path? : String?, line_number? : Int32?, commit_id? : @bit_object.ObjectId?) -> PrComment raise @bit_object.GitError
 pub fn Hub::add_dep(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String) -> Unit raise @bit_object.GitError
 pub fn Hub::add_issue_comment(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, reply_to? : String?) -> IssueComment raise @bit_object.GitError
 pub fn Hub::add_note(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, @bit_object.ObjectId, String, String, Int64, ns? : String) -> Note raise @bit_object.GitError
@@ -207,7 +219,7 @@ pub fn Hub::create_issue(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_
 pub fn Hub::create_pr(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?) -> PullRequest raise @bit_object.GitError
 pub fn Hub::delete_issue_comment(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String) -> Unit raise @bit_object.GitError
 pub fn Hub::find_canonical_node(Self, &@bit_lib.ObjectStore) -> String?
-pub fn Hub::find_sync_link_by_remote(Self, &@bit_lib.ObjectStore, String, String, Int) -> SyncLink?
+pub fn Hub::find_sync_link_by_remote(Self, &@bit_lib.ObjectStore, String, String, Int32) -> SyncLink?
 pub fn Hub::get_issue(Self, &@bit_lib.ObjectStore, String) -> Issue?
 pub fn Hub::get_note(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, @bit_object.ObjectId, ns? : String) -> Note? raise @bit_object.GitError
 pub fn Hub::get_pr(Self, &@bit_lib.ObjectStore, String) -> PullRequest?
@@ -236,7 +248,7 @@ pub fn Hub::list_work_items(Self, &@bit_lib.ObjectStore, state? : WorkItemState?
 pub fn Hub::load(&@bit_lib.ObjectStore, &@bit_lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @bit_object.GitError
 pub fn Hub::merge_pr(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, strategy? : PrMergeStrategy) -> PrMergeResult raise @bit_object.GitError
 pub fn Hub::propose_pr(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?, closes_issues? : Array[String]) -> PullRequest raise @bit_object.GitError
-pub fn Hub::publish_node_heartbeat(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, commit_count? : Int, main_tip? : String) -> Unit raise @bit_object.GitError
+pub fn Hub::publish_node_heartbeat(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, commit_count? : Int32, main_tip? : String) -> Unit raise @bit_object.GitError
 pub fn Hub::put_sync_link(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, SyncLink) -> Unit raise @bit_object.GitError
 pub fn Hub::record_pr_workflow(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, PrWorkflowStatus, String, String, txn_id? : String?, summary? : String) -> PrWorkflowResult raise @bit_object.GitError
 pub fn Hub::reload_store(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore) -> Unit raise @bit_object.GitError
@@ -250,7 +262,7 @@ pub fn Hub::update_issue_comment(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore
 pub fn Hub::update_pr(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, title? : String?, body? : String?, labels? : Array[String]?) -> PullRequest raise @bit_object.GitError
 
 pub struct HubRecord {
-  version : Int
+  version : Int32
   key : String
   kind : String
   clock : Map[String, Int64]
@@ -260,7 +272,7 @@ pub struct HubRecord {
   signature : String?
   payload : String
 }
-pub fn HubRecord::new(String, String, String, String, Int64, clock? : Map[String, Int64], deleted? : Bool, version? : Int, signature? : String?) -> Self
+pub fn HubRecord::new(String, String, String, String, Int64, clock? : Map[String, Int64], deleted? : Bool, version? : Int32, signature? : String?) -> Self
 pub fn HubRecord::serialize(Self) -> String
 
 pub struct HubStore {
@@ -280,12 +292,12 @@ pub fn HubStore::require_signed(Self) -> Bool
 pub fn HubStore::signing_key(Self) -> String?
 
 pub struct ImportStats {
-  created : Int
-  updated : Int
+  created : Int32
+  updated : Int32
 }
-pub fn ImportStats::created(Self) -> Int
-pub fn ImportStats::new(Int, Int) -> Self
-pub fn ImportStats::updated(Self) -> Int
+pub fn ImportStats::created(Self) -> Int32
+pub fn ImportStats::new(Int32, Int32) -> Self
+pub fn ImportStats::updated(Self) -> Int32
 
 pub struct Issue {
   id : String
@@ -341,13 +353,17 @@ pub(all) enum IssueState {
   Open
   Closed
 } derive(Eq, @debug.Debug)
+pub fn IssueState::equal(Self, Self) -> Bool
+pub fn IssueState::not_equal(Self, Self) -> Bool
+pub fn IssueState::output(Self, &Logger) -> Unit
+pub fn IssueState::to_repr(Self) -> @debug.Repr
 pub fn IssueState::to_string(Self) -> String
 pub fn IssueState::to_work_item_state(Self) -> WorkItemState
 pub impl Show for IssueState
 
 pub struct NodeHeartbeat {
   node_id : String
-  commit_count : Int
+  commit_count : Int32
   main_tip : String
   timestamp : Int64
   clock : Map[String, Int64]
@@ -377,7 +393,7 @@ pub struct PrComment {
   created_at : Int64
   reply_to : String?
   file_path : String?
-  line_number : Int?
+  line_number : Int32?
   commit_id : @bit_object.ObjectId?
 }
 pub fn PrComment::author(Self) -> String
@@ -386,23 +402,23 @@ pub fn PrComment::commit_id(Self) -> @bit_object.ObjectId?
 pub fn PrComment::created_at(Self) -> Int64
 pub fn PrComment::file_path(Self) -> String?
 pub fn PrComment::id(Self) -> String
-pub fn PrComment::line_number(Self) -> Int?
-pub fn PrComment::new(String, String, String, String, Int64, reply_to? : String?, file_path? : String?, line_number? : Int?, commit_id? : @bit_object.ObjectId?) -> Self
+pub fn PrComment::line_number(Self) -> Int32?
+pub fn PrComment::new(String, String, String, String, Int64, reply_to? : String?, file_path? : String?, line_number? : Int32?, commit_id? : @bit_object.ObjectId?) -> Self
 pub fn PrComment::pr_id(Self) -> String
 pub fn PrComment::reply_to(Self) -> String?
 pub fn PrComment::serialize(Self) -> String
 
 pub struct PrMergePolicy {
-  required_approvals : Int
+  required_approvals : Int32
   allow_request_changes : Bool
   require_signed_records : Bool
   required_workflows : Array[String]
 }
 pub fn PrMergePolicy::allow_request_changes(Self) -> Bool
 pub fn PrMergePolicy::default() -> Self
-pub fn PrMergePolicy::new(Int, Bool, Bool, required_workflows? : Array[String]) -> Self
+pub fn PrMergePolicy::new(Int32, Bool, Bool, required_workflows? : Array[String]) -> Self
 pub fn PrMergePolicy::require_signed_records(Self) -> Bool
-pub fn PrMergePolicy::required_approvals(Self) -> Int
+pub fn PrMergePolicy::required_approvals(Self) -> Int32
 pub fn PrMergePolicy::required_workflows(Self) -> Array[String]
 
 pub struct PrMergeResult {
@@ -446,6 +462,10 @@ pub(all) enum PrState {
   Merged
   Closed
 } derive(Eq, @debug.Debug)
+pub fn PrState::equal(Self, Self) -> Bool
+pub fn PrState::not_equal(Self, Self) -> Bool
+pub fn PrState::output(Self, &Logger) -> Unit
+pub fn PrState::to_repr(Self) -> @debug.Repr
 pub fn PrState::to_string(Self) -> String
 pub fn PrState::to_work_item_state(Self) -> WorkItemState
 pub impl Show for PrState
@@ -489,6 +509,10 @@ pub(all) enum PrWorkflowStatus {
   Success
   Failed
 } derive(Eq, @debug.Debug)
+pub fn PrWorkflowStatus::equal(Self, Self) -> Bool
+pub fn PrWorkflowStatus::not_equal(Self, Self) -> Bool
+pub fn PrWorkflowStatus::output(Self, &Logger) -> Unit
+pub fn PrWorkflowStatus::to_repr(Self) -> @debug.Repr
 pub fn PrWorkflowStatus::to_string(Self) -> String
 pub impl Show for PrWorkflowStatus
 
@@ -539,6 +563,11 @@ pub(all) enum RecordTriggerClass {
   Full
   NotifyOnly
 } derive(Eq, @debug.Debug)
+pub fn RecordTriggerClass::equal(Self, Self) -> Bool
+pub fn RecordTriggerClass::not_equal(Self, Self) -> Bool
+pub fn RecordTriggerClass::output(Self, &Logger) -> Unit
+pub fn RecordTriggerClass::to_repr(Self) -> @debug.Repr
+pub fn RecordTriggerClass::to_string(Self) -> String
 pub impl Show for RecordTriggerClass
 
 pub(all) enum ReviewVerdict {
@@ -546,6 +575,10 @@ pub(all) enum ReviewVerdict {
   RequestChanges
   Comment
 } derive(Eq, @debug.Debug)
+pub fn ReviewVerdict::equal(Self, Self) -> Bool
+pub fn ReviewVerdict::not_equal(Self, Self) -> Bool
+pub fn ReviewVerdict::output(Self, &Logger) -> Unit
+pub fn ReviewVerdict::to_repr(Self) -> @debug.Repr
 pub fn ReviewVerdict::to_string(Self) -> String
 pub impl Show for ReviewVerdict
 
@@ -563,7 +596,7 @@ pub struct SyncLink {
   local_kind : String
   provider : String
   repo : String
-  remote_number : Int
+  remote_number : Int32
   remote_node_id : String
   last_pull_at : Int64
   last_push_at : Int64
@@ -573,10 +606,10 @@ pub fn SyncLink::last_pull_at(Self) -> Int64
 pub fn SyncLink::last_push_at(Self) -> Int64
 pub fn SyncLink::local_id(Self) -> String
 pub fn SyncLink::local_kind(Self) -> String
-pub fn SyncLink::new(String, String, String, String, remote_number? : Int, remote_node_id? : String, last_pull_at? : Int64, last_push_at? : Int64, remote_updated_at? : Int64) -> Self
+pub fn SyncLink::new(String, String, String, String, remote_number? : Int32, remote_node_id? : String, last_pull_at? : Int64, last_push_at? : Int64, remote_updated_at? : Int64) -> Self
 pub fn SyncLink::provider(Self) -> String
 pub fn SyncLink::remote_node_id(Self) -> String
-pub fn SyncLink::remote_number(Self) -> Int
+pub fn SyncLink::remote_number(Self) -> Int32
 pub fn SyncLink::remote_updated_at(Self) -> Int64
 pub fn SyncLink::repo(Self) -> String
 pub fn SyncLink::serialize(Self) -> String
@@ -622,6 +655,10 @@ pub(all) enum WorkItemKind {
   Issue
   PullRequest
 } derive(Eq, @debug.Debug)
+pub fn WorkItemKind::equal(Self, Self) -> Bool
+pub fn WorkItemKind::not_equal(Self, Self) -> Bool
+pub fn WorkItemKind::output(Self, &Logger) -> Unit
+pub fn WorkItemKind::to_repr(Self) -> @debug.Repr
 pub fn WorkItemKind::to_string(Self) -> String
 pub impl Show for WorkItemKind
 
@@ -650,12 +687,15 @@ pub(all) enum WorkItemState {
   Merged
   Closed
 } derive(Eq, @debug.Debug)
+pub fn WorkItemState::equal(Self, Self) -> Bool
+pub fn WorkItemState::not_equal(Self, Self) -> Bool
+pub fn WorkItemState::output(Self, &Logger) -> Unit
 pub fn WorkItemState::to_issue_state(Self) -> IssueState?
 pub fn WorkItemState::to_pr_state(Self) -> PrState
+pub fn WorkItemState::to_repr(Self) -> @debug.Repr
 pub fn WorkItemState::to_string(Self) -> String
 pub impl Show for WorkItemState
 
 // Type aliases
 
 // Traits
-

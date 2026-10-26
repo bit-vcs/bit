@@ -3,7 +3,7 @@
 ///|
 fn setup_repo() -> @bit.TestFs {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
   fs
@@ -13,7 +13,7 @@ fn setup_repo() -> @bit.TestFs {
 fn setup_sha256_compat_repo() -> @bit.TestFs {
   let fs = @bit.TestFs::new()
   ignore(
-    init_repo_with_options(fs, "/repo", {
+    @bit_lib.init_repo_with_options(fs, "/repo", {
       default_branch: "main",
       bare: false,
       separate_git_dir: None,
@@ -72,18 +72,18 @@ fn worktree_test_bytes_contains_ascii(bytes : Bytes, text : String) -> Bool {
 async test "worktree: status/add/commit" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  let st1 = status(fs, "/repo")
+  let st1 = @bit_lib.status(fs, "/repo")
   assert_true(st1.untracked.contains("a.txt"))
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let st2 = status(fs, "/repo")
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let st2 = @bit_lib.status(fs, "/repo")
   assert_true(st2.staged_added.contains("a.txt"))
   assert_true(st2.untracked.length() == 0)
-  let commit_id = commit(
+  let commit_id = @bit_lib.commit(
     fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L,
   )
   let ref_text = fs.read_string("/repo/.git/refs/heads/main")
   assert_true(ref_text.contains(commit_id.to_hex()))
-  let st3 = status(fs, "/repo")
+  let st3 = @bit_lib.status(fs, "/repo")
   assert_true(st3.untracked.length() == 0)
   assert_true(st3.unstaged_modified.length() == 0)
   assert_true(st3.staged_added.length() == 0)
@@ -93,11 +93,11 @@ async test "worktree: status/add/commit" {
 async test "worktree: linked commit stores shared objects and updates common branch" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "base\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let base = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let base = @bit_lib.commit(
     fs, fs, "/repo", "base\n", "Test <test@example.com>", 1700000000L,
   )
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -107,24 +107,24 @@ async test "worktree: linked commit stores shared objects and updates common bra
   )
 
   fs.write_string("/worker/a.txt", "base\nworker\n")
-  add_paths(fs, fs, "/worker", ["a.txt"])
-  let worker_commit = commit(
+  @bit_lib.add_paths(fs, fs, "/worker", ["a.txt"])
+  let worker_commit = @bit_lib.commit(
     fs, fs, "/worker", "worker\n", "Test <test@example.com>", 1700000001L,
   )
 
   assert_true(
-    ObjectDb::load(fs, "/repo/.git").get(fs, worker_commit) is Some(_),
+    @bit_lib.ObjectDb::load(fs, "/repo/.git").get(fs, worker_commit) is Some(_),
   )
   assert_false(fs.is_dir("/repo/.git/worktrees/worker/objects"))
   @test.assert_eq(
     fs.read_string("/repo/.git/refs/heads/feature"),
     worker_commit.to_hex() + "\n",
   )
-  let linked_status = status(fs, "/worker")
+  let linked_status = @bit_lib.status(fs, "/worker")
   @test.assert_eq(linked_status.staged_added.length(), 0)
   @test.assert_eq(linked_status.staged_modified.length(), 0)
   @test.assert_eq(linked_status.unstaged_modified.length(), 0)
-  let worktrees = list_worktrees(fs, "/repo")
+  let worktrees = @bit_lib.list_worktrees(fs, "/repo")
   @test.assert_eq(worktrees.length(), 2)
   @test.assert_eq(worktrees[1].head_id, Some(worker_commit))
 }
@@ -133,16 +133,16 @@ async test "worktree: linked commit stores shared objects and updates common bra
 test "worktree: cherry-pick into linked worktree uses shared objects and refs" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "base\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let base = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let base = @bit_lib.commit(
     fs, fs, "/repo", "base\n", "Test <test@example.com>", 1700000000L,
   )
   fs.write_string("/repo/a.txt", "base\nsource\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let source = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let source = @bit_lib.commit(
     fs, fs, "/repo", "source\n", "Test <test@example.com>", 1700000001L,
   )
-  create_worktree(
+  @bit_lib.create_worktree(
     fs,
     fs,
     "/repo",
@@ -151,13 +151,13 @@ test "worktree: cherry-pick into linked worktree uses shared objects and refs" {
     new_branch=Some("feature"),
   )
 
-  let result = cherry_pick(
+  let result = @bit_lib.cherry_pick(
     fs, fs, "/worker", source, "Test <test@example.com>", 1700000002L,
   )
   guard result.commit_id is Some(picked) else {
     fail("expected linked worktree cherry-pick to create a commit")
   }
-  assert_true(ObjectDb::load(fs, "/repo/.git").get(fs, picked) is Some(_))
+  assert_true(@bit_lib.ObjectDb::load(fs, "/repo/.git").get(fs, picked) is Some(_))
   @test.assert_eq(
     fs.read_string("/repo/.git/refs/heads/feature"),
     picked.to_hex() + "\n",
@@ -171,13 +171,13 @@ async test "worktree: add_paths writes cache-tree extension" {
   fs.write_string("/repo/one", "frotz\n")
   fs.mkdir_p("/repo/two")
   fs.write_string("/repo/two/three", "frotz\n")
-  add_paths(fs, fs, "/repo", ["one", "two/three"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["one", "two/three"])
   let after_add = worktree_test_bytes_contains_ascii(
     fs.read_file("/repo/.git/index"),
     "TREE",
   )
-  let entries = read_index_entries(fs, "/repo/.git")
-  write_index_entries_preserving_cache_tree(fs, fs, "/repo/.git", entries)
+  let entries = @bit_lib.read_index_entries(fs, "/repo/.git")
+  @bit_lib.write_index_entries_preserving_cache_tree(fs, fs, "/repo/.git", entries)
   let after_rewrite = worktree_test_bytes_contains_ascii(
     fs.read_file("/repo/.git/index"),
     "TREE",
@@ -189,11 +189,11 @@ async test "worktree: add_paths writes cache-tree extension" {
 async test "worktree: status skips a matching HEAD cache-tree root" {
   let fs = setup_repo()
   fs.write_string("/repo/tracked.txt", "tracked\n")
-  add_paths(fs, fs, "/repo", ["tracked.txt"])
-  let commit_id = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["tracked.txt"])
+  let commit_id = @bit_lib.commit(
     fs, fs, "/repo", "initial\n", "Test <test@example.com>", 1700000000L,
   )
-  let db = ObjectDb::load(fs, "/repo/.git")
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git")
   let commit_obj = db.get(fs, commit_id).unwrap()
   let tree_id = @bit.parse_commit(commit_obj.data).tree
 
@@ -201,7 +201,7 @@ async test "worktree: status skips a matching HEAD cache-tree root" {
   // status consults it first, it need not load this tree object at all.
   fs.remove_file(worktree_test_object_path("/repo/.git", tree_id))
 
-  let st = status(fs, "/repo")
+  let st = @bit_lib.status(fs, "/repo")
   assert_true(st.staged_added.length() == 0)
   assert_true(st.staged_modified.length() == 0)
   assert_true(st.staged_deleted.length() == 0)
@@ -214,11 +214,11 @@ async test "worktree: status skips unchanged cache-tree subtrees" {
   fs.mkdir_p("/repo/changed")
   fs.write_string("/repo/clean/file.txt", "clean\n")
   fs.write_string("/repo/changed/file.txt", "before\n")
-  add_paths(fs, fs, "/repo", ["clean/file.txt", "changed/file.txt"])
-  let commit_id = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["clean/file.txt", "changed/file.txt"])
+  let commit_id = @bit_lib.commit(
     fs, fs, "/repo", "initial\n", "Test <test@example.com>", 1700000000L,
   )
-  let db = ObjectDb::load(fs, "/repo/.git")
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git")
   let commit_obj = db.get(fs, commit_id).unwrap()
   let root_tree = db.get(fs, @bit.parse_commit(commit_obj.data).tree).unwrap()
   let mut clean_tree_id = None
@@ -234,10 +234,10 @@ async test "worktree: status skips unchanged cache-tree subtrees" {
   // Updating the sibling invalidates the root and only that sibling in the
   // index TREE extension. The clean subtree remains reusable.
   fs.write_string("/repo/changed/file.txt", "after\n")
-  add_paths(fs, fs, "/repo", ["changed/file.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["changed/file.txt"])
   fs.remove_file(worktree_test_object_path("/repo/.git", clean_tree_id))
 
-  let st = status(fs, "/repo")
+  let st = @bit_lib.status(fs, "/repo")
   assert_true(st.staged_modified.contains("changed/file.txt"))
   assert_true(st.staged_added.length() == 0)
   assert_true(st.staged_deleted.length() == 0)
@@ -247,14 +247,14 @@ async test "worktree: status skips unchanged cache-tree subtrees" {
 async test "worktree: commit writes HEAD and branch reflogs" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(
+    @bit_lib.commit(
       fs, fs, "/repo", "msg\nbody\n", "Test <test@example.com>", 1700000000L,
     ),
   )
-  let head_log = read_reflog(fs, "/repo/.git", "HEAD")
-  let branch_log = read_reflog(fs, "/repo/.git", "refs/heads/main")
+  let head_log = @bit_lib.read_reflog(fs, "/repo/.git", "HEAD")
+  let branch_log = @bit_lib.read_reflog(fs, "/repo/.git", "refs/heads/main")
   @test.assert_eq(head_log.length(), 1)
   @test.assert_eq(branch_log.length(), 1)
   @test.assert_eq(head_log[0].message, "commit (initial): msg")
@@ -267,8 +267,8 @@ async test "worktree: sha256 compat repo records loose-object-idx mappings" {
   let git_dir = "/repo/.git"
   let content = @utf8.encode("Hello World!\n")
   fs.write_string("/repo/hello", "Hello World!\n")
-  add_paths(fs, fs, "/repo", ["hello"])
-  let commit_id = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["hello"])
+  let commit_id = @bit_lib.commit(
     fs,
     fs,
     "/repo",
@@ -295,23 +295,23 @@ async test "worktree: sha256 compat repo records loose-object-idx mappings" {
   )
   assert_true(fs.is_file(worktree_test_object_path(git_dir, blob_storage)))
   @test.assert_eq(
-    compat_lookup_loose_object_idx(fs, git_dir, blob_storage.to_hex()),
+    @bit_lib.compat_lookup_loose_object_idx(fs, git_dir, blob_storage.to_hex()),
     Some(blob_compat.to_hex()),
   )
-  let commit_obj = ObjectDb::load(fs, git_dir).get(fs, commit_id).unwrap()
+  let commit_obj = @bit_lib.ObjectDb::load(fs, git_dir).get(fs, commit_id).unwrap()
   let tree_id = @bit.parse_commit(commit_obj.data).tree
-  let tree_obj = ObjectDb::load(fs, git_dir).get(fs, tree_id).unwrap()
+  let tree_obj = @bit_lib.ObjectDb::load(fs, git_dir).get(fs, tree_id).unwrap()
   let tree_entries = @bit.parse_tree(tree_obj.data)
   @test.assert_eq(tree_entries.length(), 1)
   @test.assert_eq(tree_entries[0].name, "hello")
   @test.assert_eq(tree_entries[0].mode, "100644")
   @test.assert_eq(tree_entries[0].id.to_hex(), blob_storage.to_hex())
-  let tree_compat = compat_lookup_loose_object_idx(
+  let tree_compat = @bit_lib.compat_lookup_loose_object_idx(
     fs,
     git_dir,
     tree_id.to_hex(),
   )
-  let commit_compat = compat_lookup_loose_object_idx(
+  let commit_compat = @bit_lib.compat_lookup_loose_object_idx(
     fs,
     git_dir,
     commit_id.to_hex(),
@@ -340,12 +340,12 @@ async test "worktree: sha256 compat repo records loose-object-idx mappings" {
 async test "worktree: modified after commit" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L),
+    @bit_lib.commit(fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L),
   )
   fs.write_string("/repo/a.txt", "changed\n")
-  let st = status(fs, "/repo")
+  let st = @bit_lib.status(fs, "/repo")
   assert_true(st.unstaged_modified.contains("a.txt"))
 }
 
@@ -353,13 +353,13 @@ async test "worktree: modified after commit" {
 async test "worktree: staged modified after add" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L),
+    @bit_lib.commit(fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L),
   )
   fs.write_string("/repo/a.txt", "changed\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let st = status(fs, "/repo")
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let st = @bit_lib.status(fs, "/repo")
   assert_true(st.staged_modified.contains("a.txt"))
   assert_true(st.unstaged_modified.length() == 0)
 }
@@ -368,13 +368,13 @@ async test "worktree: staged modified after add" {
 async test "worktree: staged deleted after remove and add" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L),
+    @bit_lib.commit(fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L),
   )
   fs.remove_file("/repo/a.txt")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let st = status(fs, "/repo")
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let st = @bit_lib.status(fs, "/repo")
   assert_true(st.staged_deleted.contains("a.txt"))
   assert_true(st.unstaged_deleted.length() == 0)
 }
@@ -382,13 +382,13 @@ async test "worktree: staged deleted after remove and add" {
 ///|
 async test "worktree: status text" {
   let fs = setup_repo()
-  let text1 = status_text(fs, "/repo")
+  let text1 = @bit_lib.status_text(fs, "/repo")
   assert_true(text1.contains("On branch main"))
   assert_true(text1.contains("No commits yet"))
   assert_true(text1.contains("nothing to commit"))
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
-  let text2 = status_text(fs, "/repo")
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let text2 = @bit_lib.status_text(fs, "/repo")
   assert_true(text2.contains("Changes to be committed"))
   assert_true(text2.contains("staged: a.txt"))
 }
@@ -399,14 +399,14 @@ async test "worktree: status text tolerates sha256 ref" {
   fs.write_string(
     "/repo/.git/refs/heads/main", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n",
   )
-  let text = status_text(fs, "/repo")
+  let text = @bit_lib.status_text(fs, "/repo")
   assert_true(text.contains("On branch main"))
 }
 
 ///|
 async test "worktree: empty commit requires allow_empty" {
   let fs = setup_repo()
-  let _ = commit(
+  let _ = @bit_lib.commit(
     fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L,
   ) catch {
     _ => return ()
@@ -418,7 +418,7 @@ async test "worktree: empty commit requires allow_empty" {
 async test "worktree: allow_empty creates initial commit" {
   let fs = setup_repo()
   let allow_empty = true
-  let commit_id = commit(
+  let commit_id = @bit_lib.commit(
     fs,
     fs,
     "/repo",
@@ -435,24 +435,24 @@ async test "worktree: allow_empty creates initial commit" {
 async test "worktree: amend preserves gitlink entries without local object" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "hello\n")
-  add_paths(fs, fs, "/repo", ["a.txt"])
+  @bit_lib.add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(
-    commit(fs, fs, "/repo", "base\n", "Test <test@example.com>", 1700000000L),
+    @bit_lib.commit(fs, fs, "/repo", "base\n", "Test <test@example.com>", 1700000000L),
   )
-  let entries = read_index_entries(fs, "/repo/.git")
+  let entries = @bit_lib.read_index_entries(fs, "/repo/.git")
   entries.push(
-    IndexEntry::new(
+    @bit_lib.IndexEntry::new(
       "submodule",
       @bit.ObjectId::from_hex("e598ccc29ff366687aa04587483454a7925521ae"),
       0o160000,
       0,
     ),
   )
-  write_index_entries(fs, "/repo/.git", entries)
-  let amended = commit_amend(
+  @bit_lib.write_index_entries(fs, "/repo/.git", entries)
+  let amended = @bit_lib.commit_amend(
     fs, fs, "/repo", "amended\n", "Test <test@example.com>", 1700000001L,
   )
-  let db = ObjectDb::load_lazy(fs, "/repo/.git")
+  let db = @bit_lib.ObjectDb::load_lazy(fs, "/repo/.git")
   let commit_obj = db.get(fs, amended).unwrap()
   let commit_info = @bit.parse_commit(commit_obj.data)
   let tree_obj = db.get(fs, commit_info.tree).unwrap()
@@ -472,15 +472,15 @@ async test "worktree: mv_path moves gitlink directory" {
   let gitlink_id = @bit.ObjectId::from_hex(
     "e598ccc29ff366687aa04587483454a7925521ae",
   )
-  write_index_entries(fs, "/repo/.git", [
-    IndexEntry::new("child", gitlink_id, 0o160000, 0),
+  @bit_lib.write_index_entries(fs, "/repo/.git", [
+    @bit_lib.IndexEntry::new("child", gitlink_id, 0o160000, 0),
   ])
   fs.mkdir_p("/repo/child")
   fs.write_string("/repo/child/.git", "gitdir: ../.git/modules/child\n")
 
-  mv_path(fs, fs, "/repo", "child", "child_old")
+  @bit_lib.mv_path(fs, fs, "/repo", "child", "child_old")
 
-  let entries = read_index_entries(fs, "/repo/.git")
+  let entries = @bit_lib.read_index_entries(fs, "/repo/.git")
   @test.assert_eq(entries.length(), 1)
   @test.assert_eq(entries[0].path, "child_old")
   assert_false(fs.is_dir("/repo/child"))
@@ -500,21 +500,21 @@ async test "worktree: mv_path updates gitmodules path for gitlink rename" {
   fs.write_string(
     "/repo/.gitmodules", "[submodule \"a\"]\n\tpath = a\n\turl = ../submodule\n",
   )
-  add_paths(fs, fs, "/repo", [".gitmodules"])
-  let entries = read_index_entries(fs, "/repo/.git")
-  entries.push(IndexEntry::new("a", gitlink_id, 0o160000, 0))
-  write_index_entries(fs, "/repo/.git", entries)
+  @bit_lib.add_paths(fs, fs, "/repo", [".gitmodules"])
+  let entries = @bit_lib.read_index_entries(fs, "/repo/.git")
+  entries.push(@bit_lib.IndexEntry::new("a", gitlink_id, 0o160000, 0))
+  @bit_lib.write_index_entries(fs, "/repo/.git", entries)
   fs.mkdir_p("/repo/a")
   fs.write_string("/repo/a/.git", "gitdir: ../.git/modules/a\n")
 
-  mv_path(fs, fs, "/repo", "a", "b")
+  @bit_lib.mv_path(fs, fs, "/repo", "a", "b")
 
   @test.assert_eq(
     fs.read_string("/repo/.gitmodules"),
     "[submodule \"a\"]\n\tpath = b\n\turl = ../submodule\n",
   )
-  let updated_entries = read_index_entries(fs, "/repo/.git")
-  let mut gitmodules_entry : IndexEntry? = None
+  let updated_entries = @bit_lib.read_index_entries(fs, "/repo/.git")
+  let mut gitmodules_entry : @bit_lib.IndexEntry? = None
   for entry in updated_entries {
     if entry.path == ".gitmodules" {
       gitmodules_entry = Some(entry)
@@ -524,7 +524,7 @@ async test "worktree: mv_path updates gitmodules path for gitlink rename" {
   guard gitmodules_entry is Some(entry) else {
     fail("expected .gitmodules entry in index after move")
   }
-  let db = ObjectDb::load_lazy(fs, "/repo/.git")
+  let db = @bit_lib.ObjectDb::load_lazy(fs, "/repo/.git")
   let gitmodules_obj = db.get(fs, entry.id).unwrap()
   @test.assert_eq(
     @utf8.decode_lossy(gitmodules_obj.data),

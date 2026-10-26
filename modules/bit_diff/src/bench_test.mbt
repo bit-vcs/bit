@@ -67,7 +67,7 @@ test "bench diff_trees identical 100 files" (b : @bench.T) {
   let git_dir = bench_diff_root + "/.git"
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   b.bench(fn() {
-    let diffs = try! diff_trees(fs, git_dir, Some(tree1), tree1, db~)
+    let diffs = try! @bit_diff.diff_trees(fs, git_dir, Some(tree1), tree1, db~)
     b.keep(diffs.length())
   })
 }
@@ -78,25 +78,25 @@ test "bench diff_trees 10pct changed 100 files" (b : @bench.T) {
   let git_dir = bench_diff_root + "/.git"
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   b.bench(fn() {
-    let diffs = try! diff_trees(fs, git_dir, Some(tree1), tree2, db~)
+    let diffs = try! @bit_diff.diff_trees(fs, git_dir, Some(tree1), tree2, db~)
     b.keep(diffs.length())
   })
 }
 
 ///|
-fn setup_diff_text_data() -> Array[DiffFile] {
+fn setup_diff_text_data() -> Array[@bit_diff.DiffFile] {
   let (fs, tree1, tree2) = try! setup_diff_repo(10, 100)
   let git_dir = bench_diff_root + "/.git"
-  try! diff_trees(fs, git_dir, Some(tree1), tree2)
+  try! @bit_diff.diff_trees(fs, git_dir, Some(tree1), tree2)
 }
 
 ///|
-let bench_diff_files : Array[DiffFile] = setup_diff_text_data()
+let bench_diff_files : Array[@bit_diff.DiffFile] = setup_diff_text_data()
 
 ///|
 test "bench diff_text 10 files" (b : @bench.T) {
   b.bench(fn() {
-    let lines = diff_text(bench_diff_files)
+    let lines = @bit_diff.diff_text(bench_diff_files)
     b.keep(lines.length())
   })
 }
@@ -104,7 +104,7 @@ test "bench diff_text 10 files" (b : @bench.T) {
 ///|
 test "bench diff_stat 10 files" (b : @bench.T) {
   b.bench(fn() {
-    let lines = diff_stat(bench_diff_files)
+    let lines = @bit_diff.diff_stat(bench_diff_files)
     b.keep(lines.length())
   })
 }

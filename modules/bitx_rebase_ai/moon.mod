@@ -12,8 +12,9 @@ import {
   "mizchi/bit_utils@0.48.0",
   "mizchi/llm@0.3.2",
   "mizchi/x@0.6.1",
-  "moonbitlang/async@0.22.1",
-  "moonbitlang/x@0.5.5",
+  "moonbitlang/regexp@0.3.6",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/x@0.5.6",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"

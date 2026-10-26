@@ -110,9 +110,9 @@ pub impl @types.RepoFileSystem for TinyFs with fn mtime(_self, _path) {
 }
 
 ///|
-fn fs_store() -> FsStore {
+fn fs_store() -> @bit_objstore.FsStore {
   let fs = TinyFs::new()
-  FsStore::new(fs, fs, "/store")
+  @bit_objstore.FsStore::new(fs, fs, "/store")
 }
 
 ///|
@@ -122,7 +122,7 @@ async test "fs store: round trip through real paths" {
   let put = store.put(
     "repos/a/b/manifest.json",
     text("{}"),
-    PutCondition::IfNotExists,
+    @bit_objstore.PutCondition::IfNotExists,
   )
   inspect(put.is_applied(), content="true")
   inspect(body_of(store.get("repos/a/b/manifest.json")), content="{}")
@@ -131,18 +131,18 @@ async test "fs store: round trip through real paths" {
 ///|
 async test "fs store: compare-and-swap enforces the expected version" {
   let store = fs_store()
-  let first = store.put("m", text("v1"), PutCondition::IfNotExists)
+  let first = store.put("m", text("v1"), @bit_objstore.PutCondition::IfNotExists)
   let etag = match first {
     Applied(e) => e
     _ => "<none>"
   }
   inspect(
-    store.put("m", text("v2"), PutCondition::IfMatch("stale")),
+    store.put("m", text("v2"), @bit_objstore.PutCondition::IfMatch("stale")),
     content="NotApplied",
   )
   inspect(body_of(store.get("m")), content="v1")
   inspect(
-    store.put("m", text("v2"), PutCondition::IfMatch(etag)).is_applied(),
+    store.put("m", text("v2"), @bit_objstore.PutCondition::IfMatch(etag)).is_applied(),
     content="true",
   )
   inspect(body_of(store.get("m")), content="v2")
@@ -151,9 +151,9 @@ async test "fs store: compare-and-swap enforces the expected version" {
 ///|
 async test "fs store: create-only write does not clobber" {
   let store = fs_store()
-  let _ = store.put("k", text("first"), PutCondition::IfNotExists)
+  let _ = store.put("k", text("first"), @bit_objstore.PutCondition::IfNotExists)
   inspect(
-    store.put("k", text("second"), PutCondition::IfNotExists),
+    store.put("k", text("second"), @bit_objstore.PutCondition::IfNotExists),
     content="NotApplied",
   )
   inspect(body_of(store.get("k")), content="first")
@@ -163,7 +163,7 @@ async test "fs store: create-only write does not clobber" {
 async test "fs store: listing walks nested directories in byte order" {
   let store = fs_store()
   for key in ["log/2", "log/10", "log/1", "wal/p.pack", "manifest.json"] {
-    let _ = store.put(key, text(key), PutCondition::Unconditional)
+    let _ = store.put(key, text(key), @bit_objstore.PutCondition::Unconditional)
   }
   let keys : Array[String] = []
   for entry in store.list("log/", "").entries {
@@ -176,7 +176,7 @@ async test "fs store: listing walks nested directories in byte order" {
 async test "fs store: listing resumes after a cursor" {
   let store = fs_store()
   for key in ["log/1", "log/2", "log/3"] {
-    let _ = store.put(key, text(key), PutCondition::Unconditional)
+    let _ = store.put(key, text(key), @bit_objstore.PutCondition::Unconditional)
   }
   let keys : Array[String] = []
   for entry in store.list("log/", "log/1").entries {
@@ -188,14 +188,14 @@ async test "fs store: listing resumes after a cursor" {
 ///|
 async test "fs store: range reads slice the file" {
   let store = fs_store()
-  let _ = store.put("r", text("0123456789"), PutCondition::Unconditional)
+  let _ = store.put("r", text("0123456789"), @bit_objstore.PutCondition::Unconditional)
   inspect(body_of(store.get_range("r", { start: 2L, end: 5L })), content="2345")
 }
 
 ///|
 async test "fs store: delete removes the key and is idempotent" {
   let store = fs_store()
-  let _ = store.put("d", text("x"), PutCondition::Unconditional)
+  let _ = store.put("d", text("x"), @bit_objstore.PutCondition::Unconditional)
   store.delete("d")
   store.delete("d")
   inspect(store.get("d"), content="Missing")
@@ -218,6 +218,6 @@ async test "fs store: keys that would escape the root are refused" {
 ///|
 async test "fs store: a dotted key that does not escape is allowed" {
   let store = fs_store()
-  let put = store.put("a/..b/c", text("ok"), PutCondition::Unconditional)
+  let put = store.put("a/..b/c", text("ok"), @bit_objstore.PutCondition::Unconditional)
   inspect(put.is_applied(), content="true")
 }

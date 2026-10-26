@@ -11,7 +11,7 @@ import {
   "mizchi/bit_repo_ops@0.48.0",
   "mizchi/bit_types@0.48.0",
   "mizchi/bit_utils@0.48.0",
-  "moonbitlang/x@0.5.5",
+  "moonbitlang/x@0.5.6",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"

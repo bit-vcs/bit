@@ -1,7 +1,7 @@
 ///|
 fn fetch_request_lines(data : Bytes) -> Array[String] raise @bit.GitError {
   let lines : Array[String] = []
-  for item in pktline_decode(data) {
+  for item in @bit_protocol.pktline_decode(data) {
     let (payload, is_flush) = item
     if is_flush {
       lines.push("<flush>")
@@ -33,11 +33,11 @@ test "build protocol v2 fetch request with negotiation and shallow state" {
     "cc628ccd10742baea8241c5924df992b5c019f71",
   )
   let lines = fetch_request_lines(
-    build_fetch_request_v2(
+    @bit_protocol.build_fetch_request_v2(
       "git/moonbit",
       [want],
       3,
-      filter=FilterSpec::BlobNone,
+      filter=@bit_protocol.FilterSpec::BlobNone,
       haves=[have],
       shallow=[shallow],
     ),
@@ -72,14 +72,14 @@ test "build protocol v0 or v1 fetch request with negotiation and shallow state" 
     "cc628ccd10742baea8241c5924df992b5c019f71",
   )
   let lines = fetch_request_lines(
-    build_fetch_request_v0(
+    @bit_protocol.build_fetch_request_v0(
       "git/moonbit",
       [want],
       [
         "agent=git/2.55.0", "filter", "ofs-delta", "shallow", "side-band-64k", "thin-pack",
       ],
       depth=3,
-      filter=FilterSpec::BlobNone,
+      filter=@bit_protocol.FilterSpec::BlobNone,
       haves=[have],
       shallow=[shallow],
     ),
@@ -105,7 +105,7 @@ test "build protocol v0 or v1 fetch request with negotiation and shallow state" 
 test "build protocol v0 or v1 fetch request falls back to small sideband" {
   let want = @bit.ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
   let lines = fetch_request_lines(
-    build_fetch_request_v0("git/moonbit", [want], ["side-band"]),
+    @bit_protocol.build_fetch_request_v0("git/moonbit", [want], ["side-band"]),
   )
   @test.assert_eq(
     lines[0],
@@ -118,15 +118,15 @@ test "parse protocol v2 fetch response preserves shallow updates" {
   let shallow = "cc628ccd10742baea8241c5924df992b5c019f71"
   let unshallow = "88e38705fdbd3608cddbe904b67c731f3234c45b"
   let response = fetch_response_concat([
-    pktline_encode("shallow-info\n"),
-    pktline_encode("shallow \{shallow}\n"),
-    pktline_encode("unshallow \{unshallow}\n"),
-    pktline_delim(),
-    pktline_encode("packfile\n"),
-    pktline_encode_bytes(Bytes::from_array([b'\x01', b'P', b'A', b'C', b'K'])),
-    pktline_flush(),
+    @bit_protocol.pktline_encode("shallow-info\n"),
+    @bit_protocol.pktline_encode("shallow \{shallow}\n"),
+    @bit_protocol.pktline_encode("unshallow \{unshallow}\n"),
+    @bit_protocol.pktline_delim(),
+    @bit_protocol.pktline_encode("packfile\n"),
+    @bit_protocol.pktline_encode_bytes(Bytes::from_array([b'\x01', b'P', b'A', b'C', b'K'])),
+    @bit_protocol.pktline_flush(),
   ])
-  let result = parse_fetch_response_v2(response)
+  let result = @bit_protocol.parse_fetch_response_v2(response)
   @test.assert_eq(result.pack, b"PACK")
   @test.assert_eq(result.shallow.length(), 1)
   @test.assert_eq(result.shallow[0].to_hex(), shallow)
@@ -139,14 +139,14 @@ test "parse protocol v0 or v1 fetch response preserves shallow updates" {
   let shallow = "cc628ccd10742baea8241c5924df992b5c019f71"
   let unshallow = "88e38705fdbd3608cddbe904b67c731f3234c45b"
   let response = fetch_response_concat([
-    pktline_encode("shallow \{shallow}\n"),
-    pktline_encode("unshallow \{unshallow}\n"),
-    pktline_flush(),
-    pktline_encode("NAK\n"),
-    pktline_encode_bytes(Bytes::from_array([b'\x01', b'P', b'A', b'C', b'K'])),
-    pktline_flush(),
+    @bit_protocol.pktline_encode("shallow \{shallow}\n"),
+    @bit_protocol.pktline_encode("unshallow \{unshallow}\n"),
+    @bit_protocol.pktline_flush(),
+    @bit_protocol.pktline_encode("NAK\n"),
+    @bit_protocol.pktline_encode_bytes(Bytes::from_array([b'\x01', b'P', b'A', b'C', b'K'])),
+    @bit_protocol.pktline_flush(),
   ])
-  let result = parse_fetch_response_v0(response)
+  let result = @bit_protocol.parse_fetch_response_v0(response)
   @test.assert_eq(result.pack, b"PACK")
   @test.assert_eq(result.shallow.length(), 1)
   @test.assert_eq(result.shallow[0].to_hex(), shallow)

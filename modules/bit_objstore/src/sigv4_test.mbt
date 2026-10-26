@@ -5,7 +5,7 @@ fn config_of(
   bucket : String,
   path_style : Bool,
   session_token : String?,
-) -> S3Config {
+) -> @bit_objstore.S3Config {
   {
     endpoint,
     region: "us-east-1",
@@ -18,7 +18,7 @@ fn config_of(
 }
 
 ///|
-fn signature_of(req : SignedRequest) -> String {
+fn signature_of(req : @bit_objstore.SignedRequest) -> String {
   let auth = req.headers["Authorization"]
   match auth.find("Signature=") {
     Some(i) => String::unsafe_substring(auth, start=i + 10, end=auth.length())
@@ -37,7 +37,7 @@ test "sigv4: AWS documented GET Object vector" {
     false,
     None,
   )
-  let canonical = s3_canonical_request(
+  let canonical = @bit_objstore.s3_canonical_request(
     config,
     "GET",
     "/test.txt",
@@ -47,10 +47,10 @@ test "sigv4: AWS documented GET Object vector" {
     "20130524T000000Z",
   )
   inspect(
-    hex_sha256(@utf8.encode(canonical)),
+    @bit_objstore.hex_sha256(@utf8.encode(canonical)),
     content="7344ae5b7ee6c3e7e6b0fe0640412a37625d1fbfff95c48bbb2dc43964946972",
   )
-  let signed = sign_s3_request(
+  let signed = @bit_objstore.sign_s3_request(
     config,
     "GET",
     "/test.txt",
@@ -74,7 +74,7 @@ test "sigv4: path-style PUT with If-Match is the CAS request we actually send" {
     None,
   )
   let body = @utf8.encode("{\"head_seq\":1}")
-  let signed = sign_s3_request(
+  let signed = @bit_objstore.sign_s3_request(
     config,
     "PUT",
     "/mybucket/repos/acme/app/manifest.json",
@@ -106,7 +106,7 @@ test "sigv4: query parameters are sorted and encoded" {
     true,
     None,
   )
-  let signed = sign_s3_request(
+  let signed = @bit_objstore.sign_s3_request(
     config,
     "GET",
     "/mybucket",
@@ -132,28 +132,28 @@ test "sigv4: query parameters are sorted and encoded" {
 
 ///|
 test "uri_encode: unreserved characters survive, everything else is escaped" {
-  inspect(uri_encode("abcXYZ019-._~", true), content="abcXYZ019-._~")
-  inspect(uri_encode("a/b", true), content="a%2Fb")
-  inspect(uri_encode("a/b", false), content="a/b")
-  inspect(uri_encode("a b+c", true), content="a%20b%2Bc")
+  inspect(@bit_objstore.uri_encode("abcXYZ019-._~", true), content="abcXYZ019-._~")
+  inspect(@bit_objstore.uri_encode("a/b", true), content="a%2Fb")
+  inspect(@bit_objstore.uri_encode("a/b", false), content="a/b")
+  inspect(@bit_objstore.uri_encode("a b+c", true), content="a%20b%2Bc")
   // Multi-byte input is encoded per UTF-8 byte, not per character.
-  inspect(uri_encode("é", true), content="%C3%A9")
+  inspect(@bit_objstore.uri_encode("é", true), content="%C3%A9")
 }
 
 ///|
 test "endpoint_host: host is taken with its port and without the path" {
   inspect(
-    endpoint_host("https://s3.us-east-1.amazonaws.com"),
+    @bit_objstore.endpoint_host("https://s3.us-east-1.amazonaws.com"),
     content="s3.us-east-1.amazonaws.com",
   )
-  inspect(endpoint_host("http://127.0.0.1:9000"), content="127.0.0.1:9000")
-  inspect(endpoint_host("https://host:9000/prefix"), content="host:9000")
+  inspect(@bit_objstore.endpoint_host("http://127.0.0.1:9000"), content="127.0.0.1:9000")
+  inspect(@bit_objstore.endpoint_host("https://host:9000/prefix"), content="host:9000")
 }
 
 ///|
 test "endpoint_host: a scheme-less endpoint is rejected rather than guessed" {
   let failed = try {
-    let _ = endpoint_host("s3.amazonaws.com")
+    let _ = @bit_objstore.endpoint_host("s3.amazonaws.com")
     false
   } catch {
     _ => true
@@ -169,7 +169,7 @@ test "sigv4: session token is signed when present" {
     true,
     Some("FQoGZXIvYXdzEBYaD"),
   )
-  let signed = sign_s3_request(
+  let signed = @bit_objstore.sign_s3_request(
     config,
     "GET",
     "/examplebucket/k",

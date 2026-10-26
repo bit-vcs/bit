@@ -2,7 +2,7 @@
 package "mizchi/bitx_workspace"
 
 // Values
-pub async fn handle_workspace(Array[String], async (String, String, Array[String]) -> (Int, String)) -> Unit
+pub async fn handle_workspace(Array[String], async (String, String, Array[String]) -> (Int32, String)) -> Unit
 
 pub fn print_repo_usage() -> Unit
 
@@ -17,4 +17,3 @@ pub fn workspace_translate_implicit_command(String?, String, Array[String]) -> (
 // Type aliases
 
 // Traits
-

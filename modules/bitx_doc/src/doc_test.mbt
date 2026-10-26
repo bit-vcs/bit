@@ -4,11 +4,11 @@ test "doc: put_page validates nested names and rejects traversal" {
   let root = "/tmp/bit-test-doc-validate"
   cleanup_doc_test_root(fs, root)
 
-  match put_page(fs, root, "wiki/setup", "ok") {
+  match @bitx_doc.put_page(fs, root, "wiki/setup", "ok") {
     Ok(page) => @test.assert_eq(page, "wiki/setup")
     Err(_) => fail("expected nested page name to be valid")
   }
-  match read_page(fs, root, "wiki/setup") {
+  match @bitx_doc.read_page(fs, root, "wiki/setup") {
     Ok(body) => @test.assert_eq(body, "ok\n")
     Err(_) => fail("expected valid page to be readable")
   }
@@ -16,7 +16,7 @@ test "doc: put_page validates nested names and rejects traversal" {
     invalid in [
       "", ".", "..", "/abs", "a//b", "../x", "a/../b", "a\\b", "a\nb", "a\tb",
     ] {
-    match put_page(fs, root, invalid, "x") {
+    match @bitx_doc.put_page(fs, root, invalid, "x") {
       Ok(_) => fail("expected invalid page name to be rejected")
       Err(InvalidPageName(name)) => @test.assert_eq(name, invalid)
       Err(_) => fail("expected InvalidPageName")
@@ -38,10 +38,10 @@ test "doc: list_pages reads recursive markdown pages with prefix filter" {
   fs.write_string(root + "/.bit/docs/daily/2026-02-19.md", "# day\n")
   fs.write_string(root + "/.bit/docs/ignore.txt", "ignore\n")
 
-  let pages = list_pages(fs, root, None)
+  let pages = @bitx_doc.list_pages(fs, root, None)
   @test.assert_eq(pages, ["daily/2026-02-19", "home", "wiki/setup"])
 
-  let filtered = list_pages(fs, root, Some("wiki"))
+  let filtered = @bitx_doc.list_pages(fs, root, Some("wiki"))
   @test.assert_eq(filtered, ["wiki/setup"])
 
   fs.remove_file(root + "/.bit/docs/home.md") catch {
@@ -79,21 +79,21 @@ test "doc: put append remove updates docs storage" {
   let root = "/tmp/bit-test-doc-flow"
   cleanup_doc_test_root(fs, root)
   let page_path = root + "/.bit/docs/home.md"
-  match put_page(fs, root, "home", "initial memo") {
+  match @bitx_doc.put_page(fs, root, "home", "initial memo") {
     Ok(page) => @test.assert_eq(page, "home")
     Err(_) => fail("expected put_page to succeed")
   }
-  let initial = read_page(fs, root, "home")
+  let initial = @bitx_doc.read_page(fs, root, "home")
   match initial {
     Ok(body) => @test.assert_eq(body, "initial memo\n")
     Err(_) => fail("expected read_page to succeed")
   }
 
-  match append_page(fs, fs, root, "home", "next line", 12345) {
+  match @bitx_doc.append_page(fs, fs, root, "home", "next line", 12345) {
     Ok(page) => @test.assert_eq(page, "home")
     Err(_) => fail("expected append_page to succeed")
   }
-  let appended = read_page(fs, root, "home")
+  let appended = @bitx_doc.read_page(fs, root, "home")
   match appended {
     Ok(body) => {
       assert_true(body.contains("initial memo\n"))
@@ -102,7 +102,7 @@ test "doc: put append remove updates docs storage" {
     Err(_) => fail("expected appended page to exist")
   }
 
-  match remove_page(fs, fs, root, "home") {
+  match @bitx_doc.remove_page(fs, fs, root, "home") {
     Ok(page) => @test.assert_eq(page, "home")
     Err(_) => fail("expected remove_page to succeed")
   }

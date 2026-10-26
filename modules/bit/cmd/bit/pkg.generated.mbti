@@ -147,9 +147,19 @@ type MboxPatch
 type OsClock
 
 pub struct OsFs {
-  dummy : Int
+  dummy : Int32
 }
+pub fn OsFs::is_dir(Self, String) -> Bool
+pub fn OsFs::is_file(Self, String) -> Bool
+pub fn OsFs::mkdir_p(Self, String) -> Unit raise @bit_object.GitError
+pub fn OsFs::mtime(Self, String) -> (Int32, Int32) raise @bit_object.GitError
 pub fn OsFs::new() -> Self
+pub fn OsFs::read_file(Self, String) -> Bytes raise @bit_object.GitError
+pub fn OsFs::readdir(Self, String) -> Array[String] raise @bit_object.GitError
+pub fn OsFs::remove_dir(Self, String) -> Unit raise @bit_object.GitError
+pub fn OsFs::remove_file(Self, String) -> Unit raise @bit_object.GitError
+pub fn OsFs::write_file(Self, String, Bytes) -> Unit raise @bit_object.GitError
+pub fn OsFs::write_string(Self, String, String) -> Unit raise @bit_object.GitError
 pub impl @bit_types.FileSystem for OsFs
 pub impl @bit_types.RepoFileSystem for OsFs
 
@@ -162,6 +172,8 @@ type ParseoptMatchResult
 type ParseoptOpt
 
 type ParseoptOptType derive(Eq)
+pub fn ParseoptOptType::equal(Self, Self) -> Bool
+pub fn ParseoptOptType::not_equal(Self, Self) -> Bool
 
 type PushDefaultMode
 
@@ -230,6 +242,11 @@ pub(all) struct SubmoduleInfo {
   path : String
   url : String
 } derive(Eq, @debug.Debug)
+pub fn SubmoduleInfo::equal(Self, Self) -> Bool
+pub fn SubmoduleInfo::not_equal(Self, Self) -> Bool
+pub fn SubmoduleInfo::output(Self, &Logger) -> Unit
+pub fn SubmoduleInfo::to_repr(Self) -> @debug.Repr
+pub fn SubmoduleInfo::to_string(Self) -> String
 pub impl Show for SubmoduleInfo
 
 type UpdateRefStdinOp

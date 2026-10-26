@@ -8,7 +8,7 @@ import {
 }
 
 // Values
-pub fn civil_from_days(Int64) -> (Int, Int, Int)
+pub fn civil_from_days(Int64) -> (Int32, Int32, Int32)
 
 pub fn endpoint_host(String) -> String raise @bit_object.GitError
 
@@ -16,7 +16,7 @@ pub fn format_amz_date(Int64) -> String
 
 pub fn hex_sha256(Bytes) -> String
 
-pub fn lex_compare(String, String) -> Int
+pub fn lex_compare(String, String) -> Int32
 
 pub fn lex_lt(String, String) -> Bool
 
@@ -45,13 +45,23 @@ pub(all) struct ByteRange {
   start : Int64
   end : Int64
 } derive(Eq, @debug.Debug)
+pub fn ByteRange::equal(Self, Self) -> Bool
+pub fn ByteRange::not_equal(Self, Self) -> Bool
+pub fn ByteRange::to_repr(Self) -> @debug.Repr
 
 pub struct FsStore {
   fs : &@bit_types.FileSystem
   rfs : &@bit_types.RepoFileSystem
   root : String
 }
+pub async fn FsStore::delete(Self, String) -> Unit raise @bit_object.GitError
+pub async fn FsStore::get(Self, String) -> GetOutcome raise @bit_object.GitError
+pub async fn FsStore::get_if_none_match(Self, String, String) -> GetOutcome raise @bit_object.GitError
+pub async fn FsStore::get_range(Self, String, ByteRange) -> GetOutcome raise @bit_object.GitError
+pub async fn FsStore::list(Self, String, String) -> ObjListing raise @bit_object.GitError
 pub fn FsStore::new(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Self
+pub async fn FsStore::put(Self, String, Bytes, PutCondition) -> PutOutcome raise @bit_object.GitError
+pub fn FsStore::supports_cas(Self) -> Bool
 pub impl ObjectStore for FsStore
 
 pub(all) enum GetOutcome {
@@ -59,26 +69,38 @@ pub(all) enum GetOutcome {
   NotModified
   Missing
 } derive(Eq, @debug.Debug)
+pub fn GetOutcome::equal(Self, Self) -> Bool
+pub fn GetOutcome::not_equal(Self, Self) -> Bool
+pub fn GetOutcome::output(Self, &Logger) -> Unit
+pub fn GetOutcome::to_repr(Self) -> @debug.Repr
+pub fn GetOutcome::to_string(Self) -> String
 pub fn GetOutcome::unwrap(Self, String) -> (Bytes, String) raise @bit_object.GitError
 pub impl Show for GetOutcome
 
 pub(all) struct HttpReply {
-  status : Int
+  status : Int32
   headers : Map[String, String]
   body : Bytes
 }
 
 pub struct MemStore {
   objects : Map[String, Bytes]
-  mut fail_puts_unknown : Int
-  mut silent_puts : Int
-  mut page_size : Int
+  mut fail_puts_unknown : Int32
+  mut silent_puts : Int32
+  mut page_size : Int32
 }
-pub fn MemStore::fail_next_puts(Self, Int) -> Unit
-pub fn MemStore::len(Self) -> Int
+pub async fn MemStore::delete(Self, String) -> Unit raise @bit_object.GitError
+pub fn MemStore::fail_next_puts(Self, Int32) -> Unit
+pub async fn MemStore::get(Self, String) -> GetOutcome raise @bit_object.GitError
+pub async fn MemStore::get_if_none_match(Self, String, String) -> GetOutcome raise @bit_object.GitError
+pub async fn MemStore::get_range(Self, String, ByteRange) -> GetOutcome raise @bit_object.GitError
+pub fn MemStore::len(Self) -> Int32
+pub async fn MemStore::list(Self, String, String) -> ObjListing raise @bit_object.GitError
 pub fn MemStore::new() -> Self
-pub fn MemStore::set_page_size(Self, Int) -> Unit
-pub fn MemStore::silence_next_puts(Self, Int) -> Unit
+pub async fn MemStore::put(Self, String, Bytes, PutCondition) -> PutOutcome raise @bit_object.GitError
+pub fn MemStore::set_page_size(Self, Int32) -> Unit
+pub fn MemStore::silence_next_puts(Self, Int32) -> Unit
+pub fn MemStore::supports_cas(Self) -> Bool
 pub impl ObjectStore for MemStore
 
 pub(all) struct ObjEntry {
@@ -86,17 +108,28 @@ pub(all) struct ObjEntry {
   size : Int64
   etag : String
 } derive(Eq, @debug.Debug)
+pub fn ObjEntry::equal(Self, Self) -> Bool
+pub fn ObjEntry::not_equal(Self, Self) -> Bool
+pub fn ObjEntry::to_repr(Self) -> @debug.Repr
 
 pub(all) struct ObjListing {
   entries : Array[ObjEntry]
   next : String?
 } derive(Eq, @debug.Debug)
+pub fn ObjListing::equal(Self, Self) -> Bool
+pub fn ObjListing::not_equal(Self, Self) -> Bool
+pub fn ObjListing::to_repr(Self) -> @debug.Repr
 
 pub(all) enum PutCondition {
   Unconditional
   IfNotExists
   IfMatch(String)
 } derive(Eq, @debug.Debug)
+pub fn PutCondition::equal(Self, Self) -> Bool
+pub fn PutCondition::not_equal(Self, Self) -> Bool
+pub fn PutCondition::output(Self, &Logger) -> Unit
+pub fn PutCondition::to_repr(Self) -> @debug.Repr
+pub fn PutCondition::to_string(Self) -> String
 pub impl Show for PutCondition
 
 pub(all) enum PutOutcome {
@@ -104,7 +137,12 @@ pub(all) enum PutOutcome {
   NotApplied
   Unknown
 } derive(Eq, @debug.Debug)
+pub fn PutOutcome::equal(Self, Self) -> Bool
 pub fn PutOutcome::is_applied(Self) -> Bool
+pub fn PutOutcome::not_equal(Self, Self) -> Bool
+pub fn PutOutcome::output(Self, &Logger) -> Unit
+pub fn PutOutcome::to_repr(Self) -> @debug.Repr
+pub fn PutOutcome::to_string(Self) -> String
 pub impl Show for PutOutcome
 
 pub(all) struct S3Config {
@@ -121,9 +159,16 @@ pub struct S3Store {
   config : S3Config
   send : async (String, String, Map[String, String], Bytes) -> HttpReply raise @bit_object.GitError
   now : () -> String
-  page_size : Int
+  page_size : Int32
 }
-pub fn S3Store::new(S3Config, async (String, String, Map[String, String], Bytes) -> HttpReply raise @bit_object.GitError, () -> String, page_size? : Int) -> Self
+pub async fn S3Store::delete(Self, String) -> Unit raise @bit_object.GitError
+pub async fn S3Store::get(Self, String) -> GetOutcome raise @bit_object.GitError
+pub async fn S3Store::get_if_none_match(Self, String, String) -> GetOutcome raise @bit_object.GitError
+pub async fn S3Store::get_range(Self, String, ByteRange) -> GetOutcome raise @bit_object.GitError
+pub async fn S3Store::list(Self, String, String) -> ObjListing raise @bit_object.GitError
+pub fn S3Store::new(S3Config, async (String, String, Map[String, String], Bytes) -> HttpReply raise @bit_object.GitError, () -> String, page_size? : Int32) -> Self
+pub async fn S3Store::put(Self, String, Bytes, PutCondition) -> PutOutcome raise @bit_object.GitError
+pub fn S3Store::supports_cas(Self) -> Bool
 pub impl ObjectStore for S3Store
 
 pub(all) struct SignedRequest {

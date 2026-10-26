@@ -3,14 +3,14 @@
 ///|
 test "collect_diff_objects: collects only new objects" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create initial content
   fs.mkdir_p("/repo/src")
   fs.write_file("/repo/src/foo.mbt", b"original foo")
   fs.write_file("/repo/README.md", b"readme")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
@@ -18,12 +18,12 @@ test "collect_diff_objects: collects only new objects" {
   // Modify one file and add another
   fs.write_file("/repo/src/foo.mbt", b"modified foo")
   fs.write_file("/repo/src/bar.mbt", b"new bar")
-  let commit2 = commit(fs, fs, "/repo", "Update", "test <test@test.com>", 2000L) catch {
+  let commit2 = @bit_lib.commit(fs, fs, "/repo", "Update", "test <test@test.com>", 2000L) catch {
     _ => return ()
   }
   // Collect diff objects
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff_objects = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff_objects = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should have: commit2, new root tree, new src tree, modified foo blob, new bar blob
@@ -45,18 +45,18 @@ test "collect_diff_objects: collects only new objects" {
 ///|
 test "collect_diff_objects: empty diff when no changes" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/file.txt", b"content")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
   // Collect diff with same commit as base and new
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff_objects = collect_diff_objects(db, fs, commit1, commit1) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff_objects = @bit_lib.collect_diff_objects(db, fs, commit1, commit1) catch {
     _ => return ()
   }
   // Should be empty - same commit
@@ -66,7 +66,7 @@ test "collect_diff_objects: empty diff when no changes" {
 ///|
 test "collect_diff_objects: preserves unchanged nested trees" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create nested structure
@@ -74,18 +74,18 @@ test "collect_diff_objects: preserves unchanged nested trees" {
   fs.write_file("/repo/a/b/c/deep.mbt", b"deep content")
   fs.write_file("/repo/a/sibling.mbt", b"sibling")
   fs.write_file("/repo/root.mbt", b"root")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
   // Only modify root file
   fs.write_file("/repo/root.mbt", b"root modified")
-  let commit2 = commit(fs, fs, "/repo", "Update", "test <test@test.com>", 2000L) catch {
+  let commit2 = @bit_lib.commit(fs, fs, "/repo", "Update", "test <test@test.com>", 2000L) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff_objects = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff_objects = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should NOT include the nested unchanged trees/blobs
@@ -105,19 +105,19 @@ test "collect_diff_objects: preserves unchanged nested trees" {
 ///|
 test "collect_commit_tree_only: includes all tree objects" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.mkdir_p("/repo/src/lib")
   fs.write_file("/repo/src/lib/foo.mbt", b"content")
   fs.write_file("/repo/README.md", b"readme")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let objects = collect_commit_tree_only(db, fs, commit1) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let objects = @bit_lib.collect_commit_tree_only(db, fs, commit1) catch {
     _ => return ()
   }
   // Should include: commit, root tree, src tree, lib tree, 2 blobs
@@ -140,19 +140,19 @@ test "collect_commit_tree_only: includes all tree objects" {
 ///|
 test "collect_commit_tree_only: does not walk parent commits" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/v1.txt", b"version 1")
-  let _ = commit(fs, fs, "/repo", "v1", "test <test@test.com>", 1000L) catch {
+  let _ = @bit_lib.commit(fs, fs, "/repo", "v1", "test <test@test.com>", 1000L) catch {
     _ => return ()
   }
   fs.write_file("/repo/v2.txt", b"version 2")
-  let tip = commit(fs, fs, "/repo", "v2", "test <test@test.com>", 2000L) catch {
+  let tip = @bit_lib.commit(fs, fs, "/repo", "v2", "test <test@test.com>", 2000L) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let objects = collect_commit_tree_only(db, fs, tip) catch { _ => return () }
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let objects = @bit_lib.collect_commit_tree_only(db, fs, tip) catch { _ => return () }
   // Should only have 1 commit (commit2), not 2
   let mut commit_count = 0
   for obj in objects {
@@ -166,19 +166,19 @@ test "collect_commit_tree_only: does not walk parent commits" {
 ///|
 test "collect_reachable_objects: walks parent commits" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/v1.txt", b"version 1")
-  let _ = commit(fs, fs, "/repo", "v1", "test <test@test.com>", 1000L) catch {
+  let _ = @bit_lib.commit(fs, fs, "/repo", "v1", "test <test@test.com>", 1000L) catch {
     _ => return ()
   }
   fs.write_file("/repo/v2.txt", b"version 2")
-  let commit2 = commit(fs, fs, "/repo", "v2", "test <test@test.com>", 2000L) catch {
+  let commit2 = @bit_lib.commit(fs, fs, "/repo", "v2", "test <test@test.com>", 2000L) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let objects = collect_reachable_objects(db, fs, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let objects = @bit_lib.collect_reachable_objects(db, fs, commit2) catch {
     _ => return ()
   }
   // Should have 2 commits
@@ -194,7 +194,7 @@ test "collect_reachable_objects: walks parent commits" {
 ///|
 test "collect_diff_objects: handles subdirectory changes" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   // Create structure similar to subdir-clone scenario
@@ -203,7 +203,7 @@ test "collect_diff_objects: handles subdirectory changes" {
   fs.write_file("/repo/src/x/fs/fs.mbt", b"fs content")
   fs.write_file("/repo/src/x/kv/kv.mbt", b"kv content")
   fs.write_file("/repo/README.md", b"readme")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
@@ -211,13 +211,13 @@ test "collect_diff_objects: handles subdirectory changes" {
   // Only modify fs subdirectory
   fs.write_file("/repo/src/x/fs/fs.mbt", b"fs modified")
   fs.write_file("/repo/src/x/fs/new.mbt", b"new file")
-  let commit2 = commit(
+  let commit2 = @bit_lib.commit(
     fs, fs, "/repo", "Update fs", "test <test@test.com>", 2000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff_objects = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff_objects = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should include: new commit, changed trees (root, src, x, fs), changed/new blobs
@@ -242,23 +242,23 @@ test "collect_diff_objects: handles subdirectory changes" {
 ///|
 test "collect_diff_objects: handles file deletion" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/keep.txt", b"keep")
   fs.write_file("/repo/delete.txt", b"to delete")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
   }
   // Delete a file
   fs.remove_file("/repo/delete.txt")
-  let commit2 = commit(fs, fs, "/repo", "Delete", "test <test@test.com>", 2000L) catch {
+  let commit2 = @bit_lib.commit(fs, fs, "/repo", "Delete", "test <test@test.com>", 2000L) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff_objects = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff_objects = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should include the new commit and the new root tree
@@ -283,11 +283,11 @@ test "collect_diff_objects: handles file deletion" {
 ///|
 test "collect_diff_objects: handles new directory" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/root.txt", b"root")
-  let commit1 = commit(
+  let commit1 = @bit_lib.commit(
     fs, fs, "/repo", "Initial", "test <test@test.com>", 1000L,
   ) catch {
     _ => return ()
@@ -295,13 +295,13 @@ test "collect_diff_objects: handles new directory" {
   // Add new directory
   fs.mkdir_p("/repo/newdir")
   fs.write_file("/repo/newdir/file.txt", b"new dir file")
-  let commit2 = commit(
+  let commit2 = @bit_lib.commit(
     fs, fs, "/repo", "Add dir", "test <test@test.com>", 2000L,
   ) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
-  let diff_objects = collect_diff_objects(db, fs, commit1, commit2) catch {
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let diff_objects = @bit_lib.collect_diff_objects(db, fs, commit1, commit2) catch {
     _ => return ()
   }
   // Should include the new dir tree and its blob
@@ -320,20 +320,20 @@ test "collect_diff_objects: handles new directory" {
 ///|
 test "collect_reachable_objects_from_commits: deduplicates" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/shared.txt", b"shared")
-  let commit1 = commit(fs, fs, "/repo", "v1", "test <test@test.com>", 1000L) catch {
+  let commit1 = @bit_lib.commit(fs, fs, "/repo", "v1", "test <test@test.com>", 1000L) catch {
     _ => return ()
   }
   fs.write_file("/repo/v2.txt", b"v2 only")
-  let commit2 = commit(fs, fs, "/repo", "v2", "test <test@test.com>", 2000L) catch {
+  let commit2 = @bit_lib.commit(fs, fs, "/repo", "v2", "test <test@test.com>", 2000L) catch {
     _ => return ()
   }
-  let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
   // Collect from both commits
-  let objects = collect_reachable_objects_from_commits(db, fs, [
+  let objects = @bit_lib.collect_reachable_objects_from_commits(db, fs, [
     commit1, commit2,
   ]) catch {
     _ => return ()
@@ -354,20 +354,20 @@ test "collect_reachable_objects_from_commits: deduplicates" {
 ///|
 test "collect_reachable_objects_excluding_commits: stops at have commits" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/shared.txt", b"shared")
   fs.mkdir_p("/repo/nested")
   fs.write_file("/repo/nested/shared.txt", b"nested shared")
-  add_paths(fs, fs, "/repo", ["."])
-  let base = commit(fs, fs, "/repo", "base", "test <test@test.com>", 1000L)
+  @bit_lib.add_paths(fs, fs, "/repo", ["."])
+  let base = @bit_lib.commit(fs, fs, "/repo", "base", "test <test@test.com>", 1000L)
   fs.write_file("/repo/new.txt", b"new")
-  add_paths(fs, fs, "/repo", ["new.txt"])
-  let tip = commit(fs, fs, "/repo", "tip", "test <test@test.com>", 2000L)
-  let db = ObjectDb::load(fs, "/repo/.git")
+  @bit_lib.add_paths(fs, fs, "/repo", ["new.txt"])
+  let tip = @bit_lib.commit(fs, fs, "/repo", "tip", "test <test@test.com>", 2000L)
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git")
 
-  let objects = collect_reachable_objects_excluding_commits(db, fs, [tip], [
+  let objects = @bit_lib.collect_reachable_objects_excluding_commits(db, fs, [tip], [
     base,
   ])
   let ids : Map[String, Bool] = Map([])
@@ -415,28 +415,28 @@ fn drop_loose_object(
 ///|
 test "collect_reachable_objects_excluding_commits: shallow tip whose parent is absent" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/base.txt", b"base")
-  add_paths(fs, fs, "/repo", ["."])
-  let base = commit(fs, fs, "/repo", "base", "test <test@test.com>", 1000L)
+  @bit_lib.add_paths(fs, fs, "/repo", ["."])
+  let base = @bit_lib.commit(fs, fs, "/repo", "base", "test <test@test.com>", 1000L)
   fs.write_file("/repo/boundary.txt", b"boundary")
-  add_paths(fs, fs, "/repo", ["."])
-  let boundary = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["."])
+  let boundary = @bit_lib.commit(
     fs, fs, "/repo", "boundary", "test <test@test.com>", 2000L,
   )
   fs.write_file("/repo/new.txt", b"new")
-  add_paths(fs, fs, "/repo", ["."])
-  let tip = commit(fs, fs, "/repo", "tip", "test <test@test.com>", 3000L)
+  @bit_lib.add_paths(fs, fs, "/repo", ["."])
+  let tip = @bit_lib.commit(fs, fs, "/repo", "tip", "test <test@test.com>", 3000L)
   // A depth-1 clone (or a clone of an already shallow remote) holds `boundary`
   // but never received its parent.
   drop_loose_object(fs, "/repo/.git", base)
-  let db = ObjectDb::load(fs, "/repo/.git")
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git")
 
   // The receiver advertises `boundary`, so the walk must stop there instead of
   // trying to load the absent parent.
-  let objects = collect_reachable_objects_excluding_commits(db, fs, [tip], [
+  let objects = @bit_lib.collect_reachable_objects_excluding_commits(db, fs, [tip], [
     boundary,
   ])
   let ids : Map[String, Bool] = Map([])
@@ -450,29 +450,29 @@ test "collect_reachable_objects_excluding_commits: shallow tip whose parent is a
 ///|
 test "collect_reachable_objects: stops at a shallow boundary commit" {
   let fs = @bit.TestFs::new()
-  init_repo(fs, "/repo") catch {
+  @bit_lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
   fs.write_file("/repo/base.txt", b"base")
-  add_paths(fs, fs, "/repo", ["."])
-  let base = commit(fs, fs, "/repo", "base", "test <test@test.com>", 1000L)
+  @bit_lib.add_paths(fs, fs, "/repo", ["."])
+  let base = @bit_lib.commit(fs, fs, "/repo", "base", "test <test@test.com>", 1000L)
   fs.write_file("/repo/boundary.txt", b"boundary")
-  add_paths(fs, fs, "/repo", ["."])
-  let boundary = commit(
+  @bit_lib.add_paths(fs, fs, "/repo", ["."])
+  let boundary = @bit_lib.commit(
     fs, fs, "/repo", "boundary", "test <test@test.com>", 2000L,
   )
   drop_loose_object(fs, "/repo/.git", base)
-  let db = ObjectDb::load(fs, "/repo/.git")
+  let db = @bit_lib.ObjectDb::load(fs, "/repo/.git")
 
   // Without the boundary the walk reaches the absent parent and fails.
   let mut failed = false
-  (collect_reachable_objects(db, fs, boundary) |> ignore) catch {
+  (@bit_lib.collect_reachable_objects(db, fs, boundary) |> ignore) catch {
     _ => failed = true
   }
   assert_true(failed)
 
   // Declaring the boundary grafts the history closed, as git's shallow file does.
-  let objects = collect_reachable_objects(db, fs, boundary, shallow=[boundary])
+  let objects = @bit_lib.collect_reachable_objects(db, fs, boundary, shallow=[boundary])
   let ids : Map[String, Bool] = Map([])
   for obj in objects {
     ids[obj.id.to_hex()] = true
@@ -489,7 +489,7 @@ test "advertised_have_ids: drops zero and duplicate ids" {
   let second = @bit.ObjectId::from_hex(
     "2222222222222222222222222222222222222222",
   )
-  let haves = advertised_have_ids([
+  let haves = @bit_lib.advertised_have_ids([
     (first, "HEAD"),
     (first, "refs/heads/main"),
     (@bit.ObjectId::zero(), "refs/heads/empty"),

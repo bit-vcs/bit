@@ -86,12 +86,14 @@ test "fuzz: parse_sideband" {
 ///|
 /// receive-pack reports look like pkt-lines starting with `unpack ok`
 /// or `unpack <msg>` followed by per-ref status lines. The parser
-/// returns a Result and shouldn't crash on garbage.
+/// raises on malformed input and shouldn't crash on garbage.
 test "fuzz: parse_receive_pack_response" {
   let rng = Lcg::new(0xC0FFEE)
   for _ in 0..<128 {
     let len = rng.next_int() % 512
-    ignore(@protocol.parse_receive_pack_response(random_bytes(rng, len)))
+    ignore(@protocol.parse_receive_pack_response(random_bytes(rng, len))) catch {
+      _ => ()
+    }
   }
 }
 

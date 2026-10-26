@@ -4,9 +4,9 @@ package "mizchi/bit_utils"
 // Values
 pub fn decode_bytes(Bytes) -> String
 
-pub fn mode_to_string(Int) -> String
+pub fn mode_to_string(Int32) -> String
 
-pub fn to_octal_string(Int) -> String
+pub fn to_octal_string(Int32) -> String
 
 pub fn trim_string(String) -> String
 
@@ -17,4 +17,3 @@ pub fn trim_string(String) -> String
 // Type aliases
 
 // Traits
-

@@ -10,7 +10,7 @@ let bench_ops_root : String = "/bench_ops"
 ///|
 fn setup_add_repo(file_count : Int) -> @bit.TestFs {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, bench_ops_root)) catch {
+  ignore(@bit_lib.init_repo(fs, bench_ops_root)) catch {
     _ => ()
   }
   for i in 0..<file_count {
@@ -22,42 +22,42 @@ fn setup_add_repo(file_count : Int) -> @bit.TestFs {
 ///|
 fn setup_commit_repo(file_count : Int) -> @bit.TestFs raise @bit.GitError {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, bench_ops_root)) catch {
+  ignore(@bit_lib.init_repo(fs, bench_ops_root)) catch {
     _ => ()
   }
   for i in 0..<file_count {
     fs.write_string(bench_ops_root + "/file_\{i}.txt", "content \{i}\n")
   }
-  add_paths(fs, fs, bench_ops_root, ["."])
+  @bit_lib.add_paths(fs, fs, bench_ops_root, ["."])
   fs
 }
 
 ///|
 fn setup_checkout_repo(file_count : Int) -> @bit.TestFs raise @bit.GitError {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, bench_ops_root)) catch {
+  ignore(@bit_lib.init_repo(fs, bench_ops_root)) catch {
     _ => ()
   }
   for i in 0..<file_count {
     fs.write_string(bench_ops_root + "/file_\{i}.txt", "content \{i}\n")
   }
-  add_paths(fs, fs, bench_ops_root, ["."])
+  @bit_lib.add_paths(fs, fs, bench_ops_root, ["."])
   ignore(
-    commit(
+    @bit_lib.commit(
       fs, fs, bench_ops_root, "initial\n", "Bench <bench@example.com>", 1700000000L,
     ),
   )
-  create_branch(fs, fs, bench_ops_root, "other")
+  @bit_lib.create_branch(fs, fs, bench_ops_root, "other")
   for i in 0..<file_count {
     fs.write_string(bench_ops_root + "/file_\{i}.txt", "changed \{i}\n")
   }
-  add_paths(fs, fs, bench_ops_root, ["."])
+  @bit_lib.add_paths(fs, fs, bench_ops_root, ["."])
   ignore(
-    commit(
+    @bit_lib.commit(
       fs, fs, bench_ops_root, "other branch\n", "Bench <bench@example.com>", 1700000001L,
     ),
   )
-  ignore(checkout(fs, fs, bench_ops_root, "main"))
+  ignore(@bit_lib.checkout(fs, fs, bench_ops_root, "main"))
   fs
 }
 
@@ -65,7 +65,7 @@ fn setup_checkout_repo(file_count : Int) -> @bit.TestFs raise @bit.GitError {
 test "bench add_paths 100 files" (b : @bench.T) {
   let fs = setup_add_repo(100)
   b.bench(fn() {
-    try! add_paths(fs, fs, bench_ops_root, ["."])
+    try! @bit_lib.add_paths(fs, fs, bench_ops_root, ["."])
     b.keep(0)
   })
 }
@@ -74,7 +74,7 @@ test "bench add_paths 100 files" (b : @bench.T) {
 test "bench add_paths 500 files" (b : @bench.T) {
   let fs = setup_add_repo(500)
   b.bench(fn() {
-    try! add_paths(fs, fs, bench_ops_root, ["."])
+    try! @bit_lib.add_paths(fs, fs, bench_ops_root, ["."])
     b.keep(0)
   })
 }
@@ -83,7 +83,7 @@ test "bench add_paths 500 files" (b : @bench.T) {
 test "bench commit 100 files" (b : @bench.T) {
   let fs = try! setup_commit_repo(100)
   b.bench(fn() {
-    let id = try! commit(
+    let id = try! @bit_lib.commit(
       fs, fs, bench_ops_root, "bench commit\n", "Bench <bench@example.com>", 1700000000L,
     )
     b.keep(id.to_hex().length())
@@ -94,7 +94,7 @@ test "bench commit 100 files" (b : @bench.T) {
 test "bench checkout" (b : @bench.T) {
   let fs = try! setup_checkout_repo(100)
   b.bench(fn() {
-    let id = try! checkout(fs, fs, bench_ops_root, "other")
+    let id = try! @bit_lib.checkout(fs, fs, bench_ops_root, "other")
     b.keep(id.to_hex().length())
   })
 }

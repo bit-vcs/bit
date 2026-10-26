@@ -211,3 +211,6 @@ pub impl ObjectStore for FsStore with fn list(self, prefix, after) {
 pub impl ObjectStore for FsStore with fn supports_cas(_self) {
   true
 }
+
+///|
+pub extend FsStore with ObjectStore::{get_if_none_match, put, list, get_range, get, delete, supports_cas}

@@ -47,4 +47,3 @@ pub fn show_ref_text(&@bit_types.RepoFileSystem, String) -> Array[String] raise 
 // Type aliases
 
 // Traits
-

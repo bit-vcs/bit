@@ -191,7 +191,7 @@ fn short_hex_test(hex : String, start : Int, end : Int) -> String {
 ///|
 test "pr: init creates notes ref on first write" {
   let (fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   assert_false(fs.is_file("/repo/.git/refs/notes/bit-hub"))
   let _ = hub.create_pr(
     objects, refs, clock, "Init PR", "Body", "refs/heads/feature", "refs/heads/main",
@@ -202,13 +202,13 @@ test "pr: init creates notes ref on first write" {
 
 ///|
 test "work item: meta key uses canonical namespace" {
-  @test.assert_eq(work_item_meta_key("abc"), "hub/work-item/abc/meta")
+  @test.assert_eq(@bitx_hub.work_item_meta_key("abc"), "hub/work-item/abc/meta")
 }
 
 ///|
 test "pr: create and get PR" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let pr = prs.create_pr(
     objects, refs, clock, "Fix authentication bug", "This PR fixes the auth issue.\n\nDetails here.",
     "refs/heads/feature", "refs/heads/main", "alice@example.com",
@@ -216,7 +216,7 @@ test "pr: create and get PR" {
   let pr_id = pr.id()
   assert_true(pr_id.length() > 0)
   @test.assert_eq(pr.title(), "Fix authentication bug")
-  @test.assert_eq(pr.state(), PrState::Open)
+  @test.assert_eq(pr.state(), @bitx_hub.PrState::Open)
   // Retrieve PR
   let retrieved = prs.get_pr(objects, pr_id)
   assert_true(retrieved is Some(_))
@@ -224,7 +224,7 @@ test "pr: create and get PR" {
   @test.assert_eq(r.title(), "Fix authentication bug")
   @test.assert_eq(r.source_branch(), "refs/heads/feature")
   @test.assert_eq(r.target_branch(), "refs/heads/main")
-  let record = prs.store.get_record(objects, work_item_meta_key(pr_id))
+  let record = prs.store.get_record(objects, @bitx_hub.work_item_meta_key(pr_id))
   guard record is Some(stored) else { panic() }
   @test.assert_eq(stored.kind, "work-item")
   assert_true(stored.payload.has_prefix("work-item "))
@@ -233,12 +233,12 @@ test "pr: create and get PR" {
 ///|
 test "pr: get/list supports canonical work-item record" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let source = refs.resolve("refs/heads/feature")
   guard source is Some(source_commit) else { panic() }
   let target = refs.resolve("refs/heads/main")
   guard target is Some(target_commit) else { panic() }
-  let imported = PullRequest::new(
+  let imported = @bitx_hub.PullRequest::new(
     "work-item-pr",
     "WorkItem PR",
     "stored as work-item kind",
@@ -249,7 +249,7 @@ test "pr: get/list supports canonical work-item record" {
     "alice@example.com",
     100L,
     100L,
-    PrState::Open,
+    @bitx_hub.PrState::Open,
     [],
   )
   ignore(
@@ -257,8 +257,8 @@ test "pr: get/list supports canonical work-item record" {
       objects,
       refs,
       clock,
-      work_item_meta_key(imported.id()),
-      canonical_work_item_record_kind(),
+      @bitx_hub.work_item_meta_key(imported.id()),
+      @bitx_hub.canonical_work_item_record_kind(),
       imported.to_work_item().serialize(),
       imported.author(),
     ),
@@ -273,12 +273,12 @@ test "pr: get/list supports canonical work-item record" {
 ///|
 test "pr: list ignores legacy namespace records" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let source = refs.resolve("refs/heads/feature")
   guard source is Some(source_commit) else { panic() }
   let target = refs.resolve("refs/heads/main")
   guard target is Some(target_commit) else { panic() }
-  let legacy_pr = PullRequest::new(
+  let legacy_pr = @bitx_hub.PullRequest::new(
     "legacy-pr",
     "Legacy namespace PR",
     "out of canonical namespace",
@@ -289,7 +289,7 @@ test "pr: list ignores legacy namespace records" {
     "alice@example.com",
     100L,
     100L,
-    PrState::Open,
+    @bitx_hub.PrState::Open,
     [],
   )
   ignore(
@@ -298,7 +298,7 @@ test "pr: list ignores legacy namespace records" {
       refs,
       clock,
       "hub/pr/\{legacy_pr.id()}/meta",
-      canonical_work_item_record_kind(),
+      @bitx_hub.canonical_work_item_record_kind(),
       legacy_pr.to_work_item().serialize(),
       legacy_pr.author(),
     ),
@@ -312,7 +312,7 @@ test "pr: list ignores legacy namespace records" {
 ///|
 test "pr: list PRs" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let _ = prs.create_pr(
     objects, refs, clock, "PR 1", "First PR", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -323,14 +323,14 @@ test "pr: list PRs" {
   )
   let all = prs.list_prs(objects)
   @test.assert_eq(all.length(), 2)
-  let open_hub = prs.list_prs(objects, state=Some(PrState::Open))
+  let open_hub = prs.list_prs(objects, state=Some(@bitx_hub.PrState::Open))
   @test.assert_eq(open_hub.length(), 2)
 }
 
 ///|
 test "pr proposal: propose and list without mutating canonical PR list" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let proposed = hub.propose_pr(
     objects, refs, clock, "Proposal PR", "From external peer", "refs/heads/feature",
     "refs/heads/main", "carol@example.com",
@@ -346,40 +346,40 @@ test "pr proposal: propose and list without mutating canonical PR list" {
 ///|
 test "pr proposal: classify as notify-only trigger" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let proposed = hub.propose_pr(
     objects, refs, clock, "Notify proposal", "Only notify should fire", "refs/heads/feature",
     "refs/heads/main", "dave@example.com",
   )
-  let proposal_key = pr_proposal_meta_key(proposed.id())
+  let proposal_key = @bitx_hub.pr_proposal_meta_key(proposed.id())
   let proposal_record = hub.store.get_record(objects, proposal_key)
   guard proposal_record is Some(record) else { panic() }
   @test.assert_eq(
-    classify_record_trigger(record),
-    RecordTriggerClass::NotifyOnly,
+    @bitx_hub.classify_record_trigger(record),
+    @bitx_hub.RecordTriggerClass::NotifyOnly,
   )
-  @test.assert_eq(record_notify_topic(record), Some("hub.pr.proposal"))
+  @test.assert_eq(@bitx_hub.record_notify_topic(record), Some("hub.pr.proposal"))
 }
 
 ///|
 test "pr: classify canonical records as full triggers" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Canonical PR", "Should keep full triggers", "refs/heads/feature",
     "refs/heads/main", "erin@example.com",
   )
-  let key = work_item_meta_key(pr.id())
+  let key = @bitx_hub.work_item_meta_key(pr.id())
   let record = hub.store.get_record(objects, key)
   guard record is Some(r) else { panic() }
-  @test.assert_eq(classify_record_trigger(r), RecordTriggerClass::Full)
-  @test.assert_eq(record_notify_topic(r), None)
+  @test.assert_eq(@bitx_hub.classify_record_trigger(r), @bitx_hub.RecordTriggerClass::Full)
+  @test.assert_eq(@bitx_hub.record_notify_topic(r), None)
 }
 
 ///|
 test "pr: close PR" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let pr = prs.create_pr(
     objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -388,13 +388,13 @@ test "pr: close PR" {
   prs.close_pr(objects, refs, clock, pr_id)
   let closed = prs.get_pr(objects, pr_id)
   guard closed is Some(pr) else { panic() }
-  @test.assert_eq(pr.state(), PrState::Closed)
+  @test.assert_eq(pr.state(), @bitx_hub.PrState::Closed)
 }
 
 ///|
 test "pr: reopen PR" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let pr = prs.create_pr(
     objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -404,13 +404,13 @@ test "pr: reopen PR" {
   prs.reopen_pr(objects, refs, clock, pr_id)
   let reopened = prs.get_pr(objects, pr_id)
   guard reopened is Some(pr2) else { panic() }
-  @test.assert_eq(pr2.state(), PrState::Open)
+  @test.assert_eq(pr2.state(), @bitx_hub.PrState::Open)
 }
 
 ///|
 test "pr: reopen open PR fails" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let pr = prs.create_pr(
     objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -430,7 +430,7 @@ test "pr: reopen open PR fails" {
 ///|
 test "pr: update PR" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Original Title", "Original body", "refs/heads/feature",
     "refs/heads/main", "alice@example.com",
@@ -456,7 +456,7 @@ test "pr: update PR" {
 ///|
 test "pr: update PR labels" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -477,7 +477,7 @@ test "pr: update PR labels" {
 ///|
 test "pr: add and list comments" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let pr = prs.create_pr(
     objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -506,7 +506,7 @@ test "pr: add and list comments" {
 ///|
 test "pr: submit and list reviews" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let pr = prs.create_pr(
     objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -520,11 +520,11 @@ test "pr: submit and list reviews" {
     clock,
     pr_id,
     "bob@example.com",
-    ReviewVerdict::Approved,
+    @bitx_hub.ReviewVerdict::Approved,
     "Looks good!",
     fid,
   )
-  @test.assert_eq(r1.verdict(), ReviewVerdict::Approved)
+  @test.assert_eq(r1.verdict(), @bitx_hub.ReviewVerdict::Approved)
   let reviews = prs.list_reviews(objects, pr_id)
   @test.assert_eq(reviews.length(), 1)
   assert_true(prs.is_approved(objects, pr_id))
@@ -533,7 +533,7 @@ test "pr: submit and list reviews" {
 ///|
 test "pr: is_approved with request changes" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let pr = prs.create_pr(
     objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -548,7 +548,7 @@ test "pr: is_approved with request changes" {
     clock,
     pr_id,
     "bob@example.com",
-    ReviewVerdict::Approved,
+    @bitx_hub.ReviewVerdict::Approved,
     "LGTM",
     fid,
   )
@@ -560,7 +560,7 @@ test "pr: is_approved with request changes" {
     clock,
     pr_id,
     "carol@example.com",
-    ReviewVerdict::RequestChanges,
+    @bitx_hub.ReviewVerdict::RequestChanges,
     "Please fix X",
     fid,
   )
@@ -570,12 +570,12 @@ test "pr: is_approved with request changes" {
 ///|
 test "pr merge policy: required approvals blocks until approved" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Policy PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
   )
-  let policy = PrMergePolicy::new(1, true, false)
+  let policy = @bitx_hub.PrMergePolicy::new(1, true, false)
   ignore(
     hub.check_merge_policy(objects, refs, pr.id(), policy) catch {
       @bit.GitError::InvalidObject(message) => {
@@ -591,7 +591,7 @@ test "pr merge policy: required approvals blocks until approved" {
 ///|
 test "pr merge policy: request changes blocks when disabled" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Policy PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -604,11 +604,11 @@ test "pr merge policy: request changes blocks when disabled" {
     clock,
     pr.id(),
     "bob@example.com",
-    ReviewVerdict::RequestChanges,
+    @bitx_hub.ReviewVerdict::RequestChanges,
     "needs work",
     fid,
   )
-  let policy = PrMergePolicy::new(0, false, false)
+  let policy = @bitx_hub.PrMergePolicy::new(0, false, false)
   ignore(
     hub.check_merge_policy(objects, refs, pr.id(), policy) catch {
       @bit.GitError::InvalidObject(message) => {
@@ -624,12 +624,12 @@ test "pr merge policy: request changes blocks when disabled" {
 ///|
 test "pr merge policy: require signed records fails without signing key" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Policy PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
   )
-  let policy = PrMergePolicy::new(0, true, true)
+  let policy = @bitx_hub.PrMergePolicy::new(0, true, true)
   ignore(
     hub.check_merge_policy(objects, refs, pr.id(), policy) catch {
       @bit.GitError::InvalidObject(message) => {
@@ -645,12 +645,12 @@ test "pr merge policy: require signed records fails without signing key" {
 ///|
 test "pr merge policy: require signed records rejects unsigned PR with key" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Unsigned PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
   )
-  let policy = PrMergePolicy::new(0, true, true)
+  let policy = @bitx_hub.PrMergePolicy::new(0, true, true)
   ignore(
     hub.check_merge_policy(
       objects,
@@ -672,7 +672,7 @@ test "pr merge policy: require signed records rejects unsigned PR with key" {
 ///|
 test "pr workflow: record and list latest workflow result" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Workflow PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -683,7 +683,7 @@ test "pr workflow: record and list latest workflow result" {
     clock,
     pr.id(),
     "test",
-    PrWorkflowStatus::Failed,
+    @bitx_hub.PrWorkflowStatus::Failed,
     "fp-1",
     "ci@example.com",
     txn_id=Some("txn-failed"),
@@ -695,7 +695,7 @@ test "pr workflow: record and list latest workflow result" {
     clock,
     pr.id(),
     "test",
-    PrWorkflowStatus::Success,
+    @bitx_hub.PrWorkflowStatus::Success,
     "fp-2",
     "ci@example.com",
     txn_id=Some("txn-success"),
@@ -704,19 +704,19 @@ test "pr workflow: record and list latest workflow result" {
   let workflows = hub.list_pr_workflows(objects, pr.id())
   @test.assert_eq(workflows.length(), 1)
   @test.assert_eq(workflows[0].task(), "test")
-  @test.assert_eq(workflows[0].status(), PrWorkflowStatus::Success)
+  @test.assert_eq(workflows[0].status(), @bitx_hub.PrWorkflowStatus::Success)
   @test.assert_eq(workflows[0].workspace_fingerprint(), "fp-2")
 }
 
 ///|
 test "pr merge policy: required workflows block until latest status is success" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Workflow Gate PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
   )
-  let policy = PrMergePolicy::new(0, true, false, required_workflows=["test"])
+  let policy = @bitx_hub.PrMergePolicy::new(0, true, false, required_workflows=["test"])
   ignore(
     hub.check_merge_policy(objects, refs, pr.id(), policy) catch {
       @bit.GitError::InvalidObject(message) => {
@@ -732,7 +732,7 @@ test "pr merge policy: required workflows block until latest status is success" 
 ///|
 test "pr merge policy: required workflows accepts latest success status" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Workflow Gate PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -743,7 +743,7 @@ test "pr merge policy: required workflows accepts latest success status" {
     clock,
     pr.id(),
     "test",
-    PrWorkflowStatus::Failed,
+    @bitx_hub.PrWorkflowStatus::Failed,
     "fp-failed",
     "ci@example.com",
     txn_id=Some("txn-failed"),
@@ -754,19 +754,19 @@ test "pr merge policy: required workflows accepts latest success status" {
     clock,
     pr.id(),
     "test",
-    PrWorkflowStatus::Success,
+    @bitx_hub.PrWorkflowStatus::Success,
     "fp-success",
     "ci@example.com",
     txn_id=Some("txn-success"),
   )
-  let policy = PrMergePolicy::new(0, true, false, required_workflows=["test"])
+  let policy = @bitx_hub.PrMergePolicy::new(0, true, false, required_workflows=["test"])
   hub.check_merge_policy(objects, refs, pr.id(), policy)
 }
 
 ///|
 test "pr: merge fast-forward" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let pr = prs.create_pr(
     objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -779,7 +779,7 @@ test "pr: merge fast-forward" {
     clock,
     pr_id,
     "alice@example.com",
-    strategy=PrMergeStrategy::FastForward,
+    strategy=@bitx_hub.PrMergeStrategy::FastForward,
   )
   assert_true(result.success())
   assert_true(result.commit_id() is Some(_))
@@ -787,13 +787,13 @@ test "pr: merge fast-forward" {
   // Verify PR is marked as merged
   let merged = prs.get_pr(objects, pr_id)
   guard merged is Some(pr) else { panic() }
-  @test.assert_eq(pr.state(), PrState::Merged)
+  @test.assert_eq(pr.state(), @bitx_hub.PrState::Merged)
 }
 
 ///|
 test "pr: merge squash" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -805,19 +805,19 @@ test "pr: merge squash" {
     clock,
     pr_id,
     "alice@example.com",
-    strategy=PrMergeStrategy::Squash,
+    strategy=@bitx_hub.PrMergeStrategy::Squash,
   )
   assert_true(result.success())
   @test.assert_eq(result.message(), "Squash merge completed")
   let merged = hub.get_pr(objects, pr_id)
   guard merged is Some(pr) else { panic() }
-  @test.assert_eq(pr.state(), PrState::Merged)
+  @test.assert_eq(pr.state(), @bitx_hub.PrState::Merged)
 }
 
 ///|
 test "pr: merge commit" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let pr = hub.create_pr(
     objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
@@ -829,18 +829,18 @@ test "pr: merge commit" {
     clock,
     pr_id,
     "alice@example.com",
-    strategy=PrMergeStrategy::Merge,
+    strategy=@bitx_hub.PrMergeStrategy::Merge,
   )
   assert_true(result.success())
   @test.assert_eq(result.message(), "Merge commit created")
   let merged = hub.get_pr(objects, pr_id)
   guard merged is Some(pr) else { panic() }
-  @test.assert_eq(pr.state(), PrState::Merged)
+  @test.assert_eq(pr.state(), @bitx_hub.PrState::Merged)
 }
 
 ///|
 test "format: serialize and parse PullRequest" {
-  let pr = PullRequest::new(
+  let pr = @bitx_hub.PullRequest::new(
     "42",
     "Test PR",
     "Description\nwith multiple lines",
@@ -851,11 +851,11 @@ test "format: serialize and parse PullRequest" {
     "alice@example.com",
     1706745600L,
     1706832000L,
-    PrState::Open,
+    @bitx_hub.PrState::Open,
     ["bug", "urgent"],
   )
   let serialized = pr.serialize()
-  let parsed = parse_legacy_pull_request(serialized)
+  let parsed = @bitx_hub.parse_legacy_pull_request(serialized)
   @test.assert_eq(parsed.id(), "42")
   @test.assert_eq(parsed.title(), "Test PR")
   @test.assert_eq(parsed.labels().length(), 2)
@@ -864,7 +864,7 @@ test "format: serialize and parse PullRequest" {
 
 ///|
 test "format: serialize and parse PullRequest with source metadata" {
-  let pr = PullRequest::new(
+  let pr = @bitx_hub.PullRequest::new(
     "44",
     "Fork PR",
     "Body",
@@ -875,13 +875,13 @@ test "format: serialize and parse PullRequest with source metadata" {
     "alice@example.com",
     1706745600L,
     1706832000L,
-    PrState::Open,
+    @bitx_hub.PrState::Open,
     [],
     source_repo=Some("contrib/bit"),
     source_ref=Some("refs/heads/feature"),
   )
   let serialized = pr.serialize()
-  let parsed = parse_legacy_pull_request(serialized)
+  let parsed = @bitx_hub.parse_legacy_pull_request(serialized)
   guard parsed.source_repo() is Some(repo) else { panic() }
   @test.assert_eq(repo, "contrib/bit")
   guard parsed.source_ref() is Some(source_ref) else { panic() }
@@ -890,7 +890,7 @@ test "format: serialize and parse PullRequest with source metadata" {
 
 ///|
 test "format: serialize and parse PrComment" {
-  let comment = PrComment::new(
+  let comment = @bitx_hub.PrComment::new(
     "abc123",
     "1",
     "bob@example.com",
@@ -900,7 +900,7 @@ test "format: serialize and parse PrComment" {
     line_number=Some(42),
   )
   let serialized = comment.serialize()
-  let parsed = parse_pr_comment(serialized)
+  let parsed = @bitx_hub.parse_pr_comment(serialized)
   @test.assert_eq(parsed.id(), "abc123")
   @test.assert_eq(parsed.pr_id(), "1")
   assert_true(parsed.file_path() is Some(_))
@@ -910,25 +910,25 @@ test "format: serialize and parse PrComment" {
 
 ///|
 test "format: serialize and parse PrReview" {
-  let review = PrReview::new(
+  let review = @bitx_hub.PrReview::new(
     "rev123",
     "1",
     "carol@example.com",
-    ReviewVerdict::Approved,
+    @bitx_hub.ReviewVerdict::Approved,
     "LGTM!",
     1706918400L,
     @bit.ObjectId::zero(),
   )
   let serialized = review.serialize()
-  let parsed = parse_pr_review(serialized)
+  let parsed = @bitx_hub.parse_pr_review(serialized)
   @test.assert_eq(parsed.id(), "rev123")
-  @test.assert_eq(parsed.verdict(), ReviewVerdict::Approved)
+  @test.assert_eq(parsed.verdict(), @bitx_hub.ReviewVerdict::Approved)
 }
 
 ///|
 test "issue: create and get issue" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let issue = prs.create_issue(
     objects,
     refs,
@@ -941,13 +941,13 @@ test "issue: create and get issue" {
   let issue_id = issue.id()
   assert_true(issue_id.length() > 0)
   @test.assert_eq(issue.title(), "Bug report")
-  @test.assert_eq(issue.state(), IssueState::Open)
+  @test.assert_eq(issue.state(), @bitx_hub.IssueState::Open)
   let retrieved = prs.get_issue(objects, issue_id)
   assert_true(retrieved is Some(_))
   guard retrieved is Some(i) else { panic() }
   @test.assert_eq(i.title(), "Bug report")
   @test.assert_eq(i.labels().length(), 1)
-  let record = prs.store.get_record(objects, work_item_meta_key(issue_id))
+  let record = prs.store.get_record(objects, @bitx_hub.work_item_meta_key(issue_id))
   guard record is Some(stored) else { panic() }
   @test.assert_eq(stored.kind, "work-item")
   assert_true(stored.payload.has_prefix("work-item "))
@@ -956,23 +956,23 @@ test "issue: create and get issue" {
 ///|
 test "issue: get/list supports canonical work-item record" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
-  let imported = Issue::new(
+  let hub = @bitx_hub.Hub::init(objects, refs)
+  let imported = @bitx_hub.Issue::new(
     "work-item-issue",
     "WorkItem issue",
     "stored as work-item kind",
     "alice@example.com",
     100L,
     100L,
-    IssueState::Open,
+    @bitx_hub.IssueState::Open,
   )
   ignore(
     hub.store.put_record(
       objects,
       refs,
       clock,
-      work_item_meta_key(imported.id()),
-      canonical_work_item_record_kind(),
+      @bitx_hub.work_item_meta_key(imported.id()),
+      @bitx_hub.canonical_work_item_record_kind(),
       imported.to_work_item().serialize(),
       imported.author(),
     ),
@@ -987,15 +987,15 @@ test "issue: get/list supports canonical work-item record" {
 ///|
 test "issue: list ignores legacy namespace records" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
-  let legacy_issue = Issue::new(
+  let hub = @bitx_hub.Hub::init(objects, refs)
+  let legacy_issue = @bitx_hub.Issue::new(
     "legacy-issue",
     "Legacy namespace issue",
     "out of canonical namespace",
     "alice@example.com",
     100L,
     100L,
-    IssueState::Open,
+    @bitx_hub.IssueState::Open,
   )
   ignore(
     hub.store.put_record(
@@ -1003,7 +1003,7 @@ test "issue: list ignores legacy namespace records" {
       refs,
       clock,
       "hub/issue/\{legacy_issue.id()}/meta",
-      canonical_work_item_record_kind(),
+      @bitx_hub.canonical_work_item_record_kind(),
       legacy_issue.to_work_item().serialize(),
       legacy_issue.author(),
     ),
@@ -1017,7 +1017,7 @@ test "issue: list ignores legacy namespace records" {
 ///|
 test "issue: list issues" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let _ = prs.create_issue(
     objects, refs, clock, "Issue 1", "First", "alice@example.com",
   )
@@ -1026,14 +1026,14 @@ test "issue: list issues" {
   )
   let all = prs.list_issues(objects)
   @test.assert_eq(all.length(), 2)
-  let open_issues = prs.list_issues(objects, state=Some(IssueState::Open))
+  let open_issues = prs.list_issues(objects, state=Some(@bitx_hub.IssueState::Open))
   @test.assert_eq(open_issues.length(), 2)
 }
 
 ///|
 test "issue: close issue" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let issue = prs.create_issue(
     objects, refs, clock, "Test Issue", "Body", "alice@example.com",
   )
@@ -1041,13 +1041,13 @@ test "issue: close issue" {
   prs.close_issue(objects, refs, clock, issue_id)
   let closed = prs.get_issue(objects, issue_id)
   guard closed is Some(issue) else { panic() }
-  @test.assert_eq(issue.state(), IssueState::Closed)
+  @test.assert_eq(issue.state(), @bitx_hub.IssueState::Closed)
 }
 
 ///|
 test "issue: reopen issue" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let issue = prs.create_issue(
     objects, refs, clock, "Test Issue", "Body", "alice@example.com",
   )
@@ -1056,13 +1056,13 @@ test "issue: reopen issue" {
   prs.reopen_issue(objects, refs, clock, issue_id)
   let reopened = prs.get_issue(objects, issue_id)
   guard reopened is Some(issue2) else { panic() }
-  @test.assert_eq(issue2.state(), IssueState::Open)
+  @test.assert_eq(issue2.state(), @bitx_hub.IssueState::Open)
 }
 
 ///|
 test "issue: reopen open issue fails" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let issue = prs.create_issue(
     objects, refs, clock, "Test Issue", "Body", "alice@example.com",
   )
@@ -1081,7 +1081,7 @@ test "issue: reopen open issue fails" {
 ///|
 test "issue: add and list comments" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let issue = prs.create_issue(
     objects, refs, clock, "Test Issue", "Body", "alice@example.com",
   )
@@ -1101,7 +1101,7 @@ test "issue: add and list comments" {
 ///|
 test "issue: link PR to issue" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let prs = Hub::init(objects, refs)
+  let prs = @bitx_hub.Hub::init(objects, refs)
   let issue = prs.create_issue(
     objects, refs, clock, "Bug", "Fix needed", "alice@example.com",
   )
@@ -1121,7 +1121,7 @@ test "issue: link PR to issue" {
 ///|
 test "issue: link cross-repo issue" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let issue = hub.create_issue(
     objects,
     refs,
@@ -1142,7 +1142,7 @@ test "issue: link cross-repo issue" {
 ///|
 test "issue: update issue" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let issue = hub.create_issue(
     objects, refs, clock, "Original Title", "Original body", "alice@example.com",
   )
@@ -1165,7 +1165,7 @@ test "issue: update issue" {
 ///|
 test "issue: update issue labels and assignees" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let issue = hub.create_issue(
     objects, refs, clock, "Bug", "Details", "alice@example.com",
   )
@@ -1186,7 +1186,7 @@ test "issue: update issue labels and assignees" {
 ///|
 test "issue: add_dep sets blocked_by and blocking on both issues" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
   let b = hub.create_issue(objects, refs, clock, "B", "Body", "alice@example.com")
   hub.add_dep(objects, refs, clock, a.id(), b.id())
@@ -1201,7 +1201,7 @@ test "issue: add_dep sets blocked_by and blocking on both issues" {
 ///|
 test "issue: add_dep is idempotent when called twice" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
   let b = hub.create_issue(objects, refs, clock, "B", "Body", "alice@example.com")
   hub.add_dep(objects, refs, clock, a.id(), b.id())
@@ -1214,7 +1214,7 @@ test "issue: add_dep is idempotent when called twice" {
 ///|
 test "issue: remove_dep clears blocked_by and blocking on both issues" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
   let b = hub.create_issue(objects, refs, clock, "B", "Body", "alice@example.com")
   hub.add_dep(objects, refs, clock, a.id(), b.id())
@@ -1230,7 +1230,7 @@ test "issue: remove_dep clears blocked_by and blocking on both issues" {
 ///|
 test "issue: add_dep rejects an issue depending on itself" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
   ignore(
     hub.add_dep(objects, refs, clock, a.id(), a.id()) catch {
@@ -1247,7 +1247,7 @@ test "issue: add_dep rejects an issue depending on itself" {
 ///|
 test "issue: add_dep rejects a direct cycle" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
   let b = hub.create_issue(objects, refs, clock, "B", "Body", "alice@example.com")
   hub.add_dep(objects, refs, clock, a.id(), b.id())
@@ -1266,7 +1266,7 @@ test "issue: add_dep rejects a direct cycle" {
 ///|
 test "issue: add_dep rejects a transitive cycle" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let a = hub.create_issue(objects, refs, clock, "A", "Body", "alice@example.com")
   let b = hub.create_issue(objects, refs, clock, "B", "Body", "alice@example.com")
   let c = hub.create_issue(objects, refs, clock, "C", "Body", "alice@example.com")
@@ -1289,7 +1289,7 @@ test "issue: add_dep rejects a transitive cycle" {
 ///|
 test "work item: get returns unified issue/pr view" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let issue = hub.create_issue(
     objects,
     refs,
@@ -1306,15 +1306,15 @@ test "work item: get returns unified issue/pr view" {
   )
   let issue_item = hub.get_work_item(objects, issue.id())
   guard issue_item is Some(found_issue_item) else { panic() }
-  @test.assert_eq(found_issue_item.kind(), WorkItemKind::Issue)
-  @test.assert_eq(found_issue_item.state(), WorkItemState::Open)
+  @test.assert_eq(found_issue_item.kind(), @bitx_hub.WorkItemKind::Issue)
+  @test.assert_eq(found_issue_item.state(), @bitx_hub.WorkItemState::Open)
   @test.assert_eq(found_issue_item.assignees().length(), 1)
   assert_true(found_issue_item.patch() is None)
 
   let pr_item = hub.get_work_item(objects, pr.id())
   guard pr_item is Some(found_pr_item) else { panic() }
-  @test.assert_eq(found_pr_item.kind(), WorkItemKind::PullRequest)
-  @test.assert_eq(found_pr_item.state(), WorkItemState::Open)
+  @test.assert_eq(found_pr_item.kind(), @bitx_hub.WorkItemKind::PullRequest)
+  @test.assert_eq(found_pr_item.state(), @bitx_hub.WorkItemState::Open)
   @test.assert_eq(found_pr_item.assignees().length(), 0)
   guard found_pr_item.patch() is Some(pr_patch) else { panic() }
   @test.assert_eq(pr_patch.source_branch(), "refs/heads/feature")
@@ -1324,7 +1324,7 @@ test "work item: get returns unified issue/pr view" {
 ///|
 test "work item: list supports kind/state filters" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let issue = hub.create_issue(
     objects, refs, clock, "Issue 1", "Body", "alice@example.com",
   )
@@ -1338,79 +1338,79 @@ test "work item: list supports kind/state filters" {
   let all = hub.list_work_items(objects)
   @test.assert_eq(all.length(), 2)
 
-  let closed = hub.list_work_items(objects, state=Some(WorkItemState::Closed))
+  let closed = hub.list_work_items(objects, state=Some(@bitx_hub.WorkItemState::Closed))
   @test.assert_eq(closed.length(), 2)
 
   let issue_only = hub.list_work_items(
     objects,
-    state=Some(WorkItemState::Closed),
-    kind=Some(WorkItemKind::Issue),
+    state=Some(@bitx_hub.WorkItemState::Closed),
+    kind=Some(@bitx_hub.WorkItemKind::Issue),
   )
   @test.assert_eq(issue_only.length(), 1)
-  @test.assert_eq(issue_only[0].kind(), WorkItemKind::Issue)
+  @test.assert_eq(issue_only[0].kind(), @bitx_hub.WorkItemKind::Issue)
 
   let pr_only = hub.list_work_items(
     objects,
-    state=Some(WorkItemState::Closed),
-    kind=Some(WorkItemKind::PullRequest),
+    state=Some(@bitx_hub.WorkItemState::Closed),
+    kind=Some(@bitx_hub.WorkItemKind::PullRequest),
   )
   @test.assert_eq(pr_only.length(), 1)
-  @test.assert_eq(pr_only[0].kind(), WorkItemKind::PullRequest)
+  @test.assert_eq(pr_only[0].kind(), @bitx_hub.WorkItemKind::PullRequest)
 
-  let merged = hub.list_work_items(objects, state=Some(WorkItemState::Merged))
+  let merged = hub.list_work_items(objects, state=Some(@bitx_hub.WorkItemState::Merged))
   @test.assert_eq(merged.length(), 0)
 }
 
 ///|
 test "work item: kind is derived from patch capability" {
-  let issue_like = WorkItem::new(
+  let issue_like = @bitx_hub.WorkItem::new(
     "w-issue",
     "Issue title",
     "Issue body",
     "alice@example.com",
     1L,
     2L,
-    WorkItemState::Open,
+    @bitx_hub.WorkItemState::Open,
   )
-  @test.assert_eq(issue_like.kind(), WorkItemKind::Issue)
+  @test.assert_eq(issue_like.kind(), @bitx_hub.WorkItemKind::Issue)
 
-  let patch = WorkItemPatch::new(
+  let patch = @bitx_hub.WorkItemPatch::new(
     "refs/heads/feature",
     @bit.ObjectId::zero(),
     "refs/heads/main",
     @bit.ObjectId::zero(),
   )
-  let pr_like = WorkItem::new(
+  let pr_like = @bitx_hub.WorkItem::new(
     "w-pr",
     "PR title",
     "PR body",
     "bob@example.com",
     3L,
     4L,
-    WorkItemState::Open,
+    @bitx_hub.WorkItemState::Open,
     patch=Some(patch),
   )
-  @test.assert_eq(pr_like.kind(), WorkItemKind::PullRequest)
+  @test.assert_eq(pr_like.kind(), @bitx_hub.WorkItemKind::PullRequest)
 }
 
 ///|
 test "format: serialize and parse WorkItem issue" {
-  let item = WorkItem::new(
+  let item = @bitx_hub.WorkItem::new(
     "w-issue-1",
     "Issue title",
     "Issue body",
     "alice@example.com",
     1706745600L,
     1706832000L,
-    WorkItemState::Open,
+    @bitx_hub.WorkItemState::Open,
     labels=["bug"],
     assignees=["bob@example.com"],
     linked_prs=["pr-1"],
   )
   let serialized = item.serialize()
-  let parsed = parse_work_item(serialized)
+  let parsed = @bitx_hub.parse_work_item(serialized)
   @test.assert_eq(parsed.id(), "w-issue-1")
-  @test.assert_eq(parsed.kind(), WorkItemKind::Issue)
+  @test.assert_eq(parsed.kind(), @bitx_hub.WorkItemKind::Issue)
   guard parsed.to_issue() is Some(issue) else { panic() }
   @test.assert_eq(issue.title(), "Issue title")
   @test.assert_eq(issue.assignees().length(), 1)
@@ -1423,7 +1423,7 @@ test "format: serialize and parse WorkItem pull request" {
   ) catch {
     _ => panic()
   }
-  let patch = WorkItemPatch::new(
+  let patch = @bitx_hub.WorkItemPatch::new(
     "refs/heads/feature",
     @bit.ObjectId::zero(),
     "refs/heads/main",
@@ -1433,23 +1433,23 @@ test "format: serialize and parse WorkItem pull request" {
     source_repo=Some("contrib/bit"),
     source_ref=Some("refs/heads/feature"),
   )
-  let item = WorkItem::new(
+  let item = @bitx_hub.WorkItem::new(
     "w-pr-1",
     "PR title",
     "PR body",
     "carol@example.com",
     1706745600L,
     1706832000L,
-    WorkItemState::Merged,
+    @bitx_hub.WorkItemState::Merged,
     labels=["enhancement"],
     patch=Some(patch),
   )
   let serialized = item.serialize()
-  let parsed = parse_work_item(serialized)
+  let parsed = @bitx_hub.parse_work_item(serialized)
   @test.assert_eq(parsed.id(), "w-pr-1")
-  @test.assert_eq(parsed.kind(), WorkItemKind::PullRequest)
+  @test.assert_eq(parsed.kind(), @bitx_hub.WorkItemKind::PullRequest)
   guard parsed.to_pull_request() is Some(pr) else { panic() }
-  @test.assert_eq(pr.state(), PrState::Merged)
+  @test.assert_eq(pr.state(), @bitx_hub.PrState::Merged)
   @test.assert_eq(pr.closes_issues().length(), 1)
   guard pr.merge_commit() is Some(parsed_merge_id) else { panic() }
   @test.assert_eq(parsed_merge_id, merge_id)
@@ -1457,19 +1457,19 @@ test "format: serialize and parse WorkItem pull request" {
 
 ///|
 test "format: serialize and parse Issue" {
-  let issue = Issue::new(
+  let issue = @bitx_hub.Issue::new(
     "42",
     "Bug report",
     "Description\nwith details",
     "alice@example.com",
     1706745600L,
     1706832000L,
-    IssueState::Open,
+    @bitx_hub.IssueState::Open,
     labels=["bug", "urgent"],
     assignees=["bob@example.com"],
   )
   let serialized = issue.serialize()
-  let parsed = parse_legacy_issue(serialized)
+  let parsed = @bitx_hub.parse_legacy_issue(serialized)
   @test.assert_eq(parsed.id(), "42")
   @test.assert_eq(parsed.title(), "Bug report")
   @test.assert_eq(parsed.labels().length(), 2)
@@ -1478,11 +1478,11 @@ test "format: serialize and parse Issue" {
 
 ///|
 test "format: serialize and parse IssueComment" {
-  let comment = IssueComment::new(
+  let comment = @bitx_hub.IssueComment::new(
     "abc123", "1", "bob@example.com", "Thanks!", 1706832000L,
   )
   let serialized = comment.serialize()
-  let parsed = parse_issue_comment(serialized)
+  let parsed = @bitx_hub.parse_issue_comment(serialized)
   @test.assert_eq(parsed.id(), "abc123")
   @test.assert_eq(parsed.issue_id(), "1")
 }
@@ -1490,7 +1490,7 @@ test "format: serialize and parse IssueComment" {
 ///|
 test "notes: add and get note" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let commit_id = refs.resolve("refs/heads/main")
   guard commit_id is Some(cid) else { panic() }
   let note = hub.add_note(
@@ -1508,7 +1508,7 @@ test "notes: add and get note" {
 ///|
 test "notes: list notes" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let main_commit = refs.resolve("refs/heads/main")
   guard main_commit is Some(main_id) else { panic() }
   let feature_commit = refs.resolve("refs/heads/feature")
@@ -1526,7 +1526,7 @@ test "notes: list notes" {
 ///|
 test "notes: remove note" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let commit_id = refs.resolve("refs/heads/main")
   guard commit_id is Some(cid) else { panic() }
   let _ = hub.add_note(
@@ -1542,7 +1542,7 @@ test "notes: remove note" {
 ///|
 test "notes: custom ns" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let commit_id = refs.resolve("refs/heads/main")
   guard commit_id is Some(cid) else { panic() }
   let _ = hub.add_note(
@@ -1563,7 +1563,7 @@ test "notes: custom ns" {
 
 ///|
 test "hub_record version round-trip" {
-  let record = HubRecord::new(
+  let record = @bitx_hub.HubRecord::new(
     "hub/pr/1/meta",
     "pr",
     "some payload",
@@ -1572,7 +1572,7 @@ test "hub_record version round-trip" {
     version=1,
   )
   let serialized = record.serialize()
-  let parsed = parse_hub_record(serialized)
+  let parsed = @bitx_hub.parse_hub_record(serialized)
   @test.assert_eq(parsed.version, 1)
   @test.assert_eq(parsed.key, "hub/pr/1/meta")
   @test.assert_eq(parsed.kind, "pr")
@@ -1581,7 +1581,7 @@ test "hub_record version round-trip" {
 
 ///|
 test "hub_record signature round-trip" {
-  let record = HubRecord::new(
+  let record = @bitx_hub.HubRecord::new(
     "hub/pr/1/meta",
     "pr",
     "some payload",
@@ -1590,7 +1590,7 @@ test "hub_record signature round-trip" {
     signature=Some("deadbeef"),
   )
   let serialized = record.serialize()
-  let parsed = parse_hub_record(serialized)
+  let parsed = @bitx_hub.parse_hub_record(serialized)
   @test.assert_eq(parsed.signature, Some("deadbeef"))
 }
 
@@ -1606,7 +1606,7 @@ test "hub_record version=0 backward compat" {
     #|deleted 0
     #|
     #|payload data
-  let parsed = parse_hub_record(text)
+  let parsed = @bitx_hub.parse_hub_record(text)
   @test.assert_eq(parsed.version, 0)
   @test.assert_eq(parsed.key, "hub/pr/1/meta")
 }
@@ -1618,7 +1618,7 @@ test "pr merge_commit round-trip" {
   ) catch {
     _ => panic()
   }
-  let pr = PullRequest::new(
+  let pr = @bitx_hub.PullRequest::new(
     "42",
     "Test PR",
     "Body",
@@ -1629,12 +1629,12 @@ test "pr merge_commit round-trip" {
     "alice@example.com",
     1706745600L,
     1706832000L,
-    PrState::Open,
+    @bitx_hub.PrState::Open,
     [],
     merge_commit=Some(merge_id),
   )
   let serialized = pr.serialize()
-  let parsed = parse_legacy_pull_request(serialized) catch { _ => panic() }
+  let parsed = @bitx_hub.parse_legacy_pull_request(serialized) catch { _ => panic() }
   assert_true(parsed.merge_commit() is Some(_))
   guard parsed.merge_commit() is Some(mc) else { panic() }
   @test.assert_eq(mc.to_hex(), "abcdef0123456789abcdef0123456789abcdef01")
@@ -1642,7 +1642,7 @@ test "pr merge_commit round-trip" {
 
 ///|
 test "pr merge_commit none round-trip" {
-  let pr = PullRequest::new(
+  let pr = @bitx_hub.PullRequest::new(
     "43",
     "No merge commit",
     "Body",
@@ -1653,23 +1653,23 @@ test "pr merge_commit none round-trip" {
     "bob@example.com",
     1706745600L,
     1706832000L,
-    PrState::Open,
+    @bitx_hub.PrState::Open,
     [],
   )
   let serialized = pr.serialize()
-  let parsed = parse_legacy_pull_request(serialized) catch { _ => panic() }
+  let parsed = @bitx_hub.parse_legacy_pull_request(serialized) catch { _ => panic() }
   assert_true(parsed.merge_commit() is None)
 }
 
 ///|
 test "pr: merge uses source_commit when source branch is missing" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   let source_id = refs.resolve("refs/heads/feature")
   guard source_id is Some(sid) else { panic() }
   let target_id = refs.resolve("refs/heads/main")
   guard target_id is Some(tid) else { panic() }
-  let pr = PullRequest::new(
+  let pr = @bitx_hub.PullRequest::new(
     "9000",
     "Forked branch PR",
     "Body",
@@ -1680,7 +1680,7 @@ test "pr: merge uses source_commit when source branch is missing" {
     "contrib@example.com",
     1706745600L,
     1706832000L,
-    PrState::Open,
+    @bitx_hub.PrState::Open,
     [],
     source_repo=Some("contrib/bit"),
     source_ref=Some("refs/heads/missing-fork-branch"),
@@ -1692,7 +1692,7 @@ test "pr: merge uses source_commit when source branch is missing" {
     clock,
     "9000",
     "maintainer@example.com",
-    strategy=PrMergeStrategy::Merge,
+    strategy=@bitx_hub.PrMergeStrategy::Merge,
   )
   assert_true(result.success())
 }
@@ -1700,8 +1700,8 @@ test "pr: merge uses source_commit when source branch is missing" {
 ///|
 test "signature: require_signed hides unsigned records" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let unsigned_hub = Hub::init(objects, refs)
-  let strict_hub = Hub::init(
+  let unsigned_hub = @bitx_hub.Hub::init(objects, refs)
+  let strict_hub = @bitx_hub.Hub::init(
     objects,
     refs,
     signing_key=Some("k1"),
@@ -1725,13 +1725,13 @@ test "signature: require_signed hides unsigned records" {
 ///|
 test "signature: wrong key hides signed records" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let writer = Hub::init(
+  let writer = @bitx_hub.Hub::init(
     objects,
     refs,
     signing_key=Some("writer-key"),
     require_signed=true,
   )
-  let reader = Hub::init(
+  let reader = @bitx_hub.Hub::init(
     objects,
     refs,
     signing_key=Some("reader-key"),
@@ -1749,7 +1749,7 @@ test "signature: wrong key hides signed records" {
 ///|
 test "signature: require_signed without key rejects writes" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let strict = Hub::init(objects, refs, require_signed=true)
+  let strict = @bitx_hub.Hub::init(objects, refs, require_signed=true)
   ignore(
     strict.create_pr(
       objects, refs, clock, "Signed", "Body", "refs/heads/feature", "refs/heads/main",
@@ -1768,8 +1768,8 @@ test "signature: require_signed without key rejects writes" {
 ///|
 test "signature: require_signed hides unsigned proposal records" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let unsigned_hub = Hub::init(objects, refs)
-  let strict_hub = Hub::init(
+  let unsigned_hub = @bitx_hub.Hub::init(objects, refs)
+  let strict_hub = @bitx_hub.Hub::init(
     objects,
     refs,
     signing_key=Some("k1"),
@@ -1794,13 +1794,13 @@ test "signature: require_signed hides unsigned proposal records" {
 ///|
 test "signature: wrong key hides signed proposal records" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let writer = Hub::init(
+  let writer = @bitx_hub.Hub::init(
     objects,
     refs,
     signing_key=Some("writer-key"),
     require_signed=true,
   )
-  let reader = Hub::init(
+  let reader = @bitx_hub.Hub::init(
     objects,
     refs,
     signing_key=Some("reader-key"),
@@ -1818,7 +1818,7 @@ test "signature: wrong key hides signed proposal records" {
 ///|
 test "signature: require_signed without key rejects proposal writes" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
-  let strict = Hub::init(objects, refs, require_signed=true)
+  let strict = @bitx_hub.Hub::init(objects, refs, require_signed=true)
   ignore(
     strict.propose_pr(
       objects, refs, clock, "Signed proposal", "Body", "refs/heads/feature", "refs/heads/main",
@@ -1836,21 +1836,21 @@ test "signature: require_signed without key rejects proposal writes" {
 
 ///|
 test "format: serialize and parse WorkItem with linked_issues" {
-  let item = WorkItem::new(
+  let item = @bitx_hub.WorkItem::new(
     "w-linked-1",
     "Issue with cross-repo links",
     "Body text",
     "alice@example.com",
     1706745600L,
     1706832000L,
-    WorkItemState::Open,
+    @bitx_hub.WorkItemState::Open,
     labels=["feature"],
     linked_issues=["bit-vcs/other-repo#a1b2c3d4", "myteam/lib#deadbeef"],
   )
   let serialized = item.serialize()
   assert_true(serialized.contains("linked-issue bit-vcs/other-repo#a1b2c3d4"))
   assert_true(serialized.contains("linked-issue myteam/lib#deadbeef"))
-  let parsed = parse_work_item(serialized)
+  let parsed = @bitx_hub.parse_work_item(serialized)
   @test.assert_eq(parsed.linked_issues(), [
     "bit-vcs/other-repo#a1b2c3d4", "myteam/lib#deadbeef",
   ])
@@ -1858,7 +1858,7 @@ test "format: serialize and parse WorkItem with linked_issues" {
 
 ///|
 test "format: serialize and parse Note" {
-  let note = Note::new(
+  let note = @bitx_hub.Note::new(
     @bit.ObjectId::zero(),
     "This is a helpful note.",
     "alice@example.com",
@@ -1866,7 +1866,7 @@ test "format: serialize and parse Note" {
     ns="commits",
   )
   let serialized = note.serialize()
-  let parsed = parse_note(serialized)
+  let parsed = @bitx_hub.parse_note(serialized)
   @test.assert_eq(parsed.body(), "This is a helpful note.")
   @test.assert_eq(parsed.author(), "alice@example.com")
   @test.assert_eq(parsed.ns(), "commits")
@@ -1874,7 +1874,7 @@ test "format: serialize and parse Note" {
 
 ///|
 test "sync_link: serialize and parse roundtrip" {
-  let link = SyncLink::new(
+  let link = @bitx_hub.SyncLink::new(
     "abc12345",
     "issue",
     "github",
@@ -1891,7 +1891,7 @@ test "sync_link: serialize and parse roundtrip" {
   assert_true(serialized.contains("provider github"))
   assert_true(serialized.contains("repo owner/repo"))
   assert_true(serialized.contains("remote-number 42"))
-  let parsed = parse_sync_link(serialized)
+  let parsed = @bitx_hub.parse_sync_link(serialized)
   @test.assert_eq(parsed.local_id(), "abc12345")
   @test.assert_eq(parsed.local_kind(), "issue")
   @test.assert_eq(parsed.provider(), "github")
@@ -1906,8 +1906,8 @@ test "sync_link: serialize and parse roundtrip" {
 ///|
 test "hub: create and get sync_link" {
   let (objects, refs, clock) = make_test_stores()
-  let hub = Hub::init(objects, refs)
-  let link = SyncLink::new(
+  let hub = @bitx_hub.Hub::init(objects, refs)
+  let link = @bitx_hub.SyncLink::new(
     "issue-abc",
     "issue",
     "github",
@@ -1930,24 +1930,24 @@ test "hub: create and get sync_link" {
 ///|
 test "hub: list sync_links for repo" {
   let (objects, refs, clock) = make_test_stores()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   hub.put_sync_link(
     objects,
     refs,
     clock,
-    SyncLink::new("id-1", "issue", "github", "owner/repo", remote_number=1),
+    @bitx_hub.SyncLink::new("id-1", "issue", "github", "owner/repo", remote_number=1),
   )
   hub.put_sync_link(
     objects,
     refs,
     clock,
-    SyncLink::new("id-2", "pr", "github", "owner/repo", remote_number=2),
+    @bitx_hub.SyncLink::new("id-2", "pr", "github", "owner/repo", remote_number=2),
   )
   hub.put_sync_link(
     objects,
     refs,
     clock,
-    SyncLink::new("id-3", "issue", "github", "other/repo", remote_number=3),
+    @bitx_hub.SyncLink::new("id-3", "issue", "github", "other/repo", remote_number=3),
   )
   let links = hub.list_sync_links(objects, repo="owner/repo")
   @test.assert_eq(links.length(), 2)
@@ -1958,12 +1958,12 @@ test "hub: list sync_links for repo" {
 ///|
 test "hub: find sync_link by remote number" {
   let (objects, refs, clock) = make_test_stores()
-  let hub = Hub::init(objects, refs)
+  let hub = @bitx_hub.Hub::init(objects, refs)
   hub.put_sync_link(
     objects,
     refs,
     clock,
-    SyncLink::new("id-1", "issue", "github", "owner/repo", remote_number=42),
+    @bitx_hub.SyncLink::new("id-1", "issue", "github", "owner/repo", remote_number=42),
   )
   let found = hub.find_sync_link_by_remote(objects, "github", "owner/repo", 42)
   assert_true(found is Some(_))
@@ -1980,7 +1980,7 @@ test "github_types: parse GhIssue from JSON" {
     #|{"number":42,"node_id":"I_kwDOxxx","title":"Bug report","body":"description","state":"open","user":{"login":"alice"},"labels":[{"name":"bug"}],"assignees":[{"login":"bob"}],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-02T00:00:00Z"}
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
-  let issue = GhIssue::from_json(obj)
+  let issue = @bitx_hub.GhIssue::from_json(obj)
   @test.assert_eq(issue.number, 42)
   @test.assert_eq(issue.node_id, "I_kwDOxxx")
   @test.assert_eq(issue.title, "Bug report")
@@ -1996,7 +1996,7 @@ test "github_types: parse GhComment from JSON" {
     #|{"id":12345,"node_id":"IC_kwDOyyy","body":"comment text","user":{"login":"alice"},"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-02T00:00:00Z"}
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
-  let comment = GhComment::from_json(obj)
+  let comment = @bitx_hub.GhComment::from_json(obj)
   @test.assert_eq(comment.id, 12345)
   @test.assert_eq(comment.body, "comment text")
   @test.assert_eq(comment.user, "alice")
@@ -2008,7 +2008,7 @@ test "github_types: parse GhPullRequest from JSON" {
     #|{"number":7,"node_id":"PR_kwDOzzz","title":"Add feature","body":"details","state":"closed","user":{"login":"dev"},"head":{"ref":"feature-branch","repo":{"full_name":"dev/repo"}},"base":{"ref":"main"},"labels":[{"name":"enhancement"}],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-03T00:00:00Z","merged":true,"merged_at":"2026-01-03T00:00:00Z"}
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
-  let pr = GhPullRequest::from_json(obj)
+  let pr = @bitx_hub.GhPullRequest::from_json(obj)
   @test.assert_eq(pr.number, 7)
   @test.assert_eq(pr.node_id, "PR_kwDOzzz")
   @test.assert_eq(pr.title, "Add feature")
@@ -2028,7 +2028,7 @@ test "github_types: parse GhPullRequest open (not merged)" {
     #|{"number":8,"node_id":"PR_kwDOaaa","title":"WIP","body":"","state":"open","user":{"login":"dev"},"head":{"ref":"wip","repo":{"full_name":"dev/repo"}},"base":{"ref":"main"},"labels":[],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z","merged":false,"merged_at":null}
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
-  let pr = GhPullRequest::from_json(obj)
+  let pr = @bitx_hub.GhPullRequest::from_json(obj)
   @test.assert_eq(pr.number, 8)
   @test.assert_eq(pr.state, "open")
   assert_false(pr.merged)
@@ -2036,31 +2036,31 @@ test "github_types: parse GhPullRequest open (not merged)" {
 
 ///|
 test "timestamp: parse ISO 8601 to unix" {
-  let unix = parse_iso8601_to_unix("2026-01-15T10:30:45Z")
+  let unix = @bitx_hub.parse_iso8601_to_unix("2026-01-15T10:30:45Z")
   @test.assert_eq(unix, 1768473045L)
 }
 
 ///|
 test "timestamp: parse ISO 8601 with timezone offset" {
-  let unix = parse_iso8601_to_unix("2026-01-15T10:30:45+00:00")
+  let unix = @bitx_hub.parse_iso8601_to_unix("2026-01-15T10:30:45+00:00")
   @test.assert_eq(unix, 1768473045L)
 }
 
 ///|
 test "timestamp: unix to ISO 8601" {
-  let iso = unix_to_iso8601(1768473045L)
+  let iso = @bitx_hub.unix_to_iso8601(1768473045L)
   @test.assert_eq(iso, "2026-01-15T10:30:45Z")
 }
 
 ///|
 test "timestamp: roundtrip" {
   let original = 1774900000L
-  let iso = unix_to_iso8601(original)
-  let back = parse_iso8601_to_unix(iso)
+  let iso = @bitx_hub.unix_to_iso8601(original)
+  let back = @bitx_hub.parse_iso8601_to_unix(iso)
   @test.assert_eq(back, original)
 }
 
 ///|
 test "timestamp: empty string returns 0" {
-  @test.assert_eq(parse_iso8601_to_unix(""), 0L)
+  @test.assert_eq(@bitx_hub.parse_iso8601_to_unix(""), 0L)
 }

@@ -2,44 +2,44 @@
 
 ///|
 test "tar_format_octal: zero value" {
-  let result = tar_format_octal(0L, 7)
+  let result = @bit_archive.tar_format_octal(0L, 7)
   assert_eq(result, "0000000")
 }
 
 ///|
 test "tar_format_octal: zero with width 11" {
-  let result = tar_format_octal(0L, 11)
+  let result = @bit_archive.tar_format_octal(0L, 11)
   assert_eq(result, "00000000000")
 }
 
 ///|
 test "tar_format_octal: file mode 0o100644" {
-  let result = tar_format_octal(0o100644L, 7)
+  let result = @bit_archive.tar_format_octal(0o100644L, 7)
   assert_eq(result, "0100644")
 }
 
 ///|
 test "tar_format_octal: dir mode 0o40755" {
-  let result = tar_format_octal(0o40755L, 7)
+  let result = @bit_archive.tar_format_octal(0o40755L, 7)
   assert_eq(result, "0040755")
 }
 
 ///|
 test "tar_format_octal: file size 1024" {
-  let result = tar_format_octal(1024L, 11)
+  let result = @bit_archive.tar_format_octal(1024L, 11)
   assert_eq(result, "00000002000")
 }
 
 ///|
 test "tar_format_octal: large timestamp" {
   // 1700000000 decimal = 14524770400 octal
-  let result = tar_format_octal(1700000000L, 11)
+  let result = @bit_archive.tar_format_octal(1700000000L, 11)
   assert_eq(result, "14524770400")
 }
 
 ///|
 test "tar_split_path: short path no split needed" {
-  let (name, prefix) = tar_split_path("src/main.mbt")
+  let (name, prefix) = @bit_archive.tar_split_path("src/main.mbt")
   // Should still split at the last valid '/'
   assert_eq(name, "main.mbt")
   assert_eq(prefix, "src")
@@ -50,7 +50,7 @@ test "tar_split_path: long path splits at slash boundary" {
   // Build a path longer than 100 chars
   let long_dir = "a".repeat(80)
   let path = long_dir + "/file.txt"
-  let (name, prefix) = tar_split_path(path)
+  let (name, prefix) = @bit_archive.tar_split_path(path)
   assert_eq(name, "file.txt")
   assert_eq(prefix, long_dir)
 }
@@ -58,7 +58,7 @@ test "tar_split_path: long path splits at slash boundary" {
 ///|
 test "tar_write_string: basic write" {
   let buf = FixedArray::make(16, b'\x00')
-  tar_write_string(buf, 0, "hello", 16)
+  @bit_archive.tar_write_string(buf, 0, "hello", 16)
   assert_eq(buf[0], b'h')
   assert_eq(buf[1], b'e')
   assert_eq(buf[2], b'l')
@@ -70,7 +70,7 @@ test "tar_write_string: basic write" {
 ///|
 test "tar_write_string: truncates at max_len" {
   let buf = FixedArray::make(8, b'\x00')
-  tar_write_string(buf, 0, "abcdefghijk", 3)
+  @bit_archive.tar_write_string(buf, 0, "abcdefghijk", 3)
   assert_eq(buf[0], b'a')
   assert_eq(buf[1], b'b')
   assert_eq(buf[2], b'c')
@@ -79,13 +79,13 @@ test "tar_write_string: truncates at max_len" {
 
 ///|
 test "tar_make_header: produces 512-byte header" {
-  let hdr = tar_make_header("test.txt", 0o100644, 42, 1700000000L, b'0', "")
+  let hdr = @bit_archive.tar_make_header("test.txt", 0o100644, 42, 1700000000L, b'0', "")
   assert_eq(hdr.length(), 512)
 }
 
 ///|
 test "tar_make_header: name field" {
-  let hdr = tar_make_header("hello.txt", 0o100644, 0, 0L, b'0', "")
+  let hdr = @bit_archive.tar_make_header("hello.txt", 0o100644, 0, 0L, b'0', "")
   // name starts at offset 0
   assert_eq(hdr[0], b'h')
   assert_eq(hdr[1], b'e')
@@ -100,7 +100,7 @@ test "tar_make_header: name field" {
 
 ///|
 test "tar_make_header: magic field is ustar" {
-  let hdr = tar_make_header("f.txt", 0o100644, 0, 0L, b'0', "")
+  let hdr = @bit_archive.tar_make_header("f.txt", 0o100644, 0, 0L, b'0', "")
   // magic at offset 257, 5 bytes "ustar"
   assert_eq(hdr[257], b'u')
   assert_eq(hdr[258], b's')
@@ -115,14 +115,14 @@ test "tar_make_header: magic field is ustar" {
 
 ///|
 test "tar_make_header: typeflag for directory" {
-  let hdr = tar_make_header("dir/", 0o40755, 0, 0L, b'5', "")
+  let hdr = @bit_archive.tar_make_header("dir/", 0o40755, 0, 0L, b'5', "")
   // typeflag at offset 156
   assert_eq(hdr[156], b'5')
 }
 
 ///|
 test "tar_make_header: checksum is valid" {
-  let hdr = tar_make_header("test.txt", 0o100644, 100, 1700000000L, b'0', "")
+  let hdr = @bit_archive.tar_make_header("test.txt", 0o100644, 100, 1700000000L, b'0', "")
   // Recompute checksum: sum all bytes, treating checksum field (148..156) as spaces
   let mut expected_sum = 0
   for i in 0..<512 {
@@ -145,7 +145,7 @@ test "tar_make_header: checksum is valid" {
 
 ///|
 test "tar_make_header: symlink with linkname" {
-  let hdr = tar_make_header("link.txt", 0o120000, 0, 0L, b'2', "target.txt")
+  let hdr = @bit_archive.tar_make_header("link.txt", 0o120000, 0, 0L, b'2', "target.txt")
   assert_eq(hdr[156], b'2')
   // linkname at offset 157
   assert_eq(hdr[157], b't')
@@ -158,7 +158,7 @@ test "tar_make_header: symlink with linkname" {
 test "tar_parse_committer_timestamp: valid commit" {
   let commit_text = "tree 0000000000000000000000000000000000000000\nauthor Test <test@test.com> 1700000000 +0000\ncommitter Test <test@test.com> 1700000001 +0000\n\nmessage\n"
   let data = @utf8.encode(commit_text)
-  let ts = tar_parse_committer_timestamp(data)
+  let ts = @bit_archive.tar_parse_committer_timestamp(data)
   assert_eq(ts, 1700000001L)
 }
 
@@ -166,7 +166,7 @@ test "tar_parse_committer_timestamp: valid commit" {
 test "tar_parse_committer_timestamp: no committer line" {
   let text = "tree 0000000000000000000000000000000000000000\n\nmessage\n"
   let data = @utf8.encode(text)
-  let ts = tar_parse_committer_timestamp(data)
+  let ts = @bit_archive.tar_parse_committer_timestamp(data)
   assert_eq(ts, 0L)
 }
 
@@ -174,7 +174,7 @@ test "tar_parse_committer_timestamp: no committer line" {
 test "tar_emit_parent_dirs: creates directory entries" {
   let out : Array[Byte] = []
   let emitted : Map[String, Bool] = Map([])
-  tar_emit_parent_dirs(out, "a/b/c/file.txt", 0L, emitted)
+  @bit_archive.tar_emit_parent_dirs(out, "a/b/c/file.txt", 0L, emitted)
   // Should emit 3 directory entries: a/, a/b/, a/b/c/
   // Each directory entry is 512 bytes
   assert_eq(out.length(), 512 * 3)
@@ -189,7 +189,7 @@ test "tar_emit_parent_dirs: skips already emitted" {
   let emitted : Map[String, Bool] = Map([])
   emitted["a/"] = true
   emitted["a/b/"] = true
-  tar_emit_parent_dirs(out, "a/b/c/file.txt", 0L, emitted)
+  @bit_archive.tar_emit_parent_dirs(out, "a/b/c/file.txt", 0L, emitted)
   // Only a/b/c/ should be emitted (512 bytes)
   assert_eq(out.length(), 512)
   assert_true(emitted.contains("a/b/c/"))
@@ -202,7 +202,7 @@ test "tar: complete archive with header + data + end blocks" {
   let content_bytes = @utf8.encode(content)
   let size = content_bytes.length()
   // Write header
-  let hdr = tar_make_header("hello.txt", 0o100644, size, 0L, b'0', "")
+  let hdr = @bit_archive.tar_make_header("hello.txt", 0o100644, size, 0L, b'0', "")
   for b in hdr {
     out.push(b)
   }

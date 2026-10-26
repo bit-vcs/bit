@@ -7,11 +7,11 @@ import {
 }
 
 // Values
-pub const DEFAULT_MAX_ATTEMPTS : Int = 8
+pub const DEFAULT_MAX_ATTEMPTS : Int32 = 8
 
-pub const DEFAULT_MAX_IMAGE_BYTES : Int = 67108864
+pub const DEFAULT_MAX_IMAGE_BYTES : Int32 = 67108864
 
-pub const WAL_FORMAT_VERSION : Int = 1
+pub const WAL_FORMAT_VERSION : Int32 = 1
 
 pub fn content_id(Bytes) -> String
 
@@ -26,6 +26,10 @@ pub(all) enum CommitOutcome {
   Committed(Int64)
   Contended
 } derive(Eq)
+pub fn CommitOutcome::equal(Self, Self) -> Bool
+pub fn CommitOutcome::not_equal(Self, Self) -> Bool
+pub fn CommitOutcome::output(Self, &Logger) -> Unit
+pub fn CommitOutcome::to_string(Self) -> String
 pub impl Show for CommitOutcome
 
 pub(all) struct Fold {
@@ -39,8 +43,8 @@ pub struct Wal[S] {
   mut image : WalImage
   mut etag : String
   mut loaded : Bool
-  max_attempts : Int
-  max_image_bytes : Int
+  max_attempts : Int32
+  max_image_bytes : Int32
 }
 pub async fn[S : @bit_objstore.ObjectStore] Wal::append(Self[S], Array[WalEntry]) -> CommitOutcome raise @bit_object.GitError
 pub async fn[S : @bit_objstore.ObjectStore] Wal::compact(Self[S], Int64, async (Bytes, Array[WalEntry]) -> Fold raise @bit_object.GitError) -> CommitOutcome raise @bit_object.GitError
@@ -48,7 +52,7 @@ pub fn[S] Wal::entries(Self[S]) -> Array[WalEntry]
 pub async fn[S : @bit_objstore.ObjectStore] Wal::get_payload(Self[S], String) -> Bytes raise @bit_object.GitError
 pub fn[S] Wal::head_seq(Self[S]) -> Int64
 pub fn[S] Wal::image_key(Self[S]) -> String
-pub fn[S] Wal::new(S, String, max_attempts? : Int, max_image_bytes? : Int) -> Self[S]
+pub fn[S] Wal::new(S, String, max_attempts? : Int32, max_image_bytes? : Int32) -> Self[S]
 pub fn[S] Wal::payload_key(Self[S], String) -> String
 pub async fn[S : @bit_objstore.ObjectStore] Wal::put_payload(Self[S], Bytes) -> String raise @bit_object.GitError
 pub async fn[S : @bit_objstore.ObjectStore] Wal::read_snapshot(Self[S]) -> Bytes raise @bit_object.GitError
@@ -67,10 +71,12 @@ pub(all) struct WalEntry {
   data : String
   idempotency_key : String
 } derive(Eq)
+pub fn WalEntry::equal(Self, Self) -> Bool
 pub fn WalEntry::new(String, String, payload_keys? : Array[String], idempotency_key? : String) -> Self
+pub fn WalEntry::not_equal(Self, Self) -> Bool
 
 pub(all) struct WalImage {
-  version : Int
+  version : Int32
   snapshot : String
   snapshot_seq : Int64
   snapshot_payloads : Array[String]
@@ -78,8 +84,10 @@ pub(all) struct WalImage {
   settings : String
 } derive(Eq)
 pub fn WalImage::empty() -> Self
+pub fn WalImage::equal(Self, Self) -> Bool
 pub fn WalImage::head_seq(Self) -> Int64
 pub fn WalImage::live_payloads(Self) -> Array[String]
+pub fn WalImage::not_equal(Self, Self) -> Bool
 
 // Type aliases
 

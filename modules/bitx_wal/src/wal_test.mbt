@@ -4,12 +4,12 @@ fn text(s : String) -> Bytes {
 }
 
 ///|
-fn entry(kind : String, data : String, key : String) -> WalEntry {
-  WalEntry::new(kind, data, idempotency_key=key)
+fn entry(kind : String, data : String, key : String) -> @bitx_wal.WalEntry {
+  @bitx_wal.WalEntry::new(kind, data, idempotency_key=key)
 }
 
 ///|
-fn kinds_and_data(entries : Array[WalEntry]) -> String {
+fn kinds_and_data(entries : Array[@bitx_wal.WalEntry]) -> String {
   let parts : Array[String] = []
   for e in entries {
     parts.push("\{e.seq}:\{e.kind}:\{e.data}")
@@ -20,7 +20,7 @@ fn kinds_and_data(entries : Array[WalEntry]) -> String {
 ///|
 async test "wal: an absent log reads as empty rather than failing" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "repos/acme/app")
+  let wal = @bitx_wal.Wal::new(store, "repos/acme/app")
   wal.sync()
   inspect(wal.head_seq(), content="0")
   inspect(wal.entries().length(), content="0")
@@ -30,9 +30,9 @@ async test "wal: an absent log reads as empty rather than failing" {
 ///|
 async test "wal: an append is visible to a reader that never saw the writer" {
   let store = @objstore.MemStore::new()
-  let writer = Wal::new(store, "p")
+  let writer = @bitx_wal.Wal::new(store, "p")
   inspect(writer.append([entry("push", "refs/heads/main", "k1")]), content="Committed(1)")
-  let reader : Wal[@objstore.MemStore] = Wal::new(store, "p")
+  let reader : @bitx_wal.Wal[@objstore.MemStore] = @bitx_wal.Wal::new(store, "p")
   reader.sync()
   inspect(kinds_and_data(reader.entries()), content="1:push:refs/heads/main")
 }
@@ -40,7 +40,7 @@ async test "wal: an append is visible to a reader that never saw the writer" {
 ///|
 async test "wal: several entries in one call cost one commit and stay ordered" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let outcome = wal.append([
     entry("push", "a", "k1"),
     entry("push", "b", "k2"),
@@ -56,15 +56,15 @@ async test "wal: several entries in one call cost one commit and stay ordered" {
 ///|
 async test "wal: a writer with a stale version rebases instead of clobbering" {
   let store = @objstore.MemStore::new()
-  let a = Wal::new(store, "p")
-  let b : Wal[@objstore.MemStore] = Wal::new(store, "p")
+  let a = @bitx_wal.Wal::new(store, "p")
+  let b : @bitx_wal.Wal[@objstore.MemStore] = @bitx_wal.Wal::new(store, "p")
   a.sync()
   b.sync()
   // b commits while a still holds the version it read.
   inspect(b.append([entry("push", "from-b", "kb")]), content="Committed(1)")
   // a's compare-and-swap fails, so it re-reads and appends on top.
   inspect(a.append([entry("push", "from-a", "ka")]), content="Committed(2)")
-  let reader : Wal[@objstore.MemStore] = Wal::new(store, "p")
+  let reader : @bitx_wal.Wal[@objstore.MemStore] = @bitx_wal.Wal::new(store, "p")
   reader.sync()
   inspect(
     kinds_and_data(reader.entries()),
@@ -78,10 +78,10 @@ async test "wal: a commit that lands but reports Unknown is not applied twice" {
   // response is lost; a writer that treats Unknown as failure and retries
   // blindly would write the entry a second time.
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   store.silence_next_puts(1)
   inspect(wal.append([entry("push", "once", "k1")]), content="Committed(1)")
-  let reader : Wal[@objstore.MemStore] = Wal::new(store, "p")
+  let reader : @bitx_wal.Wal[@objstore.MemStore] = @bitx_wal.Wal::new(store, "p")
   reader.sync()
   inspect(kinds_and_data(reader.entries()), content="1:push:once")
 }
@@ -89,10 +89,10 @@ async test "wal: a commit that lands but reports Unknown is not applied twice" {
 ///|
 async test "wal: a commit that did not land is retried and applied once" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   store.fail_next_puts(1)
   inspect(wal.append([entry("push", "once", "k1")]), content="Committed(1)")
-  let reader : Wal[@objstore.MemStore] = Wal::new(store, "p")
+  let reader : @bitx_wal.Wal[@objstore.MemStore] = @bitx_wal.Wal::new(store, "p")
   reader.sync()
   inspect(kinds_and_data(reader.entries()), content="1:push:once")
 }
@@ -100,10 +100,10 @@ async test "wal: a commit that did not land is retried and applied once" {
 ///|
 async test "wal: re-sending an entry with the same key is a no-op" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   inspect(wal.append([entry("push", "a", "k1")]), content="Committed(1)")
   // A client that never saw the first acknowledgement sends it again.
-  let retry : Wal[@objstore.MemStore] = Wal::new(store, "p")
+  let retry : @bitx_wal.Wal[@objstore.MemStore] = @bitx_wal.Wal::new(store, "p")
   inspect(retry.append([entry("push", "a", "k1")]), content="Committed(1)")
   retry.sync()
   inspect(kinds_and_data(retry.entries()), content="1:push:a")
@@ -114,16 +114,16 @@ async test "wal: entries without an idempotency key are always new" {
   // Opting out is allowed, and the consequence is explicit: two identical
   // unkeyed entries are two entries.
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
-  let _ = wal.append([WalEntry::new("push", "a")])
-  let _ = wal.append([WalEntry::new("push", "a")])
+  let wal = @bitx_wal.Wal::new(store, "p")
+  let _ = wal.append([@bitx_wal.WalEntry::new("push", "a")])
+  let _ = wal.append([@bitx_wal.WalEntry::new("push", "a")])
   inspect(kinds_and_data(wal.entries()), content="1:push:a,2:push:a")
 }
 
 ///|
 async test "wal: an empty append reports the current head without writing" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let _ = wal.append([entry("push", "a", "k1")])
   let before = store.len()
   inspect(wal.append([]), content="Committed(1)")
@@ -133,7 +133,7 @@ async test "wal: an empty append reports the current head without writing" {
 ///|
 async test "wal: payloads are content addressed, so writing one twice is free" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let id1 = wal.put_payload(text("packdata"))
   let id2 = wal.put_payload(text("packdata"))
   inspect(id1 == id2, content="true")
@@ -145,9 +145,9 @@ async test "wal: payloads are content addressed, so writing one twice is free" {
 ///|
 async test "wal: settings ride along with the image" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   inspect(wal.set_settings("deny-force-push=true"), content="Committed(0)")
-  let reader : Wal[@objstore.MemStore] = Wal::new(store, "p")
+  let reader : @bitx_wal.Wal[@objstore.MemStore] = @bitx_wal.Wal::new(store, "p")
   reader.sync()
   inspect(reader.settings(), content="deny-force-push=true")
 }
@@ -155,7 +155,7 @@ async test "wal: settings ride along with the image" {
 ///|
 /// Fold that simply concatenates the folded entries' data onto the previous
 /// snapshot, and keeps every payload key it saw.
-let concat_fold : async (Bytes, Array[WalEntry]) -> Fold raise @bit.GitError = (
+let concat_fold : async (Bytes, Array[@bitx_wal.WalEntry]) -> @bitx_wal.Fold raise @bit.GitError = (
   previous,
   folding,
 ) => {
@@ -176,7 +176,7 @@ let concat_fold : async (Bytes, Array[WalEntry]) -> Fold raise @bit.GitError = (
 ///|
 async test "wal: compaction folds a prefix and leaves the tail live" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let _ = wal.append([
     entry("push", "a", "k1"),
     entry("push", "b", "k2"),
@@ -193,7 +193,7 @@ async test "wal: compaction folds a prefix and leaves the tail live" {
 ///|
 async test "wal: a second compaction folds onto the first" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let _ = wal.append([
     entry("push", "a", "k1"),
     entry("push", "b", "k2"),
@@ -209,7 +209,7 @@ async test "wal: a second compaction folds onto the first" {
 ///|
 async test "wal: compacting to a point already folded is a no-op" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let _ = wal.append([entry("push", "a", "k1"), entry("push", "b", "k2")])
   let _ = wal.compact(2L, concat_fold)
   let snapshot = wal.snapshot()
@@ -220,7 +220,7 @@ async test "wal: compacting to a point already folded is a no-op" {
 ///|
 async test "wal: an append after compaction continues the sequence" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let _ = wal.append([entry("push", "a", "k1"), entry("push", "b", "k2")])
   let _ = wal.compact(2L, concat_fold)
   inspect(wal.append([entry("push", "c", "k3")]), content="Committed(3)")
@@ -230,11 +230,11 @@ async test "wal: an append after compaction continues the sequence" {
 ///|
 async test "wal: a sweep removes orphaned payloads and keeps referenced ones" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let used = wal.put_payload(text("referenced"))
   let orphan = wal.put_payload(text("abandoned"))
   let _ = wal.append([
-    WalEntry::new("push", "a", payload_keys=[used], idempotency_key="k1"),
+    @bitx_wal.WalEntry::new("push", "a", payload_keys=[used], idempotency_key="k1"),
   ])
   let doomed = wal.unreferenced_keys()
   inspect(doomed.length(), content="1")
@@ -248,7 +248,7 @@ async test "wal: a sweep removes orphaned payloads and keeps referenced ones" {
 ///|
 async test "wal: a sweep drops the snapshot that compaction superseded" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let _ = wal.append([entry("push", "a", "k1"), entry("push", "b", "k2")])
   let _ = wal.compact(1L, concat_fold)
   let first_snapshot = wal.snapshot()
@@ -263,10 +263,10 @@ async test "wal: a sweep drops the snapshot that compaction superseded" {
 ///|
 async test "wal: payloads retained by a fold are not swept" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let kept = wal.put_payload(text("still-needed"))
   let _ = wal.append([
-    WalEntry::new("push", "a", payload_keys=[kept], idempotency_key="k1"),
+    @bitx_wal.WalEntry::new("push", "a", payload_keys=[kept], idempotency_key="k1"),
   ])
   // Folding the entry away must not make its payload look like garbage.
   let _ = wal.compact(1L, concat_fold)
@@ -276,8 +276,8 @@ async test "wal: payloads retained by a fold are not swept" {
 ///|
 async test "wal: an oversized image is refused rather than written" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p", max_image_bytes=200)
-  let big = WalEntry::new("push", "x".repeat(500), idempotency_key="k1")
+  let wal = @bitx_wal.Wal::new(store, "p", max_image_bytes=200)
+  let big = @bitx_wal.WalEntry::new("push", "x".repeat(500), idempotency_key="k1")
   let message = try {
     let _ = wal.append([big])
     "<no error>"
@@ -297,7 +297,7 @@ async test "wal: a future format version is refused, not silently rewritten" {
     text("{\"version\":99,\"entries\":[],\"snapshot\":\"\"}"),
     @objstore.PutCondition::Unconditional,
   )
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let message = try {
     wal.sync()
     "<no error>"
@@ -310,11 +310,11 @@ async test "wal: a future format version is refused, not silently rewritten" {
 ///|
 async test "wal: contention is reported once the retry budget runs out" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p", max_attempts=3)
+  let wal = @bitx_wal.Wal::new(store, "p", max_attempts=3)
   store.fail_next_puts(3)
   inspect(wal.append([entry("push", "a", "k1")]), content="Contended")
   // The log is untouched: a Contended result never half-commits.
-  let reader : Wal[@objstore.MemStore] = Wal::new(store, "p")
+  let reader : @bitx_wal.Wal[@objstore.MemStore] = @bitx_wal.Wal::new(store, "p")
   reader.sync()
   inspect(reader.entries().length(), content="0")
 }
@@ -371,7 +371,7 @@ async test "wal: a store without compare-and-swap is refused up front" {
   // Failing here is the whole point: silently accepting such a store would
   // degrade every commit to last-writer-wins and lose entries under load.
   let store : NoCasStore = { inner: @objstore.MemStore::new() }
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let message = try {
     let _ = wal.append([entry("push", "a", "k1")])
     "<no error>"
@@ -384,11 +384,11 @@ async test "wal: a store without compare-and-swap is refused up front" {
 ///|
 async test "wal: a fresh read after many commits sees them all in order" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   for i in 0..<10 {
     let _ = wal.append([entry("push", "e\{i}", "k\{i}")])
   }
-  let reader : Wal[@objstore.MemStore] = Wal::new(store, "p")
+  let reader : @bitx_wal.Wal[@objstore.MemStore] = @bitx_wal.Wal::new(store, "p")
   reader.sync()
   inspect(reader.head_seq(), content="10")
   inspect(reader.entries()[0].data, content="e0")
@@ -398,7 +398,7 @@ async test "wal: a fresh read after many commits sees them all in order" {
 ///|
 async test "wal: sync on an unchanged log transfers nothing" {
   let store = @objstore.MemStore::new()
-  let wal = Wal::new(store, "p")
+  let wal = @bitx_wal.Wal::new(store, "p")
   let _ = wal.append([entry("push", "a", "k1")])
   wal.sync()
   // The conditional read reported NotModified, so the cached image stands.

@@ -7,6 +7,9 @@ pub(all) enum ProtocolVersion {
 } derive(Eq)
 
 ///|
+pub extend ProtocolVersion with Eq::{not_equal, equal}
+
+///|
 pub fn detect_protocol_version(
   data : Bytes,
 ) -> ProtocolVersion raise @bit.GitError {

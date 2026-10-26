@@ -1,7 +1,7 @@
 ///|
 /// Fs blackbox tests
 test "bitfs: empty filesystem" {
-  let bitfs = Fs::empty("/repo/.git")
+  let bitfs = @bit_vfs.Fs::empty("/repo/.git")
   @test.assert_eq(bitfs.is_dirty(), false)
   @test.assert_eq(bitfs.base_tree(), @bit.ObjectId::zero())
   @test.assert_eq(bitfs.base_commit(), None)
@@ -9,7 +9,7 @@ test "bitfs: empty filesystem" {
 
 ///|
 test "bitfs: write and read file in working layer" {
-  let bitfs = Fs::empty("/repo/.git")
+  let bitfs = @bit_vfs.Fs::empty("/repo/.git")
   bitfs.write_string("/file.txt", "hello\n")
   @test.assert_eq(bitfs.is_dirty(), true)
   let files = bitfs.get_working_files()
@@ -18,14 +18,14 @@ test "bitfs: write and read file in working layer" {
 
 ///|
 test "bitfs: mkdir_p creates directory hierarchy" {
-  let bitfs = Fs::empty("/repo/.git")
+  let bitfs = @bit_vfs.Fs::empty("/repo/.git")
   bitfs.mkdir_p("a/b/c")
   @test.assert_eq(bitfs.is_dirty(), true)
 }
 
 ///|
 test "bitfs: remove_file marks file as deleted" {
-  let bitfs = Fs::empty("/repo/.git")
+  let bitfs = @bit_vfs.Fs::empty("/repo/.git")
   bitfs.write_string("file.txt", "content")
   bitfs.remove_file("file.txt")
   let files = bitfs.get_working_files()
@@ -36,7 +36,7 @@ test "bitfs: remove_file marks file as deleted" {
 
 ///|
 test "bitfs: rollback clears working layer" {
-  let bitfs = Fs::empty("/repo/.git")
+  let bitfs = @bit_vfs.Fs::empty("/repo/.git")
   bitfs.write_string("file.txt", "content")
   @test.assert_eq(bitfs.is_dirty(), true)
   bitfs.rollback()
@@ -46,7 +46,7 @@ test "bitfs: rollback clears working layer" {
 
 ///|
 test "bitfs: config defaults" {
-  let config = FsConfig::default()
+  let config = @bit_vfs.FsConfig::default()
   @test.assert_eq(config.max_cache_bytes, 64 * 1024 * 1024)
   @test.assert_eq(config.max_cache_entries, 1000)
 }
@@ -60,7 +60,7 @@ test "bitfs: full workflow with backing fs" {
   let commit1 = @lib.commit(
     fs, fs, "/repo", "Initial commit", "Author <a@b.com>", 1700000000L,
   )
-  let bitfs = Fs::from_commit(fs, "/repo/.git", commit1)
+  let bitfs = @bit_vfs.Fs::from_commit(fs, "/repo/.git", commit1)
   let content = bitfs.read_file(fs, "file.txt")
   @test.assert_eq(@utf8.decode_lossy(content[:]), "initial\n")
   bitfs.write_string("file.txt", "modified\n")
@@ -87,7 +87,7 @@ test "bitfs: readdir from base tree" {
   let commit = @lib.commit(
     fs, fs, "/repo", "Add files", "Author <a@b.com>", 1700000000L,
   )
-  let bitfs = Fs::from_commit(fs, "/repo/.git", commit)
+  let bitfs = @bit_vfs.Fs::from_commit(fs, "/repo/.git", commit)
   let root_entries = bitfs.readdir(fs, "")
   assert_true(root_entries.contains("a"))
   assert_true(root_entries.contains("d.txt"))
@@ -105,7 +105,7 @@ test "bitfs: is_dir and is_file" {
   let commit = @lib.commit(
     fs, fs, "/repo", "Add file", "Author <a@b.com>", 1700000000L,
   )
-  let bitfs = Fs::from_commit(fs, "/repo/.git", commit)
+  let bitfs = @bit_vfs.Fs::from_commit(fs, "/repo/.git", commit)
   assert_true(bitfs.is_dir(fs, ""))
   assert_true(bitfs.is_dir(fs, "dir"))
   assert_false(bitfs.is_dir(fs, "dir/file.txt"))
@@ -128,7 +128,7 @@ test "bitfs: layers" {
   let commit2 = @lib.commit(
     fs, fs, "/repo", "Layer", "Author <a@b.com>", 1700001000L,
   )
-  let bitfs = Fs::from_commit(fs, "/repo/.git", commit1)
+  let bitfs = @bit_vfs.Fs::from_commit(fs, "/repo/.git", commit1)
   assert_true(bitfs.is_file(fs, "base.txt"))
   assert_false(bitfs.is_file(fs, "layer.txt"))
   bitfs.add_layer_from_commit(fs, commit2, "overlay")

@@ -1,7 +1,7 @@
 ///|
 /// Tests for Git pkt-line protocol
 test "pktline encode simple" {
-  let encoded = pktline_encode("hello\n")
+  let encoded = @bit_protocol.pktline_encode("hello\n")
   // Length = 6 + 4 = 10 = 0x000a
   inspect(encoded[0], content="b'\\x30'") // '0'
   inspect(encoded[1], content="b'\\x30'") // '0'
@@ -13,7 +13,7 @@ test "pktline encode simple" {
 
 ///|
 test "pktline flush" {
-  let flush = pktline_flush()
+  let flush = @bit_protocol.pktline_flush()
   inspect(flush.length(), content="4")
   inspect(flush[0], content="b'\\x30'")
   inspect(flush[1], content="b'\\x30'")
@@ -23,7 +23,7 @@ test "pktline flush" {
 
 ///|
 test "pktline delim" {
-  let delim = pktline_delim()
+  let delim = @bit_protocol.pktline_delim()
   inspect(delim.length(), content="4")
   inspect(delim[0], content="b'\\x30'")
   inspect(delim[1], content="b'\\x30'")
@@ -37,7 +37,7 @@ test "pktline decode simple" {
   let data = Bytes::from_array([
     b'0', b'0', b'0', b'a', b'h', b'e', b'l', b'l', b'o', b'\n',
   ])
-  let result = pktline_decode(data)
+  let result = @bit_protocol.pktline_decode(data)
   inspect(result.length(), content="1")
   let (payload, is_flush) = result[0]
   inspect(is_flush, content="false")
@@ -51,7 +51,7 @@ test "pktline decode with flush" {
     b'0', b'0', b'0', b'a', b'h', b'e', b'l', b'l', b'o', b'\n', b'0', b'0', b'0',
     b'0',
   ])
-  let result = pktline_decode(data)
+  let result = @bit_protocol.pktline_decode(data)
   inspect(result.length(), content="2")
   let (_, is_flush1) = result[0]
   let (_, is_flush2) = result[1]
@@ -62,8 +62,8 @@ test "pktline decode with flush" {
 ///|
 test "pktline encode decode roundtrip" {
   let original = "test message\n"
-  let encoded = pktline_encode(original)
-  let decoded = pktline_decode(encoded)
+  let encoded = @bit_protocol.pktline_encode(original)
+  let decoded = @bit_protocol.pktline_decode(encoded)
   inspect(decoded.length(), content="1")
   let (payload, is_flush) = decoded[0]
   inspect(is_flush, content="false")
@@ -86,7 +86,7 @@ test "build ref update" {
   let new_id = @bit.ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let cmd = build_ref_update(old_id, new_id, "refs/heads/main", "report-status")
+  let cmd = @bit_protocol.build_ref_update(old_id, new_id, "refs/heads/main", "report-status")
   assert_true(cmd.has_prefix("0000000000000000000000000000000000000000"))
   assert_true(cmd.find("ce013625030ba8dba906f756967f9e9ca394464a") is Some(_))
   assert_true(cmd.find("refs/heads/main") is Some(_))
@@ -99,7 +99,7 @@ test "build ref update simple" {
   let new_id = @bit.ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let cmd = build_ref_update_simple(old_id, new_id, "refs/heads/main")
+  let cmd = @bit_protocol.build_ref_update_simple(old_id, new_id, "refs/heads/main")
   inspect(
     cmd,
     content=(
@@ -112,7 +112,7 @@ test "build ref update simple" {
 ///|
 test "pktline encode bytes" {
   let data = Bytes::from_array([b'\x00', b'\x01', b'\x02'])
-  let encoded = pktline_encode_bytes(data)
+  let encoded = @bit_protocol.pktline_encode_bytes(data)
   // Length = 3 + 4 = 7 = 0x0007
   inspect(encoded[0], content="b'\\x30'")
   inspect(encoded[1], content="b'\\x30'")

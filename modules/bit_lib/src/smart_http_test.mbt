@@ -3,12 +3,12 @@
 ///|
 test "smart http: info/refs auth" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
-  let bad = receive_pack_info_refs_response(fs, "/repo", None, "token")
+  let bad = @bit_lib.receive_pack_info_refs_response(fs, "/repo", None, "token")
   assert_true(bad.status == 401)
-  let ok = receive_pack_info_refs_response(
+  let ok = @bit_lib.receive_pack_info_refs_response(
     fs,
     "/repo",
     Some("Bearer token"),

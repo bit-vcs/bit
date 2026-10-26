@@ -12,7 +12,7 @@ pub fn diff_index(&@bit_types.RepoFileSystem, String) -> Array[DiffFile] raise @
 
 pub fn diff_stat(Array[DiffFile]) -> Array[String]
 
-pub fn diff_text(Array[DiffFile], context_lines? : Int) -> Array[String]
+pub fn diff_text(Array[DiffFile], context_lines? : Int32) -> Array[String]
 
 pub fn diff_trees(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId?, @bit_object.ObjectId, db? : @bit_lib.ObjectDb) -> Array[DiffFile] raise @bit_object.GitError
 
@@ -26,8 +26,8 @@ pub(all) struct DiffFile {
   kind : DiffKind
   old_content : Bytes?
   new_content : Bytes?
-  old_mode : Int?
-  new_mode : Int?
+  old_mode : Int32?
+  new_mode : Int32?
 }
 
 pub(all) enum DiffKind {
@@ -39,4 +39,3 @@ pub(all) enum DiffKind {
 // Type aliases
 
 // Traits
-

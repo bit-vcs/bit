@@ -2,26 +2,25 @@
 package "mizchi/bit_diff_core"
 
 // Values
-pub fn count_lines(Bytes) -> Int
+pub fn count_lines(Bytes) -> Int32
 
-pub fn format_range(Int, Int) -> String
+pub fn format_range(Int32, Int32) -> String
 
 pub fn myers_diff(Array[String], Array[String]) -> Array[DiffEditOp]
 
 pub fn split_lines(Bytes) -> Array[String]
 
-pub fn unified_hunks(Array[String], Bytes?, Bytes?, context_lines? : Int) -> Unit
+pub fn unified_hunks(Array[String], Bytes?, Bytes?, context_lines? : Int32) -> Unit
 
 // Errors
 
 // Types and methods
 pub(all) enum DiffEditOp {
-  Keep(Int, Int)
-  Delete(Int)
-  Insert(Int)
+  Keep(Int32, Int32)
+  Delete(Int32)
+  Insert(Int32)
 }
 
 // Type aliases
 
 // Traits
-

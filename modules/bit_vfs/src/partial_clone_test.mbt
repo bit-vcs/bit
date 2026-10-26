@@ -54,7 +54,7 @@ test "partial_clone: mount and list files" {
   println("Commit: \{commit_id}")
 
   // Mount with Fs
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
   println("Fs mounted")
   println("  is_lazy: \{bitfs.is_lazy()}")
   println("  is_promisor_enabled: \{bitfs.is_promisor_enabled()}")
@@ -107,7 +107,7 @@ async test "partial_clone: on-demand fetch" {
   } else {
     @bit.ObjectId::from_hex(head_str)
   }
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
 
   // Try to read a file - this should trigger on-demand fetch
   println("\n=== On-demand Fetch Test ===")
@@ -171,7 +171,7 @@ test "partial_clone: glob pattern matching" {
   } else {
     @bit.ObjectId::from_hex(head_str)
   }
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Glob Pattern Test ===")
 
   // Test collect_files_bfs
@@ -234,7 +234,7 @@ async test "partial_clone: prefetch with glob" {
   } else {
     @bit.ObjectId::from_hex(head_str)
   }
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Prefetch Glob Test ===")
 
   // Prefetch all .json files
@@ -276,7 +276,7 @@ async test "partial_clone: prefetch BFS" {
   } else {
     @bit.ObjectId::from_hex(head_str)
   }
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Prefetch BFS Test ===")
 
   // Get pending before prefetch
@@ -324,7 +324,7 @@ async test "partial_clone: prefetch multiple files" {
   } else {
     @bit.ObjectId::from_hex(head_str)
   }
-  let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = @bit_vfs.Fs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Prefetch Test ===")
 
   // Get list of files to prefetch

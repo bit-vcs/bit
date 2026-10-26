@@ -4,13 +4,13 @@
 /// Simulated network for testing gossip sync
 struct TestNetwork {
   nodes : Array[TestNode]
-  message_queue : Array[(Int, Int, GossipMessage)] // (from, to, msg)
+  message_queue : Array[(Int, Int, @bitx_kv.GossipMessage)] // (from, to, msg)
   mut tick : Int64
 }
 
 ///|
 struct TestNode {
-  db : Kv
+  db : @bitx_kv.Kv
 }
 
 ///|
@@ -21,7 +21,7 @@ fn TestNetwork::new(node_count : Int) -> TestNetwork {
     @lib.init_repo(fs, "/repo") catch {
       _ => ()
     }
-    let node_id = NodeId::new("node-" + i.to_string())
+    let node_id = @bitx_kv.NodeId::new("node-" + i.to_string())
     let bitfs = @fs.Fs::empty("/repo/.git")
     let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
     let store : TestObjectStore = {
@@ -29,7 +29,7 @@ fn TestNetwork::new(node_count : Int) -> TestNetwork {
       write_fs: fs,
       git_dir: "/repo/.git",
     }
-    let kv = Kv::new(node_id, tree, store, @bit.ObjectId::zero())
+    let kv = @bitx_kv.Kv::new(node_id, tree, store, @bit.ObjectId::zero())
     nodes.push({ db: kv })
   }
   { nodes, message_queue: [], tick: 0L }
@@ -41,7 +41,7 @@ fn TestNetwork::send(
   self : TestNetwork,
   from : Int,
   to : Int,
-  msg : GossipMessage,
+  msg : @bitx_kv.GossipMessage,
 ) -> Unit {
   self.message_queue.push((from, to, msg))
 }
@@ -80,7 +80,7 @@ fn TestNetwork::process_all(self : TestNetwork) -> Int {
 fn TestNetwork::broadcast_announce(self : TestNetwork, from : Int) -> Unit {
   let node = self.nodes[from]
   let state = node.db.get_gossip_state(self.tick)
-  let msg = GossipMessage::Announce(state)
+  let msg = @bitx_kv.GossipMessage::Announce(state)
   for i = 0; i < self.nodes.length(); i = i + 1 {
     if i != from {
       self.send(from, i, msg)
@@ -267,7 +267,7 @@ test "sync: message types" {
   let _ = node0.db.commit("Setup", 1000L)
   // Test Announce message
   let state = node0.db.get_gossip_state(1000L)
-  let announce = GossipMessage::Announce(state)
+  let announce = @bitx_kv.GossipMessage::Announce(state)
   let node1 = net.node(1)
   let response = node1.db.handle_gossip(announce, 1000L)
   // Node 1 should request sync since it's behind
@@ -285,8 +285,8 @@ test "sync: gossip peer selection" {
   let node0 = net.node(0)
   // Add all other nodes as peers
   for i = 1; i < 10; i = i + 1 {
-    let peer : PeerInfo = {
-      node_id: NodeId::new("node-" + i.to_string()),
+    let peer : @bitx_kv.PeerInfo = {
+      node_id: @bitx_kv.NodeId::new("node-" + i.to_string()),
       last_seen: (i * 100).to_int64(),
       head: @bit.ObjectId::zero(),
       endpoint: "ws://node-" + i.to_string(),

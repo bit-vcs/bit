@@ -2,7 +2,7 @@
 package "mizchi/bit_hash"
 
 // Values
-pub fn hex_char_to_int(Char) -> Int raise
+pub fn hex_char_to_int(Char) -> Int32 raise
 
 pub fn hex_encode(FixedArray[Byte]) -> String
 
@@ -10,7 +10,7 @@ pub fn hmac_sha256_bytes(Bytes, Bytes) -> Bytes
 
 pub fn hmac_sha256_raw(Bytes, Bytes) -> FixedArray[Byte]
 
-pub fn int_to_hex4(Int) -> String
+pub fn int_to_hex4(Int32) -> String
 
 pub fn is_hex_char(Char) -> Bool
 
@@ -18,38 +18,38 @@ pub fn is_hex_string(String) -> Bool
 
 pub fn lower_hex_string(String) -> String
 
-pub fn sha1_array_prefix_raw(Array[Byte], Int) -> FixedArray[Byte]
+pub fn sha1_array_prefix_raw(Array[Byte], Int32) -> FixedArray[Byte]
 
 pub fn sha1_array_raw(Array[Byte]) -> FixedArray[Byte]
 
 pub fn sha1_bytes(Bytes) -> Bytes
 
-pub fn sha1_prefix_raw(Bytes, Int) -> FixedArray[Byte]
+pub fn sha1_prefix_raw(Bytes, Int32) -> FixedArray[Byte]
 
 pub fn sha1_prefixed_raw(Bytes, Bytes) -> FixedArray[Byte]
 
 pub fn sha1_raw(Bytes) -> FixedArray[Byte]
 
-pub fn sha256_array_prefix_raw(Array[Byte], Int) -> FixedArray[Byte]
+pub fn sha256_array_prefix_raw(Array[Byte], Int32) -> FixedArray[Byte]
 
 pub fn sha256_array_raw(Array[Byte]) -> FixedArray[Byte]
 
 pub fn sha256_bytes(Bytes) -> Bytes
 
-pub fn sha256_prefix_raw(Bytes, Int) -> FixedArray[Byte]
+pub fn sha256_prefix_raw(Bytes, Int32) -> FixedArray[Byte]
 
 pub fn sha256_raw(Bytes) -> FixedArray[Byte]
 
-pub fn short_hex(String, Int) -> String
+pub fn short_hex(String, Int32) -> String
 
 // Errors
 
 // Types and methods
 pub struct Sha1State {
-  h : FixedArray[Int]
+  h : FixedArray[Int32]
   block : FixedArray[Byte]
-  w : FixedArray[Int]
-  mut block_len : Int
+  w : FixedArray[Int32]
+  mut block_len : Int32
   mut total_len : Int64
 }
 pub fn Sha1State::finish_raw(Self) -> FixedArray[Byte]
@@ -57,14 +57,14 @@ pub fn Sha1State::new() -> Self
 pub fn Sha1State::reset(Self) -> Unit
 pub fn Sha1State::update(Self, Bytes) -> Unit
 pub fn Sha1State::update_byte(Self, Byte) -> Unit
-pub fn Sha1State::update_slice(Self, Bytes, Int, Int) -> Unit
+pub fn Sha1State::update_slice(Self, Bytes, Int32, Int32) -> Unit
 pub fn Sha1State::update_string(Self, String) -> Unit
 
 pub struct Sha256State {
-  h : FixedArray[Int]
+  h : FixedArray[Int32]
   block : FixedArray[Byte]
-  w : FixedArray[Int]
-  mut block_len : Int
+  w : FixedArray[Int32]
+  mut block_len : Int32
   mut total_len : Int64
 }
 pub fn Sha256State::finish_raw(Self) -> FixedArray[Byte]
@@ -72,10 +72,9 @@ pub fn Sha256State::new() -> Self
 pub fn Sha256State::reset(Self) -> Unit
 pub fn Sha256State::update(Self, Bytes) -> Unit
 pub fn Sha256State::update_byte(Self, Byte) -> Unit
-pub fn Sha256State::update_slice(Self, Bytes, Int, Int) -> Unit
+pub fn Sha256State::update_slice(Self, Bytes, Int32, Int32) -> Unit
 pub fn Sha256State::update_string(Self, String) -> Unit
 
 // Type aliases
 
 // Traits
-

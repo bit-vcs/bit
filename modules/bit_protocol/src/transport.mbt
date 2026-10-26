@@ -8,6 +8,9 @@ pub(all) enum RemoteKind {
 } derive(Eq)
 
 ///|
+pub extend RemoteKind with Eq::{not_equal, equal}
+
+///|
 pub struct RemoteSpec {
   kind : RemoteKind
   raw : String

@@ -22,7 +22,7 @@ test "subdir: extract_subdir_tree finds nested directory" {
   // ObjectDb を読み込む
   let db = @lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
   // サブディレクトリのツリーを抽出
-  let tree_id = extract_subdir_tree(db, fs, commit_id, "src/lib") catch {
+  let tree_id = @bitx_subdir.extract_subdir_tree(db, fs, commit_id, "src/lib") catch {
     _ => return ()
   }
   // ツリーが見つかったことを確認
@@ -46,7 +46,7 @@ test "subdir: SubdirRepo::from_commit creates repo" {
     _ => return ()
   }
   // SubdirRepo を作成
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
   // 基本プロパティを確認
@@ -71,7 +71,7 @@ test "subdir: read file through Fs" {
     _ => return ()
   }
   // SubdirRepo を作成
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
   // サブディレクトリ内のファイルをルートからのパスで読む
@@ -96,7 +96,7 @@ test "subdir: write file to working layer" {
     _ => return ()
   }
   // SubdirRepo を作成
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
   // 最初は dirty ではない
@@ -126,7 +126,7 @@ test "subdir: error on non-existent subdir" {
     _ => return ()
   }
   // 存在しないサブディレクトリを指定 - エラーになるはず
-  let _ = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "nonexistent") catch {
+  let _ = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "nonexistent") catch {
     SubdirNotFound(_) =>
       // 期待通りのエラー - テスト成功
       return ()
@@ -170,7 +170,7 @@ test "subdir: log returns commits that changed subdir" {
     _ => return ()
   }
   // SubdirRepo を作成してログを取得
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit3, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit3, "src/lib") catch {
     _ => return ()
   }
   let history = subdir.log(fs) catch { _ => return () }
@@ -192,7 +192,7 @@ test "subdir: diff shows working changes" {
   ) catch {
     _ => return ()
   }
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
   // 変更前は空
@@ -221,7 +221,7 @@ test "subdir: commit changes to parent repo" {
     _ => return ()
   }
   // SubdirRepo を作成して変更を加える
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
     _ => return ()
   }
   subdir.fs().write_file("/foo.mbt", b"modified")
@@ -266,15 +266,15 @@ test "subdir: normalize path" {
     _ => return ()
   }
   // 様々なパス形式でテスト
-  let subdir1 = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir1 = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
-  let subdir2 = SubdirRepo::from_commit(
+  let subdir2 = @bitx_subdir.SubdirRepo::from_commit(
     fs, "/repo/.git", commit_id, "/src/lib/",
   ) catch {
     _ => return ()
   }
-  let subdir3 = SubdirRepo::from_commit(
+  let subdir3 = @bitx_subdir.SubdirRepo::from_commit(
     fs, "/repo/.git", commit_id, "./src/lib",
   ) catch {
     _ => return ()
@@ -294,8 +294,8 @@ test "subdir: init creates config and marker files" {
   fs.mkdir_p("/repo/src/lib")
   fs.write_file("/repo/src/lib/foo.mbt", b"content")
   // 初期化
-  let config = SubdirInitConfig::new(create_wrapper=false)
-  let info = init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
+  let config = @bitx_subdir.SubdirInitConfig::new(create_wrapper=false)
+  let info = @bitx_subdir.init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
     _ => return ()
   }
   // 結果を確認
@@ -315,14 +315,14 @@ test "subdir: is_subdir_initialized returns correct status" {
   }
   fs.mkdir_p("/repo/src/lib")
   // 初期化前
-  assert_false(is_subdir_initialized(fs, "/repo/.git", "src/lib"))
+  assert_false(@bitx_subdir.is_subdir_initialized(fs, "/repo/.git", "src/lib"))
   // 初期化
-  let config = SubdirInitConfig::default()
-  let _ = init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
+  let config = @bitx_subdir.SubdirInitConfig::default()
+  let _ = @bitx_subdir.init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
     _ => return ()
   }
   // 初期化後
-  assert_true(is_subdir_initialized(fs, "/repo/.git", "src/lib"))
+  assert_true(@bitx_subdir.is_subdir_initialized(fs, "/repo/.git", "src/lib"))
 }
 
 ///|
@@ -333,21 +333,21 @@ test "subdir: deinit removes config and marker files" {
   }
   fs.mkdir_p("/repo/src/lib")
   // 初期化
-  let config = SubdirInitConfig::new(create_wrapper=false)
-  let _ = init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
+  let config = @bitx_subdir.SubdirInitConfig::new(create_wrapper=false)
+  let _ = @bitx_subdir.init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
     _ => return ()
   }
-  assert_true(is_subdir_initialized(fs, "/repo/.git", "src/lib"))
+  assert_true(@bitx_subdir.is_subdir_initialized(fs, "/repo/.git", "src/lib"))
   // 初期化解除
-  deinit_subdir(fs, fs, "/repo/.git", "/repo", "src/lib")
+  @bitx_subdir.deinit_subdir(fs, fs, "/repo/.git", "/repo", "src/lib")
   // 確認
-  assert_false(is_subdir_initialized(fs, "/repo/.git", "src/lib"))
+  assert_false(@bitx_subdir.is_subdir_initialized(fs, "/repo/.git", "src/lib"))
   assert_false(fs.is_file("/repo/src/lib/.gitsubdir"))
 }
 
 ///|
 test "subdir: generate_shell_env returns correct variables" {
-  let env = generate_shell_env("/repo/.git", "/repo", "src/lib")
+  let env = @bitx_subdir.generate_shell_env("/repo/.git", "/repo", "src/lib")
   @test.assert_eq(env.length(), 4)
   // MOONGIT_SUBDIR
   @test.assert_eq(env[0].0, "MOONGIT_SUBDIR")
@@ -359,7 +359,7 @@ test "subdir: generate_shell_env returns correct variables" {
 
 ///|
 test "subdir: generate_shell_rc contains git wrapper" {
-  let rc = generate_shell_rc("src/lib")
+  let rc = @bitx_subdir.generate_shell_rc("src/lib")
   // 基本的な内容を確認
   assert_true(rc.contains("git()"))
   assert_true(rc.contains("log)"))
@@ -375,8 +375,8 @@ test "subdir: init creates wrapper script with correct content" {
   }
   fs.mkdir_p("/repo/src/lib")
   // ラッパー付きで初期化
-  let config = SubdirInitConfig::new(create_wrapper=true)
-  let _ = init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
+  let config = @bitx_subdir.SubdirInitConfig::new(create_wrapper=true)
+  let _ = @bitx_subdir.init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
     _ => return ()
   }
   // ラッパースクリプトが作成されている
@@ -400,8 +400,8 @@ test "subdir: config file contains correct settings" {
     _ => ()
   }
   fs.mkdir_p("/repo/src/lib")
-  let config = SubdirInitConfig::new(create_wrapper=false)
-  let _ = init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
+  let config = @bitx_subdir.SubdirInitConfig::new(create_wrapper=false)
+  let _ = @bitx_subdir.init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
     _ => return ()
   }
   // 設定ファイルの内容を確認
@@ -422,8 +422,8 @@ test "subdir: marker file contains path info" {
     _ => ()
   }
   fs.mkdir_p("/repo/src/lib")
-  let config = SubdirInitConfig::new(verbose_marker=true)
-  let _ = init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
+  let config = @bitx_subdir.SubdirInitConfig::new(verbose_marker=true)
+  let _ = @bitx_subdir.init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
     _ => return ()
   }
   // マーカーファイルの内容を確認
@@ -443,15 +443,15 @@ test "subdir: get_subdir_info returns info for initialized subdir" {
   }
   fs.mkdir_p("/repo/src/lib")
   // 初期化前は None
-  let info_before = get_subdir_info(fs, "/repo/.git", "/repo", "src/lib")
+  let info_before = @bitx_subdir.get_subdir_info(fs, "/repo/.git", "/repo", "src/lib")
   assert_true(info_before is None)
   // 初期化
-  let config = SubdirInitConfig::default()
-  let _ = init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
+  let config = @bitx_subdir.SubdirInitConfig::default()
+  let _ = @bitx_subdir.init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
     _ => return ()
   }
   // 初期化後は Some
-  let info_after = get_subdir_info(fs, "/repo/.git", "/repo", "src/lib")
+  let info_after = @bitx_subdir.get_subdir_info(fs, "/repo/.git", "/repo", "src/lib")
   match info_after {
     Some(info) => {
       @test.assert_eq(info.path, "src/lib")
@@ -474,21 +474,21 @@ test "subdir: full workflow init -> check -> deinit" {
   fs.write_file("/repo/src/lib/foo.mbt", b"lib content")
   fs.write_file("/repo/src/cli/main.mbt", b"cli content")
   // 両方を初期化
-  let config = SubdirInitConfig::default()
-  let _ = init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
+  let config = @bitx_subdir.SubdirInitConfig::default()
+  let _ = @bitx_subdir.init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
     _ => return ()
   }
-  let _ = init_subdir(fs, "/repo/.git", "/repo", "src/cli", config) catch {
+  let _ = @bitx_subdir.init_subdir(fs, "/repo/.git", "/repo", "src/cli", config) catch {
     _ => return ()
   }
   // 両方が初期化されている
-  assert_true(is_subdir_initialized(fs, "/repo/.git", "src/lib"))
-  assert_true(is_subdir_initialized(fs, "/repo/.git", "src/cli"))
+  assert_true(@bitx_subdir.is_subdir_initialized(fs, "/repo/.git", "src/lib"))
+  assert_true(@bitx_subdir.is_subdir_initialized(fs, "/repo/.git", "src/cli"))
   // lib だけ解除
-  deinit_subdir(fs, fs, "/repo/.git", "/repo", "src/lib")
+  @bitx_subdir.deinit_subdir(fs, fs, "/repo/.git", "/repo", "src/lib")
   // lib は解除され、cli はまだ初期化されている
-  assert_false(is_subdir_initialized(fs, "/repo/.git", "src/lib"))
-  assert_true(is_subdir_initialized(fs, "/repo/.git", "src/cli"))
+  assert_false(@bitx_subdir.is_subdir_initialized(fs, "/repo/.git", "src/lib"))
+  assert_true(@bitx_subdir.is_subdir_initialized(fs, "/repo/.git", "src/cli"))
   // ファイルが削除されている
   assert_false(fs.is_file("/repo/src/lib/.gitsubdir"))
   assert_false(fs.is_file("/repo/src/lib/git-subdir"))
@@ -505,8 +505,8 @@ test "subdir: nested path initialization" {
   // 深いネストのディレクトリ
   fs.mkdir_p("/repo/src/packages/core/lib")
   fs.write_file("/repo/src/packages/core/lib/index.mbt", b"content")
-  let config = SubdirInitConfig::default()
-  let info = init_subdir(
+  let config = @bitx_subdir.SubdirInitConfig::default()
+  let info = @bitx_subdir.init_subdir(
     fs, "/repo/.git", "/repo", "src/packages/core/lib", config,
   ) catch {
     _ => return ()
@@ -519,7 +519,7 @@ test "subdir: nested path initialization" {
 
 ///|
 test "subdir: shell rc script has correct structure" {
-  let rc = generate_shell_rc("src/lib")
+  let rc = @bitx_subdir.generate_shell_rc("src/lib")
   // ヘッダーコメント
   assert_true(rc.contains("# Moongit subdir shell for: src/lib"))
   // git 関数定義
@@ -546,7 +546,7 @@ test "subdir: shell rc script has correct structure" {
 
 ///|
 test "subdir: env vars have correct values" {
-  let env = generate_shell_env(
+  let env = @bitx_subdir.generate_shell_env(
     "/home/user/repo/.git", "/home/user/repo", "packages/core",
   )
   // 各環境変数を確認
@@ -597,12 +597,12 @@ test "subdir: init with SubdirRepo integration" {
     _ => return ()
   }
   // init_subdir を実行
-  let config = SubdirInitConfig::default()
-  let _ = init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
+  let config = @bitx_subdir.SubdirInitConfig::default()
+  let _ = @bitx_subdir.init_subdir(fs, "/repo/.git", "/repo", "src/lib", config) catch {
     _ => return ()
   }
   // SubdirRepo も正常に作成できる
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
   // ファイルが読める
@@ -628,7 +628,7 @@ test "module: init creates git module structure" {
   fs.mkdir_p("/repo/src/lib")
   fs.write_file("/repo/src/lib/foo.mbt", b"content")
   // モジュールとして初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // modules ディレクトリが作成されている
@@ -650,7 +650,7 @@ test "module: .git file contains correct gitdir path" {
     _ => ()
   }
   fs.mkdir_p("/repo/src/lib")
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // .git ファイルの内容を確認
@@ -667,7 +667,7 @@ test "module: config contains worktree path" {
     _ => ()
   }
   fs.mkdir_p("/repo/src/lib")
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // config ファイルの内容を確認
@@ -688,7 +688,7 @@ test "module: alternates points to parent objects" {
     _ => ()
   }
   fs.mkdir_p("/repo/src/lib")
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // alternates ファイルの内容を確認
@@ -709,13 +709,13 @@ test "module: is_module_initialized returns correct status" {
   }
   fs.mkdir_p("/repo/src/lib")
   // 初期化前
-  assert_false(is_module_initialized(fs, "/repo/.git", "src/lib"))
+  assert_false(@bitx_subdir.is_module_initialized(fs, "/repo/.git", "src/lib"))
   // 初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // 初期化後
-  assert_true(is_module_initialized(fs, "/repo/.git", "src/lib"))
+  assert_true(@bitx_subdir.is_module_initialized(fs, "/repo/.git", "src/lib"))
 }
 
 ///|
@@ -726,14 +726,14 @@ test "module: deinit removes module structure" {
   }
   fs.mkdir_p("/repo/src/lib")
   // 初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
-  assert_true(is_module_initialized(fs, "/repo/.git", "src/lib"))
+  assert_true(@bitx_subdir.is_module_initialized(fs, "/repo/.git", "src/lib"))
   // 削除
-  deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib")
+  @bitx_subdir.deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib")
   // 確認
-  assert_false(is_module_initialized(fs, "/repo/.git", "src/lib"))
+  assert_false(@bitx_subdir.is_module_initialized(fs, "/repo/.git", "src/lib"))
   assert_false(fs.is_file("/repo/src/lib/.git"))
 }
 
@@ -746,19 +746,19 @@ test "module: list_modules returns initialized modules" {
   fs.mkdir_p("/repo/src/lib")
   fs.mkdir_p("/repo/src/cli")
   // 初期状態では空
-  let modules_before = list_modules(fs, "/repo/.git")
+  let modules_before = @bitx_subdir.list_modules(fs, "/repo/.git")
   @test.assert_eq(modules_before.length(), 0)
   // lib を初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
-  let modules_one = list_modules(fs, "/repo/.git")
+  let modules_one = @bitx_subdir.list_modules(fs, "/repo/.git")
   @test.assert_eq(modules_one.length(), 1)
   // cli も初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/cli") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/cli") catch {
     _ => return ()
   }
-  let modules_two = list_modules(fs, "/repo/.git")
+  let modules_two = @bitx_subdir.list_modules(fs, "/repo/.git")
   @test.assert_eq(modules_two.length(), 2)
 }
 
@@ -769,7 +769,7 @@ test "module: nested path creates correct structure" {
     _ => ()
   }
   fs.mkdir_p("/repo/packages/core/lib")
-  init_module(fs, fs, "/repo/.git", "/repo", "packages/core/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "packages/core/lib") catch {
     _ => return ()
   }
   // モジュール名が正しく変換されている
@@ -799,7 +799,7 @@ test "subdir: commit creates new commit in parent repo" {
     _ => return ()
   }
   // SubdirRepo を作成して変更
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
     _ => return ()
   }
   // ワーキング層に変更を加える
@@ -819,7 +819,7 @@ test "subdir: commit creates new commit in parent repo" {
   // 新しいコミットが作成された
   assert_true(commit2 != commit1)
   // 新しいコミットからファイルを読める
-  let subdir2 = SubdirRepo::from_commit(fs, "/repo/.git", commit2, "src/lib") catch {
+  let subdir2 = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit2, "src/lib") catch {
     _ => return ()
   }
   let content = subdir2.fs().read_file(fs, "/foo.mbt") catch { _ => return () }
@@ -852,13 +852,13 @@ test "subdir: checkout retrieves files from specific commit" {
     _ => return ()
   }
   // commit1 のサブディレクトリを取得
-  let subdir1 = SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
+  let subdir1 = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
     _ => return ()
   }
   let content1 = subdir1.fs().read_file(fs, "/foo.mbt") catch { _ => return () }
   @test.assert_eq(content1, b"version 1")
   // commit2 のサブディレクトリを取得
-  let subdir2 = SubdirRepo::from_commit(fs, "/repo/.git", commit2, "src/lib") catch {
+  let subdir2 = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit2, "src/lib") catch {
     _ => return ()
   }
   let content2 = subdir2.fs().read_file(fs, "/foo.mbt") catch { _ => return () }
@@ -883,7 +883,7 @@ test "subdir: commit preserves files outside subdirectory" {
     _ => return ()
   }
   // SubdirRepo で変更してコミット
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
     _ => return ()
   }
   subdir.fs().write_file("/foo.mbt", b"modified lib")
@@ -924,7 +924,7 @@ test "error: SubdirRepo from non-existent subdir" {
     _ => return ()
   }
   // 存在しないサブディレクトリ - エラーになるはず
-  let _ = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "nonexistent") catch {
+  let _ = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "nonexistent") catch {
     SubdirNotFound(_) => return () // 期待通り
     _ => {
       assert_true(false) // 予期しないエラー
@@ -948,7 +948,7 @@ test "error: commit without changes" {
   ) catch {
     _ => return ()
   }
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
   // 変更なしでコミット試行
@@ -972,10 +972,10 @@ test "error: module init creates directories" {
   }
   fs.mkdir_p("/repo/src/lib")
   // 正常に初期化できることを確認
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
-  assert_true(is_module_initialized(fs, "/repo/.git", "src/lib"))
+  assert_true(@bitx_subdir.is_module_initialized(fs, "/repo/.git", "src/lib"))
 }
 
 // ============================================================================
@@ -997,7 +997,7 @@ test "edge: empty subdirectory" {
   ) catch {
     _ => return ()
   }
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
   // 空でも正常に作成される
@@ -1019,7 +1019,7 @@ test "edge: very deep nesting (5 levels)" {
     _ => return ()
   }
   // 深いネストでも正常動作
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, deep_path) catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, deep_path) catch {
     _ => return ()
   }
   @test.assert_eq(subdir.path(), deep_path)
@@ -1036,7 +1036,7 @@ test "edge: module with very deep nesting" {
   let deep_path = "packages/scope/name/src/lib"
   fs.mkdir_p("/repo/" + deep_path)
   fs.write_file("/repo/" + deep_path + "/index.mbt", b"content")
-  init_module(fs, fs, "/repo/.git", "/repo", deep_path) catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", deep_path) catch {
     _ => return ()
   }
   // 正しいモジュール名で作成される
@@ -1066,7 +1066,7 @@ test "edge: path normalization variants" {
   // 様々なパス形式
   let paths = ["src/lib", "/src/lib", "src/lib/", "/src/lib/", "./src/lib"]
   for path in paths {
-    let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, path) catch {
+    let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, path) catch {
       _ => continue
     }
     @test.assert_eq(subdir.path(), "src/lib")
@@ -1086,7 +1086,7 @@ test "edge: single file in subdirectory" {
   ) catch {
     _ => return ()
   }
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
   let files = subdir.fs().readdir(fs, "/") catch { _ => return () }
@@ -1114,12 +1114,12 @@ test "workflow: init -> commit -> checkout -> deinit" {
     _ => return ()
   }
   // 2. モジュール初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
-  assert_true(is_module_initialized(fs, "/repo/.git", "src/lib"))
+  assert_true(@bitx_subdir.is_module_initialized(fs, "/repo/.git", "src/lib"))
   // 3. SubdirRepo で変更してコミット
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
     _ => return ()
   }
   subdir.fs().write_file("/foo.mbt", b"v2")
@@ -1133,7 +1133,7 @@ test "workflow: init -> commit -> checkout -> deinit" {
     _ => return ()
   }
   // 4. 古いコミットをチェックアウト
-  let subdir_old = SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
+  let subdir_old = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
     _ => return ()
   }
   let old_content = subdir_old.fs().read_file(fs, "/foo.mbt") catch {
@@ -1141,7 +1141,7 @@ test "workflow: init -> commit -> checkout -> deinit" {
     }
   @test.assert_eq(old_content, b"v1")
   // 5. 新しいコミットを確認
-  let subdir_new = SubdirRepo::from_commit(fs, "/repo/.git", commit2, "src/lib") catch {
+  let subdir_new = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit2, "src/lib") catch {
     _ => return ()
   }
   let new_content = subdir_new.fs().read_file(fs, "/foo.mbt") catch {
@@ -1149,8 +1149,8 @@ test "workflow: init -> commit -> checkout -> deinit" {
     }
   @test.assert_eq(new_content, b"v2")
   // 6. モジュール削除
-  deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib")
-  assert_false(is_module_initialized(fs, "/repo/.git", "src/lib"))
+  @bitx_subdir.deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib")
+  assert_false(@bitx_subdir.is_module_initialized(fs, "/repo/.git", "src/lib"))
 }
 
 ///|
@@ -1169,7 +1169,7 @@ test "workflow: multiple commits in sequence" {
   // 複数回コミット
   let mut current_commit = commit1
   for i = 2; i <= 5; i = i + 1 {
-    let subdir = SubdirRepo::from_commit(
+    let subdir = @bitx_subdir.SubdirRepo::from_commit(
       fs, "/repo/.git", current_commit, "src/lib",
     ) catch {
       _ => return ()
@@ -1187,7 +1187,7 @@ test "workflow: multiple commits in sequence" {
     }
   }
   // 最終バージョンを確認
-  let final_subdir = SubdirRepo::from_commit(
+  let final_subdir = @bitx_subdir.SubdirRepo::from_commit(
     fs, "/repo/.git", current_commit, "src/lib",
   ) catch {
     _ => return ()
@@ -1221,25 +1221,25 @@ test "parallel: multiple modules independent operations" {
     _ => return ()
   }
   // 全てをモジュールとして初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "packages/core") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "packages/core") catch {
     _ => return ()
   }
-  init_module(fs, fs, "/repo/.git", "/repo", "packages/utils") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "packages/utils") catch {
     _ => return ()
   }
-  init_module(fs, fs, "/repo/.git", "/repo", "packages/cli") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "packages/cli") catch {
     _ => return ()
   }
   // 全て初期化されている
-  let modules = list_modules(fs, "/repo/.git")
+  let modules = @bitx_subdir.list_modules(fs, "/repo/.git")
   @test.assert_eq(modules.length(), 3)
   // 各モジュールで独立してSubdirRepoを作成
-  let core = SubdirRepo::from_commit(
+  let core = @bitx_subdir.SubdirRepo::from_commit(
     fs, "/repo/.git", commit_id, "packages/core",
   ) catch {
     _ => return ()
   }
-  let utils = SubdirRepo::from_commit(
+  let utils = @bitx_subdir.SubdirRepo::from_commit(
     fs, "/repo/.git", commit_id, "packages/utils",
   ) catch {
     _ => return ()
@@ -1271,7 +1271,7 @@ test "parallel: commit to one module preserves others" {
     _ => return ()
   }
   // pkg/a だけ変更してコミット
-  let subdir_a = SubdirRepo::from_commit(fs, "/repo/.git", commit1, "pkg/a") catch {
+  let subdir_a = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit1, "pkg/a") catch {
     _ => return ()
   }
   subdir_a.fs().write_file("/file.mbt", b"a modified")
@@ -1285,7 +1285,7 @@ test "parallel: commit to one module preserves others" {
     _ => return ()
   }
   // pkg/b は変更されていない
-  let subdir_b = SubdirRepo::from_commit(fs, "/repo/.git", commit2, "pkg/b") catch {
+  let subdir_b = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit2, "pkg/b") catch {
     _ => return ()
   }
   let b_content = subdir_b.fs().read_file(fs, "/file.mbt") catch {
@@ -1293,7 +1293,7 @@ test "parallel: commit to one module preserves others" {
     }
   @test.assert_eq(b_content, b"b original")
   // pkg/a は変更されている
-  let subdir_a2 = SubdirRepo::from_commit(fs, "/repo/.git", commit2, "pkg/a") catch {
+  let subdir_a2 = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit2, "pkg/a") catch {
     _ => return ()
   }
   let a_content = subdir_a2.fs().read_file(fs, "/file.mbt") catch {
@@ -1315,13 +1315,13 @@ test "sync: sync_module updates HEAD" {
   fs.mkdir_p("/repo/src/lib")
   fs.write_file("/repo/src/lib/foo.mbt", b"content")
   // モジュール初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // 親のHEADを変更（ブランチ参照に）
   fs.write_file("/repo/.git/HEAD", b"ref: refs/heads/develop\n")
   // sync実行
-  sync_module(fs, fs, "/repo/.git", "src/lib") catch {
+  @bitx_subdir.sync_module(fs, fs, "/repo/.git", "src/lib") catch {
     _ => return ()
   }
   // モジュールのHEADも更新される
@@ -1364,7 +1364,7 @@ test "misc: log filters commits correctly" {
     _ => return ()
   }
   // lib の履歴を取得
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit3, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit3, "src/lib") catch {
     _ => return ()
   }
   let history = subdir.log(fs) catch { _ => return () }
@@ -1386,7 +1386,7 @@ test "misc: diff shows only subdirectory changes" {
   ) catch {
     _ => return ()
   }
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
   // 複数のファイルを変更
@@ -1414,7 +1414,7 @@ test "misc: multiple files in subdirectory" {
   ) catch {
     _ => return ()
   }
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
   let files = subdir.fs().readdir(fs, "/") catch { _ => return () }
@@ -1436,7 +1436,7 @@ test "misc: subdirectory with nested directories" {
   ) catch {
     _ => return ()
   }
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
     _ => return ()
   }
   // ネストしたディレクトリも読める
@@ -1461,7 +1461,7 @@ test "misc: commit with delete file" {
   ) catch {
     _ => return ()
   }
-  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
+  let subdir = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit1, "src/lib") catch {
     _ => return ()
   }
   // ファイルを削除
@@ -1476,7 +1476,7 @@ test "misc: commit with delete file" {
     _ => return ()
   }
   // 削除後のコミットを確認
-  let subdir2 = SubdirRepo::from_commit(fs, "/repo/.git", commit2, "src/lib") catch {
+  let subdir2 = @bitx_subdir.SubdirRepo::from_commit(fs, "/repo/.git", commit2, "src/lib") catch {
     _ => return ()
   }
   let files = subdir2.fs().readdir(fs, "/") catch { _ => return () }
@@ -1511,15 +1511,15 @@ test "sparse: init_module_sparse enables sparse checkout" {
     _ => return ()
   }
   // モジュールを初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // sparse checkout を初期化
-  init_module_sparse(fs, fs, "/repo/.git", "src/lib") catch {
+  @bitx_subdir.init_module_sparse(fs, fs, "/repo/.git", "src/lib") catch {
     _ => return ()
   }
   // 有効になっていることを確認
-  assert_true(is_module_sparse_enabled(fs, "/repo/.git", "src/lib"))
+  assert_true(@bitx_subdir.is_module_sparse_enabled(fs, "/repo/.git", "src/lib"))
 }
 
 ///|
@@ -1535,11 +1535,11 @@ test "sparse: init_module_sparse with cone mode" {
   ) catch {
     _ => return ()
   }
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // cone mode で初期化
-  init_module_sparse(fs, fs, "/repo/.git", "src/lib", cone=true) catch {
+  @bitx_subdir.init_module_sparse(fs, fs, "/repo/.git", "src/lib", cone=true) catch {
     _ => return ()
   }
   // config を確認
@@ -1563,19 +1563,19 @@ test "sparse: write and read patterns" {
   ) catch {
     _ => return ()
   }
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
-  init_module_sparse(fs, fs, "/repo/.git", "src/lib") catch {
+  @bitx_subdir.init_module_sparse(fs, fs, "/repo/.git", "src/lib") catch {
     _ => return ()
   }
   // パターンを書き込み
   let patterns = ["*.mbt", "*.mbti", "!*_test.mbt"]
-  write_module_sparse_patterns(fs, "/repo/.git", "src/lib", patterns) catch {
+  @bitx_subdir.write_module_sparse_patterns(fs, "/repo/.git", "src/lib", patterns) catch {
     _ => return ()
   }
   // パターンを読み取り
-  let read_patterns = read_module_sparse_patterns(fs, "/repo/.git", "src/lib")
+  let read_patterns = @bitx_subdir.read_module_sparse_patterns(fs, "/repo/.git", "src/lib")
   @test.assert_eq(read_patterns.length(), 3)
   @test.assert_eq(read_patterns[0], "*.mbt")
   @test.assert_eq(read_patterns[1], "*.mbti")
@@ -1595,19 +1595,19 @@ test "sparse: set_module_sparse_patterns replaces existing" {
   ) catch {
     _ => return ()
   }
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // 最初のパターンを設定
-  set_module_sparse_patterns(fs, fs, "/repo/.git", "src/lib", ["*.mbt"]) catch {
+  @bitx_subdir.set_module_sparse_patterns(fs, fs, "/repo/.git", "src/lib", ["*.mbt"]) catch {
     _ => return ()
   }
   // 新しいパターンで置換
-  set_module_sparse_patterns(fs, fs, "/repo/.git", "src/lib", ["*.txt", "*.md"]) catch {
+  @bitx_subdir.set_module_sparse_patterns(fs, fs, "/repo/.git", "src/lib", ["*.txt", "*.md"]) catch {
     _ => return ()
   }
   // 読み取り
-  let patterns = read_module_sparse_patterns(fs, "/repo/.git", "src/lib")
+  let patterns = @bitx_subdir.read_module_sparse_patterns(fs, "/repo/.git", "src/lib")
   @test.assert_eq(patterns.length(), 2)
   @test.assert_eq(patterns[0], "*.txt")
   @test.assert_eq(patterns[1], "*.md")
@@ -1626,21 +1626,21 @@ test "sparse: add_module_sparse_patterns appends without duplicates" {
   ) catch {
     _ => return ()
   }
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // 初期パターン
-  set_module_sparse_patterns(fs, fs, "/repo/.git", "src/lib", ["*.mbt"]) catch {
+  @bitx_subdir.set_module_sparse_patterns(fs, fs, "/repo/.git", "src/lib", ["*.mbt"]) catch {
     _ => return ()
   }
   // パターンを追加（重複を含む）
-  add_module_sparse_patterns(fs, fs, "/repo/.git", "src/lib", [
+  @bitx_subdir.add_module_sparse_patterns(fs, fs, "/repo/.git", "src/lib", [
     "*.mbt", "*.mbti",
   ]) catch {
     _ => return ()
   }
   // 読み取り
-  let patterns = read_module_sparse_patterns(fs, "/repo/.git", "src/lib")
+  let patterns = @bitx_subdir.read_module_sparse_patterns(fs, "/repo/.git", "src/lib")
   @test.assert_eq(patterns.length(), 2) // *.mbt は重複しない
   @test.assert_eq(patterns[0], "*.mbt")
   @test.assert_eq(patterns[1], "*.mbti")
@@ -1659,65 +1659,65 @@ test "sparse: disable_module_sparse disables sparse checkout" {
   ) catch {
     _ => return ()
   }
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
-  init_module_sparse(fs, fs, "/repo/.git", "src/lib") catch {
+  @bitx_subdir.init_module_sparse(fs, fs, "/repo/.git", "src/lib") catch {
     _ => return ()
   }
-  assert_true(is_module_sparse_enabled(fs, "/repo/.git", "src/lib"))
+  assert_true(@bitx_subdir.is_module_sparse_enabled(fs, "/repo/.git", "src/lib"))
   // 無効化
-  disable_module_sparse(fs, fs, "/repo/.git", "src/lib") catch {
+  @bitx_subdir.disable_module_sparse(fs, fs, "/repo/.git", "src/lib") catch {
     _ => return ()
   }
-  assert_false(is_module_sparse_enabled(fs, "/repo/.git", "src/lib"))
+  assert_false(@bitx_subdir.is_module_sparse_enabled(fs, "/repo/.git", "src/lib"))
 }
 
 ///|
 test "sparse: matches_module_sparse with extension pattern" {
   let patterns = ["*.mbt"]
-  assert_true(matches_module_sparse("foo.mbt", patterns))
-  assert_true(matches_module_sparse("bar.mbt", patterns))
-  assert_false(matches_module_sparse("foo.txt", patterns))
-  assert_false(matches_module_sparse("foo.mbti", patterns))
+  assert_true(@bitx_subdir.matches_module_sparse("foo.mbt", patterns))
+  assert_true(@bitx_subdir.matches_module_sparse("bar.mbt", patterns))
+  assert_false(@bitx_subdir.matches_module_sparse("foo.txt", patterns))
+  assert_false(@bitx_subdir.matches_module_sparse("foo.mbti", patterns))
 }
 
 ///|
 test "sparse: matches_module_sparse with directory pattern" {
   let patterns = ["src/"]
-  assert_true(matches_module_sparse("src/foo.mbt", patterns))
-  assert_true(matches_module_sparse("src/lib/bar.mbt", patterns))
-  assert_false(matches_module_sparse("test/foo.mbt", patterns))
+  assert_true(@bitx_subdir.matches_module_sparse("src/foo.mbt", patterns))
+  assert_true(@bitx_subdir.matches_module_sparse("src/lib/bar.mbt", patterns))
+  assert_false(@bitx_subdir.matches_module_sparse("test/foo.mbt", patterns))
 }
 
 ///|
 test "sparse: matches_module_sparse with negation" {
   let patterns = ["*.mbt", "!*_test.mbt"]
-  assert_true(matches_module_sparse("foo.mbt", patterns))
-  assert_false(matches_module_sparse("foo_test.mbt", patterns))
+  assert_true(@bitx_subdir.matches_module_sparse("foo.mbt", patterns))
+  assert_false(@bitx_subdir.matches_module_sparse("foo_test.mbt", patterns))
 }
 
 ///|
 test "sparse: matches_module_sparse with double star" {
   let patterns = ["**/test*.mbt"]
-  assert_true(matches_module_sparse("test_foo.mbt", patterns))
-  assert_true(matches_module_sparse("src/test_bar.mbt", patterns))
-  assert_true(matches_module_sparse("src/lib/test_baz.mbt", patterns))
-  assert_false(matches_module_sparse("foo.mbt", patterns))
+  assert_true(@bitx_subdir.matches_module_sparse("test_foo.mbt", patterns))
+  assert_true(@bitx_subdir.matches_module_sparse("src/test_bar.mbt", patterns))
+  assert_true(@bitx_subdir.matches_module_sparse("src/lib/test_baz.mbt", patterns))
+  assert_false(@bitx_subdir.matches_module_sparse("foo.mbt", patterns))
 }
 
 ///|
 test "sparse: matches_module_sparse with root only pattern" {
   let patterns = ["/*"]
-  assert_true(matches_module_sparse("README.md", patterns))
-  assert_false(matches_module_sparse("src/foo.mbt", patterns))
+  assert_true(@bitx_subdir.matches_module_sparse("README.md", patterns))
+  assert_false(@bitx_subdir.matches_module_sparse("src/foo.mbt", patterns))
 }
 
 ///|
 test "sparse: matches_module_sparse with empty patterns includes all" {
   let patterns : Array[String] = []
-  assert_true(matches_module_sparse("anything.txt", patterns))
-  assert_true(matches_module_sparse("any/path/file.mbt", patterns))
+  assert_true(@bitx_subdir.matches_module_sparse("anything.txt", patterns))
+  assert_true(@bitx_subdir.matches_module_sparse("any/path/file.mbt", patterns))
 }
 
 ///|
@@ -1727,7 +1727,7 @@ test "sparse: init without module fails" {
     _ => ()
   }
   // モジュールを初期化せずに sparse を初期化しようとする
-  let result = init_module_sparse(fs, fs, "/repo/.git", "src/lib") catch {
+  let result = @bitx_subdir.init_module_sparse(fs, fs, "/repo/.git", "src/lib") catch {
     IoError(_) => return () // 期待されるエラー
     _ => {
       assert_true(false)
@@ -1746,7 +1746,7 @@ test "sparse: read patterns from non-existent module returns empty" {
     _ => ()
   }
   // 存在しないモジュールのパターンを読み取り
-  let patterns = read_module_sparse_patterns(fs, "/repo/.git", "nonexistent")
+  let patterns = @bitx_subdir.read_module_sparse_patterns(fs, "/repo/.git", "nonexistent")
   @test.assert_eq(patterns.length(), 0)
 }
 
@@ -1756,7 +1756,7 @@ test "sparse: is_module_sparse_enabled returns false for non-existent" {
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
-  assert_false(is_module_sparse_enabled(fs, "/repo/.git", "nonexistent"))
+  assert_false(@bitx_subdir.is_module_sparse_enabled(fs, "/repo/.git", "nonexistent"))
 }
 
 // ============================================
@@ -1777,7 +1777,7 @@ test "module: init creates .gitmodules entry" {
     _ => return ()
   }
   // モジュールを初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // .gitmodules が作成されたことを確認
@@ -1803,7 +1803,7 @@ test "module: init adds gitlink to index" {
     _ => return ()
   }
   // モジュールを初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // index に gitlink エントリがあることを確認
@@ -1835,7 +1835,7 @@ test "module: init removes subdir files from index" {
     _ => return ()
   }
   // モジュールを初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // index から src/lib/ 内のファイルが削除されていることを確認
@@ -1862,12 +1862,12 @@ test "module: deinit removes .gitmodules entry" {
     _ => return ()
   }
   // モジュールを初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   assert_true(fs.is_file("/repo/.gitmodules"))
   // モジュールを削除
-  deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib")
+  @bitx_subdir.deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib")
   // .gitmodules が削除されたことを確認（空になった場合）
   assert_false(fs.is_file("/repo/.gitmodules"))
 }
@@ -1886,11 +1886,11 @@ test "module: deinit removes gitlink from index" {
     _ => return ()
   }
   // モジュールを初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   // モジュールを削除
-  deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib")
+  @bitx_subdir.deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib")
   // index から gitlink が削除されていることを確認
   let entries = @lib.read_index_entries(fs, "/repo/.git") catch {
     _ => return ()
@@ -1918,10 +1918,10 @@ test "module: multiple modules in gitmodules" {
     _ => return ()
   }
   // 複数のモジュールを初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
-  init_module(fs, fs, "/repo/.git", "/repo", "src/core") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/core") catch {
     _ => return ()
   }
   // .gitmodules に両方のエントリがあることを確認
@@ -1947,14 +1947,14 @@ test "module: deinit one of multiple modules" {
     _ => return ()
   }
   // 複数のモジュールを初期化
-  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
-  init_module(fs, fs, "/repo/.git", "/repo", "src/core") catch {
+  @bitx_subdir.init_module(fs, fs, "/repo/.git", "/repo", "src/core") catch {
     _ => return ()
   }
   // 1つだけ削除
-  deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib")
+  @bitx_subdir.deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib")
   // .gitmodules に残りのエントリがあることを確認
   let content = fs.read_file("/repo/.gitmodules") catch { _ => return () }
   let text = bytes_to_string_test(content)

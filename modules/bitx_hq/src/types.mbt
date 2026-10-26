@@ -12,6 +12,12 @@ pub struct RepoPath {
 } derive(Debug, Eq)
 
 ///|
+pub extend RepoPath with Debug::{to_repr}
+
+///|
+pub extend RepoPath with Eq::{not_equal, equal}
+
+///|
 fn hq_show_string(value : String) -> String {
   let buf = StringBuilder()
   buf.write_char('"')
@@ -56,6 +62,9 @@ pub impl Show for RepoPath with fn output(self, logger) {
     "}",
   )
 }
+
+///|
+pub extend RepoPath with Show::{to_string, output}
 
 ///|
 pub fn RepoPath::new(
@@ -169,6 +178,12 @@ pub(all) enum HqGetResult {
 } derive(Debug, Eq)
 
 ///|
+pub extend HqGetResult with Debug::{to_repr}
+
+///|
+pub extend HqGetResult with Eq::{not_equal, equal}
+
+///|
 pub impl Show for HqGetResult with fn output(self, logger) {
   match self {
     Cloned(path) => logger.write_string("Cloned(" + hq_show_string(path) + ")")
@@ -180,3 +195,6 @@ pub impl Show for HqGetResult with fn output(self, logger) {
       logger.write_string("Error(" + hq_show_string(message) + ")")
   }
 }
+
+///|
+pub extend HqGetResult with Show::{to_string, output}

@@ -24,19 +24,19 @@ fn build_receive_request(
 ///|
 test "receive-pack: push to empty repo" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/src")) catch {
+  ignore(@bit_lib.init_repo(fs, "/src")) catch {
     _ => ()
   }
-  ignore(init_repo(fs, "/dst")) catch {
+  ignore(@bit_lib.init_repo(fs, "/dst")) catch {
     _ => ()
   }
   fs.write_string("/src/a.txt", "hello\n")
-  add_paths(fs, fs, "/src", ["a.txt"])
-  let commit_id = commit(
+  @bit_lib.add_paths(fs, fs, "/src", ["a.txt"])
+  let commit_id = @bit_lib.commit(
     fs, fs, "/src", "msg\n", "Test <t@example.com>", 1700000000L,
   )
-  let db = ObjectDb::load(fs, "/src/.git")
-  let objects = collect_reachable_objects(db, fs, commit_id)
+  let db = @bit_lib.ObjectDb::load(fs, "/src/.git")
+  let objects = @bit_lib.collect_reachable_objects(db, fs, commit_id)
   let pack = @pack.create_packfile(objects)
   let req = build_receive_request(
     @bit.ObjectId::zero(),
@@ -44,8 +44,8 @@ test "receive-pack: push to empty repo" {
     "refs/heads/main",
     pack,
   )
-  ignore(receive_pack(fs, fs, "/dst", req))
-  match resolve_ref(fs, "/dst/.git", "refs/heads/main") {
+  ignore(@bit_lib.receive_pack(fs, fs, "/dst", req))
+  match @bit_lib.resolve_ref(fs, "/dst/.git", "refs/heads/main") {
     None => assert_true(false)
     Some(id) => assert_true(id == commit_id)
   }
@@ -58,10 +58,10 @@ test "receive-pack: push to empty repo" {
 ///|
 test "receive-pack: advertise empty repo" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/repo")) catch {
+  ignore(@bit_lib.init_repo(fs, "/repo")) catch {
     _ => ()
   }
-  let adv = build_receive_pack_advertisement(fs, "/repo")
+  let adv = @bit_lib.build_receive_pack_advertisement(fs, "/repo")
   let decoded = @protocol.pktline_decode(adv) catch { _ => [] }
   assert_true(decoded.length() > 0)
   let (line_bytes, _) = decoded[0]
@@ -73,30 +73,30 @@ test "receive-pack: advertise empty repo" {
 ///|
 test "receive-pack: reject non-fast-forward" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/src")) catch {
+  ignore(@bit_lib.init_repo(fs, "/src")) catch {
     _ => ()
   }
-  ignore(init_repo(fs, "/dst")) catch {
+  ignore(@bit_lib.init_repo(fs, "/dst")) catch {
     _ => ()
   }
   fs.write_string("/src/a.txt", "one\n")
-  add_paths(fs, fs, "/src", ["a.txt"])
-  let commit_src = commit(
+  @bit_lib.add_paths(fs, fs, "/src", ["a.txt"])
+  let commit_src = @bit_lib.commit(
     fs, fs, "/src", "src\n", "Test <t@example.com>", 1700000000L,
   )
   fs.write_string("/dst/b.txt", "two\n")
-  add_paths(fs, fs, "/dst", ["b.txt"])
-  let commit_dst = commit(
+  @bit_lib.add_paths(fs, fs, "/dst", ["b.txt"])
+  let commit_dst = @bit_lib.commit(
     fs, fs, "/dst", "dst\n", "Test <t@example.com>", 1700000001L,
   )
-  let db = ObjectDb::load(fs, "/src/.git")
-  let objects = collect_reachable_objects(db, fs, commit_src)
+  let db = @bit_lib.ObjectDb::load(fs, "/src/.git")
+  let objects = @bit_lib.collect_reachable_objects(db, fs, commit_src)
   let pack = @pack.create_packfile(objects)
   let req = build_receive_request(
     commit_dst, commit_src, "refs/heads/main", pack,
   )
-  let res = parse_receive_pack_request(req)
-  let result = apply_receive_pack(fs, fs, "/dst", res)
+  let res = @bit_lib.parse_receive_pack_request(req)
+  let result = @bit_lib.apply_receive_pack(fs, fs, "/dst", res)
   assert_true(result.updated.length() == 0)
   assert_true(result.rejected.length() == 1)
   let (refname, msg) = result.rejected[0]
@@ -107,7 +107,7 @@ test "receive-pack: reject non-fast-forward" {
 ///|
 test "receive-pack: reject invalid refname" {
   let fs = @bit.TestFs::new()
-  ignore(init_repo(fs, "/dst")) catch {
+  ignore(@bit_lib.init_repo(fs, "/dst")) catch {
     _ => ()
   }
   let req = build_receive_request(
@@ -116,7 +116,7 @@ test "receive-pack: reject invalid refname" {
     "../refs/heads/main",
     @protocol.pktline_flush(),
   )
-  let _ = parse_receive_pack_request(req) catch { _ => return () }
+  let _ = @bit_lib.parse_receive_pack_request(req) catch { _ => return () }
   assert_true(false)
 }
 
@@ -124,7 +124,7 @@ test "receive-pack: reject invalid refname" {
 test "receive-pack: reject path traversal from /tmp repo" {
   let fs = @bit.TestFs::new()
   let tmp_repo = "/tmp/bit-receive-pack-poc"
-  ignore(init_repo(fs, tmp_repo)) catch {
+  ignore(@bit_lib.init_repo(fs, tmp_repo)) catch {
     _ => ()
   }
   let bad_req = build_receive_request(
@@ -133,6 +133,6 @@ test "receive-pack: reject path traversal from /tmp repo" {
     "../" + "tmp/bit-receive-pack-poc/.git/HEAD",
     @protocol.pktline_flush(),
   )
-  let _ = parse_receive_pack_request(bad_req) catch { _ => return () }
+  let _ = @bit_lib.parse_receive_pack_request(bad_req) catch { _ => return () }
   assert_true(false)
 }

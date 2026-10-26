@@ -41,11 +41,20 @@ pub(all) enum RefValue {
 } derive(Eq, Debug)
 
 ///|
+pub extend RefValue with Eq::{not_equal, equal}
+
+///|
+pub extend RefValue with Debug::{to_repr}
+
+///|
 pub(all) struct RefRecord {
   refname : String
   update_index : UInt64
   value : RefValue
 } derive(Eq)
+
+///|
+pub extend RefRecord with Eq::{not_equal, equal}
 
 ///|
 fn reftable_show_string(value : String) -> String {
@@ -83,6 +92,9 @@ pub impl Show for RefValue with fn output(self, logger) {
 }
 
 ///|
+pub extend RefValue with Show::{to_string, output}
+
+///|
 pub impl Show for RefRecord with fn output(self, logger) {
   logger.write_string(
     "{refname: " +
@@ -96,12 +108,21 @@ pub impl Show for RefRecord with fn output(self, logger) {
 }
 
 ///|
+pub extend RefRecord with Show::{to_string, output}
+
+///|
 pub struct ReftableHeader {
   version : Int
   block_size : Int
   min_update_index : UInt64
   max_update_index : UInt64
 } derive(Eq, Debug)
+
+///|
+pub extend ReftableHeader with Eq::{not_equal, equal}
+
+///|
+pub extend ReftableHeader with Debug::{to_repr}
 
 ///|
 struct ReftableFooter {
@@ -113,6 +134,12 @@ struct ReftableFooter {
   log_index_offset : UInt64
   crc32 : UInt
 } derive(Eq, Debug)
+
+///|
+pub extend ReftableFooter with Eq::{not_equal, equal}
+
+///|
+pub extend ReftableFooter with Debug::{to_repr}
 
 ///|
 /// Encode a varint (LEB128 variant with zero optimization used by reftable).
