@@ -75,7 +75,9 @@ async fn subdir_clone(
         None => subdir_path
       }
   }
-  let root = get_work_root()
+  // Like `git clone`, a relative destination is relative to where the
+  // command runs, not to an enclosing repository's root.
+  let root = clone_command_root(get_work_root())
   let target = if relative_target.has_prefix("/") {
     relative_target
   } else {
@@ -87,10 +89,7 @@ async fn subdir_clone(
   )
   let fs = OsFs::new()
   let target_existed = fs.is_dir(target)
-  let local_root = match @env.get_env_var("GIT_SHIM_CWD") {
-    Some(dir) => dir
-    None => root
-  }
+  let local_root = root
   let local_repo_path = @bitlib.resolve_local_repo_path(
     fs, local_root, remote_url,
   )
@@ -233,15 +232,18 @@ async fn subdir_clone(
       @pack.write_packfile_with_index(fs, temp_git_dir, pack, objects)
     }
   }
-  // Reload object database
-  let db2 = @bitlib.ObjectDb::load_lazy(fs, temp_git_dir)
-  // Step 4: Write files directly to target
-  print_line("  Writing files...")
-  @bitlib.write_tree_to_worktree(db2, fs, fs, tree_id, target)
-  // Step 5: Move .git to target
+  // Step 4: Move .git to target
   print_line("  Setting up git repository...")
   @bitlib.move_directory(fs, fs, temp_git_dir, git_dir)
   @bitlib.subdir_remove_dir(fs, fs, temp_clone)
+  // Step 5: Write files and the matching index, so the clone starts clean
+  print_line("  Writing files...")
+  let db2 = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  let files = @bitlib.collect_tree_files(db2, fs, tree_id)
+  let entries = @bitlib.write_worktree_and_build_index(
+    db2, fs, fs, target, git_dir, files,
+  )
+  @bitlib.write_index_entries(fs, git_dir, entries)
   // Step 6: Create orphan commit with subdirectory as root
   print_line("  Creating initial commit...")
   let timestamp = get_current_timestamp()
@@ -282,10 +284,17 @@ async fn subdir_clone(
       ()
     }
   }
-  // Step 7: Write subdir-clone metadata to .git/info/attributes
-  write_subdir_attributes(fs, git_dir, remote_url, subdir_path, commit_id)
-  // Step 8: Reset index
-  let _ = run_git_command(["-C", target, "reset", "HEAD"], cwd=None)
+  // Step 7: Write subdir-clone metadata to .git/info/attributes. A local
+  // upstream is recorded by its resolved path: a relative one would be read
+  // against the clone later, not against where it was typed.
+  @bitlib.write_subdir_attributes(
+    fs,
+    git_dir,
+    local_repo_path.unwrap_or(remote_url),
+    subdir_path,
+    commit_id,
+    local_commit=Some(new_commit_id),
+  )
   print_line("done.")
   print_line("")
   print_line("Cloned '\{subdir_path}' to '\{relative_target}/'")
@@ -293,21 +302,8 @@ async fn subdir_clone(
   print_line("Standard git/bit commands work from this directory:")
   print_line("  cd \{relative_target}")
   print_line("  bit status")
-  print_line("  bit rebase origin/main  # rebases only subdir changes")
-}
-
-///|
-/// Write subdir-clone metadata to .git/info/attributes
-fn write_subdir_attributes(
-  fs : OsFs,
-  git_dir : String,
-  remote_url : String,
-  subdir_path : String,
-  base_commit : @bitcore.ObjectId,
-) -> Unit {
-  @bitlib.write_subdir_attributes(
-    fs, git_dir, remote_url, subdir_path, base_commit,
-  )
+  print_line("  bit pull                # bring in upstream changes to the subdir")
+  print_line("  bit push origin main    # send local commits back upstream")
 }
 
 ///|

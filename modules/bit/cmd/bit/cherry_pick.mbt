@@ -156,21 +156,30 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
     eprint_line("error: cherry-pick requires a commit argument")
     @sys.exit(1)
   }
-  match subdir_info {
-    Some((_, subdir_path, _)) => {
-      handle_subdir_cherry_pick(fs, root, git_dir, spec, subdir_path)
-      return
-    }
-    None => ()
-  }
   // "-" means previous branch's HEAD — resolve via @{-1}
   let effective_spec = if spec == "-" { "@{-1}" } else { spec }
   // Resolve commit
   let commit_id = @bitrepo.rev_parse(fs, git_dir, effective_spec)
-  guard commit_id is Some(cid) else {
+  guard commit_id is Some(resolved_id) else {
     raise @bitcore.GitError::InvalidObject(
       "unknown revision: \{effective_spec}",
     )
+  }
+  let cid = match subdir_info {
+    Some((remote_url, subdir_path, _)) =>
+      match
+        subdir_cherry_pick_source(
+          fs, root, git_dir, remote_url, resolved_id, subdir_path,
+        ) {
+        Some(id) => id
+        None => {
+          print_line(
+            "Commit \{spec} does not change \{subdir_path}, skipping.",
+          )
+          return
+        }
+      }
+    None => resolved_id
   }
   // Validate the commit object
   if subdir_info is None {
@@ -269,60 +278,3 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
   }
 }
 
-///|
-/// Handle cherry-pick for subdir-clone
-async fn handle_subdir_cherry_pick(
-  fs : OsFs,
-  root : String,
-  git_dir : String,
-  spec : String,
-  subdir_path : String,
-) -> Unit raise Error {
-  print_line("Cherry-picking from upstream (subdir: \{subdir_path})...")
-  // Resolve commit
-  let commit_id = resolve_ref_for_subdir(fs, git_dir, spec)
-  guard commit_id is Some(cid) else {
-    raise @bitcore.GitError::InvalidObject("unknown revision: \{spec}")
-  }
-  // Load object database
-  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
-  // Get upstream commit's subdir tree
-  let upstream_tree = get_subdir_tree_from_commit(db, fs, cid, subdir_path)
-  guard upstream_tree is Some(utree) else {
-    raise @bitcore.GitError::InvalidObject(
-      "Subdirectory not found in commit: \{subdir_path}",
-    )
-  }
-  // Get upstream commit's parent subdir tree
-  let commit_obj = db.get(fs, cid)
-  guard commit_obj is Some(co) else {
-    raise @bitcore.GitError::InvalidObject("Cannot read commit")
-  }
-  let commit_info = @bitcore.parse_commit(co.data)
-  let parent_tree = if commit_info.parents.length() > 0 {
-    get_subdir_tree_from_commit(db, fs, commit_info.parents[0], subdir_path) catch {
-      _ => None
-    }
-  } else {
-    None
-  }
-  // Check if this commit changes the subdir
-  let changed = match parent_tree {
-    Some(pt) => pt.to_hex() != utree.to_hex()
-    None => true
-  }
-  if !changed {
-    print_line("Commit \{spec} does not change \{subdir_path}, skipping.")
-    return
-  }
-  // Apply the subdir change
-  let (author, message) = parse_commit_author_message(co.data)
-  let change_info : SubdirChangeInfo = {
-    id: cid,
-    subdir_tree: utree,
-    message,
-    author,
-  }
-  apply_subdir_change(fs, db, root, git_dir, change_info)
-  print_line("Cherry-picked: \{message}")
-}

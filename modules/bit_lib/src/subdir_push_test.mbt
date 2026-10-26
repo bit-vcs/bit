@@ -150,8 +150,8 @@ test "subdir_push: multiple commits transform correctly" {
       commit_count += 1
     }
   }
-  // Should only have commit3 (collect_diff_objects only walks the new commit, not history)
-  assert_eq(commit_count, 1)
+  // Every commit after the base is packed: the receiver needs the whole chain
+  assert_eq(commit_count, 2)
 }
 
 ///|

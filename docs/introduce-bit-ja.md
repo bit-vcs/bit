@@ -83,6 +83,10 @@ bit commit -m "update"
 bit push origin main  # 元の mizchi/bit-vcs に push される
 ```
 
+ローカルの各コミットは、作者とメッセージを保ったまま、`src/vfs` だけを変更する上流のコミットになります。上流の変更を取り込むには、clone 内で `bit pull`(または `bit rebase origin/main`)を実行します。サブディレクトリに触れた上流のコミットがローカルのコミットとして取り込まれ、未 push のコミットはその上に rebase されます。コンフリクトが起きたら通常どおり rebase が止まるので、解消して `bit rebase --continue` してください。前回の同期以降に誰かが上流へ push していた場合、`bit push` は pull するまで拒否されます。
+
+`bit cherry-pick <上流のコミット>` で、そのコミットのサブディレクトリへの変更だけを取り込むこともできます。
+
 ### 親リポジトリとの共存
 
 git から見たときは submodule と同じく embedded repository として認識されるので、親リポジトリから操作して不整合を起こすことはありません。

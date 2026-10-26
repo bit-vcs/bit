@@ -445,6 +445,8 @@ pub fn read_sparse_patterns(&@bit_types.RepoFileSystem, String) -> Array[String]
 
 pub fn read_subdir_attributes(&@bit_types.RepoFileSystem, String) -> (String, String, String)?
 
+pub fn read_subdir_local(&@bit_types.RepoFileSystem, String) -> @bit_object.ObjectId?
+
 pub fn read_unmerged_paths(&@bit_types.RepoFileSystem, String) -> Map[String, Bool]
 
 pub async fn rebase_abort(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> Unit raise @bit_object.GitError
@@ -569,6 +571,8 @@ pub fn rev_parse_parse_parent_suffix(String) -> (String, String)?
 
 pub fn rewrite_packed_refs(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, (String) -> String?) -> Unit raise @bit_object.GitError
 
+pub fn rewrite_subdir_commit(Bytes, @bit_object.ObjectId, Array[@bit_object.ObjectId]) -> Bytes
+
 pub fn rm_paths(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[String], cached? : Bool, force? : Bool, recursive? : Bool) -> Unit raise @bit_object.GitError
 
 pub fn save_interactive_rebase_state(&@bit_types.FileSystem, String, InteractiveRebaseState) -> Unit raise @bit_object.GitError
@@ -653,6 +657,8 @@ pub fn update_head_ref(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, Strin
 
 pub fn update_subdir_base(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit
 
+pub fn update_subdir_sync_point(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId) -> Unit
+
 pub fn upload_pack(&@bit_types.RepoFileSystem, String, UploadPackRequest, git_dir_override? : String) -> Bytes raise @bit_object.GitError
 
 pub fn upload_pack_v2(&@bit_types.RepoFileSystem, String, UploadPackRequestV2, UploadPackConfig, git_dir_override? : String) -> Bytes raise @bit_object.GitError
@@ -679,7 +685,7 @@ pub fn write_skip_worktree_paths(&@bit_types.FileSystem, String, Array[String]) 
 
 pub fn write_sparse_patterns(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[String]) -> Unit raise @bit_object.GitError
 
-pub fn write_subdir_attributes(&@bit_types.FileSystem, String, String, String, @bit_object.ObjectId) -> Unit
+pub fn write_subdir_attributes(&@bit_types.FileSystem, String, String, String, @bit_object.ObjectId, local_commit? : @bit_object.ObjectId?) -> Unit
 
 pub fn write_tree_from_index(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[IndexEntry], prefix? : String?, missing_ok? : Bool, algo? : @bit_object.HashAlgorithm) -> @bit_object.ObjectId raise @bit_object.GitError
 

@@ -1,185 +1,148 @@
 #!/bin/sh
 #
-# Test subdir-push functionality
+# Test the subdir-clone round trip: push local commits back to the upstream
+# repository and bring upstream changes into the subdir-clone.
 #
 
-test_description='Test subdir-push (pushing a subdirectory clone back to upstream)'
+test_description='Test subdir-clone push and pull against the upstream repository'
 
 TEST_DIRECTORY=$(cd "$(dirname "$0")" && pwd)
 . "$TEST_DIRECTORY/test-lib.sh"
 
-# Setup: create upstream repository
-test_expect_success 'setup: create upstream repository' '
-	mkdir -p upstream &&
-	(cd upstream &&
-	 git init --bare &&
-	 git symbolic-ref HEAD refs/heads/main)
-'
+upstream_file() {
+	git -C "$TRASH_DIRECTORY/upstream.git" show "main:$1"
+}
 
-test_expect_success 'setup: create working clone' '
-	git clone upstream working &&
-	(cd working &&
-	 mkdir -p src/lib src/cmd docs &&
+# Commit in the upstream repository through a separate ordinary clone.
+upstream_commit() {
+	(cd "$TRASH_DIRECTORY/work" &&
+	 git pull -q origin main &&
+	 eval "$1" &&
+	 git add -A &&
+	 git commit -q -m "$2" &&
+	 git push -q origin main)
+}
+
+test_expect_success 'setup: upstream repository with a subdirectory' '
+	git init -q --bare -b main upstream.git &&
+	git clone -q upstream.git work &&
+	(cd work &&
+	 mkdir -p src/lib src/cmd &&
 	 echo "# Project" > README.md &&
 	 echo "lib v1" > src/lib/lib.mbt &&
+	 echo "util v1" > src/lib/util.mbt &&
 	 echo "cmd v1" > src/cmd/main.mbt &&
-	 echo "docs v1" > docs/guide.md &&
 	 git add -A &&
-	 git commit -m "Initial structure" &&
-	 git push origin main)
+	 git commit -q -m "Initial structure" &&
+	 git push -q origin main)
 '
 
-# Test: create subdir clone and push back
-test_expect_success 'subdir-push: extract src/lib' '
-	mkdir -p subdir-lib &&
-	cp -r working/src/lib/* subdir-lib/ &&
-	(cd subdir-lib &&
-	 git init &&
-	 git add -A &&
-	 git commit -m "Extract src/lib")
+test_expect_success 'clone: subdir-clone checks out only the subdirectory' '
+	$BIT subdir-clone "$TRASH_DIRECTORY/upstream.git" src/lib lib &&
+	test_path_is_file lib/lib.mbt &&
+	test_path_is_file lib/util.mbt &&
+	test_path_is_missing lib/README.md &&
+	test_path_is_missing lib/src
 '
 
-test_expect_success 'subdir-push: modify subdir content' '
-	(cd subdir-lib &&
-	 echo "lib v2 - modified" > lib.mbt &&
-	 echo "new feature" > feature.mbt &&
-	 git add -A &&
-	 git commit -m "Modify lib")
+test_expect_success 'clone: the index matches the checkout' '
+	(cd lib && git status --porcelain) >status.out &&
+	test ! -s status.out
 '
 
-test_expect_success 'subdir-push: store upstream metadata' '
-	base_commit=$(cd working && git rev-parse HEAD) &&
-	(cd subdir-lib &&
-	 git config bit.upstream.url "../upstream" &&
-	 git config bit.upstream.path "src/lib" &&
-	 git config bit.upstream.base "$base_commit")
+test_expect_success 'push: a local commit lands under the subdirectory' '
+	(cd lib &&
+	 echo "lib v2" > lib.mbt &&
+	 echo "feature" > feature.mbt &&
+	 $BIT add . &&
+	 $BIT commit -q -m "Add feature" &&
+	 $BIT push origin main) &&
+	test "$(upstream_file src/lib/lib.mbt)" = "lib v2" &&
+	test "$(upstream_file src/lib/feature.mbt)" = "feature" &&
+	test "$(upstream_file src/cmd/main.mbt)" = "cmd v1" &&
+	test "$(upstream_file README.md)" = "# Project" &&
+	test "$(git -C upstream.git log -1 --format=%s main)" = "Add feature"
 '
 
-# Test: tree transformation
-test_expect_success 'transform: verify local tree structure' '
-	(cd subdir-lib &&
-	 git ls-tree HEAD > tree.txt &&
-	 grep "lib.mbt" tree.txt &&
-	 grep "feature.mbt" tree.txt)
+test_expect_success 'push: nothing new is up to date' '
+	(cd lib && $BIT push origin main) >push.out &&
+	grep "Everything up-to-date" push.out
 '
 
-test_expect_success 'transform: simulate tree embedding' '
-	(cd working &&
-	 git fetch origin &&
-	 cp ../subdir-lib/lib.mbt src/lib/ &&
-	 cp ../subdir-lib/feature.mbt src/lib/ &&
-	 git add -A &&
-	 git commit -m "Merge subdir changes")
+test_expect_success 'push: several commits at once, after an earlier push' '
+	before=$(git -C upstream.git rev-list --count main) &&
+	(cd lib &&
+	 echo "util v2" > util.mbt &&
+	 $BIT add . &&
+	 $BIT commit -q -m "util v2" &&
+	 echo "util v3" > util.mbt &&
+	 $BIT add . &&
+	 $BIT commit -q -m "util v3" &&
+	 $BIT push origin main) &&
+	test "$(git -C upstream.git rev-list --count main)" = "$((before + 2))" &&
+	test "$(git -C upstream.git log -2 --format=%s main | tr "\n" ,)" = "util v3,util v2," &&
+	test "$(upstream_file src/lib/util.mbt)" = "util v3" &&
+	git -C upstream.git fsck --no-progress
 '
 
-test_expect_success 'transform: verify merged structure' '
-	test_path_is_file working/src/lib/lib.mbt &&
-	test_path_is_file working/src/lib/feature.mbt &&
-	test_path_is_file working/src/cmd/main.mbt &&
-	test_path_is_file working/docs/guide.md
-'
-
-test_expect_success 'transform: verify content preserved' '
-	grep "lib v2" working/src/lib/lib.mbt &&
-	grep "new feature" working/src/lib/feature.mbt
-'
-
-# Test: push to upstream
-test_expect_success 'push: push merged changes to upstream' '
-	(cd working && git push origin main)
-'
-
-test_expect_success 'push: verify upstream updated' '
-	git clone upstream verify &&
-	test_path_is_file verify/src/lib/feature.mbt
-'
-
-# Test: diff-only push (minimal objects)
-test_expect_success 'diff-push: setup second modification' '
-	(cd subdir-lib &&
+test_expect_success 'push: rejected when the upstream moved on' '
+	upstream_commit "echo \"cmd v2\" > src/cmd/main.mbt" "Change cmd" &&
+	(cd lib &&
 	 echo "lib v3" > lib.mbt &&
-	 git add -A &&
-	 git commit -m "Version 3")
+	 $BIT add . &&
+	 $BIT commit -q -m "lib v3" &&
+	 ! $BIT push origin main) &&
+	test "$(upstream_file src/cmd/main.mbt)" = "cmd v2" &&
+	test "$(upstream_file src/lib/lib.mbt)" = "lib v2"
 '
 
-test_expect_success 'diff-push: count objects in diff' '
-	(cd subdir-lib && git rev-list HEAD~1..HEAD --objects) > diff-objects.txt &&
-	test "$(wc -l < diff-objects.txt | tr -d " ")" -lt 10
+test_expect_success 'pull: syncs without pulling the rest of the repository in' '
+	(cd lib && $BIT pull) &&
+	test_path_is_missing lib/README.md &&
+	test_path_is_missing lib/src &&
+	test "$(cat lib/lib.mbt)" = "lib v3"
 '
 
-# Test: conflict detection
-test_expect_success 'conflict: setup concurrent changes' '
-	(cd working &&
-	 echo "concurrent change" > src/lib/lib.mbt &&
-	 git add -A &&
-	 git commit -m "Concurrent change" &&
-	 git push origin main)
+test_expect_success 'push: succeeds after pull and keeps the upstream change' '
+	(cd lib && $BIT push origin main) &&
+	test "$(upstream_file src/lib/lib.mbt)" = "lib v3" &&
+	test "$(upstream_file src/cmd/main.mbt)" = "cmd v2"
 '
 
-test_expect_success 'conflict: detect base mismatch' '
-	old_base=$(cd subdir-lib && git config bit.upstream.base) &&
-	new_head=$(cd working && git rev-parse HEAD) &&
-	test "$old_base" != "$new_head"
+test_expect_success 'pull: upstream subdirectory changes rebase local work' '
+	upstream_commit "echo \"upstream util\" > src/lib/util.mbt" "Upstream util" &&
+	(cd lib &&
+	 echo "local" > local.mbt &&
+	 $BIT add . &&
+	 $BIT commit -q -m "Add local" &&
+	 $BIT pull) &&
+	test "$(cat lib/util.mbt)" = "upstream util" &&
+	test "$(cat lib/local.mbt)" = "local" &&
+	test "$(git -C lib log --format=%s -2 | tr "\n" ,)" = "Add local,Upstream util," &&
+	(cd lib && git status --porcelain) >status.out &&
+	test ! -s status.out
 '
 
-# Test: binary file handling
-test_expect_success 'binary: create fresh repo with binary file' '
-	mkdir -p binary-test &&
-	(cd binary-test &&
-	 git init &&
-	 printf "\x00\x01\x02\xFF" > binary.bin &&
-	 git add binary.bin &&
-	 git commit -m "Add binary")
+test_expect_success 'push: the rebased commit goes on top of the upstream change' '
+	(cd lib && $BIT push origin main) &&
+	test "$(upstream_file src/lib/local.mbt)" = "local" &&
+	test "$(upstream_file src/lib/util.mbt)" = "upstream util" &&
+	test "$(git -C upstream.git log -2 --format=%s main | tr "\n" ,)" = "Add local,Upstream util,"
 '
 
-test_expect_success 'binary: verify binary tracked' '
-	test_path_is_file binary-test/binary.bin &&
-	(cd binary-test && git ls-files | grep -q binary.bin)
-'
-
-# Test: file deletion
-test_expect_success 'delete: create repo and delete file' '
-	mkdir -p delete-test &&
-	(cd delete-test &&
-	 git init &&
-	 echo "keep" > keep.txt &&
-	 echo "delete" > delete.txt &&
-	 git add -A &&
-	 git commit -m "Initial" &&
-	 rm delete.txt &&
-	 git add -A &&
-	 git commit -m "Delete file")
-'
-
-test_expect_success 'delete: verify deletion tracked' '
-	test_path_is_missing delete-test/delete.txt &&
-	test_path_is_file delete-test/keep.txt
-'
-
-# Test: multiple subdirs
-test_expect_success 'multi: clone multiple subdirs independently' '
-	mkdir -p multi-lib multi-cmd &&
-	echo "lib" > multi-lib/lib.mbt &&
-	echo "cmd" > multi-cmd/cmd.mbt &&
-	(cd multi-lib && git init && git add -A && git commit -m "Lib") &&
-	(cd multi-cmd && git init && git add -A && git commit -m "Cmd")
-'
-
-test_expect_success 'multi: verify independent tracking' '
-	lib_head=$(cd multi-lib && git rev-parse HEAD) &&
-	cmd_head=$(cd multi-cmd && git rev-parse HEAD) &&
-	test "$lib_head" != "$cmd_head"
-'
-
-# Test: atomic push simulation
-test_expect_success 'atomic: prepare atomic push data' '
-	git -C subdir-lib rev-parse HEAD > push-commit.txt &&
-	echo "src/lib" >> push-commit.txt
-'
-
-test_expect_success 'atomic: verify push data' '
-	test_path_is_file push-commit.txt &&
-	test "$(wc -l < push-commit.txt | tr -d " ")" = "2"
+test_expect_success 'pull: a conflict stops the rebase and --continue finishes it' '
+	upstream_commit "echo \"upstream lib\" > src/lib/lib.mbt" "Upstream lib" &&
+	(cd lib &&
+	 echo "local lib" > lib.mbt &&
+	 $BIT add . &&
+	 $BIT commit -q -m "Local lib" &&
+	 ! $BIT pull &&
+	 echo "merged lib" > lib.mbt &&
+	 $BIT add lib.mbt &&
+	 GIT_EDITOR=true $BIT rebase --continue &&
+	 $BIT push origin main) &&
+	test "$(upstream_file src/lib/lib.mbt)" = "merged lib" &&
+	test "$(git -C upstream.git log -2 --format=%s main | tr "\n" ,)" = "Local lib,Upstream lib,"
 '
 
 test_done
