@@ -6,6 +6,7 @@ pub fn write_subdir_attributes(
   remote_url : String,
   subdir_path : String,
   base_commit : @bit.ObjectId,
+  local_commit? : @bit.ObjectId? = None,
 ) -> Unit {
   let info_dir = git_dir + "/info"
   fs.mkdir_p(info_dir) catch {
@@ -22,6 +23,16 @@ pub fn write_subdir_attributes(
   content.write_string("* subdir-base=")
   content.write_string(base_commit.to_hex())
   content.write_string("\n")
+  // subdir-local is the local commit whose tree matches subdir-path at
+  // subdir-base: the sync point push starts from and rebase builds onto.
+  match local_commit {
+    Some(id) => {
+      content.write_string("* subdir-local=")
+      content.write_string(id.to_hex())
+      content.write_string("\n")
+    }
+    None => ()
+  }
   let attr_path = info_dir + "/attributes"
   fs.write_file(attr_path, string_to_bytes(content.to_string())) catch {
     _ => ()
@@ -75,9 +86,128 @@ pub fn update_subdir_base(
         @bit.ObjectId::from_hex(new_base) catch {
           _ => return
         },
+        local_commit=read_subdir_local(rfs, git_dir),
       )
     None => ()
   }
+}
+
+///|
+/// Read subdir-local (the local commit synced with subdir-base), if recorded.
+/// Clones made before it was introduced do not have one.
+pub fn read_subdir_local(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> @bit.ObjectId? {
+  let content = rfs.read_file(git_dir + "/info/attributes") catch {
+    _ => return None
+  }
+  for line in bytes_to_string(content).split("\n") {
+    let l = line.to_owned()
+    if l.has_prefix("* subdir-local=") {
+      let hex = String::unsafe_substring(l, start=15, end=l.length())
+      return Some(@bit.ObjectId::from_hex(hex)) catch { _ => None }
+    }
+  }
+  None
+}
+
+///|
+/// Record that local commit `local_commit` corresponds to upstream commit
+/// `base`.
+pub fn update_subdir_sync_point(
+  wfs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  base : @bit.ObjectId,
+  local_commit : @bit.ObjectId,
+) -> Unit {
+  match read_subdir_attributes(rfs, git_dir) {
+    Some((remote, path, _)) =>
+      write_subdir_attributes(
+        wfs,
+        git_dir,
+        remote,
+        path,
+        base,
+        local_commit=Some(local_commit),
+      )
+    None => ()
+  }
+}
+
+///|
+/// Rewrite a raw commit object onto a new tree and parents, keeping its
+/// author, committer, encoding and message. Signature headers are dropped
+/// because they no longer match the rewritten content.
+pub fn rewrite_subdir_commit(
+  raw : Bytes,
+  tree : @bit.ObjectId,
+  parents : Array[@bit.ObjectId],
+) -> Bytes {
+  let out : Array[Byte] = []
+  let push_str = (text : String) => {
+    for b in string_to_bytes(text) {
+      out.push(b)
+    }
+  }
+  push_str("tree " + tree.to_hex() + "\n")
+  for parent in parents {
+    push_str("parent " + parent.to_hex() + "\n")
+  }
+  let n = raw.length()
+  let mut i = 0
+  let mut skipping = false
+  while i < n {
+    let mut j = i
+    while j < n && raw[j] != b'\n' {
+      j += 1
+    }
+    if j == i {
+      // Blank line: the header ends and the message follows verbatim.
+      for k in i..<n {
+        out.push(raw[k])
+      }
+      return Bytes::from_array(out)
+    }
+    let line = raw[i:j]
+    if line[0] == b' ' {
+      // Continuation of a multi-line header (gpgsig, mergetag).
+      if !skipping {
+        for b in line {
+          out.push(b)
+        }
+        out.push(b'\n')
+      }
+    } else {
+      skipping = subdir_header_starts_with(line, "tree ") ||
+        subdir_header_starts_with(line, "parent ") ||
+        subdir_header_starts_with(line, "gpgsig") ||
+        subdir_header_starts_with(line, "mergetag ")
+      if !skipping {
+        for b in line {
+          out.push(b)
+        }
+        out.push(b'\n')
+      }
+    }
+    i = j + 1
+  }
+  Bytes::from_array(out)
+}
+
+///|
+fn subdir_header_starts_with(line : BytesView, prefix : String) -> Bool {
+  let p = string_to_bytes(prefix)
+  if line.length() < p.length() {
+    return false
+  }
+  for k in 0..<p.length() {
+    if line[k] != p[k] {
+      return false
+    }
+  }
+  true
 }
 
 ///|

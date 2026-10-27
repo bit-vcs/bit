@@ -83,6 +83,10 @@ bit commit -m "update"
 bit push origin main  # pushes back to mizchi/bit-vcs
 ```
 
+Each local commit becomes an upstream commit that changes only `src/vfs`, keeping its author and message. To bring in upstream changes, run `bit pull` (or `bit rebase origin/main`) inside the clone: upstream commits that touch the subdirectory become local commits, and your unpushed commits are rebased on top of them. A conflict stops the rebase as usual; resolve it and run `bit rebase --continue`. If someone pushed upstream since your last sync, `bit push` is rejected until you pull.
+
+`bit cherry-pick <upstream-commit>` applies just that commit's change to the subdirectory.
+
 ### Coexistence with the parent repo
 
 From git's perspective, this is an embedded repository (like a submodule), so operations from the parent repo will not corrupt it.

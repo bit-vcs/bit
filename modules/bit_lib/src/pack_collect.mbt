@@ -30,7 +30,8 @@ pub fn collect_commit_tree_only(
 
 ///|
 /// Collect diff objects between base and new commit.
-/// Only collects objects that don't exist in the base tree.
+/// Collects every commit on the way from base to new commit, plus the trees
+/// and blobs they introduce; anything reachable from base is skipped.
 /// Used for subdir-push where base objects already exist on remote.
 pub fn collect_diff_objects(
   db : ObjectDb,
@@ -131,10 +132,20 @@ fn collect_new_commit_objects(
       if o.obj_type != @bit.ObjectType::Commit {
         raise @bit.GitError::InvalidObject("Object is not a commit")
       }
+      // Mark before descending so shared trees and parents are packed once.
+      base_ids[hex] = true
       out.push(o)
       let info = @bit.parse_commit(o.data)
       collect_new_tree_objects(db, fs, info.tree, base_ids, out)
-      // Do NOT walk parent commits - they're in base_ids
+      // Parents reachable from base are already in base_ids; any other
+      // parent is a new commit on the way from base and must be packed too.
+      // A parent missing locally (shallow or partial history) is treated as
+      // the boundary, as the base side already is.
+      for parent in info.parents {
+        if !base_ids.contains(parent.to_hex()) && db.get(fs, parent) is Some(_) {
+          collect_new_commit_objects(db, fs, parent, base_ids, out)
+        }
+      }
     }
   }
 }
@@ -158,6 +169,7 @@ fn collect_new_tree_objects(
       if o.obj_type != @bit.ObjectType::Tree {
         raise @bit.GitError::InvalidObject("Object is not a tree")
       }
+      base_ids[hex] = true
       out.push(o)
       let entries = @bit.parse_tree(o.data)
       for entry in entries {
@@ -197,6 +209,7 @@ fn collect_new_blob_object(
       if o.obj_type != @bit.ObjectType::Blob {
         raise @bit.GitError::InvalidObject("Object is not a blob")
       }
+      base_ids[hex] = true
       out.push(o)
     }
   }

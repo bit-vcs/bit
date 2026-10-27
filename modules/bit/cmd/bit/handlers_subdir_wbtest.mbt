@@ -21,7 +21,7 @@ test "subdir: write and read attributes" {
   ) catch {
     _ => return ()
   }
-  write_subdir_attributes(
+  @bitlib.write_subdir_attributes(
     fs,
     test_dir + "/.git",
     "https://github.com/user/repo",
@@ -66,7 +66,7 @@ test "subdir: is_subdir_clone detection" {
   ) catch {
     _ => return ()
   }
-  write_subdir_attributes(
+  @bitlib.write_subdir_attributes(
     fs,
     test_dir + "/.git",
     "https://github.com/user/repo",
@@ -101,7 +101,7 @@ test "subdir: get_subdir_info returns metadata" {
   ) catch {
     _ => return ()
   }
-  write_subdir_attributes(
+  @bitlib.write_subdir_attributes(
     fs,
     test_dir + "/.git",
     "https://github.com/example/repo",
@@ -144,7 +144,7 @@ test "subdir: update_subdir_base updates base commit" {
   ) catch {
     _ => return ()
   }
-  write_subdir_attributes(
+  @bitlib.write_subdir_attributes(
     fs,
     test_dir + "/.git",
     "https://github.com/user/repo",
@@ -196,7 +196,7 @@ test "subdir: get_effective_remote_url prefers subdir remote" {
   ) catch {
     _ => return ()
   }
-  write_subdir_attributes(
+  @bitlib.write_subdir_attributes(
     fs,
     test_dir + "/.git",
     "https://github.com/user/subdir-repo",
@@ -270,7 +270,7 @@ test "subdir: attributes file format" {
   ) catch {
     _ => return ()
   }
-  write_subdir_attributes(
+  @bitlib.write_subdir_attributes(
     fs,
     test_dir + "/.git",
     "https://github.com/test/repo",

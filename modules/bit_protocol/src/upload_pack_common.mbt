@@ -262,6 +262,24 @@ pub fn FilterSpec::is_partial(self : FilterSpec) -> Bool {
 }
 
 ///|
+/// Whether a protocol v2 server accepts `filter` in fetch requests: it lists
+/// the feature on its `fetch=` capability line (uploadpack.allowFilter).
+/// Servers without it reject the request outright, so callers drop the filter.
+pub fn v2_fetch_supports_filter(caps : Array[String]) -> Bool {
+  for cap in caps {
+    if cap.has_prefix("fetch=") {
+      let features = String::unsafe_substring(cap, start=6, end=cap.length())
+      for feature in features.split(" ") {
+        if feature == "filter" {
+          return true
+        }
+      }
+    }
+  }
+  false
+}
+
+///|
 /// Build a fetch request for protocol v2.
 /// - depth > 0: shallow clone with that depth
 /// - filter: partial clone filter specification

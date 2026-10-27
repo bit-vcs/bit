@@ -147,7 +147,11 @@ pub async fn fetch_pack_with_http_result(
       "git/moonbit",
       wants,
       depth,
-      filter~,
+      filter=if v2_fetch_supports_filter(caps) {
+        filter
+      } else {
+        FilterSpec::NoFilter
+      },
       haves~,
       shallow~,
     )

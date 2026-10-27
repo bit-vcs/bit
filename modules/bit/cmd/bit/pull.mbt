@@ -17,6 +17,11 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   } else {
     git_dir
   }
+  // A plain merge would pour the whole upstream tree into the subdir-clone.
+  if is_subdir_clone(fs, git_dir) {
+    handle_subdir_pull(fs, root, git_dir, args)
+    return
+  }
   let (remotes, branches) = @bitlib.read_repo_config(fs, git_dir)
   // Read remote URL - prefer subdir-clone remote, then config
   let mut remote_name = "origin"

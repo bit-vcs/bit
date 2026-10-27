@@ -1076,11 +1076,40 @@ fn should_delegate_to_real_git(
         cmd == "submodule--helper" ||
         is_bit_only_command(cmd) {
         false
+      } else if subdir_aware_command(cmd) && delegation_targets_subdir_clone(opts) {
+        // Real git would push/pull the subdir-clone as an ordinary repository.
+        false
       } else if shim_handles_config {
         false
       } else {
         has_config_env
       }
+    None => false
+  }
+}
+
+///|
+fn subdir_aware_command(cmd : String) -> Bool {
+  cmd == "push" || cmd == "pull" || cmd == "rebase" || cmd == "cherry-pick"
+}
+
+///|
+fn delegation_targets_subdir_clone(opts : GlobalOptions) -> Bool {
+  let fs = OsFs::new()
+  match opts.git_dir {
+    Some(dir) => return is_subdir_clone(fs, dir)
+    None => ()
+  }
+  let start = match opts.cwd {
+    Some(dir) => Some(dir)
+    None =>
+      match @env.current_dir() {
+        Some(dir) => Some(dir)
+        None => @env.get_env_var("PWD")
+      }
+  }
+  match start.bind(find_repo_root) {
+    Some(root) => is_subdir_clone(fs, default_repo_marker_path(fs, root))
     None => false
   }
 }

@@ -153,3 +153,18 @@ test "parse protocol v0 or v1 fetch response preserves shallow updates" {
   @test.assert_eq(result.unshallow.length(), 1)
   @test.assert_eq(result.unshallow[0].to_hex(), unshallow)
 }
+
+///|
+test "v2_fetch_supports_filter reads the fetch capability line" {
+  assert_true(
+    @bit_protocol.v2_fetch_supports_filter([
+      "version 2", "ls-refs=unborn", "fetch=shallow wait-for-done filter",
+    ]),
+  )
+  assert_false(
+    @bit_protocol.v2_fetch_supports_filter([
+      "version 2", "ls-refs=unborn", "fetch=shallow wait-for-done",
+    ]),
+  )
+  assert_false(@bit_protocol.v2_fetch_supports_filter(["version 2"]))
+}

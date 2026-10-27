@@ -1154,7 +1154,11 @@ pub async fn fetch_pack_process_result(
       "git/moonbit",
       wants,
       depth,
-      filter~,
+      filter=if @protocol.v2_fetch_supports_filter(caps) {
+        filter
+      } else {
+        @protocol.FilterSpec::NoFilter
+      },
       haves~,
       shallow~,
     )

@@ -223,8 +223,6 @@ type ServeSession
 
 type SparseCheckoutListState
 
-type SubdirChangeInfo
-
 type SubdirDiffEntry
 
 pub(all) enum SubdirDiffKind {

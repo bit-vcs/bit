@@ -311,6 +311,7 @@ options(
     "stripspace.mbt": [ "native" ],
     "subdir_clone.mbt": [ "native" ],
     "subdir_ops.mbt": [ "native" ],
+    "subdir_sync.mbt": [ "native" ],
     "subdir_shorthand_wbtest.mbt": [ "native" ],
     "submodule.mbt": [ "native" ],
     "submodule_wbtest.mbt": [ "native" ],
