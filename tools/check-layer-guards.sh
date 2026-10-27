@@ -2,7 +2,7 @@
 # Static guards enforced by `pkf run check` after type-checks succeed.
 set -euo pipefail
 
-if rg -n "OsFs::new|@process\\.run" modules/bit/src/runtime >/dev/null; then
+if rg -n "OsFs::new|@process\\.run" modules/bit_runtime/src >/dev/null; then
   echo "runtime layer must not use OsFs::new or @process.run"
   exit 1
 fi

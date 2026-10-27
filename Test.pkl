@@ -13,23 +13,23 @@ amends "pkspec/Test.pkl"
 tests {
   new {
     name = "moon-test-js"
-    cmd = "moon test --target js -p mizchi/bit -p mizchi/bit/lib"
+    cmd = "moon test --target js -p mizchi/bit -p mizchi/bit_lib"
   }
   new {
     name = "moon-test-wasm-storage-runtime"
-    cmd = "moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt"
+    cmd = "moon test --target wasm modules/bit_runtime/src/storage_runtime_wbtest.mbt"
   }
   new {
     name = "moon-test-wasm-diff3"
-    cmd = "moon test --target wasm -p mizchi/bit/diff3"
+    cmd = "moon test --target wasm -p mizchi/bit_diff3"
   }
   new {
     name = "moon-test-wasm-repo"
-    cmd = "moon test --target wasm -p mizchi/bit/repo"
+    cmd = "moon test --target wasm -p mizchi/bit_repo"
   }
   new {
     name = "moon-test-wasm-grep"
-    cmd = "moon test --target wasm -p mizchi/bit/grep"
+    cmd = "moon test --target wasm -p mizchi/bit_grep"
   }
   new {
     name = "moon-test-native"

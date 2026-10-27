@@ -72,8 +72,8 @@ test_expect_success 'rev-list stops at the boundary and matches log' '
 	rm -rf d &&
 	bit_cmd clone -q --depth 2 "file://$(pwd)/origin.git" d &&
 	test "$(bit_cmd -C d rev-list --count HEAD)" = 2 &&
-	test "$(bit_cmd -C d rev-list HEAD | wc -l)" = 2 &&
-	test "$(bit_cmd -C d log --oneline | wc -l)" = 2 &&
+	test "$(bit_cmd -C d rev-list HEAD | wc -l | tr -d " ")" = 2 &&
+	test "$(bit_cmd -C d log --oneline | wc -l | tr -d " ")" = 2 &&
 	bit_cmd -C d rev-list HEAD | while read -r oid; do
 		git -C d cat-file -e "$oid" || exit 1
 	done
@@ -83,14 +83,14 @@ test_expect_success 'gc succeeds in a shallow clone and keeps every commit' '
 	rm -rf d &&
 	bit_cmd clone -q --depth 3 "file://$(pwd)/origin.git" d &&
 	bit_cmd -C d gc &&
-	test "$(bit_cmd -C d log --oneline | wc -l)" = 3
+	test "$(bit_cmd -C d log --oneline | wc -l | tr -d " ")" = 3
 '
 
 test_expect_success 'prune succeeds in a shallow clone' '
 	rm -rf d &&
 	bit_cmd clone -q --depth 3 "file://$(pwd)/origin.git" d &&
 	bit_cmd -C d prune &&
-	test "$(bit_cmd -C d log --oneline | wc -l)" = 3
+	test "$(bit_cmd -C d log --oneline | wc -l | tr -d " ")" = 3
 '
 
 # repack -ad used to pack only the tip and then delete the pack holding the

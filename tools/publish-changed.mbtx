@@ -1,3 +1,4 @@
+///|
 // Lerna-style selective publish for the bit workspace's many `modules/*`
 // packages: diff each package's directory against the last "Release vX.Y.Z"
 // commit and only `moon publish` the ones that actually changed, in
@@ -12,10 +13,11 @@
 //     -- compare against an explicit ref instead of the last Release commit
 
 import {
-  "moonbitlang/async@0.19.4",
-  "moonbitlang/async@0.19.4/process",
-  "moonbitlang/x@0.4.40/fs",
-  "moonbitlang/x@0.4.40/sys",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/x@0.5.6/fs",
+  "moonbitlang/x@0.5.6/sys",
+  "moonbitlang/core/env",
   "moonbitlang/core/json",
 }
 
@@ -50,7 +52,9 @@ fn extract_quoted_strings(text : String) -> Array[String] {
   for i, c in text {
     if c == '"' {
       if in_quote {
-        result.push(String::unsafe_substring(text, start=quote_start + 1, end=i))
+        result.push(
+          String::unsafe_substring(text, start=quote_start + 1, end=i),
+        )
         in_quote = false
       } else {
         quote_start = i
@@ -86,7 +90,11 @@ fn quoted_field(content : String, field : String) -> String? {
     if !value_part.has_prefix("\"") {
       continue
     }
-    let rest = String::unsafe_substring(value_part, start=1, end=value_part.length())
+    let rest = String::unsafe_substring(
+      value_part,
+      start=1,
+      end=value_part.length(),
+    )
     match rest.find("\"") {
       Some(idx) => return Some(String::unsafe_substring(rest, start=0, end=idx))
       None => continue
@@ -125,14 +133,16 @@ fn internal_dep_names(content : String) -> Array[String] {
 ///|
 fn load_workspace_modules(root : String) -> Array[ModuleInfo] raise ScriptError {
   let modules_dir = root + "/modules"
-  let entries = try @fs.read_dir(modules_dir) catch {
-    err => raise ScriptError::Fail("cannot read \{modules_dir}: \{err}")
+  let entries = @fs.read_dir(modules_dir) catch {
+    err =>
+      raise ScriptError::Fail("cannot read \{modules_dir}: \{err.to_repr()}")
   }
+  let entries = entries.to_array()
   entries.sort()
   let result : Array[ModuleInfo] = []
   for entry in entries {
     let dir = modules_dir + "/" + entry
-    let is_dir = try @fs.is_dir(dir) catch { _ => false }
+    let is_dir = @fs.is_dir(dir) catch { _ => false }
     if !is_dir {
       continue
     }
@@ -140,8 +150,11 @@ fn load_workspace_modules(root : String) -> Array[ModuleInfo] raise ScriptError 
     if !@fs.path_exists(manifest_path) {
       continue
     }
-    let content = try @fs.read_file_to_string(manifest_path) catch {
-      err => raise ScriptError::Fail("cannot read \{manifest_path}: \{err}")
+    let content = @fs.read_file_to_string(manifest_path) catch {
+      err =>
+        raise ScriptError::Fail(
+          "cannot read \{manifest_path}: \{err.to_repr()}",
+        )
     }
     let name = match quoted_field(content, "name") {
       Some(v) => v
@@ -212,12 +225,12 @@ fn topological_layers(
 
 ///|
 async fn git_output(args : Array[String]) -> String raise ScriptError {
-  let (code, stdout, stderr) = try @process.collect_output("git", args) catch {
+  let (code, stdout, stderr) = @process.collect_output("git", args) catch {
     err => raise ScriptError::Fail("failed to spawn git \{args}: \{err}")
   }
-  let out = try stdout.text() catch { _ => "" }
+  let out = stdout.text() catch { _ => "" }
   if code != 0 {
-    let err_text = try stderr.text() catch { _ => "" }
+    let err_text = stderr.text() catch { _ => "" }
     raise ScriptError::Fail(
       "git \{args} failed (\{code}): \{err_text.trim().to_owned()}",
     )
@@ -261,7 +274,9 @@ async fn find_anchor_commit() -> (String, String) raise ScriptError {
 /// `moon.mod` file itself, since a release commit bumps every module's
 /// `moon.mod` in lockstep regardless of whether that module's own code
 /// changed).
-async fn changed_module_dirs(anchor : String) -> Array[String] raise ScriptError {
+async fn changed_module_dirs(
+  anchor : String,
+) -> Array[String] raise ScriptError {
   let out = git_output(["diff", "--name-only", anchor, "HEAD", "--", "modules"])
   let changed : Array[String] = []
   for raw_line in out.split("\n") {
@@ -274,7 +289,11 @@ async fn changed_module_dirs(anchor : String) -> Array[String] raise ScriptError
       None => continue
       Some(si) => {
         let mod_dir = String::unsafe_substring(rest, start=0, end=si)
-        let sub = String::unsafe_substring(rest, start=si + 1, end=rest.length())
+        let sub = String::unsafe_substring(
+          rest,
+          start=si + 1,
+          end=rest.length(),
+        )
         if sub != "moon.mod" && !changed.contains(mod_dir) {
           changed.push(mod_dir)
         }
@@ -301,20 +320,17 @@ fn registry_has_version(m : ModuleInfo) -> Bool {
   if !@fs.path_exists(path) {
     return false
   }
-  let content = try @fs.read_file_to_string(path) catch { _ => "" }
+  let content = @fs.read_file_to_string(path) catch { _ => "" }
   for raw_line in content.split("\n") {
     let line = raw_line.trim().to_owned()
     if line.length() == 0 {
       continue
     }
-    let parsed = try @json.parse(line) catch { _ => Json::null() }
+    let parsed = @json.parse(line) catch { _ => Json::null() }
     match parsed {
       Json::Object(obj) =>
         match obj.get("version") {
-          Some(Json::String(v)) =>
-            if v == m.version {
-              return true
-            }
+          Some(Json::String(v)) => if v == m.version { return true }
           _ => ()
         }
       _ => ()
@@ -325,7 +341,7 @@ fn registry_has_version(m : ModuleInfo) -> Bool {
 
 ///|
 async fn refresh_registry() -> Unit raise ScriptError {
-  let code = try @process.run("moon", ["update"], inherit_env=true) catch {
+  let code = @process.run("moon", ["update"], inherit_env=true) catch {
     err => raise ScriptError::Fail("failed to spawn moon update: \{err}")
   }
   if code != 0 {
@@ -347,7 +363,7 @@ async fn wait_for_layer(layer : Array[ModuleInfo]) -> Unit raise ScriptError {
     if all_present {
       return
     }
-    try @async.sleep(1000 * (attempt + 1)) catch {
+    @async.sleep(1000 * (attempt + 1)) catch {
       err => raise ScriptError::Fail("interrupted while waiting: \{err}")
     }
     attempt += 1
@@ -382,26 +398,26 @@ async fn main_async() -> Unit {
   let args = @env.args()
   let apply = args.contains("--apply")
   let root = "."
-  let modules = try load_workspace_modules(root) catch {
+  let modules = load_workspace_modules(root) catch {
     err => {
       println("error: \{err}")
       @sys.exit(1)
       return
     }
   }
-  let (anchor_sha, anchor_subject) = try (
+  let (anchor_sha, anchor_subject) = try {
     match arg_value_after(args, "--since") {
       Some(refname) => (refname, "(explicit --since ref)")
       None => find_anchor_commit()
     }
-  ) catch {
+  } catch {
     err => {
       println("error: \{err}")
       @sys.exit(1)
       return
     }
   }
-  let changed_dirs = try changed_module_dirs(anchor_sha) catch {
+  let changed_dirs = changed_module_dirs(anchor_sha) catch {
     err => {
       println("error: \{err}")
       @sys.exit(1)
@@ -410,7 +426,7 @@ async fn main_async() -> Unit {
   }
   println("comparing against \{anchor_sha} \{anchor_subject}")
   println("")
-  let layers = try topological_layers(modules) catch {
+  let layers = topological_layers(modules) catch {
     err => {
       println("error: \{err}")
       @sys.exit(1)
@@ -452,7 +468,7 @@ async fn main_async() -> Unit {
     return
   }
   println("")
-  let dirty = try git_output(["status", "--porcelain"]) catch {
+  let dirty = git_output(["status", "--porcelain"]) catch {
     err => {
       println("error: \{err}")
       @sys.exit(1)
@@ -480,7 +496,11 @@ async fn main_async() -> Unit {
           continue
         }
         println("publishing \{m.name}@\{m.version}")
-        let code = @process.run("moon", ["-C", m.dir, "publish"], inherit_env=true)
+        let code = @process.run(
+          "moon",
+          ["-C", m.dir, "publish"],
+          inherit_env=true,
+        )
         if code != 0 {
           raise ScriptError::Fail("moon -C \{m.dir} publish failed (\{code})")
         }
