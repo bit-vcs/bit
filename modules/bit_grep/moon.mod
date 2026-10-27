@@ -1,15 +1,15 @@
 name = "mizchi/bit_grep"
 
-version = "0.48.1"
+version = "0.49.0"
 
 import {
-  "mizchi/bit_core@0.48.1",
-  "mizchi/bit_ignore@0.48.1",
-  "mizchi/bit_io@0.48.1",
-  "mizchi/bit_lib@0.48.1",
-  "mizchi/bit_object@0.48.1",
-  "mizchi/bit_repo_ops@0.48.1",
-  "mizchi/bit_types@0.48.1",
+  "mizchi/bit_core@0.49.0",
+  "mizchi/bit_ignore@0.49.0",
+  "mizchi/bit_io@0.49.0",
+  "mizchi/bit_lib@0.49.0",
+  "mizchi/bit_object@0.49.0",
+  "mizchi/bit_repo_ops@0.49.0",
+  "mizchi/bit_types@0.49.0",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"
