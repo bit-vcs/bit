@@ -179,6 +179,8 @@ async fn sparse_checkout_wbtest_collect_shim_git_shell_output(
   let shim_moon = sparse_checkout_wbtest_shim_moon_path(repo_root)
   let env : Map[String, String] = {
     "SHIM_GIT": shim_git,
+    "GIT_SHIM_CWD": cwd,
+    "GIT_SHIM_PWD": cwd,
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_EXEC_PATH": repo_root + "/third_party/git",
     "SHIM_MOON": shim_moon,
