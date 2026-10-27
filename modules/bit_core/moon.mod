@@ -1,12 +1,12 @@
 name = "mizchi/bit_core"
 
-version = "0.48.0"
+version = "0.48.1"
 
 import {
-  "mizchi/bit_io@0.48.0",
-  "mizchi/bit_object@0.48.0",
-  "mizchi/bit_repo@0.48.0",
-  "mizchi/bit_types@0.48.0",
+  "mizchi/bit_io@0.48.1",
+  "mizchi/bit_object@0.48.1",
+  "mizchi/bit_repo@0.48.1",
+  "mizchi/bit_types@0.48.1",
 }
 
 readme = "README.mbt.md"

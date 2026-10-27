@@ -1,11 +1,11 @@
 name = "mizchi/bitx_wal"
 
-version = "0.48.0"
+version = "0.48.1"
 
 import {
-  "mizchi/bit_hash@0.48.0",
-  "mizchi/bit_object@0.48.0",
-  "mizchi/bit_objstore@0.48.0",
+  "mizchi/bit_hash@0.48.1",
+  "mizchi/bit_object@0.48.1",
+  "mizchi/bit_objstore@0.48.1",
   "moonbitlang/async@0.22.5",
 }
 
