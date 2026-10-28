@@ -11,6 +11,8 @@ pub fn check_shorthand_ambiguity(String, (String) -> Bool) -> String?
 
 pub fn detect_git_dir(&@bit_types.RepoFileSystem, String) -> (String, Bool)?
 
+pub fn is_absolute_path(String) -> Bool
+
 pub fn is_bare_git_dir(String) -> Bool
 
 pub fn parse_github_shorthand(String) -> GitHubShorthand?

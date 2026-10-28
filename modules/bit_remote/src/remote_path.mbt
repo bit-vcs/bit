@@ -211,7 +211,7 @@ pub fn resolve_gitdir(fs : &@bit.RepoFileSystem, bit_path : String) -> String {
       end=trimmed.length(),
     )
     // If relative path, resolve relative to parent of .git file
-    if !gitdir_target_is_absolute(target) {
+    if !is_absolute_path(target) {
       let parent = match last_dir_separator(bit_path) {
         Some(i) => String::unsafe_substring(bit_path, start=0, end=i)
         None => "."
@@ -224,12 +224,12 @@ pub fn resolve_gitdir(fs : &@bit.RepoFileSystem, bit_path : String) -> String {
 }
 
 ///|
-/// Whether a `gitdir:` target is absolute, as git's is_absolute_path sees
-/// it: it starts with a directory separator (POSIX `/x`, Windows `\x` and
-/// UNC `\\server\share`) or has a DOS drive prefix (`C:/x`, `C:\x`). A
-/// drive-relative `C:x` also has a drive prefix, so like git it is used as
-/// is rather than glued onto the `.git` file's directory.
-fn gitdir_target_is_absolute(path : String) -> Bool {
+/// Whether `path` is absolute, as git's is_absolute_path sees it: it starts
+/// with a directory separator (POSIX `/x`, Windows `\x` and UNC
+/// `\\server\share`) or has a DOS drive prefix (`C:/x`, `C:\x`). For a
+/// `gitdir:` target this means a drive-relative `C:x` also counts, so like
+/// git it is used as is rather than glued onto the `.git` file's directory.
+pub fn is_absolute_path(path : String) -> Bool {
   if path.length() == 0 {
     return false
   }

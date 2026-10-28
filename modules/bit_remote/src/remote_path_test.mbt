@@ -66,3 +66,13 @@ test "remote/path: resolve_gitdir leaves a drive-relative target as is" {
   let fs = gitdir_fixture("C:/linked/.git", "C:relative")
   @test.assert_eq(@bit_remote.resolve_gitdir(fs, "C:/linked/.git"), "C:relative")
 }
+
+///|
+test "remote/path: is_absolute_path" {
+  for path in ["/x", "\\x", "\\\\server\\share", "C:/x", "c:\\x", "C:x"] {
+    assert_true(@bit_remote.is_absolute_path(path), msg=path)
+  }
+  for path in ["", "x", "./x", "../x", "1:/x"] {
+    assert_false(@bit_remote.is_absolute_path(path), msg=path)
+  }
+}

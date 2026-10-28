@@ -1920,7 +1920,11 @@ fn rev_parse_resolve_git_dir_arg(
   cwd_abs : String,
   path : String,
 ) -> String? {
-  let abs_path = if path.has_prefix("/") { path } else { cwd_abs + "/" + path }
+  let abs_path = if @bitlib.is_absolute_path(path) {
+    path
+  } else {
+    cwd_abs + "/" + path
+  }
   // Check if the path is a directory containing HEAD (bare or .git dir)
   if fs.is_file(abs_path + "/HEAD") {
     return Some(abs_path)
@@ -1939,14 +1943,14 @@ fn rev_parse_resolve_git_dir_arg(
         start=8,
         end=trimmed.length(),
       )
-      let target_abs = if target.has_prefix("/") {
+      let target_abs = if @bitlib.is_absolute_path(target) {
         target
       } else {
         // Resolve relative to the directory containing the gitfile
         let chars = abs_path.to_array()
         let mut last_slash = -1
         for i in 0..<chars.length() {
-          if chars[i] == '/' {
+          if chars[i] == '/' || chars[i] == '\\' {
             last_slash = i
           }
         }
@@ -3566,7 +3570,7 @@ fn rev_parse_last_slash(s : String) -> Int {
   let chars = s.to_array()
   let mut last = -1
   for i = 0; i < chars.length(); i = i + 1 {
-    if chars[i] == '/' {
+    if chars[i] == '/' || chars[i] == '\\' {
       last = i
     }
   }
@@ -3591,7 +3595,7 @@ fn rev_parse_find_superproject_working_tree(
     start=8,
     end=trimmed.length(),
   )
-  let gitdir_abs = if gitdir_raw.has_prefix("/") {
+  let gitdir_abs = if @bitlib.is_absolute_path(gitdir_raw) {
     gitdir_raw
   } else {
     normalize_path(root + "/" + gitdir_raw)
