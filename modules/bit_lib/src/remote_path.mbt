@@ -15,6 +15,12 @@ pub fn resolve_gitdir(fs : &@bit.RepoFileSystem, bit_path : String) -> String {
 }
 
 ///|
+/// Whether `path` is absolute, including Windows drive and UNC paths.
+pub fn is_absolute_path(path : String) -> Bool {
+  @bitremote.is_absolute_path(path)
+}
+
+///|
 /// Resolve the repository directory that owns shared metadata such as
 /// objects, refs, and config. `git_dir` may be either a `.git` marker file or
 /// an already-resolved linked-worktree administration directory.

@@ -751,7 +751,7 @@ fn worktree_repair_gitfile_target(
   }
   let raw = String::unsafe_substring(content, start=8, end=content.length())
   Some(
-    if raw.has_prefix("/") {
+    if is_absolute_path(raw) {
       normalize_path(raw)
     } else {
       normalize_path(join_path(worktree_path, raw))
@@ -1141,7 +1141,7 @@ fn resolve_git_dir(
         end=content.length(),
       )
       // Resolve relative paths
-      if target.has_prefix("/") {
+      if is_absolute_path(target) {
         return resolve_commondir(fs, target)
       } else {
         let abs = join_path(root, target)
@@ -1161,7 +1161,7 @@ fn resolve_commondir(
   let commondir_path = join_path(git_dir, "commondir")
   if fs.is_file(commondir_path) {
     let rel = read_trimmed_file(fs, commondir_path)
-    if rel.has_prefix("/") {
+    if is_absolute_path(rel) {
       return rel
     } else {
       return normalize_path(join_path(git_dir, rel))
@@ -1463,7 +1463,7 @@ fn resolve_commondir_from_admin(
   let commondir_path = join_path(admin_dir, "commondir")
   if fs.is_file(commondir_path) {
     let rel = read_trimmed_file(fs, commondir_path)
-    if rel.has_prefix("/") {
+    if is_absolute_path(rel) {
       return rel
     } else {
       return normalize_path(join_path(admin_dir, rel))

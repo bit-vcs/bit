@@ -86,7 +86,12 @@
 /// | `**/*.test.js` | `.test.js` files at any depth |
 /// | `doc/**/*.md` | `.md` files under `doc/` at any depth |
 /// | `temp?` | `temp` + any single character (`temp1`, `tempA`) |
+/// | `[ab].txt` | `a.txt` or `b.txt` (character class) |
+/// | `log[0-9]` | `log0` … `log9` (range; `[!0-9]` / `[^0-9]` negate) |
+/// | `x[[:digit:]]` | `x` + a digit (POSIX class) |
+/// | `file\?.txt` | Literal `file?.txt` (`\` escapes `?`, `*`, `[`, …) |
 /// | `\!literal` | Match literal `!` (escaped) |
+/// | `name\ ` | `name ` with its trailing space kept |
 ///
 /// ## Performance
 ///
@@ -396,79 +401,246 @@ fn precompile_segments(pattern : String) -> Array[FixedArray[UInt16]] {
 }
 
 ///|
-/// Check if a single pattern matches a path segment.
-/// Supports * (any characters) and ? (single character) wildcards.
+/// Check if a single pattern matches a path segment, with gitignore glob
+/// syntax: `*`, `?`, bracket expressions (`[ab]`, `[0-9]`, `[!0-9]`,
+/// `[^a]`, `[[:digit:]]`) and backslash escapes (`\?`, `\*`, `\[`).
 pub fn match_glob(pattern : String, text : String) -> Bool {
   let p = string_to_uint16_array(pattern)
-  match_glob_precompiled(p, text)
+  match_glob_precompiled_range(p, text, 0, text.length())
 }
 
 ///|
-/// match_glob using pre-compiled pattern code units to avoid repeated allocation.
-fn match_glob_precompiled(p : FixedArray[UInt16], text : String) -> Bool {
-  let slen = text.length()
-  let plen = p.length()
-  let mut pi = 0
-  let mut si = 0
-  let mut star = -1
-  let mut mark = 0
-  while si < slen {
-    if pi < plen && (p[pi] == char_question || p[pi] == text.unsafe_get(si)) {
-      pi += 1
-      si += 1
-    } else if pi < plen && p[pi] == char_star {
-      star = pi
-      mark = si
-      pi += 1
-    } else if star != -1 {
-      pi = star + 1
-      mark += 1
-      si = mark
-    } else {
-      return false
-    }
-  }
-  while pi < plen && p[pi] == char_star {
-    pi += 1
-  }
-  pi == plen
-}
-
-///|
-/// Match a precompiled pattern against a substring of text (segment between slashes).
+/// Match a precompiled pattern against a substring of text (segment between
+/// slashes).
 fn match_glob_precompiled_range(
   p : FixedArray[UInt16],
   text : String,
   start : Int,
   end : Int,
 ) -> Bool {
-  let slen = end - start
   let plen = p.length()
   let mut pi = 0
-  let mut si = 0
+  let mut si = start
   let mut star = -1
-  let mut mark = 0
-  while si < slen {
-    let tc = text.unsafe_get(start + si)
-    if pi < plen && (p[pi] == char_question || p[pi] == tc) {
-      pi += 1
-      si += 1
-    } else if pi < plen && p[pi] == char_star {
+  let mut mark = start
+  while si < end {
+    if pi < plen && p[pi] == char_star {
       star = pi
       mark = si
       pi += 1
-    } else if star != -1 {
-      pi = star + 1
-      mark += 1
-      si = mark
-    } else {
+      continue
+    }
+    if pi < plen {
+      let next = glob_match_one(p, pi, text.unsafe_get(si))
+      if next == glob_abort {
+        return false
+      }
+      if next >= 0 {
+        pi = next
+        si += 1
+        continue
+      }
+    }
+    if star == -1 {
       return false
     }
+    pi = star + 1
+    mark += 1
+    si = mark
   }
   while pi < plen && p[pi] == char_star {
     pi += 1
   }
   pi == plen
+}
+
+///|
+/// Returned by `glob_match_one` for a malformed pattern (an unterminated
+/// bracket expression or a trailing backslash), which, as in git, never
+/// matches anything.
+let glob_abort : Int = -2
+
+///|
+/// Match the single-character pattern token at `pi` (a literal, `?`, an
+/// escaped character or a bracket expression) against `c`. Returns the index
+/// after the token on a match, -1 on a mismatch, or `glob_abort`.
+fn glob_match_one(p : FixedArray[UInt16], pi : Int, c : UInt16) -> Int {
+  let tok = p[pi]
+  if tok == char_question {
+    pi + 1
+  } else if tok == char_backslash {
+    if pi + 1 >= p.length() {
+      glob_abort
+    } else if p[pi + 1] == c {
+      pi + 2
+    } else {
+      -1
+    }
+  } else if tok == char_open_bracket {
+    glob_match_class(p, pi, c)
+  } else if tok == c {
+    pi + 1
+  } else {
+    -1
+  }
+}
+
+///|
+/// Match the bracket expression starting at `p[pi] == '['` against `c`.
+fn glob_match_class(p : FixedArray[UInt16], pi : Int, c : UInt16) -> Int {
+  let plen = p.length()
+  let mut i = pi + 1
+  let negated = i < plen && (p[i] == char_bang || p[i] == char_caret)
+  if negated {
+    i += 1
+  }
+  let mut matched = false
+  let mut first = true
+  while true {
+    if i >= plen {
+      return glob_abort
+    }
+    let tok = p[i]
+    if tok == char_close_bracket && !first {
+      break
+    }
+    first = false
+    // POSIX character class such as [:digit:]
+    if tok == char_open_bracket && i + 1 < plen && p[i + 1] == char_colon {
+      match glob_posix_class_end(p, i + 2) {
+        Some(name_end) => {
+          if glob_posix_class_matches(p, i + 2, name_end, c) {
+            matched = true
+          }
+          i = name_end + 2
+          continue
+        }
+        None => ()
+      }
+    }
+    let mut lo = tok
+    if tok == char_backslash {
+      i += 1
+      if i >= plen {
+        return glob_abort
+      }
+      lo = p[i]
+    }
+    // A range a-z; a `-` right before `]` is literal.
+    if i + 2 < plen && p[i + 1] == char_dash && p[i + 2] != char_close_bracket {
+      let mut hi = p[i + 2]
+      i += 3
+      if hi == char_backslash {
+        if i >= plen {
+          return glob_abort
+        }
+        hi = p[i]
+        i += 1
+      }
+      if lo <= c && c <= hi {
+        matched = true
+      }
+    } else {
+      if lo == c {
+        matched = true
+      }
+      i += 1
+    }
+  }
+  if matched != negated {
+    i + 1
+  } else {
+    -1
+  }
+}
+
+///|
+/// Index of the `:` closing a `[:name:]` whose name starts at `start`.
+fn glob_posix_class_end(p : FixedArray[UInt16], start : Int) -> Int? {
+  let mut j = start
+  while j + 1 < p.length() {
+    if p[j] == char_colon && p[j + 1] == char_close_bracket {
+      return Some(j)
+    }
+    if p[j] == char_close_bracket {
+      return None
+    }
+    j += 1
+  }
+  None
+}
+
+///|
+fn glob_posix_class_matches(
+  p : FixedArray[UInt16],
+  start : Int,
+  end : Int,
+  c : UInt16,
+) -> Bool {
+  let name = StringBuilder()
+  for k in start..<end {
+    name.write_char(p[k].to_int().unsafe_to_char())
+  }
+  let code = c.to_int()
+  let is_upper = code >= 'A'.to_int() && code <= 'Z'.to_int()
+  let is_lower = code >= 'a'.to_int() && code <= 'z'.to_int()
+  let is_digit = code >= '0'.to_int() && code <= '9'.to_int()
+  let is_print = code >= 0x20 && code < 0x7f
+  match name.to_string() {
+    "alnum" => is_upper || is_lower || is_digit
+    "alpha" => is_upper || is_lower
+    "blank" => code == ' '.to_int() || code == '\t'.to_int()
+    "cntrl" => code < 0x20 || code == 0x7f
+    "digit" => is_digit
+    "graph" => is_print && code != ' '.to_int()
+    "lower" => is_lower
+    "print" => is_print
+    "punct" =>
+      is_print && code != ' '.to_int() && !(is_upper || is_lower || is_digit)
+    "space" => code == ' '.to_int() || (code >= 0x09 && code <= 0x0d)
+    "upper" => is_upper
+    "xdigit" =>
+      is_digit ||
+      (code >= 'a'.to_int() && code <= 'f'.to_int()) ||
+      (code >= 'A'.to_int() && code <= 'F'.to_int())
+    _ => false
+  }
+}
+
+///|
+let char_backslash : UInt16 = {
+  let c : Int = '\\'.to_int()
+  c.to_uint16()
+}
+
+///|
+let char_close_bracket : UInt16 = {
+  let c : Int = ']'.to_int()
+  c.to_uint16()
+}
+
+///|
+let char_bang : UInt16 = {
+  let c : Int = '!'.to_int()
+  c.to_uint16()
+}
+
+///|
+let char_caret : UInt16 = {
+  let c : Int = '^'.to_int()
+  c.to_uint16()
+}
+
+///|
+let char_colon : UInt16 = {
+  let c : Int = ':'.to_int()
+  c.to_uint16()
+}
+
+///|
+let char_dash : UInt16 = {
+  let c : Int = '-'.to_int()
+  c.to_uint16()
 }
 
 ///|
@@ -632,7 +804,9 @@ fn trim_trailing_whitespace(s : String) -> String {
   let mut end = s.length()
   while end > 0 {
     let c = s.unsafe_get(end - 1)
-    if c == ' ' || c == '\t' {
+    // A backslash keeps the whitespace after it ("foo\ " matches "foo ").
+    if (c == ' ' || c == '\t') &&
+      !(end >= 2 && s.unsafe_get(end - 2) == char_backslash) {
       end -= 1
     } else {
       break

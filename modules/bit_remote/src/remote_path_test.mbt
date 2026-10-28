@@ -21,3 +21,58 @@ test "remote/path: detect bare git dir" {
     ),
   )
 }
+
+///|
+fn gitdir_fixture(dot_git : String, target : String) -> @bit.TestFs {
+  let fs = @bit.TestFs::new()
+  match dot_git.rev_find("/") {
+    Some(i) => fs.mkdir_p(String::unsafe_substring(dot_git, start=0, end=i))
+    None => ()
+  }
+  fs.write_string(dot_git, "gitdir: " + target + "\n")
+  fs
+}
+
+///|
+test "remote/path: resolve_gitdir keeps absolute Windows targets (issue #209)" {
+  for
+    target in [
+      "C:/repo/.git/worktrees/linked", "c:/repo/.git/worktrees/linked", "C:\\repo\\.git\\worktrees\\linked",
+      "\\\\server\\share\\repo\\.git\\worktrees\\linked", "/repo/.git/worktrees/linked",
+    ] {
+    let fs = gitdir_fixture("C:/linked/.git", target)
+    @test.assert_eq(@bit_remote.resolve_gitdir(fs, "C:/linked/.git"), target)
+  }
+}
+
+///|
+test "remote/path: resolve_gitdir joins relative targets to the .git directory" {
+  let fs = gitdir_fixture("/work/linked/.git", "../repo/.git/worktrees/linked")
+  @test.assert_eq(
+    @bit_remote.resolve_gitdir(fs, "/work/linked/.git"),
+    "/work/linked/../repo/.git/worktrees/linked",
+  )
+  let win = gitdir_fixture("C:/linked/.git", "../repo/.git/worktrees/linked")
+  @test.assert_eq(
+    @bit_remote.resolve_gitdir(win, "C:/linked/.git"),
+    "C:/linked/../repo/.git/worktrees/linked",
+  )
+}
+
+///|
+test "remote/path: resolve_gitdir leaves a drive-relative target as is" {
+  // Like git, `C:relative` has a drive prefix and is not glued onto the
+  // .git file's directory; it stays distinct from `C:/relative`.
+  let fs = gitdir_fixture("C:/linked/.git", "C:relative")
+  @test.assert_eq(@bit_remote.resolve_gitdir(fs, "C:/linked/.git"), "C:relative")
+}
+
+///|
+test "remote/path: is_absolute_path" {
+  for path in ["/x", "\\x", "\\\\server\\share", "C:/x", "c:\\x", "C:x"] {
+    assert_true(@bit_remote.is_absolute_path(path), msg=path)
+  }
+  for path in ["", "x", "./x", "../x", "1:/x"] {
+    assert_false(@bit_remote.is_absolute_path(path), msg=path)
+  }
+}

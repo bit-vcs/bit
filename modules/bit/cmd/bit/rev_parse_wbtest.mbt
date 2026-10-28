@@ -212,3 +212,27 @@ test "rev-parse: detached --glob consumes only non-option argument" {
 test "rev-parse: no colon means no prefix applied" {
   @test.assert_eq(rev_parse_apply_prefix_to_colon_path("HEAD", "sub1/"), "HEAD")
 }
+
+///|
+test "rev-parse: --resolve-git-dir follows absolute Windows gitfile targets" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("C:/linked")
+  fs.write_string("C:/linked/.git", "gitdir: C:/repo/.git/worktrees/linked\n")
+  fs.mkdir_p("C:/repo/.git/worktrees/linked")
+  fs.write_string("C:/repo/.git/worktrees/linked/HEAD", "ref: refs/heads/main\n")
+  assert_eq(
+    rev_parse_resolve_git_dir_arg(fs, "/cwd", "C:/linked/.git"),
+    Some("C:/repo/.git/worktrees/linked"),
+  )
+  // A relative target still resolves next to a backslash-separated gitfile.
+  fs.mkdir_p("C:\\wt")
+  fs.write_string("C:\\wt\\.git", "gitdir: ../repo/.git/worktrees/linked\n")
+  fs.mkdir_p("C:\\wt/../repo/.git/worktrees/linked")
+  fs.write_string(
+    "C:\\wt/../repo/.git/worktrees/linked/HEAD", "ref: refs/heads/main\n",
+  )
+  assert_eq(
+    rev_parse_resolve_git_dir_arg(fs, "/cwd", "C:\\wt\\.git"),
+    Some("C:\\wt/../repo/.git/worktrees/linked"),
+  )
+}

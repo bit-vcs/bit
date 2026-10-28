@@ -209,6 +209,8 @@ pub async fn interactive_rebase_skip_impl(&@bit_types.FileSystem, &@bit_types.Re
 
 pub async fn interactive_rebase_start(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId, async (String) -> String?, async (String) -> String?, autosquash? : Bool, exec_runner? : (async (String) -> Int32)?, exec_cmds? : Array[String], update_refs? : Bool, root_mode? : Bool, rebase_merges? : Bool) -> InteractiveRebaseResult raise @bit_object.GitError
 
+pub fn is_absolute_path(String) -> Bool
+
 pub fn is_ancestor_of(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId) -> Bool
 
 pub fn is_bare_git_dir(String) -> Bool
