@@ -1,14 +1,14 @@
 name = "mizchi/bit_fingerprint"
 
-version = "0.49.0"
+version = "0.49.1"
 
 import {
-  "mizchi/bit_core@0.49.0",
-  "mizchi/bit_object@0.49.0",
-  "mizchi/bit_lib@0.49.0",
-  "mizchi/bit_osfs@0.49.0",
-  "mizchi/bit_types@0.49.0",
-  "mizchi/bit_utils@0.49.0",
+  "mizchi/bit_core@0.49.1",
+  "mizchi/bit_object@0.49.1",
+  "mizchi/bit_lib@0.49.1",
+  "mizchi/bit_osfs@0.49.1",
+  "mizchi/bit_types@0.49.1",
+  "mizchi/bit_utils@0.49.1",
   "moonbitlang/async@0.22.5",
 }
 
