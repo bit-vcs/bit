@@ -151,37 +151,37 @@ extern "js" fn lib_js_host_remove_dir(host_id : Int, path : String) -> String? =
 extern "js" fn lib_js_host_read_file(
   host_id : Int,
   path : String,
-) -> Array[Byte]? =
+) -> FixedArray[Byte]? =
   #| (hostId, path) => {
   #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
   #|   const host = state.hosts.get(hostId);
   #|   if (!host) {
   #|     globalThis.__bitGitJsLastError = `bit-git js host ${hostId} not found`;
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #|   if (typeof host.readFile !== 'function') {
   #|     globalThis.__bitGitJsLastError = 'bit-git js host.readFile(path) is required';
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #|   try {
   #|     const value = host.readFile(path);
   #|     if (value instanceof Uint8Array) {
-  #|       return { $tag: 1, _0: Array.from(value) };
+  #|       return Uint8Array.from(value);
   #|     }
   #|     if (value instanceof ArrayBuffer) {
-  #|       return { $tag: 1, _0: Array.from(new Uint8Array(value)) };
+  #|       return new Uint8Array(value.slice(0));
   #|     }
   #|     if (Array.isArray(value)) {
-  #|       return { $tag: 1, _0: value.map((item) => Number(item) & 0xff) };
+  #|       return Uint8Array.from(value, (item) => Number(item) & 0xff);
   #|     }
   #|     if (typeof value === 'string') {
-  #|       return { $tag: 1, _0: Array.from(new TextEncoder().encode(value)) };
+  #|       return new TextEncoder().encode(value);
   #|     }
   #|     globalThis.__bitGitJsLastError = 'bit-git js host.readFile must return Uint8Array, ArrayBuffer, Array<number>, or string';
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   } catch (error) {
   #|     globalThis.__bitGitJsLastError = String(error?.message ?? error);
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #| }
 
@@ -189,26 +189,23 @@ extern "js" fn lib_js_host_read_file(
 extern "js" fn lib_js_host_readdir(
   host_id : Int,
   path : String,
-) -> Array[String]? =
+) -> FixedArray[String]? =
   #| (hostId, path) => {
   #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
   #|   const host = state.hosts.get(hostId);
   #|   if (!host) {
   #|     globalThis.__bitGitJsLastError = `bit-git js host ${hostId} not found`;
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #|   if (typeof host.readdir !== 'function') {
   #|     globalThis.__bitGitJsLastError = 'bit-git js host.readdir(path) is required';
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #|   try {
-  #|     return {
-  #|       $tag: 1,
-  #|       _0: Array.from(host.readdir(path) ?? [], (item) => String(item)),
-  #|     };
+  #|     return Array.from(host.readdir(path) ?? [], (item) => String(item));
   #|   } catch (error) {
   #|     globalThis.__bitGitJsLastError = String(error?.message ?? error);
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #| }
 
@@ -243,34 +240,34 @@ extern "js" fn lib_js_host_is_file(host_id : Int, path : String) -> Bool =
   #| }
 
 ///|
-extern "js" fn lib_js_host_mtime(host_id : Int, path : String) -> Array[Int]? =
+extern "js" fn lib_js_host_mtime(host_id : Int, path : String) -> FixedArray[Int]? =
   #| (hostId, path) => {
   #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
   #|   const host = state.hosts.get(hostId);
   #|   if (!host) {
   #|     globalThis.__bitGitJsLastError = `bit-git js host ${hostId} not found`;
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #|   if (typeof host.mtime !== 'function') {
   #|     globalThis.__bitGitJsLastError = 'bit-git js host.mtime(path) is required';
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #|   try {
   #|     const value = host.mtime(path);
   #|     if (!Array.isArray(value) || value.length !== 2) {
   #|       globalThis.__bitGitJsLastError = 'bit-git js host.mtime(path) must return [seconds, nanoseconds]';
-  #|       return { $tag: 0 };
+  #|       return undefined;
   #|     }
   #|     const seconds = Number(value[0]);
   #|     const nanoseconds = Number(value[1]);
   #|     if (!Number.isInteger(seconds) || !Number.isInteger(nanoseconds)) {
   #|       globalThis.__bitGitJsLastError = 'bit-git js host.mtime(path) must return integer seconds and nanoseconds';
-  #|       return { $tag: 0 };
+  #|       return undefined;
   #|     }
-  #|     return { $tag: 1, _0: [seconds, nanoseconds] };
+  #|     return [seconds, nanoseconds];
   #|   } catch (error) {
   #|     globalThis.__bitGitJsLastError = String(error?.message ?? error);
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #| }
 
@@ -501,7 +498,7 @@ impl @bit.RepoFileSystem for LibJsHostFs with fn read_file(self, path) {
 ///|
 impl @bit.RepoFileSystem for LibJsHostFs with fn readdir(self, path) {
   match lib_js_host_readdir(self.host_id, path) {
-    Some(entries) => entries
+    Some(entries) => Array::from_fixed_array(entries)
     None => raise @bit.GitError::IoError(js_host_error_message())
   }
 }

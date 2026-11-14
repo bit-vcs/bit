@@ -1092,7 +1092,7 @@ fn js_convert_merge_result(result : MergeResult) -> JsMergeResult {
   {
     status: js_merge_status_text(result.status),
     commit_id: js_commit_id_or_empty(result.commit_id),
-    conflicts: result.conflicts,
+    conflicts: FixedArray::from_array(result.conflicts),
   }
 }
 
@@ -1101,7 +1101,7 @@ fn js_convert_rebase_result(result : RebaseResult) -> JsRebaseResult {
   {
     status: js_rebase_status_text(result.status),
     commit_id: js_commit_id_or_empty(result.commit_id),
-    conflicts: result.conflicts,
+    conflicts: FixedArray::from_array(result.conflicts),
   }
 }
 
@@ -1112,7 +1112,7 @@ fn js_convert_cherry_pick_result(
   {
     status: js_cherry_pick_status_text(result.status),
     commit_id: js_commit_id_or_empty(result.commit_id),
-    conflicts: result.conflicts,
+    conflicts: FixedArray::from_array(result.conflicts),
   }
 }
 
@@ -1189,7 +1189,17 @@ pub fn js_git_init(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_add_paths(
+  host_id : Int,
+  root : String,
+  paths : FixedArray[String],
+) -> Result[Unit, String] {
+  js_add_paths_impl(host_id, root, Array::from_fixed_array(paths))
+}
+
+///|
+fn js_add_paths_impl(
   host_id : Int,
   root : String,
   paths : Array[String],
@@ -1199,7 +1209,13 @@ pub fn js_add_paths(
 }
 
 ///|
-pub fn js_status(host_id : Int, root : String) -> Result[Status, String] {
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
+pub fn js_status(host_id : Int, root : String) -> Result[JsStatus, String] {
+  js_status_impl(host_id, root).map(JsStatus::from_status)
+}
+
+///|
+fn js_status_impl(host_id : Int, root : String) -> Result[Status, String] {
   let fs = js_make_host_fs(host_id)
   js_wrap_error(() => {
     let git_dir = js_resolve_git_dir(fs, root)
@@ -1269,11 +1285,20 @@ pub fn js_status(host_id : Int, root : String) -> Result[Status, String] {
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_status_porcelain(
   host_id : Int,
   root : String,
+) -> Result[FixedArray[String], String] {
+  js_status_porcelain_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_status_porcelain_impl(
+  host_id : Int,
+  root : String,
 ) -> Result[Array[String], String] {
-  match js_status(host_id, root) {
+  match js_status_impl(host_id, root) {
     Ok(status_result) => Ok(status_porcelain_from(status_result))
     Err(error) => Err(error)
   }
@@ -1508,7 +1533,17 @@ pub fn js_verify_commit_ssh_ed25519_promise(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_log(
+  host_id : Int,
+  root : String,
+  max_count : Int,
+) -> Result[FixedArray[JsLogEntry], String] {
+  js_log_impl(host_id, root, max_count).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_log_impl(
   host_id : Int,
   root : String,
   max_count : Int,
@@ -1531,7 +1566,17 @@ pub fn js_log(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_log_oneline(
+  host_id : Int,
+  root : String,
+  max_count : Int,
+) -> Result[FixedArray[String], String] {
+  js_log_oneline_impl(host_id, root, max_count).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_log_oneline_impl(
   host_id : Int,
   root : String,
   max_count : Int,
@@ -1560,7 +1605,16 @@ pub fn js_rev_parse(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_show_ref(
+  host_id : Int,
+  root : String,
+) -> Result[FixedArray[JsRefInfo], String] {
+  js_show_ref_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_show_ref_impl(
   host_id : Int,
   root : String,
 ) -> Result[Array[JsRefInfo], String] {
@@ -1578,7 +1632,17 @@ pub fn js_show_ref(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_reflog(
+  host_id : Int,
+  root : String,
+  refname : String,
+) -> Result[FixedArray[JsReflogEntry], String] {
+  js_reflog_impl(host_id, root, refname).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_reflog_impl(
   host_id : Int,
   root : String,
   refname : String,
@@ -1618,9 +1682,9 @@ pub fn js_gc(host_id : Int, root : String) -> Result[JsGcResult, String] {
           pack_id: pack.pack_id.to_hex(),
           object_count: pack.object_count,
           pack_bytes: pack.pack_bytes,
-          dangling,
+          dangling: FixedArray::from_array(dangling),
         }
-      None => { pack_id: "", object_count: 0, pack_bytes: 0, dangling }
+      None => { pack_id: "", object_count: 0, pack_bytes: 0, dangling: FixedArray::from_array(dangling) }
     }
   })
 }
@@ -1644,15 +1708,24 @@ pub fn js_fsck(host_id : Int, root : String) -> Result[JsFsckResult, String] {
     {
       errors: fsck_result.errors,
       reachable: fsck_result.reachable.length(),
-      missing,
-      root_commits: fsck_result.root_commits,
-      tag_objects: fsck_result.tag_objects,
+      missing: FixedArray::from_array(missing),
+      root_commits: FixedArray::from_array(fsck_result.root_commits),
+      tag_objects: FixedArray::from_array(fsck_result.tag_objects),
     }
   })
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_worktree_list(
+  host_id : Int,
+  root : String,
+) -> Result[FixedArray[JsWorktreeInfo], String] {
+  js_worktree_list_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_worktree_list_impl(
   host_id : Int,
   root : String,
 ) -> Result[Array[JsWorktreeInfo], String] {
@@ -1703,7 +1776,18 @@ pub fn js_merge(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_merge_base(
+  host_id : Int,
+  root : String,
+  a_spec : String,
+  b_spec : String,
+) -> Result[FixedArray[String], String] {
+  js_merge_base_impl(host_id, root, a_spec, b_spec).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_merge_base_impl(
   host_id : Int,
   root : String,
   a_spec : String,
@@ -1779,7 +1863,17 @@ pub fn js_switch_branch(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_restore_paths(
+  host_id : Int,
+  root : String,
+  paths : FixedArray[String],
+) -> Result[Unit, String] {
+  js_restore_paths_impl(host_id, root, Array::from_fixed_array(paths))
+}
+
+///|
+fn js_restore_paths_impl(
   host_id : Int,
   root : String,
   paths : Array[String],
@@ -1789,7 +1883,16 @@ pub fn js_restore_paths(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_branch_list(
+  host_id : Int,
+  root : String,
+) -> Result[FixedArray[JsBranchInfo], String] {
+  js_branch_list_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_branch_list_impl(
   host_id : Int,
   root : String,
 ) -> Result[Array[JsBranchInfo], String] {
@@ -1859,7 +1962,16 @@ pub fn js_branch_rename(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_tag_list(
+  host_id : Int,
+  root : String,
+) -> Result[FixedArray[String], String] {
+  js_tag_list_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_tag_list_impl(
   host_id : Int,
   root : String,
 ) -> Result[Array[String], String] {
@@ -1996,7 +2108,16 @@ pub fn js_reset(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_stash_list(
+  host_id : Int,
+  root : String,
+) -> Result[FixedArray[JsStashEntry], String] {
+  js_stash_list_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_stash_list_impl(
   host_id : Int,
   root : String,
 ) -> Result[Array[JsStashEntry], String] {
@@ -2108,8 +2229,10 @@ pub async fn js_diff_worktree(
 pub fn js_diff_worktree_promise(
   host_id : Int,
   root : String,
-) -> @js_async.Promise[Result[Array[String], String]] {
-  js_export_promise(async fn() { js_diff_worktree(host_id, root) })
+) -> @js_async.Promise[Result[FixedArray[String], String]] {
+  js_export_promise(async fn() {
+    js_diff_worktree(host_id, root).map(a => FixedArray::from_array(a))
+  })
 }
 
 ///|
@@ -2127,12 +2250,23 @@ pub async fn js_diff_worktree_stat(
 pub fn js_diff_worktree_stat_promise(
   host_id : Int,
   root : String,
-) -> @js_async.Promise[Result[Array[String], String]] {
-  js_export_promise(async fn() { js_diff_worktree_stat(host_id, root) })
+) -> @js_async.Promise[Result[FixedArray[String], String]] {
+  js_export_promise(async fn() {
+    js_diff_worktree_stat(host_id, root).map(a => FixedArray::from_array(a))
+  })
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_diff_index(
+  host_id : Int,
+  root : String,
+) -> Result[FixedArray[String], String] {
+  js_diff_index_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_diff_index_impl(
   host_id : Int,
   root : String,
 ) -> Result[Array[String], String] {
@@ -2141,7 +2275,16 @@ pub fn js_diff_index(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_diff_index_stat(
+  host_id : Int,
+  root : String,
+) -> Result[FixedArray[String], String] {
+  js_diff_index_stat_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_diff_index_stat_impl(
   host_id : Int,
   root : String,
 ) -> Result[Array[String], String] {
@@ -2150,7 +2293,16 @@ pub fn js_diff_index_stat(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_list_remotes(
+  host_id : Int,
+  root : String,
+) -> Result[FixedArray[String], String] {
+  js_list_remotes_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_list_remotes_impl(
   host_id : Int,
   root : String,
 ) -> Result[Array[String], String] {
@@ -2159,7 +2311,16 @@ pub fn js_list_remotes(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_list_remotes_verbose(
+  host_id : Int,
+  root : String,
+) -> Result[FixedArray[JsRemoteVerboseEntry], String] {
+  js_list_remotes_verbose_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_list_remotes_verbose_impl(
   host_id : Int,
   root : String,
 ) -> Result[Array[JsRemoteVerboseEntry], String] {
@@ -2198,7 +2359,17 @@ pub fn js_sparse_checkout_init(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_sparse_checkout_set(
+  host_id : Int,
+  root : String,
+  patterns : FixedArray[String],
+) -> Result[Unit, String] {
+  js_sparse_checkout_set_impl(host_id, root, Array::from_fixed_array(patterns))
+}
+
+///|
+fn js_sparse_checkout_set_impl(
   host_id : Int,
   root : String,
   patterns : Array[String],
@@ -2208,7 +2379,17 @@ pub fn js_sparse_checkout_set(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_sparse_checkout_add(
+  host_id : Int,
+  root : String,
+  patterns : FixedArray[String],
+) -> Result[Unit, String] {
+  js_sparse_checkout_add_impl(host_id, root, Array::from_fixed_array(patterns))
+}
+
+///|
+fn js_sparse_checkout_add_impl(
   host_id : Int,
   root : String,
   patterns : Array[String],
@@ -2258,7 +2439,16 @@ pub fn js_sparse_checkout_cone_enabled(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_sparse_checkout_patterns(
+  host_id : Int,
+  root : String,
+) -> Result[FixedArray[String], String] {
+  js_sparse_checkout_patterns_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_sparse_checkout_patterns_impl(
   host_id : Int,
   root : String,
 ) -> Result[Array[String], String] {
@@ -2267,7 +2457,16 @@ pub fn js_sparse_checkout_patterns(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_sparse_checkout_display_patterns(
+  host_id : Int,
+  root : String,
+) -> Result[FixedArray[String], String] {
+  js_sparse_checkout_display_patterns_impl(host_id, root).map(a => FixedArray::from_array(a))
+}
+
+///|
+fn js_sparse_checkout_display_patterns_impl(
   host_id : Int,
   root : String,
 ) -> Result[Array[String], String] {
@@ -2852,7 +3051,18 @@ pub fn js_push_remote_promise(
 }
 
 ///|
+/// JS boundary: arrays cross as `FixedArray` (a plain JS array).
 pub fn js_rm_paths(
+  host_id : Int,
+  root : String,
+  paths : FixedArray[String],
+  cached : Bool,
+) -> Result[Unit, String] {
+  js_rm_paths_impl(host_id, root, Array::from_fixed_array(paths), cached)
+}
+
+///|
+fn js_rm_paths_impl(
   host_id : Int,
   root : String,
   paths : Array[String],
