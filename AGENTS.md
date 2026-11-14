@@ -8,6 +8,13 @@ the package-by-package classification.
 
 Run `node tools/check-layers.mjs` to validate the dependency graph.
 
+## MoonBit toolchain
+
+CI, the dev shell (`nix develop`) and the nix build all use the flake's
+`moonbit` package, pinned through `moonbit-overlay` in `flake.lock`
+(`.github/actions/setup-moonbit` installs it with Nix). To move to a newer
+MoonBit, run `nix flake update moonbit-overlay`.
+
 ## Native builds
 
 `moon test --target native` runs its test drivers through the bundled
