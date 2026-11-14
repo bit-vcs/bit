@@ -3,8 +3,8 @@ name = "mizchi/bitx_bitconfig"
 version = "0.49.1"
 
 import {
-  "moonbit-community/toml@0.5.0",
-  "moonbitlang/x@0.5.6",
+  "moonbit-community/toml@0.5.1",
+  "moonbitlang/x@0.5.7",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"

@@ -1,0 +1,47 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/llm/openai"
+
+import {
+  "mizchi/llm",
+  "mizchi/llm/ffi",
+  "mizchi/llm/tools",
+}
+
+// Values
+pub fn list_openrouter_models() -> Array[ModelInfo]
+
+pub fn parse_openai_event(String) -> @llm.StreamEvent?
+
+// Errors
+
+// Types and methods
+pub(all) struct ModelInfo {
+  id : String
+  name : String
+  context_length : Int32
+  pricing_prompt : String
+  pricing_completion : String
+}
+pub impl Show for ModelInfo
+
+pub(all) enum OpenAIEndpoint {
+  OpenAI
+  OpenRouter
+  Ollama
+  Cloudflare(account_id~ : String)
+  Custom(base_url~ : String)
+}
+
+pub struct OpenAIProvider {
+  config : @llm.ProviderConfig
+  endpoint : OpenAIEndpoint
+}
+pub async fn OpenAIProvider::collect_text(Self, Array[@llm.Message], tools? : Array[@tools.ToolDef]) -> String
+pub fn OpenAIProvider::collect_text_async(Self, Array[@llm.Message], tools? : Array[@tools.ToolDef]) -> @ffi.Promise[String]
+pub fn OpenAIProvider::new(String, endpoint? : OpenAIEndpoint, model? : String, max_tokens? : Int32, system_prompt? : String, base_url? : String, timeout_sec? : Int32, max_retries? : Int32) -> Self
+pub fn OpenAIProvider::new_compat(String, String, api_key? : String, max_tokens? : Int32, system_prompt? : String, timeout_sec? : Int32, max_retries? : Int32) -> Self
+pub impl @llm.Provider for OpenAIProvider
+
+// Type aliases
+
+// Traits

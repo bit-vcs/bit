@@ -24,11 +24,12 @@ pub fn resolve_local_repo_path(&@bit_types.RepoFileSystem, String, String) -> St
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum GitHubShorthand {
   Repo(String, String?)
   Subdir(String, String, String?)
   File(String, String)
-} derive(Eq, @debug.Debug)
+}
 pub fn GitHubShorthand::equal(Self, Self) -> Bool
 pub fn GitHubShorthand::not_equal(Self, Self) -> Bool
 pub fn GitHubShorthand::output(Self, &Logger) -> Unit

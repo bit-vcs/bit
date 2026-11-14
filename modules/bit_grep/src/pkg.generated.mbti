@@ -63,12 +63,13 @@ pub fn validate_grep_patterns(Array[String], GrepPatternType) -> Unit raise @bit
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum GrepExpr {
   Pattern(String)
   And(GrepExpr, GrepExpr)
   Or(GrepExpr, GrepExpr)
   Not(GrepExpr)
-} derive(Eq, @debug.Debug)
+}
 pub fn GrepExpr::equal(Self, Self) -> Bool
 pub fn GrepExpr::not_equal(Self, Self) -> Bool
 pub fn GrepExpr::output(Self, &Logger) -> Unit
@@ -76,10 +77,11 @@ pub fn GrepExpr::to_repr(Self) -> @debug.Repr
 pub fn GrepExpr::to_string(Self) -> String
 pub impl Show for GrepExpr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct GrepExprMatch {
   matched : Bool
   span : GrepMatchSpan?
-} derive(Eq, @debug.Debug)
+}
 pub fn GrepExprMatch::equal(Self, Self) -> Bool
 pub fn GrepExprMatch::not_equal(Self, Self) -> Bool
 pub fn GrepExprMatch::output(Self, &Logger) -> Unit
@@ -87,6 +89,7 @@ pub fn GrepExprMatch::to_repr(Self) -> @debug.Repr
 pub fn GrepExprMatch::to_string(Self) -> String
 pub impl Show for GrepExprMatch
 
+#derive(Eq, @debug.Debug)
 pub(all) enum GrepExprToken {
   Pattern(String)
   And
@@ -94,7 +97,7 @@ pub(all) enum GrepExprToken {
   Not
   LParen
   RParen
-} derive(Eq, @debug.Debug)
+}
 pub fn GrepExprToken::equal(Self, Self) -> Bool
 pub fn GrepExprToken::not_equal(Self, Self) -> Bool
 pub fn GrepExprToken::output(Self, &Logger) -> Unit
@@ -102,10 +105,11 @@ pub fn GrepExprToken::to_repr(Self) -> @debug.Repr
 pub fn GrepExprToken::to_string(Self) -> String
 pub impl Show for GrepExprToken
 
+#derive(Eq, @debug.Debug)
 pub(all) struct GrepFileMatch {
   path : String
   matches : Array[GrepLineMatch]
-} derive(Eq, @debug.Debug)
+}
 pub fn GrepFileMatch::equal(Self, Self) -> Bool
 pub fn GrepFileMatch::not_equal(Self, Self) -> Bool
 pub fn GrepFileMatch::output(Self, &Logger) -> Unit
@@ -113,11 +117,12 @@ pub fn GrepFileMatch::to_repr(Self) -> @debug.Repr
 pub fn GrepFileMatch::to_string(Self) -> String
 pub impl Show for GrepFileMatch
 
+#derive(Eq, @debug.Debug)
 pub(all) struct GrepLineMatch {
   line_number : Int32
   column : Int32
   line : String
-} derive(Eq, @debug.Debug)
+}
 pub fn GrepLineMatch::equal(Self, Self) -> Bool
 pub fn GrepLineMatch::not_equal(Self, Self) -> Bool
 pub fn GrepLineMatch::output(Self, &Logger) -> Unit
@@ -125,10 +130,11 @@ pub fn GrepLineMatch::to_repr(Self) -> @debug.Repr
 pub fn GrepLineMatch::to_string(Self) -> String
 pub impl Show for GrepLineMatch
 
+#derive(Eq, @debug.Debug)
 pub(all) struct GrepMatchSpan {
   start_column : Int32
   end_column : Int32
-} derive(Eq, @debug.Debug)
+}
 pub fn GrepMatchSpan::equal(Self, Self) -> Bool
 pub fn GrepMatchSpan::not_equal(Self, Self) -> Bool
 pub fn GrepMatchSpan::output(Self, &Logger) -> Unit
@@ -136,12 +142,13 @@ pub fn GrepMatchSpan::to_repr(Self) -> @debug.Repr
 pub fn GrepMatchSpan::to_string(Self) -> String
 pub impl Show for GrepMatchSpan
 
+#derive(Eq, @debug.Debug)
 pub(all) enum GrepPatternType {
   Fixed
   Basic
   Extended
   Perl
-} derive(Eq, @debug.Debug)
+}
 pub fn GrepPatternType::equal(Self, Self) -> Bool
 pub fn GrepPatternType::not_equal(Self, Self) -> Bool
 pub fn GrepPatternType::output(Self, &Logger) -> Unit

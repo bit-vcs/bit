@@ -6,6 +6,7 @@ import {
   "mizchi/bit_object",
   "mizchi/bit_types",
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
 }
 
 // Values
@@ -49,9 +50,9 @@ pub fn merge_record_bytes_with_policy(Bytes, Bytes, RecordMergePolicy) -> Bytes
 
 pub fn parse_claim_action(String) -> ClaimAction?
 
-pub fn parse_claim_message(Json) -> ClaimMessage?
+pub fn parse_claim_message(@json.Json) -> ClaimMessage?
 
-pub fn parse_claims_from_envelopes(Array[Json]) -> Array[ClaimMessage]
+pub fn parse_claims_from_envelopes(Array[@json.Json]) -> Array[ClaimMessage]
 
 pub fn parse_hub_record(String) -> HubRecord
 
@@ -118,21 +119,23 @@ pub fn work_item_meta_prefix() -> String
 pub fn write_object_bytes(&@bit_types.FileSystem, String, @bit_object.ObjectId, Bytes) -> Unit raise @bit_object.GitError
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror PrError {
   NotFound(String)
   InvalidFormat(String)
   InvalidState(String)
   MergeConflict(Array[String])
-} derive(Eq, @debug.Debug)
+}
 pub fn PrError::equal(Self, Self) -> Bool
 pub fn PrError::not_equal(Self, Self) -> Bool
 pub fn PrError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum ClaimAction {
   Claim
   Unclaim
-} derive(Eq, @debug.Debug)
+}
 pub fn ClaimAction::equal(Self, Self) -> Bool
 pub fn ClaimAction::not_equal(Self, Self) -> Bool
 pub fn ClaimAction::output(Self, &Logger) -> Unit
@@ -140,12 +143,13 @@ pub fn ClaimAction::to_repr(Self) -> @debug.Repr
 pub fn ClaimAction::to_string(Self) -> String
 pub impl Show for ClaimAction
 
+#derive(Eq, @debug.Debug)
 pub struct ClaimMessage {
   issue_id : String
   action : ClaimAction
   claimer : String
   timestamp : Int64
-} derive(Eq, @debug.Debug)
+}
 pub fn ClaimMessage::action(Self) -> ClaimAction
 pub fn ClaimMessage::claimer(Self) -> String
 pub fn ClaimMessage::equal(Self, Self) -> Bool
@@ -155,7 +159,7 @@ pub fn ClaimMessage::new(String, ClaimAction, String, Int64) -> Self
 pub fn ClaimMessage::not_equal(Self, Self) -> Bool
 pub fn ClaimMessage::output(Self, &Logger) -> Unit
 pub fn ClaimMessage::timestamp(Self) -> Int64
-pub fn ClaimMessage::to_json(Self) -> Json
+pub fn ClaimMessage::to_json(Self) -> @json.Json
 pub fn ClaimMessage::to_repr(Self) -> @debug.Repr
 pub fn ClaimMessage::to_string(Self) -> String
 pub impl Show for ClaimMessage
@@ -168,7 +172,7 @@ pub struct GhComment {
   created_at : String
   updated_at : String
 }
-pub fn GhComment::from_json(Map[String, Json]) -> Self
+pub fn GhComment::from_json(Map[String, @json.Json]) -> Self
 
 pub struct GhIssue {
   number : Int32
@@ -182,7 +186,7 @@ pub struct GhIssue {
   created_at : String
   updated_at : String
 }
-pub fn GhIssue::from_json(Map[String, Json]) -> Self
+pub fn GhIssue::from_json(Map[String, @json.Json]) -> Self
 
 pub struct GhPullRequest {
   number : Int32
@@ -200,7 +204,7 @@ pub struct GhPullRequest {
   merged : Bool
   merged_at : String
 }
-pub fn GhPullRequest::from_json(Map[String, Json]) -> Self
+pub fn GhPullRequest::from_json(Map[String, @json.Json]) -> Self
 
 pub struct Hub {
   mut store : HubStore
@@ -349,10 +353,11 @@ pub fn IssueComment::new(String, String, String, String, Int64, reply_to? : Stri
 pub fn IssueComment::reply_to(Self) -> String?
 pub fn IssueComment::serialize(Self) -> String
 
+#derive(Eq, @debug.Debug)
 pub(all) enum IssueState {
   Open
   Closed
-} derive(Eq, @debug.Debug)
+}
 pub fn IssueState::equal(Self, Self) -> Bool
 pub fn IssueState::not_equal(Self, Self) -> Bool
 pub fn IssueState::output(Self, &Logger) -> Unit
@@ -457,11 +462,12 @@ pub fn PrReview::pr_id(Self) -> String
 pub fn PrReview::serialize(Self) -> String
 pub fn PrReview::verdict(Self) -> ReviewVerdict
 
+#derive(Eq, @debug.Debug)
 pub(all) enum PrState {
   Open
   Merged
   Closed
-} derive(Eq, @debug.Debug)
+}
 pub fn PrState::equal(Self, Self) -> Bool
 pub fn PrState::not_equal(Self, Self) -> Bool
 pub fn PrState::output(Self, &Logger) -> Unit
@@ -503,12 +509,13 @@ pub fn PrWorkflowResult::txn_id(Self) -> String?
 pub fn PrWorkflowResult::updated_at(Self) -> Int64
 pub fn PrWorkflowResult::workspace_fingerprint(Self) -> String
 
+#derive(Eq, @debug.Debug)
 pub(all) enum PrWorkflowStatus {
   Pending
   Running
   Success
   Failed
-} derive(Eq, @debug.Debug)
+}
 pub fn PrWorkflowStatus::equal(Self, Self) -> Bool
 pub fn PrWorkflowStatus::not_equal(Self, Self) -> Bool
 pub fn PrWorkflowStatus::output(Self, &Logger) -> Unit
@@ -559,10 +566,11 @@ pub enum RecordMergePolicy {
   TombstoneWins
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) enum RecordTriggerClass {
   Full
   NotifyOnly
-} derive(Eq, @debug.Debug)
+}
 pub fn RecordTriggerClass::equal(Self, Self) -> Bool
 pub fn RecordTriggerClass::not_equal(Self, Self) -> Bool
 pub fn RecordTriggerClass::output(Self, &Logger) -> Unit
@@ -570,11 +578,12 @@ pub fn RecordTriggerClass::to_repr(Self) -> @debug.Repr
 pub fn RecordTriggerClass::to_string(Self) -> String
 pub impl Show for RecordTriggerClass
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ReviewVerdict {
   Approved
   RequestChanges
   Comment
-} derive(Eq, @debug.Debug)
+}
 pub fn ReviewVerdict::equal(Self, Self) -> Bool
 pub fn ReviewVerdict::not_equal(Self, Self) -> Bool
 pub fn ReviewVerdict::output(Self, &Logger) -> Unit
@@ -651,10 +660,11 @@ pub fn WorkItem::to_issue(Self) -> Issue?
 pub fn WorkItem::to_pull_request(Self) -> PullRequest?
 pub fn WorkItem::updated_at(Self) -> Int64
 
+#derive(Eq, @debug.Debug)
 pub(all) enum WorkItemKind {
   Issue
   PullRequest
-} derive(Eq, @debug.Debug)
+}
 pub fn WorkItemKind::equal(Self, Self) -> Bool
 pub fn WorkItemKind::not_equal(Self, Self) -> Bool
 pub fn WorkItemKind::output(Self, &Logger) -> Unit
@@ -682,11 +692,12 @@ pub fn WorkItemPatch::source_repo(Self) -> String?
 pub fn WorkItemPatch::target_branch(Self) -> String
 pub fn WorkItemPatch::target_commit(Self) -> @bit_object.ObjectId
 
+#derive(Eq, @debug.Debug)
 pub(all) enum WorkItemState {
   Open
   Merged
   Closed
-} derive(Eq, @debug.Debug)
+}
 pub fn WorkItemState::equal(Self, Self) -> Bool
 pub fn WorkItemState::not_equal(Self, Self) -> Bool
 pub fn WorkItemState::output(Self, &Logger) -> Unit

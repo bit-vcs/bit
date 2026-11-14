@@ -11,7 +11,7 @@ import {
 import {
   "mizchi/bit_lib" @lib,
   "mizchi/bit_osfs" @osfs,
-  "mizchi/zlib",
+  "mizchi/bit_object/zlib",
   "moonbitlang/core/bench",
   "moonbitlang/core/env",
   "moonbitlang/async",

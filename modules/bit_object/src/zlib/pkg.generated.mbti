@@ -1,0 +1,32 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit_object/zlib"
+
+// Values
+pub fn adler32(BytesView) -> UInt32
+
+pub let default_max_decompressed_size : Int32
+
+pub fn zlib_compress(BytesView) -> Bytes
+
+pub fn zlib_compress_fast(BytesView) -> Bytes
+
+pub fn zlib_compress_stored(BytesView) -> Bytes
+
+pub fn zlib_decompress(BytesView, max_size? : Int32) -> Bytes raise ZlibError
+
+pub fn zlib_decompress_at(BytesView, Int32, max_size? : Int32) -> (Bytes, Int32) raise ZlibError
+
+// Errors
+pub(all) suberror ZlibError {
+  ZlibError(@moonbitlang/core/compress/zlib.ZlibErrorKind, String)
+}
+pub fn ZlibError::output(Self, &Logger) -> Unit
+pub fn ZlibError::to_string(Self) -> String
+pub impl Show for ZlibError
+
+// Types and methods
+
+// Type aliases
+pub using @moonbitlang/core/compress/zlib {type ZlibErrorKind}
+
+// Traits

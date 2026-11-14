@@ -114,10 +114,11 @@ pub struct LsRefsResult {
   symrefs : Map[String, String]
 }
 
+#derive(Eq)
 pub(all) enum ProtocolVersion {
   V0
   V2
-} derive(Eq)
+}
 pub fn ProtocolVersion::equal(Self, Self) -> Bool
 pub fn ProtocolVersion::not_equal(Self, Self) -> Bool
 
@@ -136,11 +137,12 @@ pub fn Remote::info_refs_url(Self) -> String
 pub fn Remote::new(String) -> Self
 pub fn Remote::receive_pack_url(Self) -> String
 
+#derive(Eq)
 pub(all) enum RemoteKind {
   Http
   Ssh
   File
-} derive(Eq)
+}
 pub fn RemoteKind::equal(Self, Self) -> Bool
 pub fn RemoteKind::not_equal(Self, Self) -> Bool
 

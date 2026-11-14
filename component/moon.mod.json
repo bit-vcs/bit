@@ -5,9 +5,8 @@
     "mizchi/bit": {
       "path": ".."
     },
-    "mizchi/zlib": "0.4.9",
-    "moonbitlang/x": "0.5.5",
-    "mizchi/x": "0.6.1"
+    "moonbitlang/x": "0.5.7",
+    "mizchi/x": "0.7.0"
   },
   "license": "Apache-2.0",
   "description": "WASM Component for bit-vcs git operations"

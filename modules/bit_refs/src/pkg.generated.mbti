@@ -33,11 +33,12 @@ pub fn serialize_packed_refs_entries(Array[PackedRefEntry]) -> String
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) struct PackedRefEntry {
   refname : String
   oid : String
   peeled : String?
-} derive(Eq, @debug.Debug)
+}
 pub fn PackedRefEntry::equal(Self, Self) -> Bool
 pub fn PackedRefEntry::not_equal(Self, Self) -> Bool
 pub fn PackedRefEntry::to_repr(Self) -> @debug.Repr

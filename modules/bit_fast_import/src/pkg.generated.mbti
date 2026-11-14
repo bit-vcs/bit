@@ -32,13 +32,14 @@ pub(all) struct FastImportDataResult {
   next_line : Int32
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) enum FastImportFileOp {
   Modify(mode~ : String, dataref~ : String, path~ : String)
   Delete(path~ : String)
   DeleteAll
   Rename(old_path~ : String, new_path~ : String)
   Copy(old_path~ : String, new_path~ : String)
-} derive(Eq, @debug.Debug)
+}
 pub fn FastImportFileOp::equal(Self, Self) -> Bool
 pub fn FastImportFileOp::not_equal(Self, Self) -> Bool
 pub fn FastImportFileOp::output(Self, &Logger) -> Unit

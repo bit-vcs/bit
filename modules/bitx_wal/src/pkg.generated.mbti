@@ -22,10 +22,11 @@ pub fn encode_image(WalImage) -> Bytes
 // Errors
 
 // Types and methods
+#derive(Eq)
 pub(all) enum CommitOutcome {
   Committed(Int64)
   Contended
-} derive(Eq)
+}
 pub fn CommitOutcome::equal(Self, Self) -> Bool
 pub fn CommitOutcome::not_equal(Self, Self) -> Bool
 pub fn CommitOutcome::output(Self, &Logger) -> Unit
@@ -64,17 +65,19 @@ pub async fn[S : @bit_objstore.ObjectStore] Wal::sweep_offline(Self[S]) -> Array
 pub async fn[S : @bit_objstore.ObjectStore] Wal::sync(Self[S]) -> Unit raise @bit_object.GitError
 pub async fn[S : @bit_objstore.ObjectStore] Wal::unreferenced_keys(Self[S]) -> Array[String] raise @bit_object.GitError
 
+#derive(Eq)
 pub(all) struct WalEntry {
   seq : Int64
   kind : String
   payload_keys : Array[String]
   data : String
   idempotency_key : String
-} derive(Eq)
+}
 pub fn WalEntry::equal(Self, Self) -> Bool
 pub fn WalEntry::new(String, String, payload_keys? : Array[String], idempotency_key? : String) -> Self
 pub fn WalEntry::not_equal(Self, Self) -> Bool
 
+#derive(Eq)
 pub(all) struct WalImage {
   version : Int32
   snapshot : String
@@ -82,7 +85,7 @@ pub(all) struct WalImage {
   snapshot_payloads : Array[String]
   entries : Array[WalEntry]
   settings : String
-} derive(Eq)
+}
 pub fn WalImage::empty() -> Self
 pub fn WalImage::equal(Self, Self) -> Bool
 pub fn WalImage::head_seq(Self) -> Int64

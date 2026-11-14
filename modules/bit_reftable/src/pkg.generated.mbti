@@ -41,23 +41,25 @@ pub fn write_reftable(Array[RefRecord], Int32, UInt64, UInt64) -> Bytes
 // Errors
 
 // Types and methods
+#derive(Eq)
 pub(all) struct RefRecord {
   refname : String
   update_index : UInt64
   value : RefValue
-} derive(Eq)
+}
 pub fn RefRecord::equal(Self, Self) -> Bool
 pub fn RefRecord::not_equal(Self, Self) -> Bool
 pub fn RefRecord::output(Self, &Logger) -> Unit
 pub fn RefRecord::to_string(Self) -> String
 pub impl Show for RefRecord
 
+#derive(Eq, @debug.Debug)
 pub(all) enum RefValue {
   Deletion
   Val1(@bit_object.ObjectId)
   Val2(@bit_object.ObjectId, @bit_object.ObjectId)
   Symref(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn RefValue::equal(Self, Self) -> Bool
 pub fn RefValue::not_equal(Self, Self) -> Bool
 pub fn RefValue::output(Self, &Logger) -> Unit
@@ -65,17 +67,19 @@ pub fn RefValue::to_repr(Self) -> @debug.Repr
 pub fn RefValue::to_string(Self) -> String
 pub impl Show for RefValue
 
-type ReftableFooter derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+type ReftableFooter
 pub fn ReftableFooter::equal(Self, Self) -> Bool
 pub fn ReftableFooter::not_equal(Self, Self) -> Bool
 pub fn ReftableFooter::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct ReftableHeader {
   version : Int32
   block_size : Int32
   min_update_index : UInt64
   max_update_index : UInt64
-} derive(Eq, @debug.Debug)
+}
 pub fn ReftableHeader::equal(Self, Self) -> Bool
 pub fn ReftableHeader::not_equal(Self, Self) -> Bool
 pub fn ReftableHeader::to_repr(Self) -> @debug.Repr

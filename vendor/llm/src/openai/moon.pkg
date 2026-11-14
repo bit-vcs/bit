@@ -1,0 +1,12 @@
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+  "mizchi/llm",
+  "mizchi/llm/ffi",
+}
+
+options(
+  targets: { "openai_async.mbt": [ "js" ] },
+)
+
+warnings = "-25-29-79"
