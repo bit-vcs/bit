@@ -1,5 +1,5 @@
 import {
-  "mizchi/zlib",
+  "mizchi/bit_object/zlib",
   "mizchi/bit_hash" @hash,
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",

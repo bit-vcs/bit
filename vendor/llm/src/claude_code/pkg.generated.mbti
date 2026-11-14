@@ -1,0 +1,24 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/llm/claude_code"
+
+import {
+  "mizchi/llm",
+  "mizchi/llm/tools",
+}
+
+// Values
+pub fn parse_claude_code_line(String) -> @llm.StreamEvent?
+
+// Errors
+
+// Types and methods
+pub struct ClaudeCodeProvider {
+  model : String
+  system_prompt : String
+}
+pub fn ClaudeCodeProvider::new(model? : String, system_prompt? : String) -> Self
+pub impl @llm.Provider for ClaudeCodeProvider
+
+// Type aliases
+
+// Traits

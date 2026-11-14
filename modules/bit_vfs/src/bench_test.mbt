@@ -40,16 +40,16 @@ test "bench hash_blob 64KB" (b : @bench.T) {
 
 ///|
 test "bench zlib compress 64KB" (b : @bench.T) {
-  b.bench(fn() { b.keep(@mizchi/zlib.zlib_compress(bench_64kb)) })
+  b.bench(fn() { b.keep(@zlib.zlib_compress(bench_64kb)) })
 }
 
 ///|
-let bench_compressed_64kb : Bytes = @mizchi/zlib.zlib_compress(bench_64kb)
+let bench_compressed_64kb : Bytes = @zlib.zlib_compress(bench_64kb)
 
 ///|
 test "bench zlib decompress 64KB" (b : @bench.T) {
   b.bench(fn() {
-    b.keep(try! @mizchi/zlib.zlib_decompress(bench_compressed_64kb))
+    b.keep(try! @zlib.zlib_decompress(bench_compressed_64kb))
   })
 }
 

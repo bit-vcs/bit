@@ -103,6 +103,7 @@ is to keep extracting until every core package is its own module.
 | `mizchi/bit_config`           | `modules/bit_config/src`          | `gix-config`                       |
 | `mizchi/bit_core`             | `modules/bit_core/src`            | Stable internal facade             |
 | `mizchi/bit_object`           | `modules/bit_object/src`          | `gix-object`                       |
+| `mizchi/bit_object/zlib`      | `modules/bit_object/src/zlib`     | zlib helpers over `moonbitlang/core/compress` |
 | `mizchi/bit_pack`             | `modules/bit_pack/src`            | `gix-pack`                         |
 | `mizchi/bit_protocol`         | `modules/bit_protocol/src`        | `gix-protocol` + `gix-transport`   |
 | `mizchi/bit_reftable`         | `modules/bit_reftable/src`        | (reftable backend)                 |

@@ -41,10 +41,11 @@ pub fn xml_unescape(String) -> String
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) struct ByteRange {
   start : Int64
   end : Int64
-} derive(Eq, @debug.Debug)
+}
 pub fn ByteRange::equal(Self, Self) -> Bool
 pub fn ByteRange::not_equal(Self, Self) -> Bool
 pub fn ByteRange::to_repr(Self) -> @debug.Repr
@@ -64,11 +65,12 @@ pub async fn FsStore::put(Self, String, Bytes, PutCondition) -> PutOutcome raise
 pub fn FsStore::supports_cas(Self) -> Bool
 pub impl ObjectStore for FsStore
 
+#derive(Eq, @debug.Debug)
 pub(all) enum GetOutcome {
   Found(Bytes, String)
   NotModified
   Missing
-} derive(Eq, @debug.Debug)
+}
 pub fn GetOutcome::equal(Self, Self) -> Bool
 pub fn GetOutcome::not_equal(Self, Self) -> Bool
 pub fn GetOutcome::output(Self, &Logger) -> Unit
@@ -103,28 +105,31 @@ pub fn MemStore::silence_next_puts(Self, Int32) -> Unit
 pub fn MemStore::supports_cas(Self) -> Bool
 pub impl ObjectStore for MemStore
 
+#derive(Eq, @debug.Debug)
 pub(all) struct ObjEntry {
   key : String
   size : Int64
   etag : String
-} derive(Eq, @debug.Debug)
+}
 pub fn ObjEntry::equal(Self, Self) -> Bool
 pub fn ObjEntry::not_equal(Self, Self) -> Bool
 pub fn ObjEntry::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct ObjListing {
   entries : Array[ObjEntry]
   next : String?
-} derive(Eq, @debug.Debug)
+}
 pub fn ObjListing::equal(Self, Self) -> Bool
 pub fn ObjListing::not_equal(Self, Self) -> Bool
 pub fn ObjListing::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum PutCondition {
   Unconditional
   IfNotExists
   IfMatch(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn PutCondition::equal(Self, Self) -> Bool
 pub fn PutCondition::not_equal(Self, Self) -> Bool
 pub fn PutCondition::output(Self, &Logger) -> Unit
@@ -132,11 +137,12 @@ pub fn PutCondition::to_repr(Self) -> @debug.Repr
 pub fn PutCondition::to_string(Self) -> String
 pub impl Show for PutCondition
 
+#derive(Eq, @debug.Debug)
 pub(all) enum PutOutcome {
   Applied(String)
   NotApplied
   Unknown
-} derive(Eq, @debug.Debug)
+}
 pub fn PutOutcome::equal(Self, Self) -> Bool
 pub fn PutOutcome::is_applied(Self) -> Bool
 pub fn PutOutcome::not_equal(Self, Self) -> Bool

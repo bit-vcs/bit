@@ -1,0 +1,6 @@
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+}
+
+warnings = "-25-29-79"

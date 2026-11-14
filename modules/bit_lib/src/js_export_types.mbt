@@ -84,7 +84,7 @@ pub extend JsRemoteVerboseEntry with Eq::{not_equal, equal}
 pub struct JsMergeResult {
   status : String
   commit_id : String
-  conflicts : Array[String]
+  conflicts : FixedArray[String]
 } derive(Debug, Eq)
 
 ///|
@@ -97,7 +97,7 @@ pub extend JsMergeResult with Eq::{not_equal, equal}
 pub struct JsRebaseResult {
   status : String
   commit_id : String
-  conflicts : Array[String]
+  conflicts : FixedArray[String]
 } derive(Debug, Eq)
 
 ///|
@@ -110,7 +110,7 @@ pub extend JsRebaseResult with Eq::{not_equal, equal}
 pub struct JsCherryPickResult {
   status : String
   commit_id : String
-  conflicts : Array[String]
+  conflicts : FixedArray[String]
 } derive(Debug, Eq)
 
 ///|
@@ -151,7 +151,7 @@ pub struct JsGcResult {
   pack_id : String
   object_count : Int
   pack_bytes : Int
-  dangling : Array[String]
+  dangling : FixedArray[String]
 } derive(Debug, Eq)
 
 ///|
@@ -164,9 +164,9 @@ pub extend JsGcResult with Eq::{not_equal, equal}
 pub struct JsFsckResult {
   errors : Int
   reachable : Int
-  missing : Array[String]
-  root_commits : Array[String]
-  tag_objects : Array[String]
+  missing : FixedArray[String]
+  root_commits : FixedArray[String]
+  tag_objects : FixedArray[String]
 } derive(Debug, Eq)
 
 ///|
@@ -190,3 +190,27 @@ pub extend JsWorktreeInfo with Debug::{to_repr}
 
 ///|
 pub extend JsWorktreeInfo with Eq::{not_equal, equal}
+
+///|
+/// `Status` as it crosses the JS boundary: arrays are `FixedArray`, which the
+/// JS backend represents as a plain JS array (`Array` is an internal struct).
+pub struct JsStatus {
+  staged_added : FixedArray[String]
+  staged_modified : FixedArray[String]
+  staged_deleted : FixedArray[String]
+  unstaged_modified : FixedArray[String]
+  unstaged_deleted : FixedArray[String]
+  untracked : FixedArray[String]
+}
+
+///|
+fn JsStatus::from_status(status : Status) -> JsStatus {
+  {
+    staged_added: FixedArray::from_array(status.staged_added),
+    staged_modified: FixedArray::from_array(status.staged_modified),
+    staged_deleted: FixedArray::from_array(status.staged_deleted),
+    unstaged_modified: FixedArray::from_array(status.unstaged_modified),
+    unstaged_deleted: FixedArray::from_array(status.unstaged_deleted),
+    untracked: FixedArray::from_array(status.untracked),
+  }
+}

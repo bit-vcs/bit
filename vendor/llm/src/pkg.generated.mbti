@@ -1,0 +1,242 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/llm"
+
+import {
+  "mizchi/llm/tools",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn collect(&Provider, Array[Message], tools? : Array[@tools.ToolDef]) -> CollectResult
+
+pub fn collect_text(&Provider, Array[Message], tools? : Array[@tools.ToolDef]) -> String
+
+pub let default_anthropic_model : String
+
+pub let default_ollama_model : String
+
+pub let default_openai_model : String
+
+pub let default_openrouter_model : String
+
+pub fn json_get_array(@json.Json, String) -> Array[@json.Json]?
+
+pub fn json_get_int(@json.Json, String) -> Int32?
+
+pub fn json_get_object(@json.Json, String) -> @json.Json?
+
+pub fn json_get_string(@json.Json, String) -> String?
+
+pub fn parse_skill_frontmatter(String) -> (Map[String, String]?, String)
+
+pub fn run_agent(BoxedProvider, @tools.ToolRegistry, Array[Message], StopCondition, (AgentEvent) -> Unit) -> Unit
+
+pub fn run_agent_cancellable(BoxedProvider, @tools.ToolRegistry, Array[Message], StopCondition, () -> Bool, (AgentEvent) -> Unit) -> Unit
+
+pub fn run_json_chat_loop(Array[@json.Json], Array[@json.Json], Int32, (Array[@json.Json], Array[@json.Json]) -> JsonChatResponse, (String, @json.Json) -> String, fallback_content? : String) -> JsonChatLoopResult
+
+pub fn skill_metadata_description(Map[String, String]?, String) -> String
+
+pub fn skill_metadata_is_always(Map[String, String]?, scope_key? : String) -> Bool
+
+pub fn skill_metadata_is_available(Map[String, String]?, bins? : Map[String, Bool], env? : Map[String, String], scope_key? : String) -> Bool
+
+pub fn skill_metadata_missing_requirements(Map[String, String]?, bins? : Map[String, Bool], env? : Map[String, String], scope_key? : String) -> String
+
+pub fn strip_skill_frontmatter(String) -> String
+
+pub fn truncate_messages(Array[Message], Int32) -> Array[Message]
+
+pub fn validate_params(@json.Json, @json.Json) -> Array[String]
+
+pub fn validate_tool_input(@json.Json, @json.Json) -> Array[String]
+
+// Errors
+
+// Types and methods
+pub(all) enum AgentEvent {
+  Stream(StreamEvent)
+  ToolExecute(name~ : String, input~ : @json.Json)
+  ToolResult(name~ : String, result~ : String, is_error~ : Bool)
+  StepComplete(step~ : Int32)
+  Done(reason~ : String)
+}
+
+pub struct BoxedProvider {
+  inner : &Provider
+}
+pub fn BoxedProvider::name(Self) -> String
+pub fn BoxedProvider::new(&Provider) -> Self
+pub fn BoxedProvider::stream(Self, Array[Message], Array[@tools.ToolDef], StreamHandler) -> Unit
+
+pub(all) struct CollectResult {
+  text : String
+  tool_calls : Array[ToolCall]
+  finish_reason : FinishReason
+  usage : Usage?
+}
+
+pub(all) enum ContentBlock {
+  Text(String)
+  ToolUse(id~ : String, name~ : String, input~ : @json.Json)
+  ToolResult(tool_use_id~ : String, content~ : String, is_error~ : Bool)
+}
+pub fn ContentBlock::to_anthropic_json(Self) -> @json.Json
+pub fn ContentBlock::to_openai_json(Self) -> @json.Json
+
+#derive(@debug.Debug)
+pub(all) enum FinishReason {
+  Stop
+  ToolUse
+  Length
+  ContentFilter
+  Error
+  Unknown(String)
+}
+pub fn FinishReason::from_string(String) -> Self
+pub impl Show for FinishReason
+
+pub(all) struct JsonChatLoopResult {
+  final_content : String
+  messages : Array[@json.Json]
+  iterations : Int32
+}
+
+pub(all) struct JsonChatResponse {
+  content : String
+  tool_calls : Array[JsonChatToolCall]
+  reasoning_content : String?
+}
+pub fn JsonChatResponse::new(String, Array[JsonChatToolCall], String?) -> Self
+
+pub(all) struct JsonChatToolCall {
+  id : String
+  name : String
+  arguments : @json.Json
+}
+pub fn JsonChatToolCall::new(String, String, @json.Json) -> Self
+
+pub(all) struct Message {
+  role : Role
+  content : Array[ContentBlock]
+}
+pub fn Message::assistant(String) -> Self
+pub fn Message::estimate_tokens(Self) -> Int32
+pub fn Message::get_text(Self) -> String
+pub fn Message::system(String) -> Self
+pub fn Message::text(Role, String) -> Self
+pub fn Message::to_anthropic_json(Self) -> @json.Json
+pub fn Message::to_openai_json(Self) -> @json.Json
+pub fn Message::user(String) -> Self
+
+pub struct MockProvider {
+  responses : Array[Array[StreamEvent]]
+  mut call_count : Int32
+}
+pub fn MockProvider::boxed(Self) -> BoxedProvider
+pub fn MockProvider::new(Array[Array[StreamEvent]]) -> Self
+
+pub(all) struct ProviderConfig {
+  api_key : String
+  model : String
+  max_tokens : Int32
+  system_prompt : String
+  base_url : String
+  timeout_sec : Int32
+  max_retries : Int32
+  retry_delay_ms : Int32
+}
+pub fn ProviderConfig::new(String, String, String, max_tokens? : Int32, system_prompt? : String, timeout_sec? : Int32, max_retries? : Int32, retry_delay_ms? : Int32) -> Self
+
+#derive(Eq, @debug.Debug)
+pub(all) enum Role {
+  User
+  Assistant
+  System
+  Tool
+}
+pub fn Role::from_string(String) -> Self
+pub fn Role::to_string(Self) -> String
+pub impl Show for Role
+
+pub(all) struct SkillEntry {
+  name : String
+  path : String
+  source : String
+  content : String
+}
+pub fn SkillEntry::new(String, String, String, String) -> Self
+
+pub(all) struct SkillInfo {
+  name : String
+  path : String
+  source : String
+  available : Bool
+}
+pub fn SkillInfo::new(String, String, String, Bool) -> Self
+
+pub struct SkillsLoader {
+  workspace_skills : Map[String, SkillEntry]
+  builtin_skills : Map[String, SkillEntry]
+}
+pub fn SkillsLoader::build_skills_summary(Self, bins? : Map[String, Bool], env? : Map[String, String]) -> String
+pub fn SkillsLoader::get_always_skills(Self, bins? : Map[String, Bool], env? : Map[String, String]) -> Array[String]
+pub fn SkillsLoader::get_skill_description(Self, String) -> String
+pub fn SkillsLoader::get_skill_metadata(Self, String) -> Map[String, String]?
+pub fn SkillsLoader::list_skills(Self, filter_unavailable? : Bool, bins? : Map[String, Bool], env? : Map[String, String]) -> Array[SkillInfo]
+pub fn SkillsLoader::load_skill(Self, String) -> String?
+pub fn SkillsLoader::load_skills_for_context(Self, Array[String]) -> String
+pub fn SkillsLoader::new() -> Self
+pub fn SkillsLoader::register_builtin_skill(Self, String, String, path? : String) -> Unit
+pub fn SkillsLoader::register_workspace_skill(Self, String, String, path? : String) -> Unit
+
+pub(all) enum StopCondition {
+  MaxSteps(Int32)
+  OnFinish
+}
+
+pub(all) enum StreamEvent {
+  TextDelta(String)
+  ToolCallStart(id~ : String, name~ : String)
+  ToolCallDelta(id~ : String, input_delta~ : String)
+  ToolCallEnd(id~ : String, name~ : String, input~ : @json.Json)
+  MessageStart
+  MessageEnd(finish_reason~ : FinishReason, usage~ : Usage?)
+  Error(String)
+}
+pub impl Show for StreamEvent
+
+pub(all) struct StreamHandler {
+  on_event : (StreamEvent) -> Unit
+}
+
+pub(all) struct ToolCall {
+  id : String
+  name : String
+  input : @json.Json
+}
+
+#derive(@debug.Debug)
+pub(all) struct Usage {
+  input_tokens : Int32
+  output_tokens : Int32
+}
+pub impl Show for Usage
+
+// Type aliases
+pub using @tools {type SchemaBuilder}
+
+pub using @tools {type ToolChoice}
+
+pub using @tools {type ToolDef}
+
+pub using @tools {type ToolExecuteError}
+
+pub using @tools {type ToolRegistry}
+
+// Traits
+pub(open) trait Provider {
+  fn stream(Self, Array[Message], Array[@tools.ToolDef], StreamHandler) -> Unit
+  fn name(Self) -> String
+}

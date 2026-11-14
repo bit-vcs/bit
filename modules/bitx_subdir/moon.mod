@@ -10,7 +10,6 @@ import {
   "mizchi/bit_lib@0.49.1",
   "mizchi/bit_types@0.49.1",
   "mizchi/bit_vfs@0.49.1",
-  "mizchi/zlib@0.4.10",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"

@@ -50,40 +50,44 @@ pub async fn run_filter_command(String, String, String, Bytes) -> Bytes raise @b
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub struct LfsDownloadAction {
   oid : String
   size : Int64
   href : String
   headers : Map[String, String]
-} derive(Eq, @debug.Debug)
+}
 pub fn LfsDownloadAction::equal(Self, Self) -> Bool
 pub fn LfsDownloadAction::not_equal(Self, Self) -> Bool
 pub fn LfsDownloadAction::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct LfsDownloadError {
   oid : String
   code : Int32
   message : String
-} derive(Eq, @debug.Debug)
+}
 pub fn LfsDownloadError::equal(Self, Self) -> Bool
 pub fn LfsDownloadError::not_equal(Self, Self) -> Bool
 pub fn LfsDownloadError::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct LfsUploadAction {
   oid : String
   size : Int64
   href : String
   headers : Map[String, String]
-} derive(Eq, @debug.Debug)
+}
 pub fn LfsUploadAction::equal(Self, Self) -> Bool
 pub fn LfsUploadAction::not_equal(Self, Self) -> Bool
 pub fn LfsUploadAction::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct LfsUploadError {
   oid : String
   code : Int32
   message : String
-} derive(Eq, @debug.Debug)
+}
 pub fn LfsUploadError::equal(Self, Self) -> Bool
 pub fn LfsUploadError::not_equal(Self, Self) -> Bool
 pub fn LfsUploadError::to_repr(Self) -> @debug.Repr

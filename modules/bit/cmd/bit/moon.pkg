@@ -36,7 +36,7 @@ import {
   "mizchi/bit_refs" @bitrefs,
   "mizchi/bit_runtime" @runtime,
   "mizchi/bit_utils" @string_utils,
-  "mizchi/zlib",
+  "mizchi/bit_object/zlib",
   "moonbitlang/async",
   "moonbitlang/async/js_async",
   "moonbitlang/async/fs" @asyncfs,

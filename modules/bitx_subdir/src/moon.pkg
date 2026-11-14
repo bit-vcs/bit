@@ -6,7 +6,7 @@ import {
   "mizchi/bit_io" @io,
   "mizchi/bit_lib" @lib,
   "mizchi/bit_vfs" @fs,
-  "mizchi/zlib",
+  "mizchi/bit_object/zlib",
 }
 
 warnings = "-unused_constructor-29"

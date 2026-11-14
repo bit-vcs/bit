@@ -19,7 +19,7 @@ fn lm_setup_basic() -> (Int, Array[String]) {
   }
 
   fn add(paths : Array[String]) -> Unit {
-    guard js_add_paths(host, "/repo", paths) is Ok(_) else { abort("add") }
+    guard js_add_paths(host, "/repo", FixedArray::from_array(paths)) is Ok(_) else { abort("add") }
   }
 
   fn commit(msg : String, ts : Int) -> String {
@@ -284,7 +284,7 @@ test "last-modified: subdirectory modified via merge" {
   }
 
   fn add(paths : Array[String]) -> Unit {
-    guard js_add_paths(host, "/repo", paths) is Ok(_) else { abort("add") }
+    guard js_add_paths(host, "/repo", FixedArray::from_array(paths)) is Ok(_) else { abort("add") }
   }
 
   fn commit(msg : String, ts : Int) -> String {
@@ -341,7 +341,7 @@ test "last-modified: merge attributes each path to its own branch" {
   }
 
   fn add(paths : Array[String]) -> Unit {
-    guard js_add_paths(host, "/repo", paths) is Ok(_) else { abort("add") }
+    guard js_add_paths(host, "/repo", FixedArray::from_array(paths)) is Ok(_) else { abort("add") }
   }
 
   fn commit(msg : String, ts : Int) -> String {

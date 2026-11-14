@@ -10,10 +10,15 @@ import { pathToFileURL } from "node:url";
 // toolchain moved to moonc 0.10.13 with moonbitlang/x 0.5 / async 0.22: the
 // same exports now emit ~174_500 raw / ~40_300 gzip bytes. Rebaselined to
 // 186_000 when the toolchain moved to moonc 0.10.17 with moonbitlang/x 0.5.6
-// / async 0.22.5: the same exports now emit ~180_700 raw bytes. Headroom is
-// intentional so small future additions don't require another bump.
-const MAX_MINIMAL_RAW_BYTES = 186_000;
-const MAX_MINIMAL_GZIP_BYTES = 44_000;
+// / async 0.22.5: the same exports now emit ~180_700 raw bytes. Rebaselined to
+// 216_000 raw / 52_000 gzip when mizchi/zlib was replaced by
+// moonbitlang/core/compress: with moonc 0.10.20 the minimal bundle is
+// ~185_500 raw / ~42_500 gzip on mizchi/zlib and ~210_500 raw / ~49_600 gzip
+// on core compress, whose inflate (IncrementalDecoder + MemDecoder) is the
+// whole difference. Headroom is intentional so small future additions don't
+// require another bump.
+const MAX_MINIMAL_RAW_BYTES = 216_000;
+const MAX_MINIMAL_GZIP_BYTES = 52_000;
 const MAX_MINIMAL_RATIO = 0.70;
 
 function readSize(path) {

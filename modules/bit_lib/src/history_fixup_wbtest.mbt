@@ -103,7 +103,7 @@ test "history fixup: full CLI flow (tip) replicates end to end" {
 
 ///|
 fn hf_add(host : Int, paths : Array[String]) -> Unit {
-  guard js_add_paths(host, "/repo", paths) is Ok(_) else { abort("add") }
+  guard js_add_paths(host, "/repo", FixedArray::from_array(paths)) is Ok(_) else { abort("add") }
 }
 
 ///|

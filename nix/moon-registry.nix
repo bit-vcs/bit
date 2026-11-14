@@ -13,7 +13,8 @@
 {
   registryIndexSrc, # checkout of https://mooncakes.io/git/index
   deps, # attrset<name: string, version: string>
-  moonCacheUri ? "https://moonbitlang-mooncakes.s3.us-west-2.amazonaws.com",
+  # Same host `moon` itself downloads module zips from.
+  moonCacheUri ? "https://download.mooncakes.io",
 }:
 let
   # Parse $MOON_HOME/registry/index/user/<user>/<package>.index (JSON lines)

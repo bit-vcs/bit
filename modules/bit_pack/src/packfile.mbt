@@ -84,21 +84,8 @@ fn compress_pack_data(
   match compression {
     @bit.PackCompression::Stored => @zlib.zlib_compress_stored(data)
     @bit.PackCompression::Default => {
-      // Use fixed Huffman (fast) for pack data, matching git's default level 1
-      let deflated = @zlib.deflate_compress_fixed(data)
-      let deflated_len = deflated.length()
-      let total_len = 2 + deflated_len + 4
-      let result : FixedArray[Byte] = FixedArray::make(total_len, b'\x00')
-      result[0] = b'\x78'
-      result[1] = b'\x01'
-      // Bulk copy the deflate stream — avoids byte-by-byte iteration
-      result.blit_from_bytes(2, deflated, 0, deflated_len)
-      let checksum = @zlib.adler32(data)
-      result[total_len - 4] = ((checksum >> 24) & 0xFF).to_byte()
-      result[total_len - 3] = ((checksum >> 16) & 0xFF).to_byte()
-      result[total_len - 2] = ((checksum >> 8) & 0xFF).to_byte()
-      result[total_len - 1] = (checksum & 0xFF).to_byte()
-      let compressed = Bytes::from_array(result)
+      // Fast DEFLATE (zlib level 1) for pack data, matching git's default
+      let compressed = @zlib.zlib_compress_fast(data)
       if compressed.length() > data.length() + 11 {
         @zlib.zlib_compress_stored(data)
       } else {

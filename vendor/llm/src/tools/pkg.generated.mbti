@@ -1,0 +1,87 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/llm/tools"
+
+import {
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn clamp(Int32, Int32, Int32) -> Int32
+
+pub fn count_occurrences(String, String) -> Int32
+
+pub fn guard_command(String, Bool) -> String?
+
+pub fn normalize_path(String) -> String
+
+pub fn optional_int(@json.Json, String) -> Int32?
+
+pub fn optional_string(@json.Json, String) -> String?
+
+pub fn required_string(@json.Json, String) -> String?
+
+pub fn resolve_path(String, String?) -> Result[String, String]
+
+pub fn validate_params(@json.Json, @json.Json) -> Array[String]
+
+pub fn validate_tool_input(@json.Json, @json.Json) -> Array[String]
+
+pub fn validate_url(String) -> Result[Unit, String]
+
+pub fn web_fetch_result_json(String, String, Int32, String, String, Bool) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct SchemaBuilder {
+  properties : Map[String, @json.Json]
+  required : Array[String]
+}
+pub fn SchemaBuilder::array(Self, String, String, String, required? : Bool) -> Self
+pub fn SchemaBuilder::boolean(Self, String, String, required? : Bool) -> Self
+pub fn SchemaBuilder::build(Self) -> @json.Json
+pub fn SchemaBuilder::integer(Self, String, String, required? : Bool) -> Self
+pub fn SchemaBuilder::new() -> Self
+pub fn SchemaBuilder::number(Self, String, String, required? : Bool) -> Self
+pub fn SchemaBuilder::string(Self, String, String, required? : Bool) -> Self
+pub fn SchemaBuilder::string_enum(Self, String, String, Array[String], required? : Bool) -> Self
+
+pub(all) enum ToolChoice {
+  Auto
+  None
+  Required
+  Specific(String)
+}
+
+pub(all) struct ToolDef {
+  name : String
+  description : String
+  input_schema : @json.Json
+}
+pub fn ToolDef::new(String, String, @json.Json) -> Self
+pub fn ToolDef::to_anthropic_json(Self) -> @json.Json
+pub fn ToolDef::to_openai_json(Self) -> @json.Json
+
+pub(all) enum ToolExecuteError {
+  ToolNotFound(String)
+  InvalidParams(tool_name~ : String, errors~ : Array[String])
+}
+pub fn ToolExecuteError::to_message(Self) -> String
+
+pub(all) struct ToolRegistry {
+  tools : Array[ToolDef]
+  handlers : Map[String, (@json.Json) -> String]
+}
+pub fn ToolRegistry::definitions(Self) -> Array[@json.Json]
+pub fn ToolRegistry::execute(Self, String, @json.Json) -> (String, Bool)
+pub fn ToolRegistry::execute_result(Self, String, @json.Json) -> Result[String, ToolExecuteError]
+pub fn ToolRegistry::execute_validated(Self, String, @json.Json) -> (String, Bool)
+pub fn ToolRegistry::get_defs(Self) -> Array[ToolDef]
+pub fn ToolRegistry::has(Self, String) -> Bool
+pub fn ToolRegistry::new() -> Self
+pub fn ToolRegistry::register(Self, String, String, @json.Json, (@json.Json) -> String) -> Unit
+pub fn ToolRegistry::register_def(Self, ToolDef, (@json.Json) -> String) -> Unit
+
+// Type aliases
+
+// Traits

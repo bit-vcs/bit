@@ -15,7 +15,7 @@ import {
   "moonbitlang/async/io" @aio,
   "moonbitlang/async/stdio",
   "moonbitlang/async/process",
-  "mizchi/zlib",
+  "mizchi/bit_object/zlib",
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",

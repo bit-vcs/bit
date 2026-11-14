@@ -3,6 +3,7 @@ package "mizchi/bitx_hub/crypto"
 
 import {
   "mizchi/bit_object",
+  "moonbitlang/core/json",
 }
 
 // Values
@@ -10,7 +11,7 @@ pub fn relay_base64_to_base64url(String) -> String
 
 pub fn relay_build_publish_signing_message(String, String, String, String, Int64, String, String) -> String
 
-pub fn relay_canonicalize_json(Json) -> String
+pub fn relay_canonicalize_json(@json.Json) -> String
 
 pub fn relay_extract_ed25519_public_key_from_der(Bytes) -> String?
 
@@ -28,7 +29,7 @@ pub async fn relay_sha256_hex(String) -> String raise @bit_object.GitError
 
 pub async fn relay_sign_ed25519(String, String) -> String raise @bit_object.GitError
 
-pub async fn relay_sign_publish_payload(RelayHttpSigningConfig?, String, String, String, String, Json) -> RelayPublishHttpSignature? raise @bit_object.GitError
+pub async fn relay_sign_publish_payload(RelayHttpSigningConfig?, String, String, String, String, @json.Json) -> RelayPublishHttpSignature? raise @bit_object.GitError
 
 pub fn relay_unix_timestamp_sec() -> Int64
 

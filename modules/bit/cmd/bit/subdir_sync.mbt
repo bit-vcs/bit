@@ -345,9 +345,9 @@ async fn handle_subdir_push(
     Some(path) =>
       subdir_push_local(fs, db, path, upstream_base, pushed, refname)
     None => {
-      errdefer eprint_line(
+      errdefer @async.protect_from_cancel(() => eprint_line(
         "hint: the upstream may have moved on; run `bit pull` in this subdir-clone, then push again",
-      )
+      ))
       let result = @bitlibnative.push_http_tree_only(
         fs, root, remote_url, pushed, upstream_base, refname,
       )

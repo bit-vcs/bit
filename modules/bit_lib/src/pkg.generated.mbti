@@ -809,11 +809,12 @@ pub struct GcResult {
   dangling : Array[@bit_object.ObjectId]
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) enum GitHubShorthand {
   Repo(String, String?)
   Subdir(String, String, String?)
   File(String, String)
-} derive(Eq, @debug.Debug)
+}
 pub fn GitHubShorthand::equal(Self, Self) -> Bool
 pub fn GitHubShorthand::not_equal(Self, Self) -> Bool
 pub fn GitHubShorthand::output(Self, &Logger) -> Unit
@@ -826,11 +827,12 @@ pub enum HeadRef {
   Detached(@bit_object.ObjectId)
 }
 
+#derive(Eq)
 pub(all) enum HistoryEmptyAction {
   Drop
   Keep
   Abort
-} derive(Eq)
+}
 pub fn HistoryEmptyAction::equal(Self, Self) -> Bool
 pub fn HistoryEmptyAction::not_equal(Self, Self) -> Bool
 
@@ -839,11 +841,12 @@ pub(all) struct HistoryFixupResult {
   rewritten : @bit_object.ObjectId?
 }
 
+#derive(Eq)
 pub(all) struct HistoryRefUpdate {
   refname : String
   old_id : @bit_object.ObjectId
   new_id : @bit_object.ObjectId
-} derive(Eq)
+}
 pub fn HistoryRefUpdate::equal(Self, Self) -> Bool
 pub fn HistoryRefUpdate::not_equal(Self, Self) -> Bool
 
@@ -915,11 +918,12 @@ pub enum InteractiveRebaseStatus {
   IRBAborted
 }
 
+#derive(Eq, @debug.Debug)
 pub struct InteractiveTodoEntry {
   command : TodoCommand
   commit_hex : String
   subject : String
-} derive(Eq, @debug.Debug)
+}
 pub fn InteractiveTodoEntry::equal(Self, Self) -> Bool
 pub fn InteractiveTodoEntry::not_equal(Self, Self) -> Bool
 pub fn InteractiveTodoEntry::to_repr(Self) -> @debug.Repr
@@ -934,10 +938,11 @@ pub fn LazyPackIndex::find_offset_hex(Self, &@bit_types.RepoFileSystem, String) 
 pub fn LazyPackIndex::get(Self, &@bit_types.RepoFileSystem) -> PackIndex raise @bit_object.GitError
 pub fn LazyPackIndex::new(String, String) -> Self
 
+#derive(Eq, @debug.Debug)
 pub struct LfsPointer {
   oid : String
   size : Int64
-} derive(Eq, @debug.Debug)
+}
 pub fn LfsPointer::equal(Self, Self) -> Bool
 pub fn LfsPointer::not_equal(Self, Self) -> Bool
 pub fn LfsPointer::to_repr(Self) -> @debug.Repr
@@ -1206,6 +1211,7 @@ pub enum TextAttr {
   Unspecified
 }
 
+#derive(Eq, @debug.Debug)
 pub enum TodoCommand {
   Pick
   Reword
@@ -1218,7 +1224,7 @@ pub enum TodoCommand {
   Label
   Reset
   Merge
-} derive(Eq, @debug.Debug)
+}
 pub fn TodoCommand::equal(Self, Self) -> Bool
 pub fn TodoCommand::not_equal(Self, Self) -> Bool
 pub fn TodoCommand::output(Self, &Logger) -> Unit
@@ -1272,10 +1278,11 @@ pub(all) struct WorktreeInfo {
   is_bare : Bool
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) struct WorktreeRepairResult {
   repaired : Array[String]
   warnings : Array[String]
-} derive(Eq, @debug.Debug)
+}
 pub fn WorktreeRepairResult::equal(Self, Self) -> Bool
 pub fn WorktreeRepairResult::not_equal(Self, Self) -> Bool
 pub fn WorktreeRepairResult::to_repr(Self) -> @debug.Repr

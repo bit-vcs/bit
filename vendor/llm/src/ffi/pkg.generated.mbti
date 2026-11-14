@@ -1,0 +1,40 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/llm/ffi"
+
+// Values
+pub async fn[T, E : Error] async_suspend(((T) -> Unit, (E) -> Unit) -> Unit) -> T raise E
+
+pub async fn exec_async(String, Array[String]) -> (Int32, String, String)
+
+pub fn exec_stream(String, String, (String) -> Unit, () -> Unit, (String) -> Unit) -> Unit
+
+pub fn exec_sync(String, Int32) -> String
+
+pub fn fetch(String, String, String, String, Int32, (String) -> Unit, (String) -> Unit) -> Unit
+
+pub async fn fetch_async(String, String, String, String, Int32) -> (Int32, String)
+
+pub fn fetch_sse(String, String, String, String, Int32, (String) -> Unit, (String) -> Unit, () -> Unit) -> Unit
+
+pub fn fetch_text_async(String, String, String, String, Int32) -> Promise[String]
+
+pub fn get_env(String) -> String
+
+pub fn[A, B] identity(A) -> B
+
+pub fn run_async(async () -> Unit noraise) -> Unit
+
+// Errors
+
+// Types and methods
+#external
+pub type JsValue
+
+#external
+pub type Promise[T]
+pub fn[T] Promise::to_any(Self[T]) -> JsValue
+pub async fn[T] Promise::wait(Self[T]) -> T
+
+// Type aliases
+
+// Traits

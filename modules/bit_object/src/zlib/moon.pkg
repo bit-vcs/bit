@@ -1,0 +1,12 @@
+import {
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/compress/flate",
+  "moonbitlang/core/compress/zlib" @czlib,
+}
+
+options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/compress/flate",
+    "moonbitlang/core/compress/zlib",
+  ],
+)

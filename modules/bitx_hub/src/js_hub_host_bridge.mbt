@@ -58,35 +58,35 @@ extern "js" fn hub_js_host_mkdir_p(host_id : Int, path : String) -> String? =
 extern "js" fn hub_js_host_read_file(
   host_id : Int,
   path : String,
-) -> Array[Byte]? =
+) -> FixedArray[Byte]? =
   #| (hostId, path) => {
   #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
   #|   const host = state.hosts.get(hostId);
-  #|   if (!host) { globalThis.__bitGitJsLastError = `host ${hostId} not found`; return { $tag: 0 }; }
+  #|   if (!host) { globalThis.__bitGitJsLastError = `host ${hostId} not found`; return undefined; }
   #|   try {
   #|     const v = host.readFile(path);
-  #|     if (v instanceof Uint8Array) return { $tag: 1, _0: Array.from(v) };
-  #|     if (v instanceof ArrayBuffer) return { $tag: 1, _0: Array.from(new Uint8Array(v)) };
-  #|     if (Array.isArray(v)) return { $tag: 1, _0: v.map(x => Number(x) & 0xff) };
-  #|     if (typeof v === 'string') return { $tag: 1, _0: Array.from(new TextEncoder().encode(v)) };
+  #|     if (v instanceof Uint8Array) return Uint8Array.from(v);
+  #|     if (v instanceof ArrayBuffer) return new Uint8Array(v.slice(0));
+  #|     if (Array.isArray(v)) return Uint8Array.from(v, x => Number(x) & 0xff);
+  #|     if (typeof v === 'string') return new TextEncoder().encode(v);
   #|     globalThis.__bitGitJsLastError = 'readFile must return Uint8Array/ArrayBuffer/Array/string';
-  #|     return { $tag: 0 };
-  #|   } catch (e) { globalThis.__bitGitJsLastError = String(e?.message ?? e); return { $tag: 0 }; }
+  #|     return undefined;
+  #|   } catch (e) { globalThis.__bitGitJsLastError = String(e?.message ?? e); return undefined; }
   #| }
 
 ///|
 extern "js" fn hub_js_host_readdir(
   host_id : Int,
   path : String,
-) -> Array[String]? =
+) -> FixedArray[String]? =
   #| (hostId, path) => {
   #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
   #|   const host = state.hosts.get(hostId);
-  #|   if (!host) { globalThis.__bitGitJsLastError = `host ${hostId} not found`; return { $tag: 0 }; }
+  #|   if (!host) { globalThis.__bitGitJsLastError = `host ${hostId} not found`; return undefined; }
   #|   try {
   #|     const entries = host.readdir(path);
-  #|     return { $tag: 1, _0: Array.from(entries) };
-  #|   } catch (e) { globalThis.__bitGitJsLastError = String(e?.message ?? e); return { $tag: 0 }; }
+  #|     return Array.from(entries, (item) => String(item));
+  #|   } catch (e) { globalThis.__bitGitJsLastError = String(e?.message ?? e); return undefined; }
   #| }
 
 ///|
@@ -106,42 +106,42 @@ extern "js" fn hub_js_host_is_file(host_id : Int, path : String) -> Bool =
   #| }
 
 ///|
-extern "js" fn hub_js_host_mtime(host_id : Int, path : String) -> Array[Int]? =
+extern "js" fn hub_js_host_mtime(host_id : Int, path : String) -> FixedArray[Int]? =
   #| (hostId, path) => {
   #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
   #|   const host = state.hosts.get(hostId);
   #|   if (!host) {
   #|     globalThis.__bitGitJsLastError = `host ${hostId} not found`;
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #|   if (typeof host.mtime !== 'function') {
   #|     globalThis.__bitGitJsLastError = 'host.mtime(path) is required';
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #|   try {
   #|     const value = host.mtime(path);
   #|     if (!Array.isArray(value) || value.length !== 2) {
   #|       globalThis.__bitGitJsLastError = 'host.mtime(path) must return [seconds, nanoseconds]';
-  #|       return { $tag: 0 };
+  #|       return undefined;
   #|     }
   #|     const seconds = Number(value[0]);
   #|     const nanoseconds = Number(value[1]);
   #|     if (!Number.isInteger(seconds) || !Number.isInteger(nanoseconds)) {
   #|       globalThis.__bitGitJsLastError = 'host.mtime(path) must return integer seconds and nanoseconds';
-  #|       return { $tag: 0 };
+  #|       return undefined;
   #|     }
-  #|     return { $tag: 1, _0: [seconds, nanoseconds] };
+  #|     return [seconds, nanoseconds];
   #|   } catch (error) {
   #|     globalThis.__bitGitJsLastError = String(error?.message ?? error);
-  #|     return { $tag: 0 };
+  #|     return undefined;
   #|   }
   #| }
 
 // --- Trait implementations ---
 
 ///|
-fn bytes_from_array(arr : Array[Byte]) -> Bytes {
-  Bytes::from_iter(arr.iter())
+fn bytes_from_array(arr : FixedArray[Byte]) -> Bytes {
+  Bytes::from_array(arr)
 }
 
 ///|
@@ -196,7 +196,7 @@ impl @bit.RepoFileSystem for HubJsHostFs with fn read_file(self, path) {
 ///|
 impl @bit.RepoFileSystem for HubJsHostFs with fn readdir(self, path) {
   match hub_js_host_readdir(self.host_id, path) {
-    Some(arr) => arr
+    Some(arr) => Array::from_fixed_array(arr)
     None => raise @bit.GitError::IoError(hub_js_host_last_error())
   }
 }
