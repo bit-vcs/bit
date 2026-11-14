@@ -59,7 +59,10 @@
         {
           packages = {
             default = bit;
-            inherit bit pkfire pkspec;
+            # The MoonBit toolchain pinned by flake.lock (moonbit-overlay).
+            # CI installs this via .github/actions/setup-moonbit, so CI, the
+            # dev shell and the nix build all use the same toolchain.
+            inherit bit moonbit pkfire pkspec;
           };
 
           apps = {
