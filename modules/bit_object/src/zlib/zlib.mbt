@@ -27,22 +27,40 @@ pub impl Show for ZlibError with output(self, logger) {
 pub extend ZlibError with Show::{to_string, output}
 
 ///|
-/// Compress `data` into a zlib stream (default DEFLATE strategy).
+/// Compress `data` into a zlib stream (zlib level 6, the default).
 pub fn zlib_compress(data : BytesView) -> Bytes {
-  @czlib.compress(data)
+  zlib_encode(data, 6)
 }
 
 ///|
 /// Compress `data` into a zlib stream with fast, low-effort settings
-/// (equivalent to zlib level 1, git's default for pack data).
+/// (zlib level 1, git's default for pack data).
 pub fn zlib_compress_fast(data : BytesView) -> Bytes {
-  @czlib.compress(data, strategy=Standard(level=1))
+  zlib_encode(data, 1)
 }
 
 ///|
 /// Wrap `data` in a zlib stream made of DEFLATE stored (uncompressed) blocks.
 pub fn zlib_compress_stored(data : BytesView) -> Bytes {
-  @czlib.compress(data, strategy=Standard(level=0))
+  zlib_encode(data, 0)
+}
+
+///|
+/// Drive core's streaming zlib `Encoder` to completion. It only takes a
+/// `level`, unlike `@czlib.compress`, whose `Strategy` dispatch keeps the
+/// split/optimal block planners reachable and bloats tree-shaken JS bundles.
+fn zlib_encode(data : BytesView, level : Int) -> Bytes {
+  let encoder = @czlib.Encoder(level~)
+  let chunk = FixedArray::make(65536, b'\x00')
+  let out = @buffer.Buffer(size_hint=data.length() / 2 + 64)
+  for consumed = 0 {
+    let step = encoder.step(data[consumed:], chunk.mut_view(), action=Finish)
+    out.write_bytes(Bytes::from_array(chunk[:step.produced]))
+    if step.status is Done {
+      break out.to_bytes()
+    }
+    continue consumed + step.consumed
+  }
 }
 
 ///|
@@ -51,9 +69,13 @@ pub fn zlib_decompress(
   data : BytesView,
   max_size? : Int = default_max_decompressed_size,
 ) -> Bytes raise ZlibError {
-  @czlib.decompress(data, max_output=max_size) catch {
-    @czlib.ZlibError(kind, msg) => raise ZlibError(kind, msg)
+  // Same decoder path as `zlib_decompress_at`; keeping a single inflate
+  // implementation reachable keeps tree-shaken JS bundles small.
+  let (out, end) = zlib_decompress_at(data, 0, max_size~)
+  if end != data.length() {
+    raise ZlibError(TrailingData, "zlib: trailing data after stream")
   }
+  out
 }
 
 ///|
