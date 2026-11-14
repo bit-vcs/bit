@@ -103,10 +103,10 @@ async fn handle_merge_index(args : Array[String]) -> Unit raise Error {
       [base_h, base_mode, ours_h, ours_mode, theirs_h, theirs_mode, path],
       inherit_env=true,
       cwd=root,
-      stdin=@stdio.stdin,
-      stdout=@stdio.stdout,
-      stderr=@stdio.stderr,
-    )
+      stdin=Stdin,
+      stdout=Stdout,
+      stderr=Stderr,
+    ).exit_code
     if code != 0 {
       if !quiet {
         eprint_line("merge program failed for \{path}")

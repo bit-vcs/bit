@@ -298,13 +298,16 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   if resolved_sep_git_dir is Some(sep_dir) && !bare {
     let dot_git = path + "/.git"
     try {
-      let (code, stdout, _) = @process.collect_output(
+      let proc_result = @process.run(
         "readlink",
         [dot_git],
         inherit_env=true,
+        stdout=Collect,
+        stderr=Collect,
       )
+      let (code, stdout, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
       if code == 0 {
-        let target = (stdout.text() catch { _ => "" }).trim().to_owned()
+        let target = (@utf8.decode(stdout) catch { _ => "" }).trim().to_owned()
         if target != "" {
           let abs_target = if target.has_prefix("/") {
             target
@@ -313,7 +316,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
           }
           if fs.is_dir(abs_target) {
             // Move the actual directory to the separate git dir
-            let _ = @process.run("mv", [abs_target, sep_dir], inherit_env=true) catch {
+            let _ = @process.run("mv", [abs_target, sep_dir], inherit_env=true).exit_code catch {
               _ => 1
             }
           }
@@ -664,12 +667,12 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
       if fs.is_dir(actual_git_dir) {
         // Remove destination if it exists (library may have created partial dirs)
         if fs.is_dir(sep_dir) {
-          let _ = @process.run("rm", ["-rf", sep_dir], inherit_env=true) catch {
+          let _ = @process.run("rm", ["-rf", sep_dir], inherit_env=true).exit_code catch {
             _ => 1
           }
         }
         // Move common dir to separate-git-dir
-        let _ = @process.run("mv", [actual_git_dir, sep_dir], inherit_env=true) catch {
+        let _ = @process.run("mv", [actual_git_dir, sep_dir], inherit_env=true).exit_code catch {
           _ => 1
         }
         // Create gitdir file at old common dir location (e.g., mainwt/.git)

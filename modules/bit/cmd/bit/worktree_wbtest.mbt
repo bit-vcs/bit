@@ -28,7 +28,7 @@ async fn worktree_wbtest_collect_shim_git(
     )
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
-  let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
+  let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true).exit_code
   @test.assert_eq(chmod_code, 0)
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
@@ -41,14 +41,17 @@ async fn worktree_wbtest_collect_shim_git(
   for arg in args {
     git_args.push(arg)
   }
-  let (code, stdout, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     shim_git,
     git_args[:],
     extra_env=env,
     inherit_env=true,
+    stdout=Collect,
+    stderr=Collect,
   )
-  let stdout_text = stdout.text() catch { _ => "" }
-  let stderr_text = stderr.text() catch { _ => "" }
+  let (code, stdout, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let stdout_text = @utf8.decode(stdout) catch { _ => "" }
+  let stderr_text = @utf8.decode(stderr) catch { _ => "" }
   let normalized_code = if code == 0 &&
     (stderr_text.has_prefix("fatal:") || stderr_text.contains(" failed: ")) {
     1
@@ -396,7 +399,7 @@ async fn worktree_wbtest_case_preserves_executable_mode() -> Unit raise Error {
   let executable_path = repo_dir + "/hook.sh"
   fs.write_string(executable_path, "#!/bin/sh\necho ok\n")
   @test.assert_eq(
-    @process.run("chmod", ["+x", executable_path], inherit_env=true),
+    @process.run("chmod", ["+x", executable_path], inherit_env=true).exit_code,
     0,
   )
   add_test_run_git(repo_dir, ["add", "hook.sh"])
@@ -474,7 +477,7 @@ async fn worktree_wbtest_case_detects_mode_only_change() -> Unit raise Error {
   let executable_path = repo_dir + "/hook.sh"
   fs.write_string(executable_path, "#!/bin/sh\necho ok\n")
   @test.assert_eq(
-    @process.run("chmod", ["+x", executable_path], inherit_env=true),
+    @process.run("chmod", ["+x", executable_path], inherit_env=true).exit_code,
     0,
   )
   add_test_run_git(repo_dir, ["add", "hook.sh"])
@@ -490,7 +493,7 @@ async fn worktree_wbtest_case_detects_mode_only_change() -> Unit raise Error {
   ])
 
   @test.assert_eq(
-    @process.run("chmod", ["-x", worktree_dir + "/hook.sh"], inherit_env=true),
+    @process.run("chmod", ["-x", worktree_dir + "/hook.sh"], inherit_env=true).exit_code,
     0,
   )
   @env.set_env_var("GIT_SHIM_CWD", worktree_dir)
@@ -514,7 +517,7 @@ async fn worktree_wbtest_case_detects_mode_only_change() -> Unit raise Error {
   assert_true(fs.is_dir(worktree_dir))
 
   @test.assert_eq(
-    @process.run("chmod", ["+x", worktree_dir + "/hook.sh"], inherit_env=true),
+    @process.run("chmod", ["+x", worktree_dir + "/hook.sh"], inherit_env=true).exit_code,
     0,
   )
   worktree_wbtest_run_shim_git(["worktree", "remove", worktree_dir])

@@ -243,11 +243,11 @@ async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
   let opts = parse_format_patch_options(args)
   if opts.stdout_mode &&
     (opts.output_dir is Some(_) || opts.output_file is Some(_)) {
-    @stdio.stderr.write("fatal: multiple output destinations specified\n")
+    @stdio.stderr.write(@utf8.encode("fatal: multiple output destinations specified\n"))
     @sys.exit(128)
   }
   if opts.output_dir is Some(_) && opts.output_file is Some(_) {
-    @stdio.stderr.write("fatal: multiple output destinations specified\n")
+    @stdio.stderr.write(@utf8.encode("fatal: multiple output destinations specified\n"))
     @sys.exit(128)
   }
   let (base_commit, commits) = parse_format_patch_revisions(
@@ -256,7 +256,7 @@ async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
     opts.revisions,
   )
   if commits.length() == 0 {
-    @stdio.stderr.write("fatal: no commits specified")
+    @stdio.stderr.write(@utf8.encode("fatal: no commits specified"))
     @sys.exit(128)
   }
   let grep_pattern_type = resolve_grep_pattern_type(

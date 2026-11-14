@@ -35,10 +35,10 @@ async fn handle_web_browse(args : Array[String]) -> Unit raise Error {
       browser,
       [url],
       inherit_env=true,
-      stdin=@stdio.stdin,
-      stdout=@stdio.stdout,
-      stderr=@stdio.stderr,
-    )
+      stdin=Stdin,
+      stdout=Stdout,
+      stderr=Stderr,
+    ).exit_code
     if code != 0 {
       eprint_line("fatal: failed to open '\{url}' with '\{browser}'")
       @sys.exit(1)

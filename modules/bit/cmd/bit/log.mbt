@@ -167,10 +167,10 @@ async fn delegate_log_to_real_git(args : Array[String], cwd : String) -> Unit {
     argv,
     inherit_env=true,
     cwd~,
-    stdin=@stdio.stdin,
-    stdout=@stdio.stdout,
-    stderr=@stdio.stderr,
-  )
+    stdin=Stdin,
+    stdout=Stdout,
+    stderr=Stderr,
+  ).exit_code
   @sys.exit(code)
 }
 
@@ -1575,7 +1575,7 @@ fn log_resolve_pretty_color_enabled(
 
 ///|
 async fn log_stdout_is_tty() -> Bool {
-  @process.run("sh", ["-c", "test -t 1"], inherit_env=true) == 0
+  @process.run("sh", ["-c", "test -t 1"], inherit_env=true).exit_code == 0
 }
 
 ///|
@@ -5894,7 +5894,7 @@ async fn handle_whatchanged(args : Array[String]) -> Unit raise Error {
   }
   if !acknowledged {
     @stdio.stderr.write(
-      "'git whatchanged' is nominated for removal.\n\nhint: You can replace 'git whatchanged <opts>' with:\nhint:\tgit log <opts> --raw --no-merges\nhint: Or make an alias:\nhint:\tgit config set --global alias.whatchanged 'log --raw --no-merges'\n\nIf you still use this command, here's what you can do:\n\n- read https://git-scm.com/docs/BreakingChanges.html\n- check if anyone has discussed this on the mailing\n  list and if they came up with something that can\n  help you: https://lore.kernel.org/git/?q=git%20whatchanged\n- send an email to <git@vger.kernel.org> to let us\n  know that you still use this command and were unable\n  to determine a suitable replacement\n\nfatal: refusing to run without --i-still-use-this\n",
+      @utf8.encode("'git whatchanged' is nominated for removal.\n\nhint: You can replace 'git whatchanged <opts>' with:\nhint:\tgit log <opts> --raw --no-merges\nhint: Or make an alias:\nhint:\tgit config set --global alias.whatchanged 'log --raw --no-merges'\n\nIf you still use this command, here's what you can do:\n\n- read https://git-scm.com/docs/BreakingChanges.html\n- check if anyone has discussed this on the mailing\n  list and if they came up with something that can\n  help you: https://lore.kernel.org/git/?q=git%20whatchanged\n- send an email to <git@vger.kernel.org> to let us\n  know that you still use this command and were unable\n  to determine a suitable replacement\n\nfatal: refusing to run without --i-still-use-this\n"),
     )
     @sys.exit(128)
   }

@@ -170,7 +170,7 @@ fn write_mtimes_file(
 ///|
 /// Get mtime of a file as unix timestamp (seconds).
 async fn get_file_mtime_seconds(path : String) -> Int {
-  let (sec, _nsec) = @asyncfs.mtime(path[:], follow_symlink=true) catch {
+  let (sec, _nsec) = asyncfs_mtime_pair(path[:], follow_symlink=true) catch {
     _ => (0L, 0)
   }
   sec.to_int()
@@ -203,7 +203,7 @@ async fn collect_cruft_objects(
         }
       }
       None => {
-        @stdio.stderr.write("fatal: could not find pack '" + name + "'\n")
+        @stdio.stderr.write(@utf8.encode("fatal: could not find pack '" + name + "'\n"))
         @sys.exit(1)
       }
     }

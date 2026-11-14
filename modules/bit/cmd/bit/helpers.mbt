@@ -237,7 +237,7 @@ async fn run_git_command(
 async fn read_all_stdin() -> Bytes {
   let out : Array[Byte] = []
   while true {
-    match @stdio.stdin.read_some(max_len=8192) {
+    match @stdio.stdin.read() {
       None => break
       Some(bytes) =>
         for b in bytes {

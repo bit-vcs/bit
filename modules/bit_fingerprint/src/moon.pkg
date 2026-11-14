@@ -5,8 +5,8 @@ import {
   "mizchi/bit_lib" @bitlib,
   "mizchi/bit_utils" @string_utils,
   "mizchi/bit_osfs" @osfs,
-  "moonbitlang/async",
-  "moonbitlang/async/process",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/process",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
 }
@@ -18,5 +18,9 @@ import {
 } for "wbtest"
 
 options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/process",
+  ],
   targets: { "fingerprint_wbtest.mbt": [ "native" ] },
 )

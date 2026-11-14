@@ -221,7 +221,7 @@ async fn stash_prompt_patch_hunk(
 ///|
 async fn stash_read_patch_answer() -> String {
   while true {
-    match @stdio.stdin.read_some(max_len=1) {
+    match @stdio.stdin.read() {
       None => return "n"
       Some(bytes) => {
         let text = decode_bytes(bytes).to_lower()

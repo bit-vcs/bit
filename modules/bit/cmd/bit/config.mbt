@@ -334,10 +334,10 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
       "/bin/sh",
       ["-c", editor + " " + quoted_path],
       inherit_env=true,
-      stdin=@stdio.stdin,
-      stdout=@stdio.stdout,
-      stderr=@stdio.stderr,
-    )
+      stdin=Stdin,
+      stdout=Stdout,
+      stderr=Stderr,
+    ).exit_code
     @sys.exit(status)
   }
   // Validate config syntax for read operations
@@ -2145,10 +2145,10 @@ async fn delegate_config_to_real_git(args : Array[String]) -> Unit {
     real_git,
     argv,
     inherit_env=true,
-    stdin=@stdio.stdin,
-    stdout=@stdio.stdout,
-    stderr=@stdio.stderr,
-  )
+    stdin=Stdin,
+    stdout=Stdout,
+    stderr=Stderr,
+  ).exit_code
   @sys.exit(code)
 }
 

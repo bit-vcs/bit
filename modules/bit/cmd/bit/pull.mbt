@@ -2673,21 +2673,13 @@ async fn run_push_hook_with_stdin(
   fs.write_string(stdin_path, text) catch {
     _ => return 1
   }
-  let stdin = @process.redirect_from_file(stdin_path) catch {
-    _ => {
-      fs.remove_file(stdin_path) catch {
-        _ => ()
-      }
-      return 1
-    }
-  }
   let code = @process.run(
     hook_path,
     [],
     inherit_env=true,
-    stdin~,
+    stdin=FromFile(stdin_path),
     cwd=hook_git_dir,
-  ) catch {
+  ).exit_code catch {
     _ => 1
   }
   fs.remove_file(stdin_path) catch {
@@ -2775,7 +2767,7 @@ async fn run_push_to_checkout_hook(
     extra_env~,
     inherit_env=true,
     cwd=worktree_path,
-  ) catch {
+  ).exit_code catch {
     _ => 1
   }
   code

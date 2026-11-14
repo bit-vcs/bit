@@ -36,12 +36,15 @@ async fn rev_list_test_run_git(
   root : String,
   args : Array[String],
 ) -> Unit raise Error {
-  let (code, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
 }
 
@@ -50,14 +53,17 @@ async fn rev_list_test_git_stdout(
   root : String,
   args : Array[String],
 ) -> String raise Error {
-  let (code, stdout, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, stdout, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
-  stdout.text() catch {
+  @utf8.decode(stdout) catch {
     _ => ""
   }
 }
@@ -73,14 +79,17 @@ async fn rev_list_test_bit_stdout(
   for arg in args {
     bit_args.push(arg)
   }
-  let (code, stdout, _) = @process.collect_output(
+  let proc_result = @process.run(
     bit_exe,
     bit_args[:],
     inherit_env=true,
     cwd=repo_root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, stdout, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
-  stdout.text() catch {
+  @utf8.decode(stdout) catch {
     _ => ""
   }
 }
@@ -117,13 +126,16 @@ async fn rev_list_test_run_shim_git(
   for arg in args {
     git_args.push(arg)
   }
-  let (code, _, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     shim_git,
     git_args[:],
     extra_env=env,
     inherit_env=true,
+    stdout=Collect,
+    stderr=Collect,
   )
-  let text = stderr.text() catch { _ => "" }
+  let (code, _, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let text = @utf8.decode(stderr) catch { _ => "" }
   @test.assert_eq(code, 0)
   @test.assert_eq(text, "")
 }
@@ -147,14 +159,17 @@ async fn rev_list_test_shim_git_stdout(
   for arg in args {
     git_args.push(arg)
   }
-  let (code, stdout, _) = @process.collect_output(
+  let proc_result = @process.run(
     shim_git,
     git_args[:],
     extra_env=env,
     inherit_env=true,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, stdout, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
-  stdout.text() catch {
+  @utf8.decode(stdout) catch {
     _ => ""
   }
 }

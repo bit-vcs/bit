@@ -408,7 +408,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     )
     if !no_deref && has_symbolic_ref_cycle(fs, actual_git_dir, input_refname) {
       @stdio.stderr.write(
-        "error: cannot lock ref '\{input_refname}': unable to resolve reference '\{input_refname}'",
+        @utf8.encode("error: cannot lock ref '\{input_refname}': unable to resolve reference '\{input_refname}'"),
       )
       @sys.exit(1)
     }
@@ -425,13 +425,13 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
         Some(cur_id) =>
           if cur_id.to_hex() != ov {
             @stdio.stderr.write(
-              "error: cannot lock ref '\{refname}': is at \{cur_id.to_hex()} but expected \{ov}",
+              @utf8.encode("error: cannot lock ref '\{refname}': is at \{cur_id.to_hex()} but expected \{ov}"),
             )
             @sys.exit(1)
           }
         None => {
           @stdio.stderr.write(
-            "error: cannot lock ref '\{refname}': unable to resolve reference",
+            @utf8.encode("error: cannot lock ref '\{refname}': unable to resolve reference"),
           )
           @sys.exit(1)
         }
@@ -502,7 +502,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   )
   if !no_deref && has_symbolic_ref_cycle(fs, actual_git_dir, input_refname) {
     @stdio.stderr.write(
-      "error: cannot lock ref '\{input_refname}': unable to resolve reference '\{input_refname}'",
+      @utf8.encode("error: cannot lock ref '\{input_refname}': unable to resolve reference '\{input_refname}'"),
     )
     @sys.exit(1)
   }
@@ -535,11 +535,11 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             // existing ref as "already exists" rather than a value mismatch.
             if expected_id.to_hex() == @bitcore.ObjectId::zero().to_hex() {
               @stdio.stderr.write(
-                "error: cannot lock ref '\{refname}': reference already exists",
+                @utf8.encode("error: cannot lock ref '\{refname}': reference already exists"),
               )
             } else {
               @stdio.stderr.write(
-                "error: cannot lock ref '\{refname}': is at \{cur_id.to_hex()} but expected \{expected_id.to_hex()}",
+                @utf8.encode("error: cannot lock ref '\{refname}': is at \{cur_id.to_hex()} but expected \{expected_id.to_hex()}"),
               )
             }
             @sys.exit(1)
@@ -547,7 +547,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
         None =>
           if expected_id.to_hex() != @bitcore.ObjectId::zero().to_hex() {
             @stdio.stderr.write(
-              "error: cannot lock ref '\{refname}': unable to resolve reference '\{refname}'",
+              @utf8.encode("error: cannot lock ref '\{refname}': unable to resolve reference '\{refname}'"),
             )
             @sys.exit(1)
           }
@@ -1490,7 +1490,7 @@ async fn handle_update_ref_reftable(
     i += 1
   }
   if positional.length() == 0 {
-    @stdio.stderr.write("fatal: update-ref requires a ref argument\n")
+    @stdio.stderr.write(@utf8.encode("fatal: update-ref requires a ref argument\n"))
     @sys.exit(1)
   }
   let refname = positional[0]
@@ -1507,7 +1507,7 @@ async fn handle_update_ref_reftable(
   }
   let next_index = max_update_index + 1UL
   if !delete_mode && positional.length() < 2 {
-    @stdio.stderr.write("fatal: update-ref requires a value argument\n")
+    @stdio.stderr.write(@utf8.encode("fatal: update-ref requires a value argument\n"))
     @sys.exit(1)
   }
   let value : @reftable.RefValue = if delete_mode {

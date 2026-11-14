@@ -109,7 +109,7 @@ async test "blame: textconv transforms target blob content" {
     "#!/bin/sh\nsed 's/raw/text/g' \"$1\"\n",
   )
   @test.assert_eq(
-    @process.run("chmod", ["+x", root + "/textconv.sh"], inherit_env=true),
+    @process.run("chmod", ["+x", root + "/textconv.sh"], inherit_env=true).exit_code,
     0,
   )
   commit_wbtest_run_git(root, ["config", "diff.test.textconv", "./textconv.sh"])

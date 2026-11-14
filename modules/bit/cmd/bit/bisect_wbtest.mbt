@@ -3,14 +3,17 @@ async fn bisect_wbtest_git_stdout(
   root : String,
   args : Array[String],
 ) -> String raise Error {
-  let (code, stdout, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, stdout, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   assert_eq(code, 0)
-  let s = stdout.text() catch { _ => "" }
+  let s = @utf8.decode(stdout) catch { _ => "" }
   if s.has_suffix("\n") {
     String::unsafe_substring(s, start=0, end=s.length() - 1)
   } else {

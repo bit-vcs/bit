@@ -68,7 +68,7 @@ async fn handle_pack_redundant(args : Array[String]) -> Unit raise Error {
   }
   if !i_still_use_this {
     @stdio.stderr.write(
-      "WARNING: git pack-redundant has been nominated for removal.\nIf you still use this command, please add an extra\noption, '--i-still-use-this', on the command line and\nlet us know you still use it by sending an e-mail\nto git@vger.kernel.org. Thanks.\n",
+      @utf8.encode("WARNING: git pack-redundant has been nominated for removal.\nIf you still use this command, please add an extra\noption, '--i-still-use-this', on the command line and\nlet us know you still use it by sending an e-mail\nto git@vger.kernel.org. Thanks.\n"),
     )
     @sys.exit(1)
   }
@@ -184,28 +184,28 @@ async fn handle_pack_redundant(args : Array[String]) -> Unit raise Error {
   // Verbose output (before stdout)
   if verbose {
     @stdio.stderr.write(
-      "There are " +
+      @utf8.encode("There are " +
       altodb_packs.length().to_string() +
-      " packs available in alt-odbs.\n",
+      " packs available in alt-odbs.\n"),
     )
-    @stdio.stderr.write("The smallest (bytewise) set of packs is:\n")
+    @stdio.stderr.write(@utf8.encode("The smallest (bytewise) set of packs is:\n"))
     for pack in min_set {
       let rel = make_relative_to_git_dir(pack.pack_path, git_dir)
-      @stdio.stderr.write("\t" + rel + "\n")
+      @stdio.stderr.write(@utf8.encode("\t" + rel + "\n"))
     }
     let redundancy = pack_redundant_get_redundancy(min_set)
     @stdio.stderr.write(
-      "containing " +
+      @utf8.encode("containing " +
       redundancy.to_string() +
       " duplicate objects " +
-      "with a total size of 0kb.\n",
+      "with a total size of 0kb.\n"),
     )
     @stdio.stderr.write(
-      "A total of " +
+      @utf8.encode("A total of " +
       all_objects.length().to_string() +
-      " unique objects were considered.\n",
+      " unique objects were considered.\n"),
     )
-    @stdio.stderr.write("Redundant packs (with indexes):\n")
+    @stdio.stderr.write(@utf8.encode("Redundant packs (with indexes):\n"))
   }
   // Output redundant packs: idx path first, then pack path
   // Use paths relative to git_dir (prefixed with "./" like git does)
@@ -218,7 +218,7 @@ async fn handle_pack_redundant(args : Array[String]) -> Unit raise Error {
     }
   }
   if verbose {
-    @stdio.stderr.write("0MB of redundant packs in total.\n")
+    @stdio.stderr.write(@utf8.encode("0MB of redundant packs in total.\n"))
   }
 }
 
@@ -342,5 +342,5 @@ fn make_relative_to_git_dir(path : String, git_dir : String) -> String {
 
 ///|
 async fn pack_redundant_stdin_is_tty() -> Bool {
-  @process.run("sh", ["-c", "test -t 0"], inherit_env=true) == 0
+  @process.run("sh", ["-c", "test -t 0"], inherit_env=true).exit_code == 0
 }

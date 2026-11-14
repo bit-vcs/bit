@@ -274,7 +274,7 @@ async fn handlers_remote_pull_wbtest_collect_shim_git(
     )
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
-  let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
+  let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true).exit_code
   @test.assert_eq(chmod_code, 0)
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
@@ -292,13 +292,16 @@ async fn handlers_remote_pull_wbtest_collect_shim_git(
   for arg in args {
     git_args.push(arg)
   }
-  let (code, stdout, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     shim_git,
     git_args[:],
     extra_env=env,
     inherit_env=true,
+    stdout=Collect,
+    stderr=Collect,
   )
-  (code, stdout.text() catch { _ => "" }, stderr.text() catch { _ => "" })
+  let (code, stdout, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  (code, @utf8.decode(stdout) catch { _ => "" }, @utf8.decode(stderr) catch { _ => "" })
 }
 
 ///|

@@ -37,7 +37,7 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
     root + "/.git"
   }
   if is_sha256_repo(git_dir) {
-    @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
+    @stdio.stderr.write(@utf8.encode("bit: SHA256 repositories are not supported\n"))
     @sys.exit(1)
   }
   // Read push-related config
@@ -284,18 +284,20 @@ async fn receive_collect_alternate_haves(
     match alt_ref_cmd {
       Some(cmd) => {
         // Execute alternateRefsCommand with alt_git_dir as argument
-        let (code, stdout) = @process.collect_stdout(
+        let proc_result = @process.run(
           "sh",
           ["-c", cmd + " \"$@\"", "--", alt_git_dir],
           inherit_env=true,
           cwd=root,
+          stdout=Collect,
         ) catch {
           _ => continue
         }
+        let (code, stdout) = (proc_result.exit_code, proc_result.stdout_binary())
         if code != 0 {
           continue
         }
-        let output_bytes = stdout.binary()
+        let output_bytes = stdout
         let output = @utf8.decode_lossy(output_bytes[:])
         for oid_line in output.split("\n") {
           let oid_str = oid_line.to_owned()
@@ -478,7 +480,8 @@ async fn receive_run_hook(
   let (stdin_input, stdin_writer) = @process.write_to_process() catch {
     _ => return true
   }
-  stdin_writer.write(stdin_data) catch {
+  defer stdin_input.close()
+  stdin_writer.write(@utf8.encode(stdin_data)) catch {
     _ => ()
   }
   stdin_writer.close()
@@ -489,22 +492,25 @@ async fn receive_run_hook(
       env["GIT_PUSH_OPTION_\{i}"] = opt
     }
   }
-  let (code, _stdout_data, stderr_data) = @process.collect_output(
+  let proc_result = @process.run(
     exec_hook_path,
     [],
     extra_env=env,
     inherit_env=true,
-    stdin=stdin_input,
+    stdin=Shared(stdin_input),
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
     _ => return true
   }
+  let (code, _stdout_data, stderr_data) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   // Write hook stdout+stderr to our stderr (hooks use exec >&2)
-  let stderr_bytes = stderr_data.binary()
+  let stderr_bytes = stderr_data
   if stderr_bytes.length() > 0 {
     @stdio.stderr.write(stderr_data)
   }
-  let stdout_bytes = _stdout_data.binary()
+  let stdout_bytes = _stdout_data
   if stdout_bytes.length() > 0 {
     @stdio.stderr.write(_stdout_data)
   }
@@ -592,6 +598,7 @@ async fn receive_run_proc_receive_hook(
           } : @bitlib.ReceivePackProcResult)
       })
   }
+  defer stdin_input.close()
   stdin_writer.write(input_bytes) catch {
     _ => ()
   }
@@ -603,13 +610,15 @@ async fn receive_run_proc_receive_hook(
       env["GIT_PUSH_OPTION_\{i}"] = opt
     }
   }
-  let (code, stdout_data, stderr_data) = @process.collect_output(
+  let proc_result = @process.run(
     exec_hook_path,
     [],
     extra_env=env,
     inherit_env=true,
-    stdin=stdin_input,
+    stdin=Shared(stdin_input),
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
     _ =>
       return updates.map(fn(u) {
@@ -625,8 +634,9 @@ async fn receive_run_proc_receive_hook(
           } : @bitlib.ReceivePackProcResult)
       })
   }
+  let (code, stdout_data, stderr_data) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   // Write proc-receive hook stderr to our stderr (for hook diagnostics)
-  let stderr_bytes = stderr_data.binary()
+  let stderr_bytes = stderr_data
   if stderr_bytes.length() > 0 {
     @stdio.stderr.write(stderr_data)
   }
@@ -644,7 +654,7 @@ async fn receive_run_proc_receive_hook(
         } : @bitlib.ReceivePackProcResult)
     })
   }
-  let output_bytes = stdout_data.binary()
+  let output_bytes = stdout_data
   receive_parse_proc_receive_output(output_bytes, updates)
 }
 

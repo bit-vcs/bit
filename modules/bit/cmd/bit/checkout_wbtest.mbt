@@ -24,7 +24,7 @@ async fn checkout_wbtest_collect_shim_git_output(
     )
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
-  let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
+  let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true).exit_code
   @test.assert_eq(chmod_code, 0)
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
@@ -37,14 +37,17 @@ async fn checkout_wbtest_collect_shim_git_output(
   for arg in args {
     git_args.push(arg)
   }
-  let (code, stdout, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     shim_git,
     git_args[:],
     extra_env=env,
     inherit_env=true,
+    stdout=Collect,
+    stderr=Collect,
   )
-  let stdout_text = stdout.text() catch { _ => "" }
-  let stderr_text = stderr.text() catch { _ => "" }
+  let (code, stdout, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let stdout_text = @utf8.decode(stdout) catch { _ => "" }
+  let stderr_text = @utf8.decode(stderr) catch { _ => "" }
   (code, stdout_text, stderr_text)
 }
 
@@ -445,7 +448,7 @@ async fn checkout_wbtest_case_symlinked_branch_in_use() -> Unit raise Error {
     ["-s", "refs/heads/newmain", linked_head],
     inherit_env=true,
     cwd=root,
-  )
+  ).exit_code
   @test.assert_eq(link_code, 0)
 
   @env.set_env_var("GIT_SHIM_CWD", repo_dir)
@@ -508,7 +511,7 @@ async fn checkout_wbtest_case_recheckout_current_branch_with_symlink_head() -> U
     ["-s", "refs/heads/newmain", linked_head],
     inherit_env=true,
     cwd=root,
-  )
+  ).exit_code
   @test.assert_eq(link_code, 0)
 
   @env.set_env_var("GIT_SHIM_CWD", linked_dir)

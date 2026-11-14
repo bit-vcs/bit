@@ -939,10 +939,10 @@ async fn delegate_to_real_git_original_args(args : Array[String]) -> Unit {
     resolve_real_git_for_dispatch(),
     argv,
     inherit_env=true,
-    stdin=@stdio.stdin,
-    stdout=@stdio.stdout,
-    stderr=@stdio.stderr,
-  )
+    stdin=Stdin,
+    stdout=Stdout,
+    stderr=Stderr,
+  ).exit_code
   @sys.exit(code)
 }
 

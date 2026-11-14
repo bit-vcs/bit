@@ -158,7 +158,7 @@ async fn read_hub_init_approval() -> Bool {
   let bytes : Array[Byte] = []
   let mut finished = false
   while !finished {
-    match @stdio.stdin.read_some(max_len=1) {
+    match @stdio.stdin.read() {
       None => finished = true
       Some(chunk) =>
         for b in chunk {

@@ -14,7 +14,7 @@ import {
   "mizchi/bit_object/zlib",
   "moonbitlang/core/bench",
   "moonbitlang/core/env",
-  "moonbitlang/async",
+  "moonbitlang/core/async",
   "moonbitlang/core/test",
 } for "test"
 
@@ -25,6 +25,9 @@ import {
 } for "wbtest"
 
 options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+  ],
   targets: {
     "bench_real_test.mbt": [ "native" ],
     "bench_test.mbt": [ "native" ],

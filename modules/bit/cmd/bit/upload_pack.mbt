@@ -13,7 +13,7 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
   match find_malformed_uploadpackfilter_override() {
     Some(key) => {
       @stdio.stderr.write(
-        "unable to parse '" + key + "' from command-line config\n",
+        @utf8.encode("unable to parse '" + key + "' from command-line config\n"),
       )
       @sys.exit(129)
     }
@@ -46,7 +46,7 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
       git_dir
     }
     if is_sha256_repo(config_git_dir) {
-      @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
+      @stdio.stderr.write(@utf8.encode("bit: SHA256 repositories are not supported\n"))
       @sys.exit(1)
     }
     let mut has_uploadpackfilter = false
@@ -55,7 +55,7 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
       if key.has_prefix("uploadpackfilter.") {
         if value.length() == 0 {
           @stdio.stderr.write(
-            "unable to parse '" + key + "' from command-line config\n",
+            @utf8.encode("unable to parse '" + key + "' from command-line config\n"),
           )
           @sys.exit(129)
         }
@@ -74,7 +74,7 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
       None => false
     }
     if has_uploadpackfilter || allow_filter || allow_any_want {
-      @stdio.stderr.write("bit: upload-pack filter options are not supported\n")
+      @stdio.stderr.write(@utf8.encode("bit: upload-pack filter options are not supported\n"))
       @sys.exit(1)
     }
     if advertise {
@@ -155,7 +155,7 @@ async fn upload_pack_fail(
     let pkt = @protocol.pktline_encode("ERR " + line + "\n")
     @stdio.stdout.write(pkt)
   }
-  @stdio.stderr.write(msg + "\n")
+  @stdio.stderr.write(@utf8.encode(msg + "\n"))
   @sys.exit(1)
 }
 

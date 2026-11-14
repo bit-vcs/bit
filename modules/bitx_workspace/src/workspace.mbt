@@ -7,12 +7,12 @@ async fn warn_unimplemented_arg(cmd : String, arg : String) -> Unit {
     return
   }
   let msg = "warning: " + cmd + ": unsupported option '" + arg + "'\n"
-  @stdio.stderr.write(msg)
+  @stdio.stderr.write(@utf8.encode(msg))
 }
 
 ///|
 async fn eprint_line(msg : String) -> Unit {
-  @stdio.stderr.write(msg + "\n")
+  @stdio.stderr.write(@utf8.encode(msg + "\n"))
 }
 
 ///|
@@ -2122,7 +2122,7 @@ async fn handle_workspace_run(args : Array[String]) -> Unit raise Error {
           extra_env=task_spec.env,
           inherit_env=true,
           cwd=workspace_task_run_cwd(node_root, task_spec),
-        ) catch {
+        ).exit_code catch {
           err =>
             if @async.is_being_cancelled() {
               raise err
@@ -2522,7 +2522,7 @@ async fn handle_workspace_flow(
         extra_env=task_spec.env,
         inherit_env=true,
         cwd=workspace_star_task_run_cwd(workspace_root, node_map, task_spec),
-      ) catch {
+      ).exit_code catch {
         err =>
           if @async.is_being_cancelled() {
             raise err
@@ -2764,7 +2764,7 @@ async fn handle_workspace_flow(
           extra_env=task_spec.env,
           inherit_env=true,
           cwd=workspace_task_run_cwd(node_root, task_spec),
-        ) catch {
+        ).exit_code catch {
           err =>
             if @async.is_being_cancelled() {
               raise err

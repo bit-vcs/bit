@@ -7,12 +7,15 @@ async fn commit_wbtest_run_git(
   for arg in args {
     full_args.push(arg)
   }
-  let (code, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     full_args[:],
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
 }
 
@@ -25,13 +28,16 @@ async fn commit_wbtest_git_stderr(
   for arg in args {
     full_args.push(arg)
   }
-  let (code, _, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     full_args[:],
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=Collect,
   )
-  let text = stderr.text() catch { _ => "" }
+  let (code, _, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let text = @utf8.decode(stderr) catch { _ => "" }
   (code, text)
 }
 
@@ -58,7 +64,7 @@ async fn signing_wbtest_write_fake_gpg(
     "  'abc123' \\\n" +
     "  '-----END PGP SIGNATURE-----'\n",
   )
-  let chmod_code = @process.run("chmod", ["+x", path], inherit_env=true)
+  let chmod_code = @process.run("chmod", ["+x", path], inherit_env=true).exit_code
   @test.assert_eq(chmod_code, 0)
 }
 
@@ -79,7 +85,7 @@ async fn signing_wbtest_write_fake_ssh_keygen(
     "  'sshabc' \\\n" +
     "  '-----END SSH SIGNATURE-----' > \"${last}.sig\"\n",
   )
-  let chmod_code = @process.run("chmod", ["+x", path], inherit_env=true)
+  let chmod_code = @process.run("chmod", ["+x", path], inherit_env=true).exit_code
   @test.assert_eq(chmod_code, 0)
 }
 

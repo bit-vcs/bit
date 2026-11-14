@@ -485,22 +485,25 @@ async fn signing_collect_output_text(
   program : String,
   args : Array[String],
 ) -> (Int, String, String) raise @bitcore.GitError {
-  let (code, stdout_data, stderr_data) = @process.collect_output(
+  let proc_result = @process.run(
     program,
     args,
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
     err =>
       raise @bitcore.GitError::InvalidObject(
         "failed to run signing program '\{program}': \{err}",
       )
   }
-  let stdout = stdout_data.text() catch {
-    _ => decode_bytes(stdout_data.binary())
+  let (code, stdout_data, stderr_data) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let stdout = @utf8.decode(stdout_data) catch {
+    _ => decode_bytes(stdout_data)
   }
-  let stderr = stderr_data.text() catch {
-    _ => decode_bytes(stderr_data.binary())
+  let stderr = @utf8.decode(stderr_data) catch {
+    _ => decode_bytes(stderr_data)
   }
   (code, stdout, stderr)
 }
@@ -518,6 +521,7 @@ async fn signing_collect_output_text_with_payload(
         "failed to start verify input pipe: \{err}",
       )
   }
+  defer stdin_input.close()
   stdin_writer.write(payload) catch {
     err =>
       raise @bitcore.GitError::InvalidObject(
@@ -525,23 +529,26 @@ async fn signing_collect_output_text_with_payload(
       )
   }
   stdin_writer.close()
-  let (code, stdout_data, stderr_data) = @process.collect_output(
+  let proc_result = @process.run(
     program,
     args,
     inherit_env=true,
-    stdin=stdin_input,
+    stdin=Shared(stdin_input),
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
     err =>
       raise @bitcore.GitError::InvalidObject(
         "failed to run signing program '\{program}': \{err}",
       )
   }
-  let stdout = stdout_data.text() catch {
-    _ => decode_bytes(stdout_data.binary())
+  let (code, stdout_data, stderr_data) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let stdout = @utf8.decode(stdout_data) catch {
+    _ => decode_bytes(stdout_data)
   }
-  let stderr = stderr_data.text() catch {
-    _ => decode_bytes(stderr_data.binary())
+  let stderr = @utf8.decode(stderr_data) catch {
+    _ => decode_bytes(stderr_data)
   }
   (code, stdout, stderr)
 }
@@ -929,6 +936,7 @@ async fn signing_run_stdout_signer(
         "failed to start signing input pipe: \{err}",
       )
   }
+  defer stdin_input.close()
   stdin_writer.write(payload) catch {
     err =>
       raise @bitcore.GitError::InvalidObject(
@@ -936,20 +944,23 @@ async fn signing_run_stdout_signer(
       )
   }
   stdin_writer.close()
-  let (code, stdout_data, stderr_data) = @process.collect_output(
+  let proc_result = @process.run(
     program,
     args,
     inherit_env=true,
-    stdin=stdin_input,
+    stdin=Shared(stdin_input),
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
     err =>
       raise @bitcore.GitError::InvalidObject(
         "failed to run signing program '\{program}': \{err}",
       )
   }
+  let (code, stdout_data, stderr_data) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   if code != 0 {
-    let stderr = (stderr_data.text() catch { _ => "" }).trim().to_owned()
+    let stderr = (@utf8.decode(stderr_data) catch { _ => "" }).trim().to_owned()
     if stderr.length() > 0 {
       raise @bitcore.GitError::InvalidObject(stderr)
     }
@@ -957,8 +968,8 @@ async fn signing_run_stdout_signer(
       "signing program '\{program}' failed with status \{code}",
     )
   }
-  stdout_data.text() catch {
-    _ => decode_bytes(stdout_data.binary())
+  @utf8.decode(stdout_data) catch {
+    _ => decode_bytes(stdout_data)
   }
 }
 
@@ -993,11 +1004,13 @@ async fn signing_run_ssh_signer(
   args.push("-f")
   args.push(signing_key)
   args.push(temp_path)
-  let result = @process.collect_output(
+  let result = @process.run(
     program,
     args,
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
     err => {
       signing_try_remove_file(fs, temp_path)
@@ -1007,9 +1020,9 @@ async fn signing_run_ssh_signer(
       )
     }
   }
-  let (code, _stdout_data, stderr_data) = result
+  let (code, _stdout_data, stderr_data) = (result.exit_code, result.stdout_binary(), result.stderr_binary())
   if code != 0 {
-    let stderr = (stderr_data.text() catch { _ => "" }).trim().to_owned()
+    let stderr = (@utf8.decode(stderr_data) catch { _ => "" }).trim().to_owned()
     signing_try_remove_file(fs, temp_path)
     signing_try_remove_file(fs, sig_path)
     if stderr.length() > 0 {

@@ -211,10 +211,10 @@ async fn diff_run_external(
       ],
       inherit_env=true,
       cwd=root,
-      stdin=@stdio.stdin,
-      stdout=@stdio.stdout,
-      stderr=@stdio.stderr,
-    )
+      stdin=Stdin,
+      stdout=Stdout,
+      stderr=Stderr,
+    ).exit_code
     // Clean up temp files
     if old_tmp != "/dev/null" {
       @fs.remove_file(old_tmp) catch {
@@ -532,20 +532,22 @@ async fn diff_read_orderfile_patterns(
   let data = if fs.is_file(path) {
     fs.read_file(path)
   } else {
-    let (code, stdout) = @process.collect_stdout(
+    let proc_result = @process.run(
       "cat",
       [path],
       inherit_env=true,
+      stdout=Collect,
     ) catch {
       err =>
         raise @bitcore.GitError::IoError(
           "failed to read orderfile '\{path}': \{err}",
         )
     }
+    let (code, stdout) = (proc_result.exit_code, proc_result.stdout_binary())
     if code != 0 {
       raise @bitcore.GitError::IoError("failed to read orderfile '\{path}'")
     }
-    stdout.binary()
+    stdout
   }
   let content = @utf8.decode_lossy(data[:])
   diff_parse_orderfile_patterns(content)
@@ -2712,7 +2714,7 @@ async fn collect_diff_index_stale_entries(
     if !is_stale {
       let abs = root + "/" + entry.path
       try {
-        let (sec, nsec) = @asyncfs.mtime(abs, follow_symlink=false)
+        let (sec, nsec) = asyncfs_mtime_pair(abs, follow_symlink=false)
         if sec.to_int() != entry.mtime_sec || nsec != entry.mtime_nsec {
           is_stale = true
         }
@@ -3662,7 +3664,7 @@ async fn diff_no_index_is_named_pipe(abs_path : String) -> Bool {
     "sh",
     ["-c", "test -p \"$1\"", "sh", abs_path],
     inherit_env=true,
-  )
+  ).exit_code
   code == 0
 }
 
@@ -3706,17 +3708,19 @@ async fn diff_no_index_read_path(
     None => ()
   }
   if diff_no_index_uses_stream_read(fs, abs_path) {
-    let (code, stdout) = @process.collect_stdout(
+    let proc_result = @process.run(
       "sh",
       ["-c", "cat \"$1\"", "sh", abs_path],
       inherit_env=true,
+      stdout=Collect,
     )
+    let (code, stdout) = (proc_result.exit_code, proc_result.stdout_binary())
     if code != 0 {
       raise @bitcore.GitError::InvalidObject(
         "diff failed: unable to read " + abs_path,
       )
     }
-    let text = stdout.text() catch {
+    let text = @utf8.decode(stdout) catch {
       _ =>
         raise @bitcore.GitError::InvalidObject(
           "diff failed: unable to decode " + abs_path,
