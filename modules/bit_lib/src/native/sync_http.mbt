@@ -35,6 +35,7 @@ pub async fn clone_http(
       } else {
         "main"
       }
+      @object.ensure_valid_remote_refname("refs/heads/\{branch_name}")
       let head_path = sync_join_path(git_dir, "HEAD")
       fs.write_string(head_path, "ref: refs/heads/\{branch_name}\n")
       // Create local branch

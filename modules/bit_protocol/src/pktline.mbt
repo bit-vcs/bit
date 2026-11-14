@@ -217,8 +217,15 @@ pub fn parse_refs(
       }
       refname.write_char(chars[i])
     }
+    let name = refname.to_string()
+    // Server-controlled: drop names that are not well-formed `refs/` names
+    // (or HEAD), including the empty repository's `capabilities^{}`
+    // placeholder, before they can be used as paths.
+    if !@object.is_valid_remote_refname(name) {
+      continue
+    }
     let id = @bit.ObjectId::from_hex(sha_str.to_string())
-    result.push((id, refname.to_string()))
+    result.push((id, name))
   }
   result
 }

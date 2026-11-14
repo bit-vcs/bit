@@ -1385,6 +1385,7 @@ fn write_partial_clone_metadata(
     // Detached HEAD: write the commit SHA directly
     fs.write_string(@bit.join_path(git_dir, "HEAD"), commit_id.to_hex() + "\n")
   } else {
+    @object.ensure_valid_remote_refname(refname)
     fs.write_string(@bit.join_path(git_dir, "HEAD"), "ref: \{refname}\n")
     let ref_path = @bit.join_path(git_dir, refname)
     let ref_dir = match ref_path.rev_find("/") {

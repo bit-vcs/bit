@@ -9,6 +9,8 @@ import {
 // Values
 pub fn array_to_bytes(Array[Byte]) -> Bytes
 
+pub fn check_refname_format(String, allow_onelevel? : Bool) -> Bool
+
 pub fn create_blob(Bytes) -> (ObjectId, Bytes)
 
 pub fn create_blob_string(String) -> (ObjectId, Bytes)
@@ -25,6 +27,8 @@ pub fn create_tree(Array[TreeEntry]) -> (ObjectId, Bytes)
 
 pub fn create_tree_with_algo(HashAlgorithm, Array[TreeEntry]) -> (ObjectId, Bytes)
 
+pub fn ensure_valid_remote_refname(String) -> Unit raise GitError
+
 pub fn hash_array_prefix(Array[Byte], Int32, hash_size? : Int32) -> ObjectId
 
 pub fn hash_blob(Bytes) -> ObjectId
@@ -36,6 +40,10 @@ pub fn hash_object_content(ObjectType, Bytes) -> ObjectId
 pub fn hash_object_content_with_algo(HashAlgorithm, ObjectType, Bytes) -> ObjectId
 
 pub fn hash_prefix(Bytes, Int32, hash_size? : Int32) -> ObjectId
+
+pub fn is_valid_remote_refname(String) -> Bool
+
+pub fn is_valid_remote_symref_target(String) -> Bool
 
 pub fn serialize_commit_content(Commit) -> Bytes
 

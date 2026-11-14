@@ -509,6 +509,7 @@ async fn[FS : @types.AsyncFileSystem] write_partial_clone_refs_async(
       commit_id.to_hex() + "\n",
     )
   } else {
+    @object.ensure_valid_remote_refname(refname)
     @types.AsyncFileSystem::write_string(fs, head_path, "ref: \{refname}\n")
     let ref_path = @bit.join_path(git_dir, refname)
     let ref_dir = {
@@ -617,6 +618,7 @@ fn write_partial_clone_refs(
   if refname == "HEAD" {
     fs.write_string(head_path, commit_id.to_hex() + "\n")
   } else {
+    @object.ensure_valid_remote_refname(refname)
     fs.write_string(head_path, "ref: \{refname}\n")
     let ref_path = @bit.join_path(git_dir, refname)
     let ref_dir = {
