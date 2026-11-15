@@ -535,6 +535,13 @@ async fn sparse_checkout_warn_reapply_preserved_paths(
 ) -> Unit raise Error {
   let stage_entries = @bitlib.read_index_stage_entries(fs, git_dir)
   let skip_worktree_paths = @bitlib.read_skip_worktree_paths(fs, git_dir)
+  // Out-of-cone entries count as skipped even when a dirty file kept them
+  // tracked normally (git leaves those without the skip-worktree bit).
+  let patterns = if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+    @bitlib.read_sparse_patterns(fs, git_dir)
+  } else {
+    []
+  }
   let skipped_paths : Array[String] = []
   let kept_paths : Array[String] = []
   for item in stage_entries {
@@ -550,7 +557,9 @@ async fn sparse_checkout_warn_reapply_preserved_paths(
     if path.length() == 0 {
       continue
     }
-    if raw_path.has_suffix("/") || skip_worktree_paths.contains(raw_path) {
+    if raw_path.has_suffix("/") ||
+      skip_worktree_paths.contains(raw_path) ||
+      (patterns.length() > 0 && !@bitlib.matches_sparse_pattern(path, patterns)) {
       sparse_checkout_unique_push(skipped_paths, path)
     } else {
       kept_paths.push(path)
