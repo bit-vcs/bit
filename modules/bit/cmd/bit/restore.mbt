@@ -152,7 +152,7 @@ async fn handle_restore(args : Array[String]) -> Unit raise Error {
       if filtered_paths.length() == 0 {
         return
       }
-      @bitlib.restore_paths(fs, rfs, root, filtered_paths)
+      checkout_restore_index_paths(fs, root, filtered_paths)
       return
     }
   }
@@ -181,7 +181,7 @@ async fn handle_restore(args : Array[String]) -> Unit raise Error {
           update_index=true,
         )
       } else {
-        @bitlib.restore_paths(fs, rfs, root, paths)
+        checkout_restore_index_paths(fs, root, paths)
       }
   }
 }

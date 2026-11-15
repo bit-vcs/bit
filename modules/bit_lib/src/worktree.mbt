@@ -476,45 +476,18 @@ pub fn commit(
   }
   let parent = resolve_head_commit(rfs, actual_git_dir)
   let entries = read_index_entries(rfs, actual_git_dir)
+  // An empty index records the empty tree (e.g. every file deleted);
+  // whether that is "nothing to commit" is decided below, as in git.
   let tree_id = if entries.length() == 0 {
-    if !allow_empty {
-      raise @bit.GitError::InvalidObject("Empty index")
+    if !allow_empty && parent is None {
+      raise @bit.GitError::InvalidObject("nothing to commit")
     }
-    match parent {
-      Some(parent_id) => {
-        let db = ObjectDb::load_lazy(rfs, common_git_dir)
-        let parent_tree = match db.get(rfs, parent_id) {
-          Some(obj) if obj.obj_type == @bit.ObjectType::Commit =>
-            (@bit.parse_commit(obj.data).tree |> Some) catch {
-              _ => None
-            }
-          _ => None
-        }
-        match parent_tree {
-          Some(tree) => tree
-          None => {
-            let (empty_tree_id, empty_tree_compressed) = @object.create_tree_with_algo(
-              effective_algo,
-              [],
-            )
-            write_object_bytes(
-              fs, common_git_dir, empty_tree_id, empty_tree_compressed,
-            )
-            empty_tree_id
-          }
-        }
-      }
-      None => {
-        let (empty_tree_id, empty_tree_compressed) = @object.create_tree_with_algo(
-          effective_algo,
-          [],
-        )
-        write_object_bytes(
-          fs, common_git_dir, empty_tree_id, empty_tree_compressed,
-        )
-        empty_tree_id
-      }
-    }
+    let (empty_tree_id, empty_tree_compressed) = @object.create_tree_with_algo(
+      effective_algo,
+      [],
+    )
+    write_object_bytes(fs, common_git_dir, empty_tree_id, empty_tree_compressed)
+    empty_tree_id
   } else {
     write_tree_from_index(
       fs,
@@ -1970,7 +1943,10 @@ pub fn rm_paths(
     // Remove from working tree unless --cached
     if !cached {
       let abs = join_path(root, norm_path)
-      if rfs.is_file(abs) {
+      // lstat: a symlink (even dangling or to a directory) is removed itself.
+      let is_link = @bitio.worktree_entry_meta_sync(rfs, abs) is Some(info) &&
+        info.kind is @bitio.WorktreeKindMeta::Symlink
+      if is_link || rfs.is_file(abs) {
         fs.remove_file(abs)
         rm_prune_empty_parent_dirs(fs, rfs, root, norm_path)
       } else if tracked_entry is Some(entry) &&

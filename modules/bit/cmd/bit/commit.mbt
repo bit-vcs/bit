@@ -856,44 +856,16 @@ async fn commit_signed(
   let parent = @bitlib.resolve_head_commit(rfs, git_dir)
   let entries = @bitlib.read_index_entries(rfs, git_dir)
   let tree_id = if entries.length() == 0 {
-    if !allow_empty {
-      raise @bitcore.GitError::InvalidObject("Empty index")
+    // Empty index = the empty tree (every file deleted).
+    if !allow_empty && parent is None {
+      raise @bitcore.GitError::InvalidObject("nothing to commit")
     }
-    match parent {
-      Some(parent_id) => {
-        let db = @bitlib.ObjectDb::load_lazy(rfs, git_dir)
-        let parent_tree = match db.get(rfs, parent_id) {
-          Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit =>
-            (@bitcore.parse_commit(obj.data).tree |> Some) catch {
-              _ => None
-            }
-          _ => None
-        }
-        match parent_tree {
-          Some(tree) => tree
-          None => {
-            let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
-              algo,
-              [],
-            )
-            @bitlib.write_object_bytes(
-              fs, git_dir, empty_tree_id, empty_tree_compressed,
-            )
-            empty_tree_id
-          }
-        }
-      }
-      None => {
-        let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
-          algo,
-          [],
-        )
-        @bitlib.write_object_bytes(
-          fs, git_dir, empty_tree_id, empty_tree_compressed,
-        )
-        empty_tree_id
-      }
-    }
+    let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
+      algo,
+      [],
+    )
+    @bitlib.write_object_bytes(fs, git_dir, empty_tree_id, empty_tree_compressed)
+    empty_tree_id
   } else {
     @bitlib.write_tree_from_index(
       fs,
@@ -1035,44 +1007,16 @@ async fn commit_with_merge_heads(
   let head_parent = @bitlib.resolve_head_commit(rfs, git_dir)
   let entries = @bitlib.read_index_entries(rfs, git_dir)
   let tree_id = if entries.length() == 0 {
-    if !allow_empty {
-      raise @bitcore.GitError::InvalidObject("Empty index")
+    // Empty index = the empty tree (every file deleted).
+    if !allow_empty && head_parent is None {
+      raise @bitcore.GitError::InvalidObject("nothing to commit")
     }
-    match head_parent {
-      Some(parent_id) => {
-        let db = @bitlib.ObjectDb::load_lazy(rfs, git_dir)
-        let parent_tree = match db.get(rfs, parent_id) {
-          Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit =>
-            (@bitcore.parse_commit(obj.data).tree |> Some) catch {
-              _ => None
-            }
-          _ => None
-        }
-        match parent_tree {
-          Some(tree) => tree
-          None => {
-            let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
-              algo,
-              [],
-            )
-            @bitlib.write_object_bytes(
-              fs, git_dir, empty_tree_id, empty_tree_compressed,
-            )
-            empty_tree_id
-          }
-        }
-      }
-      None => {
-        let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
-          algo,
-          [],
-        )
-        @bitlib.write_object_bytes(
-          fs, git_dir, empty_tree_id, empty_tree_compressed,
-        )
-        empty_tree_id
-      }
-    }
+    let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
+      algo,
+      [],
+    )
+    @bitlib.write_object_bytes(fs, git_dir, empty_tree_id, empty_tree_compressed)
+    empty_tree_id
   } else {
     @bitlib.write_tree_from_index(
       fs,

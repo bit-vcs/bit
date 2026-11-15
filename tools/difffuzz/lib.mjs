@@ -339,7 +339,7 @@ export function restoreProblems({ repo, bit, env, workdir, maxCommits = 25 }) {
       problems.push(`restore: bit checkout ${id} failed: ${co.stderr.trim()}`);
       continue;
     }
-    const expected = (gitOut(repo, ["ls-tree", "-r", id], env) ?? "")
+    const expected = (gitOut(repo, ["-c", "core.quotePath=false", "ls-tree", "-r", id], env) ?? "")
       .split("\n")
       .filter(Boolean)
       .filter((l) => !l.startsWith("160000"))

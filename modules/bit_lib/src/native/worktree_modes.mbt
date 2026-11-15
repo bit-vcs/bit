@@ -255,3 +255,20 @@ pub async fn apply_worktree_modes_for_paths(
   }
   apply_worktree_modes_from_files(db, rfs, fs, root, git_dir, files)
 }
+
+///|
+/// Apply modes and symlinks for exactly `files` (path -> blob and mode),
+/// e.g. the entries `restore_paths` just wrote from the index.
+pub async fn apply_worktree_modes_for_files(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  files : Map[String, @bitlib.TreeFileEntry],
+) -> Unit raise @bit.GitError {
+  if files.length() == 0 {
+    return
+  }
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  apply_worktree_modes_from_files(db, rfs, fs, root, git_dir, files)
+}

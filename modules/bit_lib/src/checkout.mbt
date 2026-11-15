@@ -7,6 +7,7 @@ pub fn restore_paths(
   rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
+  restored? : Map[String, TreeFileEntry] = Map([]),
 ) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -16,53 +17,75 @@ pub fn restore_paths(
   }
   let object_git_dir = resolve_checkout_common_git_dir(rfs, actual_git_dir)
   let index_entries = read_index_entries(rfs, actual_git_dir)
-  let index_map : Map[String, IndexEntry] = Map([])
-  for e in index_entries {
-    let safe_path = normalize_checkout_path(e.path)
-    index_map[safe_path] = e
-  }
+  let skip = read_skip_worktree_paths(rfs, actual_git_dir)
   let autocrlf = read_autocrlf_setting(rfs, actual_git_dir)
   let core_eol = read_core_eol_setting(rfs, actual_git_dir)
   let db = ObjectDb::load(rfs, object_git_dir)
+  // Resolve every pathspec (a file, or a directory prefix) first, so a
+  // bad one fails before anything is written, as in git.
+  let selected : Array[IndexEntry] = []
+  let seen : Map[String, Bool] = Map([])
   for path in paths {
     let safe_path = normalize_checkout_path(path)
-    match index_map.get(safe_path) {
-      None =>
-        raise @bit.GitError::InvalidObject(
-          "error: pathspec '\{path}' did not match any file(s) known to git",
-        )
-      Some(entry) => {
-        let obj = db.get(rfs, entry.id)
-        match obj {
-          None =>
-            raise @bit.GitError::InvalidObject(
-              "Object not found: \{entry.id.to_hex()}",
-            )
-          Some(o) => {
-            let abs_path = join_path(root, safe_path)
-            let dir = parent_dir(abs_path)
-            if dir.length() > 0 && dir != root {
-              fs.mkdir_p(dir)
-            }
-            let attrs = resolve_eol_attrs(rfs, root, safe_path)
-            let data = if attrs.filter == Some("lfs") && is_lfs_pointer(o.data) {
-              match parse_lfs_pointer(o.data) {
-                Some(ptr) =>
-                  match lfs_get_cached_content(rfs, actual_git_dir, ptr.oid) {
-                    Some(cached) => cached
-                    None => o.data
-                  }
-                None => o.data
-              }
-            } else {
-              o.data
-            }
-            let output = smudge_for_checkout(data, attrs, autocrlf, core_eol~)
-            fs.write_file(abs_path, output)
-          }
+    let mut matched = false
+    for e in index_entries {
+      if safe_path == "" ||
+        e.path == safe_path ||
+        e.path.has_prefix(safe_path + "/") {
+        matched = true
+        if !seen.contains(e.path) && !skip.contains(e.path) {
+          seen[e.path] = true
+          selected.push(e)
         }
       }
     }
+    if !matched {
+      raise @bit.GitError::InvalidObject(
+        "error: pathspec '\{path}' did not match any file(s) known to git",
+      )
+    }
+  }
+  for entry in selected {
+    if is_gitlink_mode_int(entry.mode) {
+      continue
+    }
+    let o = match db.get(rfs, entry.id) {
+      Some(o) => o
+      None =>
+        raise @bit.GitError::InvalidObject(
+          "Object not found: \{entry.id.to_hex()}",
+        )
+    }
+    let abs_path = join_path(root, entry.path)
+    let dir = parent_dir(abs_path)
+    if dir.length() > 0 && dir != root {
+      fs.mkdir_p(dir)
+    }
+    // Never write through a worktree symlink: replace the link itself.
+    if @bitio.worktree_entry_meta_sync(rfs, abs_path) is Some(info) &&
+      info.kind is @bitio.WorktreeKindMeta::Symlink {
+      fs.remove_file(abs_path)
+    }
+    let attrs = resolve_eol_attrs(rfs, root, entry.path)
+    let data = if attrs.filter == Some("lfs") && is_lfs_pointer(o.data) {
+      match parse_lfs_pointer(o.data) {
+        Some(ptr) =>
+          match lfs_get_cached_content(rfs, actual_git_dir, ptr.oid) {
+            Some(cached) => cached
+            None => o.data
+          }
+        None => o.data
+      }
+    } else {
+      o.data
+    }
+    let output = if entry.mode == 0o120000 {
+      o.data
+    } else {
+      smudge_for_checkout(data, attrs, autocrlf, core_eol~)
+    }
+    fs.write_file(abs_path, output)
+    restored[entry.path] = { id: entry.id, mode: entry.mode }
   }
 }
 

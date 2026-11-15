@@ -539,7 +539,7 @@ pub fn resolve_ref(&@bit_types.RepoFileSystem, String, String) -> @bit_object.Ob
 
 pub fn resolve_ref_for_subdir(&@bit_types.RepoFileSystem, String, String) -> @bit_object.ObjectId? raise @bit_object.GitError
 
-pub fn restore_paths(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[String]) -> Unit raise @bit_object.GitError
+pub fn restore_paths(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[String], restored? : Map[String, TreeFileEntry]) -> Unit raise @bit_object.GitError
 
 pub fn rev_list_find_range_dots(String) -> (Int32, Bool)?
 

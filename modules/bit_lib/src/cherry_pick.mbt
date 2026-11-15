@@ -237,16 +237,26 @@ fn sequencer_check_local_changes(
       "your local changes would be overwritten by \{op}.\nhint: commit your changes or stash them to proceed.",
     )
   }
-  let changed : Map[String, Bool] = Map([])
-  for path, entry in theirs {
-    match base_files.get(path) {
-      Some(b) if b.id == entry.id && b.mode == entry.mode => ()
-      _ => changed[path] = true
+  // Only paths the operation actually rewrites matter: theirs differs
+  // from base, and HEAD does not already have theirs' version.
+  let same = fn(a : TreeFileEntry?, b : TreeFileEntry?) {
+    match (a, b) {
+      (Some(x), Some(y)) => x.id == y.id && x.mode == y.mode
+      (None, None) => true
+      _ => false
     }
   }
+  let changed : Map[String, Bool] = Map([])
+  for path, _ in theirs {
+    changed[path] = true
+  }
   for path, _ in base_files {
-    if !theirs.contains(path) {
-      changed[path] = true
+    changed[path] = true
+  }
+  for path in changed.keys().to_array() {
+    if same(base_files.get(path), theirs.get(path)) ||
+      same(ours.get(path), theirs.get(path)) {
+      changed.remove(path)
     }
   }
   let dirty : Array[String] = []
@@ -358,7 +368,15 @@ pub fn revert(
     rfs, root, git_dir, ours, base_files, theirs, "revert",
   )
   let subject = cherry_pick_subject(commit.message)
-  let message = "Revert \"\{subject}\"\n\nThis reverts commit \{commit_id.to_hex()}.\n"
+  // git: reverting a revert reads `Reapply "<original subject>"`.
+  let title = if subject.has_prefix("Revert \"") &&
+    subject.has_suffix("\"") &&
+    subject.length() > 9 {
+    "Reapply " + String::unsafe_substring(subject, start=7, end=subject.length())
+  } else {
+    "Revert \"\{subject}\""
+  }
+  let message = "\{title}\n\nThis reverts commit \{commit_id.to_hex()}.\n"
   let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
   let tw = merge_three_way(
     db,
@@ -401,7 +419,7 @@ pub fn revert(
   let tree_id = write_tree_from_index(fs, rfs, git_dir, entries)
   let head_tree = rebase_parse_commit_full(db, rfs, head_id).tree
   if !allow_empty && head_tree == tree_id {
-    fs.write_string(join_path(git_dir, "REVERT_HEAD"), commit_id.to_hex() + "\n")
+    // Unlike cherry-pick, git leaves no REVERT_HEAD for an empty revert.
     fs.write_string(join_path(git_dir, "MERGE_MSG"), message)
     return { status: CherryPickStatus::Empty, commit_id: None, conflicts: [] }
   }

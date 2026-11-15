@@ -153,7 +153,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       raise @bitcore.GitError::InvalidObject("No paths specified for checkout")
     }
     if targets.length() == 0 {
-      @bitlib.restore_paths(fs, fs, root, post_separator_targets)
+      checkout_restore_index_paths(fs, root, post_separator_targets)
     } else if targets.length() == 1 {
       checkout_restore_paths_from_spec(
         fs,
@@ -234,7 +234,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       switched_head = true
     } else if is_path {
       // Restore single file
-      @bitlib.restore_paths(fs, fs, root, [target])
+      checkout_restore_index_paths(fs, root, [target])
     } else {
       // Try as branch/commit
       match checkout_branch_in_use_path(rfs, root, target) {
@@ -279,7 +279,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       )
     } else {
       // Multiple targets: treat as file paths
-      @bitlib.restore_paths(fs, fs, root, targets)
+      checkout_restore_index_paths(fs, root, targets)
     }
   }
 }
@@ -861,3 +861,19 @@ fn parse_checkout_missing_object_id(err : Error) -> @bitcore.ObjectId? {
 }
 
 ///|
+
+///|
+/// `git checkout -- <paths>` / `git restore <paths>` from the index, then
+/// the entries' modes and symlinks (native only).
+async fn checkout_restore_index_paths(
+  fs : OsFs,
+  root : String,
+  paths : Array[String],
+) -> Unit raise Error {
+  let restored : Map[String, @bitlib.TreeFileEntry] = Map([])
+  @bitlib.restore_paths(fs, fs, root, paths, restored~)
+  let common_dir = @bitlib.resolve_common_git_dir(fs, resolve_git_dir(fs, root))
+  @bitlibnative.apply_worktree_modes_for_files(
+    fs, fs, root, common_dir, restored,
+  )
+}
