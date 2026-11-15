@@ -267,6 +267,7 @@ options(
     "prune.mbt": [ "native" ],
     "prune_packed.mbt": [ "native" ],
     "pull.mbt": [ "native" ],
+    "pull_clone_compat_wbtest.mbt": [ "native" ],
     "push.mbt": [ "native" ],
     "quiltimport.mbt": [ "native" ],
     "range_diff.mbt": [ "native" ],
