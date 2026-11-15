@@ -180,6 +180,10 @@ test "fetch relay: falls back to repo and then first peer" {
 ///|
 async test "fetch: depth and unshallow update shallow metadata natively" {
   @bitnative.init_native_io()
+  // Mutates process-global GIT_SHIM_* across awaits: serialize with the
+  // other env-mutating async tests in this package.
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test-fetch-depth-" + get_current_timestamp().to_string()
   let src = root + "/src"
