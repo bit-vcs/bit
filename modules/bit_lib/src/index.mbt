@@ -987,7 +987,10 @@ fn index_store_missing_trees(
   if trees.length() == 0 {
     return
   }
-  let db = ObjectDb::load_lazy(fs, git_dir)
+  // A linked worktree's git dir holds only its index; objects live in the
+  // common git dir.
+  let objects_git_dir = resolve_common_git_dir(fs, git_dir)
+  let db = ObjectDb::load_lazy(fs, objects_git_dir)
   for item in trees {
     let (id, data) = item
     let present = (db.get(fs, id) catch { _ => None }) is Some(_)
@@ -995,7 +998,7 @@ fn index_store_missing_trees(
       continue
     }
     // `data` is the compressed object `create_tree` produced for `id`.
-    write_object_bytes(wfs, git_dir, id, data)
+    write_object_bytes(wfs, objects_git_dir, id, data)
   }
 }
 

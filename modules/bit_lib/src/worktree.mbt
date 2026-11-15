@@ -166,9 +166,44 @@ pub fn add_paths(
   for e in entries {
     map[e.path] = e
   }
+  let core_filemode = read_core_filemode_setting(rfs, common_git_dir)
   let all_paths = expand_paths(rfs, root, paths)
   for path in all_paths {
     let abs = join_path(root, path)
+    // lstat, never following a symlink: a symlink is staged as itself
+    // (mode 120000, blob = link target), like git, not as its target's
+    // content -- and a dangling or directory symlink is not "missing".
+    let meta = @bitio.worktree_entry_meta_sync(rfs, abs)
+    if meta is Some(info) && info.kind is @bitio.WorktreeKindMeta::Symlink {
+      match @bitio.read_symlink_target_path(abs) {
+        Some(target) => {
+          let bytes = @utf8.encode(target)
+          let id = write_loose_object(
+            fs,
+            common_git_dir,
+            @bit.ObjectType::Blob,
+            bytes,
+            algo=effective_algo,
+          )
+          compat_record_blob_mapping(fs, rfs, common_git_dir, id, bytes)
+          map[path] = {
+            path,
+            id,
+            mode: 0o120000,
+            size: bytes.length(),
+            mtime_sec: info.mtime_sec.unwrap_or(0),
+            mtime_nsec: info.mtime_nsec.unwrap_or(0),
+            intent_to_add: false,
+            dev: info.dev.unwrap_or(0),
+            ino: info.ino.unwrap_or(0),
+            uid: info.uid.unwrap_or(0),
+            gid: info.gid.unwrap_or(0),
+          }
+        }
+        None => map.remove(path)
+      }
+      continue
+    }
     if rfs.is_file(abs) {
       let content = rfs.read_file(abs)
       let attrs = resolve_eol_attrs(rfs, root, path)
@@ -186,8 +221,7 @@ pub fn add_paths(
       )
       compat_record_blob_mapping(fs, rfs, common_git_dir, id, normalized)
       let size = content.length()
-      let (mtime_sec, mtime_nsec, dev, ino, uid, gid) = match
-        @bitio.worktree_entry_meta_sync(rfs, abs) {
+      let (mtime_sec, mtime_nsec, dev, ino, uid, gid) = match meta {
         Some(info) =>
           (
             info.mtime_sec.unwrap_or(0),
@@ -199,10 +233,19 @@ pub fn add_paths(
           )
         None => (0, 0, 0, 0, 0, 0)
       }
+      // The executable bit comes from the worktree (core.filemode); with
+      // core.filemode=false keep what the index already records.
+      let mode = match (meta, map.get(path)) {
+        (Some(info), _) if core_filemode &&
+          (info.mode == 0o100755 || info.mode == 0o100644) => info.mode
+        (_, Some(existing)) if existing.mode == 0o100755 ||
+          existing.mode == 0o100644 => existing.mode
+        _ => default_file_mode()
+      }
       map[path] = {
         path,
         id,
-        mode: default_file_mode(),
+        mode,
         size,
         mtime_sec,
         mtime_nsec,
