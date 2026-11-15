@@ -899,6 +899,9 @@ fn storage_collect_status_snapshot(
   let common_git_dir = storage_resolve_common_git_dir(rfs, git_dir)
   let core_filemode = @bitlib.core_filemode_enabled(rfs, common_git_dir)
   let entries = @bitlib.read_index_entries(rfs, git_dir)
+  // Skip-worktree entries (outside a sparse checkout) are not compared
+  // with the worktree, as in git: they are absent on disk by design.
+  let skip_worktree = @bitlib.read_skip_worktree_paths(rfs, git_dir)
   let index_map : Map[String, @bitlib.IndexEntry] = Map([])
   for entry in entries {
     index_map[entry.path] = entry
@@ -910,6 +913,9 @@ fn storage_collect_status_snapshot(
   let unstaged_modified : Array[String] = []
   for rel_path in files {
     visited[rel_path] = true
+    if skip_worktree.contains(rel_path) {
+      continue
+    }
     match index_map.get(rel_path) {
       Some(index_entry) => {
         let abs_path = root + "/" + rel_path
@@ -956,7 +962,8 @@ fn storage_collect_status_snapshot(
   }
   let unstaged_deleted : Array[String] = []
   for entry in entries {
-    if visited.get(entry.path) is Some(_) {
+    if visited.get(entry.path) is Some(_) ||
+      skip_worktree.contains(entry.path) {
       continue
     }
     let abs_path = root + "/" + entry.path

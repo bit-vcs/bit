@@ -507,8 +507,13 @@ async fn home_sync_one(
         )
         true
       } else if status.upstream is None {
-        print_line("\{name}: no upstream branch; fetching only")
-        home_run_bit(["-C", abs, "fetch", "-q"]) == 0
+        if home_capture_trimmed(["-C", abs, "remote"]) is None {
+          print_line("\{name}: no remote; nothing to sync")
+          true
+        } else {
+          print_line("\{name}: no upstream branch; fetching only")
+          home_run_bit(["-C", abs, "fetch", "-q"]) == 0
+        }
       } else if home_run_bit(["-C", abs, "pull", "-q", "--ff-only"]) ==
         0 {
         print_line("\{name}: up to date")
