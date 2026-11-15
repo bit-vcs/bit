@@ -509,6 +509,28 @@ pub fn commit(
       algo=effective_algo,
     )
   }
+  // Like git: without --allow-empty, a commit whose tree equals its
+  // parent's records nothing and is refused.
+  if !allow_empty {
+    match parent {
+      Some(parent_id) => {
+        let db = ObjectDb::load_lazy(rfs, common_git_dir)
+        let parent_tree = match db.get(rfs, parent_id) {
+          Some(obj) if obj.obj_type == @bit.ObjectType::Commit =>
+            (@bit.parse_commit(obj.data).tree |> Some) catch {
+              _ => None
+            }
+          _ => None
+        }
+        if parent_tree == Some(tree_id) {
+          raise @bit.GitError::InvalidObject(
+            "nothing to commit, working tree clean",
+          )
+        }
+      }
+      None => ()
+    }
+  }
   let parents = match parent {
     Some(p) => [p]
     None => []
