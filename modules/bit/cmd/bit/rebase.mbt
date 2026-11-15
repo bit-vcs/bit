@@ -15,10 +15,10 @@ async fn delegate_rebase_to_real_git(
     argv,
     inherit_env=true,
     cwd~,
-    stdin=@stdio.stdin,
-    stdout=@stdio.stdout,
-    stderr=@stdio.stderr,
-  )
+    stdin=Stdin,
+    stdout=Stdout,
+    stderr=Stderr,
+  ).exit_code
   @sys.exit(code)
 }
 
@@ -1391,11 +1391,11 @@ async fn make_exec_runner_callback(root : String) -> async (String) -> Int {
       "/bin/sh",
       ["-c", cmd],
       inherit_env=true,
-      stdin=@stdio.stdin,
-      stdout=@stdio.stdout,
-      stderr=@stdio.stderr,
+      stdin=Stdin,
+      stdout=Stdout,
+      stderr=Stderr,
       cwd=root,
-    )
+    ).exit_code
   }
 }
 

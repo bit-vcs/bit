@@ -44,13 +44,15 @@ pub fn relay_load_signing_key() -> String? {
 }
 
 ///|
+/// A shared stdin pipe pre-filled with `text`. The caller passes it as
+/// `stdin=Shared(...)` and closes it once the child has been started.
 async fn relay_prepare_process_stdin(
   text : String,
-) -> &@process.ProcessInput raise @bit.GitError {
+) -> @process.SharedProcessInput raise @bit.GitError {
   let (stdin, writer) = @process.write_to_process() catch {
     err => raise @bit.GitError::IoError("relay sign: pipe failed: \{err}")
   }
-  writer.write(text) catch {
+  writer.write(@utf8.encode(text)) catch {
     err => raise @bit.GitError::IoError("relay sign: pipe write failed: \{err}")
   }
   writer.close()
@@ -60,23 +62,29 @@ async fn relay_prepare_process_stdin(
 ///|
 pub async fn relay_sha256_hex(text : String) -> String raise @bit.GitError {
   let stdin = relay_prepare_process_stdin(text)
-  let (code, stdout, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     "openssl",
     ["dgst", "-sha256", "-hex", "-r"],
     inherit_env=true,
-    stdin~,
+    stdin=Shared(stdin),
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
-    err =>
+    err => {
+      stdin.close()
       raise @bit.GitError::IoError("relay sign: openssl dgst failed: \{err}")
+    }
   }
+  stdin.close()
+  let (code, stdout, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   if code != 0 {
-    let err_text = stderr.text() catch { _ => "" }
+    let err_text = @utf8.decode(stderr) catch { _ => "" }
     let normalized = err_text.trim(chars=" \n\r\t").to_owned()
     raise @bit.GitError::IoError(
       "relay sign: openssl dgst error: \{normalized}",
     )
   }
-  let out_text = stdout.text() catch { _ => "" }
+  let out_text = @utf8.decode(stdout) catch { _ => "" }
   match relay_extract_sha256_hex(out_text) {
     Some(hex) => hex
     None =>
@@ -94,22 +102,24 @@ pub async fn relay_sign_ed25519(
   let tmp_in = "/tmp/bit-relay-sign-in-" +
     @env.now().to_int().to_string() +
     ".bin"
+  let message_stdin = relay_prepare_process_stdin(message)
   let write_code = @process.run(
     "sh",
     ["-c", "cat > \"$BIT_SIGN_TMP\""],
     inherit_env=true,
-    stdin=relay_prepare_process_stdin(message),
+    stdin=Shared(message_stdin),
     extra_env={ "BIT_SIGN_TMP": tmp_in },
-  ) catch {
+  ).exit_code catch {
     err =>
       raise @bit.GitError::IoError(
         "relay sign: failed to write temp file: \{err}",
       )
   }
+  message_stdin.close()
   if write_code != 0 {
     raise @bit.GitError::IoError("relay sign: failed to write temp file")
   }
-  let (code, stdout, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     "sh",
     [
       "-c", "openssl pkeyutl -sign -rawin -inkey \"$BIT_RELAY_SIGN_PRIVATE_KEY_FILE\" -in \"$BIT_SIGN_TMP\" | openssl base64 -A; rm -f \"$BIT_SIGN_TMP\"",
@@ -119,24 +129,27 @@ pub async fn relay_sign_ed25519(
       "BIT_RELAY_SIGN_PRIVATE_KEY_FILE": key_source,
       "BIT_SIGN_TMP": tmp_in,
     },
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
     err => {
       ignore(
-        @process.run("rm", ["-f", tmp_in], inherit_env=true) catch {
+        @process.run("rm", ["-f", tmp_in], inherit_env=true).exit_code catch {
           _ => -1
         },
       )
       raise @bit.GitError::IoError("relay sign: openssl pkeyutl failed: \{err}")
     }
   }
+  let (code, stdout, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   if code != 0 {
-    let err_text = stderr.text() catch { _ => "" }
+    let err_text = @utf8.decode(stderr) catch { _ => "" }
     let normalized = err_text.trim(chars=" \n\r\t").to_owned()
     raise @bit.GitError::IoError(
       "relay sign: openssl pkeyutl error: \{normalized}",
     )
   }
-  let base64_sig = stdout.text() catch { _ => "" }
+  let base64_sig = @utf8.decode(stdout) catch { _ => "" }
   let normalized = base64_sig.trim(chars=" \n\r\t").to_owned()
   if normalized.length() == 0 {
     raise @bit.GitError::IoError("relay sign: openssl produced empty signature")
@@ -151,27 +164,30 @@ pub async fn relay_resolve_public_key(
   match relay_sign_public_key() {
     Some(explicit) => explicit
     None => {
-      let (code, stdout, stderr) = @process.collect_output(
+      let proc_result = @process.run(
         "sh",
         [
           "-c", "openssl pkey -in \"$BIT_RELAY_SIGN_PRIVATE_KEY_FILE\" -pubout -outform DER | openssl base64 -A",
         ],
         inherit_env=true,
         extra_env={ "BIT_RELAY_SIGN_PRIVATE_KEY_FILE": key_source },
+        stdout=Collect,
+        stderr=Collect,
       ) catch {
         err =>
           raise @bit.GitError::IoError(
             "relay sign: openssl pkey failed: \{err}",
           )
       }
+      let (code, stdout, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
       if code != 0 {
-        let err_text = stderr.text() catch { _ => "" }
+        let err_text = @utf8.decode(stderr) catch { _ => "" }
         let normalized = err_text.trim(chars=" \n\r\t").to_owned()
         raise @bit.GitError::IoError(
           "relay sign: openssl pkey error: \{normalized}",
         )
       }
-      let der_base64 = stdout.text() catch { _ => "" }
+      let der_base64 = @utf8.decode(stdout) catch { _ => "" }
       let normalized = der_base64.trim(chars=" \n\r\t").to_owned()
       if normalized.length() == 0 {
         raise @bit.GitError::IoError(

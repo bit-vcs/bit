@@ -93,10 +93,10 @@ async fn handle_quiltimport(args : Array[String]) -> Unit raise Error {
       am_args,
       inherit_env=true,
       cwd=root,
-      stdin=@stdio.stdin,
-      stdout=@stdio.stdout,
-      stderr=@stdio.stderr,
-    )
+      stdin=Stdin,
+      stdout=Stdout,
+      stderr=Stderr,
+    ).exit_code
     if code != 0 {
       // Fall back to bit apply + manual commit
       let apply_code = @process.run(
@@ -104,10 +104,10 @@ async fn handle_quiltimport(args : Array[String]) -> Unit raise Error {
         ["apply", "--index", patch_path],
         inherit_env=true,
         cwd=root,
-        stdin=@stdio.stdin,
-        stdout=@stdio.stdout,
-        stderr=@stdio.stderr,
-      )
+        stdin=Stdin,
+        stdout=Stdout,
+        stderr=Stderr,
+      ).exit_code
       if apply_code != 0 {
         eprint_line("fatal: failed to apply \{patch_name}")
         @sys.exit(1)
@@ -126,10 +126,10 @@ async fn handle_quiltimport(args : Array[String]) -> Unit raise Error {
         commit_args,
         inherit_env=true,
         cwd=root,
-        stdin=@stdio.stdin,
-        stdout=@stdio.stdout,
-        stderr=@stdio.stderr,
-      )
+        stdin=Stdin,
+        stdout=Stdout,
+        stderr=Stderr,
+      ).exit_code
       if commit_code != 0 {
         eprint_line("fatal: failed to commit \{patch_name}")
         @sys.exit(1)

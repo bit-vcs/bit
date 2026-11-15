@@ -270,7 +270,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   match strategy {
     Some(s) =>
       if s != "ours" && s != "recursive" && s != "ort" && s != "resolve" {
-        @stdio.stderr.write("error: merge: unknown strategy '\{s}'\n")
+        @stdio.stderr.write(@utf8.encode("error: merge: unknown strategy '\{s}'\n"))
         @sys.exit(1)
       }
     None => ()
@@ -303,7 +303,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       }
     } else {
       @stdio.stderr.write(
-        "fatal: There is no merge to abort (ORIG_HEAD missing).",
+        @utf8.encode("fatal: There is no merge to abort (ORIG_HEAD missing)."),
       )
       @sys.exit(128)
     }
@@ -315,7 +315,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     let merge_msg_path = git_dir + "/MERGE_MSG"
     if !rfs.is_file(merge_head_path) {
       @stdio.stderr.write(
-        "fatal: There is no merge in progress (MERGE_HEAD missing).",
+        @utf8.encode("fatal: There is no merge in progress (MERGE_HEAD missing)."),
       )
       @sys.exit(128)
     }
@@ -502,7 +502,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   }
   // Handle --ff-only
   if ff_only && !is_ff {
-    @stdio.stderr.write("fatal: Not possible to fast-forward, aborting.")
+    @stdio.stderr.write(@utf8.encode("fatal: Not possible to fast-forward, aborting."))
     @sys.exit(128)
   }
   // Handle --no-ff: force merge commit even if fast-forward possible

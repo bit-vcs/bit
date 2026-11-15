@@ -29,7 +29,7 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
   // git clean requires -f unless -n is specified
   if !force && !dry_run {
     @stdio.stderr.write(
-      "fatal: clean.requireForce defaults to true and neither -i, -n, nor -f given; refusing to clean",
+      @utf8.encode("fatal: clean.requireForce defaults to true and neither -i, -n, nor -f given; refusing to clean"),
     )
     @sys.exit(1)
   }
@@ -39,7 +39,7 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
   if remove_only_ignored {
     // -X: only ignored files (not implemented - need gitignore parsing)
     @stdio.stderr.write(
-      "warning: -X (remove only ignored) not fully implemented",
+      @utf8.encode("warning: -X (remove only ignored) not fully implemented"),
     )
   } else {
     // Regular untracked files

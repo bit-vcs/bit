@@ -14,12 +14,15 @@ async fn submodule_wbtest_run_git(
   cwd : String,
   args : Array[String],
 ) -> Unit raise Error {
-  let (code, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
 }
 
@@ -28,14 +31,17 @@ async fn submodule_wbtest_git_stdout(
   cwd : String,
   args : Array[String],
 ) -> String raise Error {
-  let (code, stdout, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, stdout, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
-  stdout.text() catch {
+  @utf8.decode(stdout) catch {
     _ => ""
   }
 }
@@ -45,13 +51,16 @@ async fn submodule_wbtest_git_stderr(
   cwd : String,
   args : Array[String],
 ) -> (Int, String) raise Error {
-  let (code, _, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=Collect,
   )
-  let text = stderr.text() catch { _ => "" }
+  let (code, _, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let text = @utf8.decode(stderr) catch { _ => "" }
   (code, text)
 }
 
@@ -81,13 +90,16 @@ async fn submodule_wbtest_collect_shim_git_stderr(
   for arg in args {
     git_args.push(arg)
   }
-  let (code, _, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     shim_git,
     git_args[:],
     extra_env=env,
     inherit_env=true,
+    stdout=Collect,
+    stderr=Collect,
   )
-  let text = stderr.text() catch { _ => "" }
+  let (code, _, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let text = @utf8.decode(stderr) catch { _ => "" }
   (code, text)
 }
 
@@ -143,7 +155,7 @@ async test "submodule absorbgitdirs: gitlink without gitmodules entry is fatal" 
   let fs = OsFs::new()
   let root = "/tmp/bit-test-submodule-absorbgitdirs-missing-name-" +
     get_current_timestamp().to_string()
-  ignore(@process.run("rm", ["-rf", root], inherit_env=true))
+  ignore(@process.run("rm", ["-rf", root], inherit_env=true).exit_code)
   fs.mkdir_p(root)
   submodule_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "."])
   submodule_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -173,7 +185,7 @@ async test "submodule absorbgitdirs: embedded repo migrates and update reuses mo
   let fs = OsFs::new()
   let root = "/tmp/bit-test-submodule-absorbgitdirs-update-" +
     get_current_timestamp().to_string()
-  ignore(@process.run("rm", ["-rf", root], inherit_env=true))
+  ignore(@process.run("rm", ["-rf", root], inherit_env=true).exit_code)
   fs.mkdir_p(root)
   let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
   submodule_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "."])
@@ -230,7 +242,7 @@ async test "submodule add: relative local url works from absorbed submodule root
   let fs = OsFs::new()
   let root = "/tmp/bit-test-submodule-add-nested-relative-" +
     get_current_timestamp().to_string()
-  ignore(@process.run("rm", ["-rf", root], inherit_env=true))
+  ignore(@process.run("rm", ["-rf", root], inherit_env=true).exit_code)
   fs.mkdir_p(root)
   let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
   submodule_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "."])
@@ -568,7 +580,7 @@ async test "submodule update --remote: moved source fails until set-url" {
   fs.write_string(source_dir + "/file", "a\nb\n")
   submodule_wbtest_run_git(source_dir, ["add", "file"])
   submodule_wbtest_run_git(source_dir, ["commit", "-q", "-m", "b"])
-  let move_code = @process.run("mv", [source_dir, moved_source_dir])
+  let move_code = @process.run("mv", [source_dir, moved_source_dir]).exit_code
   @test.assert_eq(move_code, 0)
 
   let (update_code, _update_stderr) = submodule_wbtest_collect_shim_git_stderr(
@@ -637,7 +649,7 @@ async test "submodule add: post-checkout hook runs in submodule worktree" {
     hook_path,
     "#!/bin/sh\n" + "echo hook >hook.run\n" + "exit 1\n",
   )
-  let chmod_code = @process.run("chmod", ["+x", hook_path], inherit_env=true)
+  let chmod_code = @process.run("chmod", ["+x", hook_path], inherit_env=true).exit_code
   @test.assert_eq(chmod_code, 0)
   let code = submodule_run_post_checkout_hook(
     work_tree,
@@ -664,7 +676,7 @@ async test "submodule add: template hook keeps executable bit" {
   let modules_dir = root + "/modules/sub"
   fs.mkdir_p(template_dir + "/hooks")
   fs.write_string(hook_path, "#!/bin/sh\nexit 0\n")
-  let chmod_code = @process.run("chmod", ["+x", hook_path], inherit_env=true)
+  let chmod_code = @process.run("chmod", ["+x", hook_path], inherit_env=true).exit_code
   @test.assert_eq(chmod_code, 0)
   let prev_template_dir = @env.get_env_var("GIT_TEMPLATE_DIR")
   @env.set_env_var("GIT_TEMPLATE_DIR", template_dir)
@@ -1989,7 +2001,7 @@ async test "submodule add: cloned gitlink repo stays clean for diff-files" {
     "mv",
     [init_dir, root + "/.subrepo"],
     inherit_env=true,
-  )
+  ).exit_code
   @test.assert_eq(mv_code, 0)
 
   submodule_wbtest_run_git(root, [

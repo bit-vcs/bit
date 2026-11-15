@@ -3,7 +3,6 @@ name = "mizchi/bit"
 version = "0.49.1"
 
 import {
-  "moonbitlang/async@0.22.9",
   "moonbitlang/x@0.5.7",
   "mizchi/simd@0.6.1",
   "mizchi/tempfile@0.1.3",

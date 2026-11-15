@@ -491,12 +491,15 @@ async test "diff: real fs diff_worktree sees gitlink head change" {
   let init_dir = root + "/init"
   let super_dir = root + "/super"
 
-  let (code_init, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     ["init", "--initial-branch=main", "-q", init_dir],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code_init, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code_init, 0)
   submodule_wbtest_run_git(init_dir, ["config", "user.name", "Test User"])
   submodule_wbtest_run_git(init_dir, [
@@ -508,12 +511,15 @@ async test "diff: real fs diff_worktree sees gitlink head change" {
   let rev1 = submodule_wbtest_git_stdout(init_dir, ["rev-parse", "HEAD"])
     |> add_test_trim_trailing_newline
 
-  let (code_super, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     ["init", "--initial-branch=main", "-q", super_dir],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code_super, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code_super, 0)
   submodule_wbtest_run_git(super_dir, ["config", "user.name", "Test User"])
   submodule_wbtest_run_git(super_dir, [
@@ -522,19 +528,25 @@ async test "diff: real fs diff_worktree sees gitlink head change" {
 
   let prev_allow_protocol = @env.get_env_var("GIT_ALLOW_PROTOCOL")
   @env.set_env_var("GIT_ALLOW_PROTOCOL", "file")
-  let (code_add, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     ["-C", super_dir, "submodule", "add", "./../init", "init"],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code_add, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code_add, 0)
-  let (code_commit, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     ["-C", super_dir, "commit", "-qam", "initial"],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code_commit, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code_commit, 0)
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
 
@@ -545,19 +557,25 @@ async test "diff: real fs diff_worktree sees gitlink head change" {
     "config", "user.email", "test@example.com",
   ])
   fs.write_string(super_dir + "/init/b", "b\n")
-  let (code_sub_add, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     ["-C", super_dir + "/init", "add", "b"],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code_sub_add, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code_sub_add, 0)
-  let (code_sub_commit, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     ["-C", super_dir + "/init", "commit", "-q", "-m", "second"],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code_sub_commit, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code_sub_commit, 0)
   let rev2 = submodule_wbtest_git_stdout(super_dir + "/init", [
       "rev-parse", "HEAD",

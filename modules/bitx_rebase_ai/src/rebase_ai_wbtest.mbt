@@ -10,7 +10,7 @@ fn test_tmp_root(prefix : String) -> String {
 
 ///|
 async fn test_cleanup(path : String) -> Unit {
-  ignore(@process.run("rm", ["-rf", path], inherit_env=true)) catch {
+  ignore(@process.run("rm", ["-rf", path], inherit_env=true).exit_code) catch {
     err => {
       if @async.is_being_cancelled() {
         raise err
@@ -26,7 +26,7 @@ async fn test_exec_code(
   args : Array[String],
   cwd : String,
 ) -> Int {
-  @process.run(cmd, args, inherit_env=true, cwd~) catch {
+  @process.run(cmd, args, inherit_env=true, cwd~).exit_code catch {
     err => {
       if @async.is_being_cancelled() {
         raise err
@@ -42,11 +42,13 @@ async fn test_exec_text(
   args : Array[String],
   cwd : String,
 ) -> String? {
-  let (code, out, _) = @process.collect_output(
+  let proc_result = @process.run(
     cmd,
     args,
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
     err => {
       if @async.is_being_cancelled() {
@@ -55,10 +57,11 @@ async fn test_exec_text(
       return None
     }
   }
+  let (code, out, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   if code != 0 {
     return None
   }
-  let text = out.text() catch {
+  let text = @utf8.decode(out) catch {
     err => {
       if @async.is_being_cancelled() {
         raise err

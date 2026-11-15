@@ -5,7 +5,7 @@ import {
   "mizchi/bit_repo" @repo,
   "mizchi/bit_io" @io,
   "mizchi/bit_pack" @pack,
-  "moonbitlang/async",
+  "moonbitlang/core/async",
   "moonbitlang/core/encoding/utf8",
 }
 
@@ -23,6 +23,9 @@ import {
 warnings = "-29"
 
 options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+  ],
   targets: {
     "bench_test.mbt": [ "native" ],
     "remote_test.mbt": [ "native" ],

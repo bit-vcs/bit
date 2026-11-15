@@ -11,7 +11,6 @@ import {
   "mizchi/bit_osfs@0.49.1",
   "mizchi/bit_utils@0.49.1",
   "mizchi/bitflow@0.4.2",
-  "moonbitlang/async@0.22.9",
   "moonbitlang/x@0.5.7",
 }
 

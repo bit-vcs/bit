@@ -7,7 +7,13 @@ import {
 }
 
 import {
-  "moonbitlang/async",
+  "moonbitlang/core/async",
 } for "test"
 
 warnings = "-29"
+
+options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+  ],
+)

@@ -9,12 +9,12 @@ import {
   "mizchi/bit_ignore" @ignore,
   "mizchi/bit_io" @bitio,
   "mizchi/bit_io_native" @bitnative,
-  "moonbitlang/async",
-  "moonbitlang/async/fs" @afs,
-  "moonbitlang/async/http",
-  "moonbitlang/async/io" @aio,
-  "moonbitlang/async/stdio",
-  "moonbitlang/async/process",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/fs" @afs,
+  "moonbitlang/core/async/http",
+  "moonbitlang/core/async/io" @aio,
+  "moonbitlang/core/async/stdio",
+  "moonbitlang/core/async/process",
   "mizchi/bit_object/zlib",
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
@@ -36,6 +36,14 @@ import {
 warnings = "-29"
 
 options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/fs",
+    "moonbitlang/core/async/http",
+    "moonbitlang/core/async/io",
+    "moonbitlang/core/async/process",
+    "moonbitlang/core/async/stdio",
+  ],
   targets: {
     "bench_worktree_entry_wbtest.mbt": [ "native" ],
     "filter.mbt": [ "native" ],

@@ -515,7 +515,13 @@ async fn handle_hub_issue_sync_install_hook(
     print_line("Created sync hook at \{hook_path}")
   }
   // Make executable
-  let _ = @process.collect_output("chmod", ["+x", hook_path], inherit_env=true)
+  let _ = @process.run(
+    "chmod",
+    ["+x", hook_path],
+    inherit_env=true,
+    stdout=Discard,
+    stderr=Discard,
+  )
 }
 
 ///|

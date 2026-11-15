@@ -744,25 +744,25 @@ fn read_hash_at(
 async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
   for arg in args {
     if arg == "-h" || arg == "--help" || arg == "--help-all" {
-      @stdio.stdout.write("usage: git index-pack [<options>] <pack> [<idx>]\n")
+      @stdio.stdout.write(@utf8.encode("usage: git index-pack [<options>] <pack> [<idx>]\n"))
       @sys.exit(129)
     }
   }
   match parse_index_pack_args(args) {
     IndexPackParse::Unsupported => {
-      @stdio.stderr.write("bit index-pack: unsupported options\n")
+      @stdio.stderr.write(@utf8.encode("bit index-pack: unsupported options\n"))
       @sys.exit(1)
     }
     IndexPackParse::Error(msg) => {
-      @stdio.stderr.write(msg + "\n")
+      @stdio.stderr.write(@utf8.encode(msg + "\n"))
       @sys.exit(1)
     }
     IndexPackParse::Ok(cfg) => {
       if cfg.threads_warning {
-        @stdio.stderr.write("warning: no threads support, ignoring --threads\n")
+        @stdio.stderr.write(@utf8.encode("warning: no threads support, ignoring --threads\n"))
       }
       if cfg.fix_thin && !cfg.stdin {
-        @stdio.stderr.write("bit index-pack: --fix-thin requires --stdin\n")
+        @stdio.stderr.write(@utf8.encode("bit index-pack: --fix-thin requires --stdin\n"))
         @sys.exit(1)
       }
       let fs = OsFs::new()
@@ -784,7 +784,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           Some(path) => resolve_in_cwd(path)
           None => {
             @stdio.stderr.write(
-              "fatal: --verify-stat-only requires a pack file\n",
+              @utf8.encode("fatal: --verify-stat-only requires a pack file\n"),
             )
             @sys.exit(1)
             ""
@@ -793,7 +793,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         let pack = @fs.read_file_to_bytes(pack_path) catch {
           err => {
             @stdio.stderr.write(
-              "fatal: " + @debug.render(Repr(err)) + "\n",
+              @utf8.encode("fatal: " + @debug.render(Repr(err)) + "\n"),
             )
             @sys.exit(1)
             Default::default()
@@ -802,13 +802,13 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         let max_depth = @pack.max_delta_chain_length(pack) catch {
           err => {
             @stdio.stderr.write(
-              "fatal: " + @debug.render(Repr(err)) + "\n",
+              @utf8.encode("fatal: " + @debug.render(Repr(err)) + "\n"),
             )
             @sys.exit(1)
             0
           }
         }
-        @stdio.stdout.write("chain length = " + max_depth.to_string() + ":\n")
+        @stdio.stdout.write(@utf8.encode("chain length = " + max_depth.to_string() + ":\n"))
         return
       }
 
@@ -817,7 +817,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         let pack_path = match cfg.pack_path {
           Some(path) => resolve_in_cwd(path)
           None => {
-            @stdio.stderr.write("fatal: --verify requires a pack file\n")
+            @stdio.stderr.write(@utf8.encode("fatal: --verify requires a pack file\n"))
             @sys.exit(1)
             ""
           }
@@ -825,7 +825,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         let pack = @fs.read_file_to_bytes(pack_path) catch {
           err => {
             @stdio.stderr.write(
-              "fatal: " + @debug.render(Repr(err)) + "\n",
+              @utf8.encode("fatal: " + @debug.render(Repr(err)) + "\n"),
             )
             @sys.exit(1)
             Default::default()
@@ -840,7 +840,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         let idx = @fs.read_file_to_bytes(idx_path) catch {
           err => {
             @stdio.stderr.write(
-              "fatal: " + @debug.render(Repr(err)) + "\n",
+              @utf8.encode("fatal: " + @debug.render(Repr(err)) + "\n"),
             )
             @sys.exit(1)
             Default::default()
@@ -848,7 +848,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         }
         match verify_pack_index(idx, pack, hash_size~) {
           Some(err) => {
-            @stdio.stderr.write("error: " + err + "\n")
+            @stdio.stderr.write(@utf8.encode("error: " + err + "\n"))
             @sys.exit(1)
           }
           None => {
@@ -863,9 +863,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
               let rev = @fs.read_file_to_bytes(rev_path) catch {
                 err => {
                   @stdio.stderr.write(
-                    "error: could not read reverse index: " +
+                    @utf8.encode("error: could not read reverse index: " +
                     @debug.render(Repr(err)) +
-                    "\n",
+                    "\n"),
                   )
                   @sys.exit(1)
                   Default::default()
@@ -874,7 +874,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
               match verify_reverse_index(rev, pack, hash_size~) {
                 Some(err) => {
                   @stdio.stderr.write(
-                    "error: reverse index validation error: " + err + "\n",
+                    @utf8.encode("error: reverse index validation error: " + err + "\n"),
                   )
                   @sys.exit(1)
                 }
@@ -883,7 +883,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
             }
             // Success - print the pack hash
             let hash_hex = pack_hash_hex(pack, hash_size~)
-            @stdio.stdout.write(hash_hex + "\n")
+            @stdio.stdout.write(@utf8.encode(hash_hex + "\n"))
           }
         }
         return
@@ -894,9 +894,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         match cfg.max_input_size {
           Some(max_size) if pack.length().to_int64() > max_size => {
             @stdio.stderr.write(
-              "fatal: pack exceeds maximum allowed size (" +
+              @utf8.encode("fatal: pack exceeds maximum allowed size (" +
               max_size.to_string() +
-              " bytes)\n",
+              " bytes)\n"),
             )
             @sys.exit(1)
           }
@@ -910,16 +910,16 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         }
         if cfg.verbose {
           @stdio.stderr.write(
-            "Receiving objects: 100% (" +
+            @utf8.encode("Receiving objects: 100% (" +
             pack_obj_count.to_string() +
             "/" +
             pack_obj_count.to_string() +
-            "), done.\n",
+            "), done.\n"),
           )
         }
         let hash_hex = pack_hash_hex(pack, hash_size~)
         if !fs.is_dir(git_dir) {
-          @stdio.stderr.write("fatal: not a git repository\n")
+          @stdio.stderr.write(@utf8.encode("fatal: not a git repository\n"))
           @sys.exit(1)
         }
         let trace2_event = @env.get_env_var("GIT_TRACE2_EVENT")
@@ -944,11 +944,11 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         }
         if cfg.verbose {
           @stdio.stderr.write(
-            "Resolving deltas: 100% (" +
+            @utf8.encode("Resolving deltas: 100% (" +
             objects.length().to_string() +
             "/" +
             objects.length().to_string() +
-            "), done.\n",
+            "), done.\n"),
           )
         }
         // When --fix-thin is used, the original pack may contain unresolved
@@ -1012,7 +1012,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           cfg.ignore_missing_email,
         )
         for w in fsck_warnings {
-          @stdio.stderr.write(w + "\n")
+          @stdio.stderr.write(@utf8.encode(w + "\n"))
         }
         // When --stdin is used with a pack path argument, write to that
         // path (like git index-pack).  Otherwise write to objects/pack/.
@@ -1071,14 +1071,14 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
             )
           None => ()
         }
-        @stdio.stdout.write(hash_hex + "\n")
+        @stdio.stdout.write(@utf8.encode(hash_hex + "\n"))
         return ()
       }
       // For file mode, check if current repo is SHA256
       let pack_path = match cfg.pack_path {
         Some(path) => path
         None => {
-          @stdio.stderr.write("fatal: missing pack file\n")
+          @stdio.stderr.write(@utf8.encode("fatal: missing pack file\n"))
           @sys.exit(1)
           ""
         }
@@ -1087,7 +1087,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
       let pack = @fs.read_file_to_bytes(pack_path) catch {
         err => {
           @stdio.stderr.write(
-            "fatal: " + @debug.render(Repr(err)) + "\n",
+            @utf8.encode("fatal: " + @debug.render(Repr(err)) + "\n"),
           )
           @sys.exit(1)
           Default::default()
@@ -1097,9 +1097,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
       match cfg.max_input_size {
         Some(max_size) if pack.length().to_int64() > max_size => {
           @stdio.stderr.write(
-            "fatal: pack exceeds maximum allowed size (" +
+            @utf8.encode("fatal: pack exceeds maximum allowed size (" +
             max_size.to_string() +
-            " bytes)\n",
+            " bytes)\n"),
           )
           @sys.exit(1)
         }
@@ -1123,7 +1123,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
       // fsck checks and still generates the index successfully.
       if cfg.fsck_objects && bit_dir_opt is None {
         @stdio.stderr.write(
-          "fatal: cannot perform queued object checks outside of a repository\n",
+          @utf8.encode("fatal: cannot perform queued object checks outside of a repository\n"),
         )
         @sys.exit(1)
       }
@@ -1139,7 +1139,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         cfg.ignore_missing_email,
       )
       for w in fsck_warnings2 {
-        @stdio.stderr.write(w + "\n")
+        @stdio.stderr.write(@utf8.encode(w + "\n"))
       }
       @pack.write_pack_index_from_objects_versioned(
         fs,
@@ -1168,7 +1168,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         }
         write_keep_file(fs, keep_path, cfg.keep_msg)
       }
-      @stdio.stdout.write(hash_hex + "\n")
+      @stdio.stdout.write(@utf8.encode(hash_hex + "\n"))
     }
   }
 }

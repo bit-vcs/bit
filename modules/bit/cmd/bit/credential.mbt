@@ -80,19 +80,25 @@ async fn credential_fill() -> Unit raise Error {
     match askpass {
       Some(prog) => {
         if username.length() == 0 {
-          let (code, stdout_data, _) = @process.collect_output(prog, [
+          let proc_result = @process.run(prog, [
             "Username for '\{protocol}://\{host}': ",
-          ])
+          ],
+            stdout=Collect,
+            stderr=Collect,)
+          let (code, stdout_data, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
           if code == 0 {
-            username = trim_string(decode_bytes(stdout_data.binary()))
+            username = trim_string(decode_bytes(stdout_data))
           }
         }
         if password.length() == 0 {
-          let (code, stdout_data, _) = @process.collect_output(prog, [
+          let proc_result = @process.run(prog, [
             "Password for '\{protocol}://\{username}@\{host}': ",
-          ])
+          ],
+            stdout=Collect,
+            stderr=Collect,)
+          let (code, stdout_data, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
           if code == 0 {
-            password = trim_string(decode_bytes(stdout_data.binary()))
+            password = trim_string(decode_bytes(stdout_data))
           }
         }
       }

@@ -10,12 +10,15 @@ async fn reset_wbtest_git_exit_code(
   cwd : String,
   args : Array[String],
 ) -> Int raise Error {
-  let (code, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   code
 }
 

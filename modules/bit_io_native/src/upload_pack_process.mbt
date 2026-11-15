@@ -629,20 +629,6 @@ async fn run_process_with_files(
   let stderr_path = "\{base}.err"
   let stdin_path = "\{base}.in"
   let cleanup_paths = [stdout_path, stderr_path, stdin_path]
-  let stdout = @process.redirect_to_file(
-    stdout_path,
-    create_mode=CreateOrTruncate,
-    permission=420,
-  ) catch {
-    e => raise @bit.GitError::IoError("failed to open stdout file: \{e}")
-  }
-  let stderr = @process.redirect_to_file(
-    stderr_path,
-    create_mode=CreateOrTruncate,
-    permission=420,
-  ) catch {
-    e => raise @bit.GitError::IoError("failed to open stderr file: \{e}")
-  }
   let stdin_bytes = match stdin_data {
     Some(data) => data
     None => Default::default()
@@ -653,19 +639,16 @@ async fn run_process_with_files(
         "failed to write stdin temp file: \{fs_error_message(e)}",
       )
   }
-  let stdin = @process.redirect_from_file(stdin_path) catch {
-    e => raise @bit.GitError::IoError("process stdin failed: \{e}")
-  }
   let run_cwd = resolve_process_cwd()
-  let code = match (spec.extra_env, run_cwd) {
+  let result = match (spec.extra_env, run_cwd) {
     (None, None) =>
       @process.run(
         spec.cmd,
         spec.args,
         inherit_env=true,
-        stdin~,
-        stdout~,
-        stderr~,
+        stdin=FromFile(stdin_path),
+        stdout=ToFile(stdout_path),
+        stderr=ToFile(stderr_path),
       ) catch {
         e => {
           cleanup_temp_files(cleanup_paths)
@@ -678,9 +661,9 @@ async fn run_process_with_files(
         spec.args,
         extra_env=env,
         inherit_env=true,
-        stdin~,
-        stdout~,
-        stderr~,
+        stdin=FromFile(stdin_path),
+        stdout=ToFile(stdout_path),
+        stderr=ToFile(stderr_path),
       ) catch {
         e => {
           cleanup_temp_files(cleanup_paths)
@@ -692,9 +675,9 @@ async fn run_process_with_files(
         spec.cmd,
         spec.args,
         inherit_env=true,
-        stdin~,
-        stdout~,
-        stderr~,
+        stdin=FromFile(stdin_path),
+        stdout=ToFile(stdout_path),
+        stderr=ToFile(stderr_path),
         cwd~,
       ) catch {
         e => {
@@ -708,9 +691,9 @@ async fn run_process_with_files(
         spec.args,
         extra_env=env,
         inherit_env=true,
-        stdin~,
-        stdout~,
-        stderr~,
+        stdin=FromFile(stdin_path),
+        stdout=ToFile(stdout_path),
+        stderr=ToFile(stderr_path),
         cwd~,
       ) catch {
         e => {
@@ -719,6 +702,7 @@ async fn run_process_with_files(
         }
       }
   }
+  let code = result.exit_code
   let out = @fs.read_file_to_bytes(stdout_path) catch {
     e => {
       cleanup_temp_files(cleanup_paths)
@@ -785,31 +769,18 @@ fn build_upload_pack_request_process_spec(
 async fn run_ssh_upload_pack_info_refs(
   spec : ProcessSpec,
 ) -> Bytes raise @bit.GitError {
-  let (stdin_input, stdin_writer) = @process.write_to_process() catch {
-    err => raise @bit.GitError::IoError("SSH stdin pipe failed: \{err}")
-  }
-  let (stdout_reader, stdout_output) = @process.read_from_process() catch {
-    err => raise @bit.GitError::IoError("SSH stdout pipe failed: \{err}")
-  }
   let nonce = @async.now()
   let stderr_path = ".moonbit-ssh-info-refs-\{nonce}.err"
-  let stderr = @process.redirect_to_file(
-    stderr_path,
-    create_mode=CreateOrTruncate,
-    permission=420,
-  ) catch {
-    err => raise @bit.GitError::IoError("SSH stderr file failed: \{err}")
-  }
   let run_cwd = resolve_process_cwd()
-  let pid = match (spec.extra_env, run_cwd) {
+  let child = match (spec.extra_env, run_cwd) {
     (None, None) =>
       @process.spawn_orphan(
         spec.cmd,
         spec.args,
         inherit_env=true,
-        stdin=stdin_input,
-        stdout=stdout_output,
-        stderr~,
+        stdin=FeedFromParent,
+        stdout=Collect,
+        stderr=ToFile(stderr_path),
       ) catch {
         e => {
           cleanup_temp_files([stderr_path])
@@ -822,9 +793,9 @@ async fn run_ssh_upload_pack_info_refs(
         spec.args,
         extra_env=env,
         inherit_env=true,
-        stdin=stdin_input,
-        stdout=stdout_output,
-        stderr~,
+        stdin=FeedFromParent,
+        stdout=Collect,
+        stderr=ToFile(stderr_path),
       ) catch {
         e => {
           cleanup_temp_files([stderr_path])
@@ -836,9 +807,9 @@ async fn run_ssh_upload_pack_info_refs(
         spec.cmd,
         spec.args,
         inherit_env=true,
-        stdin=stdin_input,
-        stdout=stdout_output,
-        stderr~,
+        stdin=FeedFromParent,
+        stdout=Collect,
+        stderr=ToFile(stderr_path),
         cwd~,
       ) catch {
         e => {
@@ -852,9 +823,9 @@ async fn run_ssh_upload_pack_info_refs(
         spec.args,
         extra_env=env,
         inherit_env=true,
-        stdin=stdin_input,
-        stdout=stdout_output,
-        stderr~,
+        stdin=FeedFromParent,
+        stdout=Collect,
+        stderr=ToFile(stderr_path),
         cwd~,
       ) catch {
         e => {
@@ -867,21 +838,21 @@ async fn run_ssh_upload_pack_info_refs(
   // Closing stdin causes it to exit (code 128), which unblocks read_all().
   // Without this, we deadlock: read_all waits for EOF on stdout while
   // git-upload-pack waits for data on stdin.
-  stdin_writer.close()
+  child.stdin.close()
   // Now read all ref advertisement from stdout
-  let response = stdout_reader.read_all() catch {
+  let response = child.stdout.read_all() catch {
     e => {
       cleanup_temp_files([stderr_path])
       raise @bit.GitError::IoError("SSH stdout read failed: \{e}")
     }
   }
-  stdout_reader.close()
-  let _code : Int = @process.wait_pid(pid) catch { _ => -1 }
+  child.stdout.close()
+  let _code : Int = child.wait() catch { _ => -1 }
   cleanup_temp_files([stderr_path])
-  if response.binary().length() == 0 {
+  if response.length() == 0 {
     raise @bit.GitError::ProtocolError("SSH ref advertisement was empty")
   }
-  response.binary()
+  response
 }
 
 ///|
@@ -981,31 +952,18 @@ async fn run_ssh_upload_pack_interactive(
   spec : ProcessSpec,
   wants_data : Bytes,
 ) -> Bytes raise @bit.GitError {
-  let (stdin_input, stdin_writer) = @process.write_to_process() catch {
-    err => raise @bit.GitError::IoError("SSH stdin pipe failed: \{err}")
-  }
-  let (stdout_reader, stdout_output) = @process.read_from_process() catch {
-    err => raise @bit.GitError::IoError("SSH stdout pipe failed: \{err}")
-  }
   let nonce = @async.now()
   let stderr_path = ".moonbit-ssh-upload-pack-\{nonce}.err"
-  let stderr = @process.redirect_to_file(
-    stderr_path,
-    create_mode=CreateOrTruncate,
-    permission=420,
-  ) catch {
-    err => raise @bit.GitError::IoError("SSH stderr file failed: \{err}")
-  }
   let run_cwd = resolve_process_cwd()
-  let pid = match (spec.extra_env, run_cwd) {
+  let child = match (spec.extra_env, run_cwd) {
     (None, None) =>
       @process.spawn_orphan(
         spec.cmd,
         spec.args,
         inherit_env=true,
-        stdin=stdin_input,
-        stdout=stdout_output,
-        stderr~,
+        stdin=FeedFromParent,
+        stdout=Collect,
+        stderr=ToFile(stderr_path),
       ) catch {
         e => {
           cleanup_temp_files([stderr_path])
@@ -1018,9 +976,9 @@ async fn run_ssh_upload_pack_interactive(
         spec.args,
         extra_env=env,
         inherit_env=true,
-        stdin=stdin_input,
-        stdout=stdout_output,
-        stderr~,
+        stdin=FeedFromParent,
+        stdout=Collect,
+        stderr=ToFile(stderr_path),
       ) catch {
         e => {
           cleanup_temp_files([stderr_path])
@@ -1032,9 +990,9 @@ async fn run_ssh_upload_pack_interactive(
         spec.cmd,
         spec.args,
         inherit_env=true,
-        stdin=stdin_input,
-        stdout=stdout_output,
-        stderr~,
+        stdin=FeedFromParent,
+        stdout=Collect,
+        stderr=ToFile(stderr_path),
         cwd~,
       ) catch {
         e => {
@@ -1048,9 +1006,9 @@ async fn run_ssh_upload_pack_interactive(
         spec.args,
         extra_env=env,
         inherit_env=true,
-        stdin=stdin_input,
-        stdout=stdout_output,
-        stderr~,
+        stdin=FeedFromParent,
+        stdout=Collect,
+        stderr=ToFile(stderr_path),
         cwd~,
       ) catch {
         e => {
@@ -1060,25 +1018,25 @@ async fn run_ssh_upload_pack_interactive(
       }
   }
   // Step 1: Read and discard ref advertisement (pkt-lines until flush)
-  skip_ssh_ref_advertisement(stdout_reader)
+  skip_ssh_ref_advertisement(child.stdout)
   // Step 2: Write fetch request (wants) to stdin, then close to signal EOF
-  stdin_writer.write(wants_data) catch {
+  child.stdin.write(wants_data) catch {
     e => {
       cleanup_temp_files([stderr_path])
       raise @bit.GitError::IoError("SSH stdin write failed: \{e}")
     }
   }
-  stdin_writer.close()
+  child.stdin.close()
   // Step 3: Read remaining response (NAK + sideband pack data)
-  let response = stdout_reader.read_all() catch {
+  let response = child.stdout.read_all() catch {
     e => {
       cleanup_temp_files([stderr_path])
       raise @bit.GitError::IoError("SSH stdout read failed: \{e}")
     }
   }
-  stdout_reader.close()
+  child.stdout.close()
   // Step 4: Wait for SSH process to exit
-  let code = @process.wait_pid(pid) catch {
+  let code = child.wait() catch {
     e => {
       cleanup_temp_files([stderr_path])
       raise @bit.GitError::IoError("SSH wait failed: \{e}")
@@ -1096,7 +1054,7 @@ async fn run_ssh_upload_pack_interactive(
     )
   }
   cleanup_temp_files([stderr_path])
-  response.binary()
+  response
 }
 
 ///|

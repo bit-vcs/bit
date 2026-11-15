@@ -14,7 +14,6 @@ import {
   "mizchi/bit_protocol@0.49.1",
   "mizchi/x@0.7.0",
   "moonbitlang/regexp@0.3.7",
-  "moonbitlang/async@0.22.9",
   "moonbitlang/x@0.5.7",
 }
 

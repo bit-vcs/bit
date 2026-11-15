@@ -134,17 +134,20 @@ async fn gh_issue_list(
 async fn gh_collect_output(
   args : Array[String],
 ) -> (String, String) raise @bitcore.GitError {
-  let (code, stdout, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     "gh",
     args,
     inherit_env=true,
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
     err => raise @bitcore.GitError::IoError("gh failed: \{err}")
   }
-  let out = stdout.text() catch {
+  let (code, stdout, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let out = @utf8.decode(stdout) catch {
     _ => ""
   }
-  let err_text = stderr.text() catch {
+  let err_text = @utf8.decode(stderr) catch {
     _ => ""
   }
   if code != 0 {

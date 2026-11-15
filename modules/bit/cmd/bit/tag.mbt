@@ -446,13 +446,9 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
           if omit_empty && line_bytes.length() == 0 {
             continue
           }
-          let _ = @stdio.stdout.write_once(
-            line_bytes,
-            offset=0,
-            len=line_bytes.length(),
-          )
+          @stdio.stdout.write(line_bytes)
           let newline : Bytes = b"\n"
-          let _ = @stdio.stdout.write_once(newline, offset=0, len=1)
+          @stdio.stdout.write(newline[0:1])
         }
       }
       None =>

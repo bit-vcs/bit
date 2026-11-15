@@ -7,10 +7,10 @@ import {
   "mizchi/bit_io" @bitio,
   "mizchi/bit_pack" @pack,
   "mizchi/bit_protocol" @protocol,
-  "moonbitlang/async",
-  "moonbitlang/async/fs" @afs,
-  "moonbitlang/async/http",
-  "moonbitlang/async/process",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/fs" @afs,
+  "moonbitlang/core/async/http",
+  "moonbitlang/core/async/process",
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
@@ -25,6 +25,12 @@ import {
 warnings = "-29"
 
 options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/fs",
+    "moonbitlang/core/async/http",
+    "moonbitlang/core/async/process",
+  ],
   "native-stub": [ "lstat_stub.c", "readdir_stub.c", "time_stub.c" ],
   targets: {
     "env_native.mbt": [ "native" ],

@@ -455,13 +455,9 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
       continue
     }
     // Write raw bytes + newline to stdout
-    let _ = @stdio.stdout.write_once(
-      line_bytes,
-      offset=0,
-      len=line_bytes.length(),
-    )
+    @stdio.stdout.write(line_bytes)
     let newline : Bytes = b"\n"
-    let _ = @stdio.stdout.write_once(newline, offset=0, len=1)
+    @stdio.stdout.write(newline[0:1])
     output_count += 1
   }
 }
@@ -3274,18 +3270,19 @@ async fn for_each_ref_describe_atom(
   // Find real git path
   let git_exe = for_each_ref_find_real_git(git_dir)
   // Redirect stderr to suppress error messages from git describe
-  let dev_null = @process.redirect_to_file("/dev/null")
-  let (code, stdout) = @process.collect_stdout(
+  let proc_result = @process.run(
     git_exe,
     args[:],
     inherit_env=true,
-    stderr=dev_null,
+    stderr=Discard,
+    stdout=Collect,
   )
+  let (code, stdout) = (proc_result.exit_code, proc_result.stdout_binary())
   if code != 0 {
     return ""
   }
   // Trim trailing newline from output
-  let out = stdout.text() catch { _ => return "" }
+  let out = @utf8.decode(stdout) catch { _ => return "" }
   let trimmed = if out.has_suffix("\n") {
     String::unsafe_substring(out, start=0, end=out.length() - 1)
   } else {

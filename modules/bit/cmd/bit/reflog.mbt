@@ -294,7 +294,7 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
     }
     "exists" => {
       if rest.length() != 1 || (rest[0].has_prefix("-") && rest[0] != "-") {
-        @stdio.stderr.write("usage: git reflog exists <ref>")
+        @stdio.stderr.write(@utf8.encode("usage: git reflog exists <ref>"))
         @sys.exit(129)
       }
       let ref_arg = rest[0]
@@ -314,7 +314,7 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
     }
     "delete" | "drop" => {
       if rest.length() == 0 {
-        @stdio.stderr.write("usage: git reflog delete <ref>@{<n>}")
+        @stdio.stderr.write(@utf8.encode("usage: git reflog delete <ref>@{<n>}"))
         @sys.exit(1)
       }
       let ref_arg = rest[rest.length() - 1]
@@ -369,7 +369,7 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
           match err {
             @bitcore.GitError::InvalidObject(msg) =>
               if msg.has_prefix("error: reflog could not be found: ") {
-                @stdio.stderr.write(msg + "\n")
+                @stdio.stderr.write(@utf8.encode(msg + "\n"))
                 @sys.exit(255)
               } else {
                 raise err

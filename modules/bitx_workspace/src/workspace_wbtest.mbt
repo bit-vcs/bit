@@ -265,28 +265,32 @@ async test "workspace: collect_changed_node_ids tracks signature drift" {
   fs.mkdir_p(root + "/root")
   fs.mkdir_p(root + "/dep")
   let root_init_code = try
-    @process.collect_output(
+    @process.run(
       "git",
       ["init", "-b", "main"],
       inherit_env=true,
       cwd=root + "/root",
+      stdout=Discard,
+      stderr=Discard,
     )
   catch {
     _ => -1
   } noraise {
-    (code, _, _) => code
+    r => r.exit_code
   }
   let dep_init_code = try
-    @process.collect_output(
+    @process.run(
       "git",
       ["init", "-b", "main"],
       inherit_env=true,
       cwd=root + "/dep",
+      stdout=Discard,
+      stderr=Discard,
     )
   catch {
     _ => -1
   } noraise {
-    (code, _, _) => code
+    r => r.exit_code
   }
   if root_init_code != 0 || dep_init_code != 0 {
     fs.remove_dir(root + "/dep") catch {
@@ -369,16 +373,18 @@ async test "workspace: collect_changed_node_ids marks missing node as changed" {
     get_current_timestamp().to_string()
   fs.mkdir_p(root + "/node-a")
   let init_code = try
-    @process.collect_output(
+    @process.run(
       "git",
       ["init", "-b", "main"],
       inherit_env=true,
       cwd=root + "/node-a",
+      stdout=Discard,
+      stderr=Discard,
     )
   catch {
     _ => -1
   } noraise {
-    (code, _, _) => code
+    r => r.exit_code
   }
   if init_code != 0 {
     fs.remove_dir(root + "/node-a") catch {
@@ -411,7 +417,7 @@ async test "workspace: collect_changed_node_ids marks missing node as changed" {
   )
   assert_eq(changed_before.get("node-a") is None, true)
   let cleanup_target = try
-    @process.run("rm", ["-rf", root + "/node-a"], inherit_env=true)
+    @process.run("rm", ["-rf", root + "/node-a"], inherit_env=true).exit_code
   catch {
     _ => 0
   } noraise {
@@ -621,24 +627,26 @@ async test "workspace: node signature changes by fingerprint mode" {
   let fs = @osfs.OsFs::new()
   let root = "/tmp/bit-test-workspace-signature-mode-" +
     get_current_timestamp().to_string()
-  ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
+  ignore(@process.run("rm", ["-rf", root], inherit_env=true).exit_code) catch {
     _ => ()
   }
   fs.mkdir_p(root)
   let init_code = try
-    @process.collect_output(
+    @process.run(
       "git",
       ["init", "-b", "main"],
       inherit_env=true,
       cwd=root,
+      stdout=Discard,
+      stderr=Discard,
     )
   catch {
     _ => -1
   } noraise {
-    (code, _, _) => code
+    r => r.exit_code
   }
   if init_code != 0 {
-    ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
+    ignore(@process.run("rm", ["-rf", root], inherit_env=true).exit_code) catch {
       _ => ()
     }
     return
@@ -658,7 +666,7 @@ async test "workspace: node signature changes by fingerprint mode" {
     (Some(fast_sig), Some(bit_sig)) => assert_eq(fast_sig == bit_sig, false)
     _ => fail("workspace signature should exist for initialized repository")
   }
-  ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
+  ignore(@process.run("rm", ["-rf", root], inherit_env=true).exit_code) catch {
     _ => ()
   }
 }

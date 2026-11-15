@@ -701,7 +701,7 @@ async fn add_refresh_index_entries(
     let mut mtime_sec = entry.mtime_sec
     let mut mtime_nsec = entry.mtime_nsec
     try {
-      let (sec, nsec) = @asyncfs.mtime(abs, follow_symlink=false)
+      let (sec, nsec) = asyncfs_mtime_pair(abs, follow_symlink=false)
       mtime_sec = sec.to_int()
       mtime_nsec = nsec
     } catch {

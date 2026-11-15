@@ -76,7 +76,7 @@ async fn shell_read_interactive_command_line() -> String {
   let line_bytes : Array[Byte] = []
   let mut done = false
   while !done {
-    match @stdio.stdin.read_some(max_len=256) {
+    match @stdio.stdin.read() {
       None => break
       Some(chunk) =>
         for b in chunk {
@@ -146,7 +146,7 @@ async fn shell_run_interactive(fs : OsFs) -> Unit {
     eprint_line("fatal: unrecognized command")
     @sys.exit(1)
   }
-  let code = @process.run(script_path, command_args, inherit_env=true)
+  let code = @process.run(script_path, command_args, inherit_env=true).exit_code
   if code != 0 {
     @sys.exit(code)
   }

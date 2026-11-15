@@ -71,7 +71,7 @@ async fn handle_describe(args : Array[String]) -> Unit raise Error {
     exclude_patterns,
   )
   if tags.length() == 0 && !always {
-    @stdio.stderr.write("fatal: No names found, cannot describe anything.")
+    @stdio.stderr.write(@utf8.encode("fatal: No names found, cannot describe anything."))
     @sys.exit(128)
   }
   // Find closest tag using BFS
@@ -101,7 +101,7 @@ async fn handle_describe(args : Array[String]) -> Unit raise Error {
         print_line(short_sha + dirty_mark)
       } else {
         @stdio.stderr.write(
-          "fatal: No tags can describe '\{tid.to_hex()}'.\nTry --always, or create a tag.",
+          @utf8.encode("fatal: No tags can describe '\{tid.to_hex()}'.\nTry --always, or create a tag."),
         )
         @sys.exit(128)
       }

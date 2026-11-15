@@ -40,7 +40,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   // Handle --abort
   if do_abort {
     if !rfs.is_file(revert_head_path) {
-      @stdio.stderr.write("error: no revert in progress")
+      @stdio.stderr.write(@utf8.encode("error: no revert in progress"))
       @sys.exit(1)
     }
     // Restore ORIG_HEAD if exists
@@ -68,7 +68,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   // Handle --skip
   if do_skip {
     if !rfs.is_file(revert_head_path) {
-      @stdio.stderr.write("error: no revert in progress")
+      @stdio.stderr.write(@utf8.encode("error: no revert in progress"))
       @sys.exit(1)
     }
     // Clean up state files (skip current revert)
@@ -86,7 +86,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   // Handle --continue
   if do_continue {
     if !rfs.is_file(revert_head_path) {
-      @stdio.stderr.write("error: no revert in progress")
+      @stdio.stderr.write(@utf8.encode("error: no revert in progress"))
       @sys.exit(1)
     }
     // Read the commit message from MERGE_MSG
@@ -124,7 +124,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   // Check if revert already in progress
   if rfs.is_file(revert_head_path) {
     @stdio.stderr.write(
-      "error: revert already in progress, use --continue, --abort, or --skip",
+      @utf8.encode("error: revert already in progress, use --continue, --abort, or --skip"),
     )
     @sys.exit(1)
   }
@@ -224,7 +224,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
             let current_id = @bitcore.hash_blob(current_content)
             if current_id.to_hex() != commit_entry.id.to_hex() {
               // Current file differs from commit, potential conflict
-              @stdio.stderr.write("warning: \{path} has local modifications")
+              @stdio.stderr.write(@utf8.encode("warning: \{path} has local modifications"))
               has_conflicts = true
               continue
             }
@@ -248,12 +248,12 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
       // Save state for --continue
       wfs.write_string(revert_head_path, cid.to_hex() + "\n")
       wfs.write_string(merge_msg_path, revert_msg)
-      @stdio.stderr.write("error: could not revert \{commit_ref}")
+      @stdio.stderr.write(@utf8.encode("error: could not revert \{commit_ref}"))
       @stdio.stderr.write(
-        "hint: after resolving conflicts, run 'git revert --continue'",
+        @utf8.encode("hint: after resolving conflicts, run 'git revert --continue'"),
       )
-      @stdio.stderr.write("hint: to skip this commit, run 'git revert --skip'")
-      @stdio.stderr.write("hint: to abort, run 'git revert --abort'")
+      @stdio.stderr.write(@utf8.encode("hint: to skip this commit, run 'git revert --skip'"))
+      @stdio.stderr.write(@utf8.encode("hint: to abort, run 'git revert --abort'"))
       @sys.exit(1)
     }
     // Create revert commit unless --no-commit

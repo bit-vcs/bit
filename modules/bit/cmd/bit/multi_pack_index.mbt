@@ -1008,7 +1008,7 @@ fn midx_pack_is_cruft(fs : OsFs, pack_dir : String, pack_name : String) -> Bool 
 
 ///|
 async fn midx_pack_mtime(pack_path : String) -> Int {
-  let (sec, _nsec) = @asyncfs.mtime(pack_path[:], follow_symlink=true) catch {
+  let (sec, _nsec) = asyncfs_mtime_pair(pack_path[:], follow_symlink=true) catch {
     _ => (0L, 0)
   }
   sec.to_int()

@@ -2,8 +2,8 @@ import {
   "mizchi/bit_core" @bit,
   "mizchi/bit_object" @object,
   "mizchi/bit_types" @types,
-  "moonbitlang/async/process",
-  "moonbitlang/async/js_async",
+  "moonbitlang/core/async/process",
+  "moonbitlang/core/async/js_async",
   "moonbitlang/core/env",
   "moonbitlang/core/encoding/base64",
   "moonbitlang/core/encoding/utf8",
@@ -12,12 +12,17 @@ import {
 }
 
 import {
-  "moonbitlang/async",
+  "moonbitlang/core/async",
 } for "wbtest"
 
 warnings = "-29-67"
 
 options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/js_async",
+    "moonbitlang/core/async/process",
+  ],
   targets: {
     "relay_sign.mbt": [ "native", "js", "wasm-gc", "wasm" ],
     "relay_sign_js.mbt": [ "js" ],

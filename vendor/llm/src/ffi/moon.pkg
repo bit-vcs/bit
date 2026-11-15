@@ -1,6 +1,6 @@
 import {
   "moonbitlang/core/json",
-  "moonbitlang/async/io",
+  "moonbitlang/core/async/io",
   "mizchi/x/http" @x_http,
   "mizchi/x/process" @x_process,
   "mizchi/x/sys" @x_sys,
@@ -9,6 +9,9 @@ import {
 warnings = "-0067-25-29-79"
 
 options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async/io",
+  ],
   "native-stub": [ "native_stub.c" ],
   targets: {
     "async_js.mbt": [ "js" ],

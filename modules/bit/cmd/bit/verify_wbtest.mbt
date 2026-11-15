@@ -6,14 +6,17 @@ async fn verify_wbtest_generate_ssh_key(
 ) -> (String, String) raise Error {
   let key_path = root + "/id_ed25519"
   let allowed_signers = root + "/allowed_signers"
-  let (code, _, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     "ssh-keygen",
     ["-q", "-t", "ed25519", "-N", "", "-C", principal, "-f", key_path],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, _, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   if code != 0 {
-    let stderr_text = stderr.text() catch { _ => "" }
+    let stderr_text = @utf8.decode(stderr) catch { _ => "" }
     fail("ssh-keygen failed: \{stderr_text}")
   }
   let public_key = trim_string(decode_bytes(fs.read_file(key_path + ".pub")))
@@ -29,28 +32,34 @@ async fn verify_wbtest_generate_timeboxed_ssh_keys(
   let valid_key_path = root + "/timeboxed_valid_ed25519"
   let invalid_key_path = root + "/timeboxed_invalid_ed25519"
   let allowed_signers = root + "/allowed_signers"
-  let (valid_code, _, valid_stderr) = @process.collect_output(
+  let proc_result = @process.run(
     "ssh-keygen",
     [
       "-q", "-t", "ed25519", "-N", "", "-C", "timeboxed valid key", "-f", valid_key_path,
     ],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (valid_code, _, valid_stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   if valid_code != 0 {
-    let stderr_text = valid_stderr.text() catch { _ => "" }
+    let stderr_text = @utf8.decode(valid_stderr) catch { _ => "" }
     fail("ssh-keygen failed: \{stderr_text}")
   }
-  let (invalid_code, _, invalid_stderr) = @process.collect_output(
+  let proc_result = @process.run(
     "ssh-keygen",
     [
       "-q", "-t", "ed25519", "-N", "", "-C", "timeboxed invalid key", "-f", invalid_key_path,
     ],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (invalid_code, _, invalid_stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   if invalid_code != 0 {
-    let stderr_text = invalid_stderr.text() catch { _ => "" }
+    let stderr_text = @utf8.decode(invalid_stderr) catch { _ => "" }
     fail("ssh-keygen failed: \{stderr_text}")
   }
   let valid_public_key = trim_string(

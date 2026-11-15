@@ -3,7 +3,8 @@ async fn format_patch_wbtest_run_git(
   cwd : String,
   args : Array[String],
 ) -> Unit raise Error {
-  let (code, _, _) = @process.collect_output("git", args[:], cwd~)
+  let proc_result = @process.run("git", args[:], cwd~, stdout=Collect, stderr=Collect)
+  let (code, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
 }
 
