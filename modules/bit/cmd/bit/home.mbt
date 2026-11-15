@@ -205,7 +205,7 @@ async fn handle_home_init(fs : OsFs, args : Array[String]) -> Unit raise Error {
   )
   fs.mkdir_p(root)
   if !rfs.is_dir(root + "/.git") && !rfs.is_file(root + "/.git") {
-    if run_git_command(["init", "-q", root], cwd=None) != 0 {
+    if home_run_bit(["init", "-q", root]) != 0 {
       eprint_line("fatal: failed to initialize \{root}")
       @sys.exit(128)
     }
@@ -363,6 +363,25 @@ async fn home_capture_bit(args : Array[String]) -> (Int, String) {
 }
 
 ///|
+/// Run this bit binary as a child process with the terminal's stdio.
+/// A child (rather than the in-process runner) supports every command and
+/// keeps each repository's environment separate.
+async fn home_run_bit(args : Array[String]) -> Int {
+  let exe = @env.args()[0]
+  let result = @process.run(
+    exe,
+    args[:],
+    inherit_env=true,
+    stdin=Stdin,
+    stdout=Stdout,
+    stderr=Stderr,
+  ) catch {
+    _ => return 127
+  }
+  result.exit_code
+}
+
+///|
 async fn home_repo_status(abs : String) -> @home.RepoStatus? {
   let (code, out) = home_capture_bit([
     "-C", abs, "status", "--porcelain=v2", "--branch",
@@ -382,12 +401,9 @@ fn home_is_git_worktree(fs : OsFs, abs : String) -> Bool {
 ///|
 /// Apply (or re-apply) the cone-mode sparse checkout of `subdir`.
 async fn home_apply_sparse(abs : String, subdir : String) -> Bool {
-  run_git_command(["-C", abs, "sparse-checkout", "init", "--cone"], cwd=None) ==
+  home_run_bit(["-C", abs, "sparse-checkout", "init", "--cone"]) ==
   0 &&
-  run_git_command(
-    ["-C", abs, "sparse-checkout", "set", @home.sparse_pattern(subdir)],
-    cwd=None,
-  ) ==
+  home_run_bit(["-C", abs, "sparse-checkout", "set", @home.sparse_pattern(subdir)]) ==
   0
 }
 
@@ -421,7 +437,7 @@ async fn home_sync_one(
     }
     clone_args.push(clone_url)
     clone_args.push(abs)
-    if run_git_command(clone_args, cwd=None) != 0 {
+    if home_run_bit(clone_args) != 0 {
       eprint_line("\{name}: clone failed")
       return false
     }
@@ -456,8 +472,8 @@ async fn home_sync_one(
         true
       } else if status.upstream is None {
         print_line("\{name}: no upstream branch; fetching only")
-        run_git_command(["-C", abs, "fetch", "-q"], cwd=None) == 0
-      } else if run_git_command(["-C", abs, "pull", "-q", "--ff-only"], cwd=None) ==
+        home_run_bit(["-C", abs, "fetch", "-q"]) == 0
+      } else if home_run_bit(["-C", abs, "pull", "-q", "--ff-only"]) ==
         0 {
         print_line("\{name}: up to date")
         true
@@ -657,7 +673,7 @@ async fn handle_home_wt(fs : OsFs, args : Array[String]) -> Unit raise Error {
       } else if base is Some(b) {
         wt_args.push(b)
       }
-      if run_git_command(wt_args, cwd=None) != 0 {
+      if home_run_bit(wt_args) != 0 {
         eprint_line("fatal: worktree add failed")
         @sys.exit(128)
       }
@@ -706,7 +722,7 @@ async fn handle_home_wt(fs : OsFs, args : Array[String]) -> Unit raise Error {
         rm_args.push("--force")
       }
       rm_args.push(wt)
-      if run_git_command(rm_args, cwd=None) != 0 {
+      if home_run_bit(rm_args) != 0 {
         eprint_line("fatal: worktree remove failed")
         @sys.exit(128)
       }
