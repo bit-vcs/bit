@@ -298,6 +298,18 @@ fn merge_write_conflicted(
         }
     }
   }
+  // modify/delete: the surviving side's version is left in the tree.
+  for path in tw.conflicts {
+    if changed.contains(path) ||
+      @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+      continue
+    }
+    match (ours.get(path), theirs.get(path)) {
+      (None, Some(t)) => changed[path] = t
+      (Some(o), None) => changed[path] = o
+      _ => ()
+    }
+  }
   write_worktree_from_files(
     db,
     fs,

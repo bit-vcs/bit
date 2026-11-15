@@ -605,7 +605,8 @@ pub fn sparse_checkout_disable(
   }
   // Materialize the skipped entries that are missing, keep the index
   // (staged changes) and every existing file, and clear the bits.
-  if !rfs.is_file(join_path(git_dir, "index")) {
+  if !rfs.is_file(join_path(git_dir, "index")) ||
+    read_unmerged_paths(rfs, git_dir).length() > 0 {
     return
   }
   let db = ObjectDb::load(rfs, git_dir)
@@ -989,6 +990,11 @@ fn sparse_update_worktree(
     return
   }
   let patterns = read_sparse_patterns(rfs, git_dir)
+  // Never rewrite an index with unmerged entries: that would drop the
+  // conflict stages (git leaves them, and warns about the paths).
+  if read_unmerged_paths(rfs, git_dir).length() > 0 {
+    return
+  }
   let head = resolve_head_commit(rfs, git_dir)
   match head {
     None => ()
