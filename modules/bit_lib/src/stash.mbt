@@ -130,18 +130,27 @@ pub async fn stash_push(
   let index_tree = write_tree_from_index(fs, rfs, common_dir, index_entries)
   // W: the index with every tracked (non skip-worktree, non gitlink) path
   // re-staged from the worktree, exactly as `git add -u` would.
+  // git builds W with `diff-index HEAD` (HEAD vs worktree) + update-index:
+  // only paths differing from HEAD are refreshed from the worktree. A new
+  // (not in HEAD) file missing on disk is not in that diff, so its index
+  // version stays; HEAD paths the index dropped (`rm --cached`) but still
+  // on disk come back from the worktree.
+  let head_db = ObjectDb::load_lazy(rfs, common_dir)
+  let head_files = collect_tree_files_from_commit(head_db, rfs, head_id)
   let tracked : Array[String] = []
   let in_index : Map[String, Bool] = Map([])
   for e in index_entries {
     in_index[e.path] = true
-    if !skip.contains(e.path) && !is_gitlink_mode_int(e.mode) {
-      tracked.push(e.path)
+    if skip.contains(e.path) || is_gitlink_mode_int(e.mode) {
+      continue
     }
+    if !head_files.contains(e.path) &&
+      @bitio.worktree_entry_meta_sync(rfs, join_path(root, e.path)) is None {
+      continue
+    }
+    tracked.push(e.path)
   }
-  // git's W also takes HEAD paths the index dropped (e.g. `rm --cached`)
-  // from the worktree: it updates every path that differs from HEAD.
-  let head_db = ObjectDb::load_lazy(rfs, common_dir)
-  for path, f in collect_tree_files_from_commit(head_db, rfs, head_id) {
+  for path, f in head_files {
     if !in_index.contains(path) &&
       !is_gitlink_mode_int(f.mode) &&
       @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {

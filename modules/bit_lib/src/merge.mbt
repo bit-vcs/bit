@@ -288,7 +288,14 @@ fn merge_write_conflicted(
   for path, f in tw.merged {
     match ours.get(path) {
       Some(o) if o.id == f.id && o.mode == f.mode => ()
-      _ => if !tw.conflicts.contains(path) { changed[path] = f }
+      _ =>
+        // Content conflicts already hold markers on disk; a conflicted
+        // path with nothing on disk (modify/delete: "left in tree") gets
+        // the surviving version written.
+        if !tw.conflicts.contains(path) ||
+          @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is None {
+          changed[path] = f
+        }
     }
   }
   write_worktree_from_files(
