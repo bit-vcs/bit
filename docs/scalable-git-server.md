@@ -115,7 +115,7 @@ Substantially more than a greenfield start:
 | Pack bitmaps, commit-graph, multi-pack-index | `modules/bit_pack/`, `bit/cmd/bit/pack_bitmap_*.mbt` |
 | Reftable backend | `modules/bit_reftable/` |
 | Storage abstraction traits (sync **and** async) | `modules/bit_types/src/contracts.mbt:4,14,23,34` |
-| Native async HTTP **server** primitives | `moonbitlang/async/http.Server` (already a dependency) |
+| Native async HTTP **server** primitives | `moonbitlang/core/async/http.Server` (bundled with `moonbitlang/core`) |
 | JS host-bridge build (Workers-capable) | `modules/bit_lib/src/js_api_exports.mbt`, `npm/` |
 
 `receive_pack` already persists an incoming push as an immutable
@@ -225,7 +225,7 @@ The Git-specific layer over `bitx_wal`:
 
 ### 5.4 `bit serve --http` (cmd) — built
 
-A `moonbitlang/async/http.Server` listener that routes
+A `moonbitlang/core/async/http.Server` listener that routes
 `/<owner>/<repo>.git/{info/refs,git-upload-pack,git-receive-pack}` straight to
 `bit_lib`'s `upload_pack`, `upload_pack_v2` and `receive_pack`.
 
@@ -358,7 +358,7 @@ an optimization.
 
 ## 10. Deployment targets
 
-**Native single binary.** `bit serve --http` on `moonbitlang/async/http.Server`,
+**Native single binary.** `bit serve --http` on `moonbitlang/core/async/http.Server`,
 any number of instances pointed at the same bucket, TLS terminated by a reverse
 proxy. This is the primary target and needs only the sync traits.
 
@@ -451,7 +451,7 @@ the test suite was checking that the promises were kept.
 - **SigV4 cost.** Needs HMAC-SHA256 (not currently in `bit_hash`) plus canonical
   request construction. Non-trivial but well-specified. On Workers the R2
   binding avoids it entirely.
-- **MoonBit async HTTP server maturity.** `moonbitlang/async/http.Server` works
+- **MoonBit async HTTP server maturity.** `moonbitlang/core/async/http.Server` works
   for this purpose — `bit serve --http` is built on it. It offers no TLS
   termination, so a public deployment needs a reverse proxy in front.
 - **`Unknown` outcomes must be reconciled, not retried blindly.** A blind retry
