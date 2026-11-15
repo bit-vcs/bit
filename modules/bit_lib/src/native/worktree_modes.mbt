@@ -272,3 +272,30 @@ pub async fn apply_worktree_modes_for_files(
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
   apply_worktree_modes_from_files(db, rfs, fs, root, git_dir, files)
 }
+
+///|
+/// Apply modes and symlinks for `paths` as the index records them.
+pub async fn apply_worktree_modes_for_index_paths(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  paths : Array[String],
+) -> Unit raise @bit.GitError {
+  if paths.length() == 0 {
+    return
+  }
+  let wanted : Map[String, Bool] = Map([])
+  for p in paths {
+    wanted[p] = true
+  }
+  let index_files = @bitlib.read_index_tree_files(rfs, git_dir)
+  let files : Map[String, @bitlib.TreeFileEntry] = Map([])
+  for path, entry in index_files {
+    if wanted.contains(path) {
+      files[path] = entry
+    }
+  }
+  let common = @bitlib.resolve_common_git_dir(rfs, git_dir)
+  apply_worktree_modes_for_files(fs, rfs, root, common, files)
+}

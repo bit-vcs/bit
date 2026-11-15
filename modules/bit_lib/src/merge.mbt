@@ -412,7 +412,12 @@ pub fn merge(
   ours_label? : String = "HEAD",
   theirs_label? : String = "incoming",
 ) -> MergeResult raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_marker = join_path(root, ".git")
+  let git_dir = if rfs.is_file(git_marker) {
+    resolve_gitdir(rfs, git_marker)
+  } else {
+    git_marker
+  }
   let head = match resolve_head_commit(rfs, git_dir) {
     None =>
       match read_head_ref(rfs, git_dir) {

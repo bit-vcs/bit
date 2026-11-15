@@ -32,6 +32,21 @@ fn resolve_worktree_git_dir(
 }
 
 ///|
+/// The worktree's own git dir (where its HEAD lives): for a linked
+/// worktree the `.git` file's target, not the common dir.
+fn resolve_worktree_head_git_dir(
+  fs : &@bit.RepoFileSystem,
+  root : String,
+) -> String raise @bit.GitError {
+  let bit_path = join_path(root, ".git")
+  if fs.is_file(bit_path) {
+    resolve_gitdir(fs, bit_path)
+  } else {
+    resolve_worktree_git_dir(fs, root)
+  }
+}
+
+///|
 /// Read HEAD and return its reference.
 pub fn read_head_ref(
   fs : &@bit.RepoFileSystem,
@@ -319,7 +334,8 @@ pub fn create_branch(
   let ref_path = join_path(git_dir, refname)
   let dir = parent_dir(ref_path)
   fs.mkdir_p(dir)
-  let head = resolve_head_commit(rfs, git_dir)
+  // The new branch starts at *this* worktree's HEAD.
+  let head = resolve_head_commit(rfs, resolve_worktree_head_git_dir(rfs, root))
   match head {
     None =>
       if rfs.is_file(ref_path) {
@@ -718,7 +734,7 @@ pub fn switch_branch(
       sparse_checkout_reapply(fs, rfs, root)
     }
   } else {
-    let head_path = join_path(git_dir, "HEAD")
+    let head_path = join_path(resolve_worktree_head_git_dir(rfs, root), "HEAD")
     fs.write_string(head_path, "ref: \{refname}\n")
   }
 }
@@ -1232,4 +1248,16 @@ pub fn is_ancestor_of(
     }
   }
   false
+}
+
+///|
+/// `root`'s own git dir: `.git`, or the target of a linked worktree's
+/// `.git` file.
+fn resolve_root_git_dir(rfs : &@bit.RepoFileSystem, root : String) -> String {
+  let marker = join_path(root, ".git")
+  if rfs.is_file(marker) {
+    resolve_gitdir(rfs, marker)
+  } else {
+    marker
+  }
 }

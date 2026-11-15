@@ -74,7 +74,9 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
 
-  if add_should_use_storage_runtime(args) {
+  let sparse_enabled = @bitlib.is_sparse_checkout_enabled(rfs, git_dir)
+  let allow_sparse = args.contains("--sparse")
+  if add_should_use_storage_runtime(args) && !sparse_enabled {
     match add_storage_runtime_delegate_args(args) {
       Some(add_args) => {
         @runtime.run_storage_command(
@@ -129,6 +131,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
       }
       "-v" | "--verbose" if !end_of_options => verbose = true
       "--interactive" if !end_of_options => interactive = true
+      "--sparse" if !end_of_options => ()
       "--chmod=+x" if !end_of_options => chmod_mode = Some("+x")
       "--chmod=-x" if !end_of_options => chmod_mode = Some("-x")
       _ if end_of_options || !arg.has_prefix("-") => paths.push(arg)
@@ -186,6 +189,11 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     for p in status.unstaged_deleted {
       all_paths.push(p)
     }
+    let (all_paths, outside_sparse) = if sparse_enabled && !allow_sparse {
+      add_split_outside_sparse(fs, git_dir, all_paths)
+    } else {
+      (all_paths, [])
+    }
     if all_paths.length() > 0 {
       let pre_code = run_add_hook(fs, root, git_dir, "pre-add")
       if pre_code != 0 {
@@ -213,6 +221,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
         raise @bitcore.GitError::InvalidObject("post-add hook failed")
       }
     }
+    add_report_outside_sparse(outside_sparse)
     return
   }
   if paths.length() == 0 && !update_only {
@@ -248,6 +257,11 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     }
   } else {
     requested_stage_paths
+  }
+  let (stage_paths, outside_sparse) = if sparse_enabled && !allow_sparse {
+    add_split_outside_sparse(fs, git_dir, stage_paths)
+  } else {
+    (stage_paths, [])
   }
   let mut had_error = false
   if stage_paths.length() > 0 {
@@ -334,6 +348,12 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   if had_error {
     eprint_line("fatal: adding files failed")
     @sys.exit(1)
+  }
+  if outside_sparse.length() > 0 {
+    if stage_paths.length() > 0 {
+      ignore(run_add_hook(fs, root, git_dir, "post-add"))
+    }
+    add_report_outside_sparse(outside_sparse)
   }
   if stage_paths.length() > 0 {
     let post_code = run_add_hook(fs, root, git_dir, "post-add")
@@ -1430,4 +1450,51 @@ fn stage_submodule_gitlinks(
       None => ()
     }
   }
+}
+
+///|
+/// git does not add untracked paths outside the sparse-checkout patterns
+/// (without --sparse): split them off so they can be reported.
+fn add_split_outside_sparse(
+  fs : OsFs,
+  git_dir : String,
+  paths : Array[String],
+) -> (Array[String], Array[String]) {
+  let patterns = @bitlib.read_sparse_patterns(fs, git_dir) catch {
+    _ => return (paths, [])
+  }
+  let tracked : Map[String, Bool] = Map([])
+  let entries = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
+  for e in entries {
+    tracked[e.path] = true
+  }
+  let kept : Array[String] = []
+  let outside : Array[String] = []
+  for p in paths {
+    if !tracked.contains(p) && !@bitlib.matches_sparse_pattern(p, patterns) {
+      outside.push(p)
+    } else {
+      kept.push(p)
+    }
+  }
+  (kept, outside)
+}
+
+///|
+async fn add_report_outside_sparse(outside : Array[String]) -> Unit {
+  if outside.length() == 0 {
+    return
+  }
+  eprint_line(
+    "The following paths and/or pathspecs matched paths that exist\noutside of your sparse-checkout definition, so will not be\nupdated in the index:",
+  )
+  let sorted = outside.copy()
+  sorted.sort()
+  for p in sorted {
+    eprint_line(p)
+  }
+  eprint_line(
+    "hint: If you intend to update such entries, try one of the following:\nhint: * Use the --sparse option.\nhint: * Disable or modify the sparsity rules.\nhint: Disable this message with \"git config advice.updateSparsePath false\"",
+  )
+  @sys.exit(1)
 }

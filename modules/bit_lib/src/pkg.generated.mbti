@@ -429,6 +429,8 @@ pub fn read_index_entries(&@bit_types.RepoFileSystem, String) -> Array[IndexEntr
 
 pub fn read_index_stage_entries(&@bit_types.RepoFileSystem, String) -> Array[IndexStageEntry] raise @bit_object.GitError
 
+pub fn read_index_tree_files(&@bit_types.RepoFileSystem, String) -> Map[String, TreeFileEntry] raise @bit_object.GitError
+
 pub fn read_local_remote_head_state(&@bit_types.RepoFileSystem, String, String) -> RemoteHeadState
 
 pub fn read_promisor_remote(&@bit_types.RepoFileSystem, String) -> String?

@@ -813,6 +813,26 @@ async fn handle_sparse_checkout_at_root(
   root : String,
   args : Array[String],
 ) -> Unit raise Error {
+  let fs = OsFs::new()
+  let git_dir = root + "/.git"
+  let updates = args.length() > 0 &&
+    ["init", "set", "add", "reapply", "disable"].contains(args[0])
+  let missing_before = if updates {
+    sparse_checkout_missing_index_paths(fs, root, git_dir)
+  } else {
+    Map([])
+  }
+  handle_sparse_checkout_at_root_inner(root, args)
+  if updates {
+    sparse_checkout_apply_materialized_modes(fs, root, git_dir, missing_before)
+  }
+}
+
+///|
+async fn handle_sparse_checkout_at_root_inner(
+  root : String,
+  args : Array[String],
+) -> Unit raise Error {
   let git_dir = root + "/.git"
   let fs = OsFs::new()
   if args.length() == 0 {
@@ -888,8 +908,10 @@ async fn handle_sparse_checkout_at_root(
         fs, git_dir, cone_flag,
       )
       if !@bitlib.is_sparse_checkout_enabled(fs, git_dir) {
-        @bitlib.sparse_checkout_init(fs, fs, root, cone=effective_cone)
+        eprint_line("fatal: no sparse-checkout to add to")
+        @sys.exit(128)
       }
+      ignore(effective_cone)
       match cone_flag {
         Some(flag) => @bitlib.sparse_set_cone_config(fs, fs, git_dir, flag)
         None => ()
@@ -920,6 +942,12 @@ async fn handle_sparse_checkout_at_root(
       }
     "reapply" => {
       sparse_checkout_validate_flag_only_args("reapply", rest)
+      if !@bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+        eprint_line(
+          "fatal: must be in a sparse-checkout to reapply sparsity patterns",
+        )
+        @sys.exit(128)
+      }
       match sparse_checkout_cone_flag(rest) {
         Some(flag) => @bitlib.sparse_set_cone_config(fs, fs, git_dir, flag)
         None => ()
@@ -952,3 +980,44 @@ async fn handle_sparse_checkout(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
+
+///|
+/// Index paths with nothing on disk (lstat), before a sparse-checkout
+/// update; whatever it materializes gets its mode / symlink afterwards.
+fn sparse_checkout_missing_index_paths(
+  fs : OsFs,
+  root : String,
+  git_dir : String,
+) -> Map[String, Bool] {
+  let out : Map[String, Bool] = Map([])
+  let entries = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
+  for e in entries {
+    if @bitio.worktree_entry_meta_sync(fs, root + "/" + e.path) is None {
+      out[e.path] = true
+    }
+  }
+  out
+}
+
+///|
+async fn sparse_checkout_apply_materialized_modes(
+  fs : OsFs,
+  root : String,
+  git_dir : String,
+  missing_before : Map[String, Bool],
+) -> Unit {
+  let entries = @bitlib.read_index_entries(fs, git_dir) catch { _ => return }
+  let paths : Array[String] = []
+  for e in entries {
+    if missing_before.contains(e.path) &&
+      e.mode != 0o160000 &&
+      @bitio.worktree_entry_meta_sync(fs, root + "/" + e.path) is Some(_) {
+      paths.push(e.path)
+    }
+  }
+  @bitlibnative.apply_worktree_modes_for_index_paths(
+    fs, fs, root, git_dir, paths,
+  ) catch {
+    _ => ()
+  }
+}

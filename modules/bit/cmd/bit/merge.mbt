@@ -78,9 +78,9 @@ fn merge_write_pending_state(
 ///|
 async fn handle_merge(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
+  let git_dir = resolve_git_dir(fs, root)
   check_and_exit_unsupported_attrs(root)
   let wfs : &@bitcore.FileSystem = fs
   let mut message : String? = None
@@ -126,6 +126,8 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
+      // Merges are never interactive here: --no-edit / --edit are moot.
+      "--no-edit" | "--edit" | "-e" => ()
       "--no-ff" => {
         no_ff = true
         i += 1

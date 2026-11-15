@@ -1665,3 +1665,16 @@ fn index_stage_priority(stage : Int) -> Int {
     1
   }
 }
+
+///|
+/// The index's stage-0 entries as path -> (blob, mode).
+pub fn read_index_tree_files(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Map[String, TreeFileEntry] raise @bit.GitError {
+  let out : Map[String, TreeFileEntry] = Map([])
+  for e in read_index_entries(rfs, git_dir) {
+    out[e.path] = { id: e.id, mode: e.mode }
+  }
+  out
+}

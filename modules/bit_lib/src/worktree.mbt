@@ -1169,12 +1169,37 @@ pub fn write_loose_object(
 }
 
 ///|
+/// Objects live in the common git dir. A linked worktree's own git dir is
+/// `<common>/worktrees/<name>` (git's layout, commondir "../.."), so an
+/// object written "into" it goes to `<common>` instead -- never into a
+/// per-worktree `objects/` that nothing reads.
+fn object_write_git_dir(git_dir : String) -> String {
+  let trimmed = if git_dir.has_suffix("/") {
+    String::unsafe_substring(git_dir, start=0, end=git_dir.length() - 1)
+  } else {
+    git_dir
+  }
+  match trimmed.rev_find("/") {
+    Some(i) => {
+      let parent = String::unsafe_substring(trimmed, start=0, end=i)
+      if parent.has_suffix("/worktrees") {
+        String::unsafe_substring(parent, start=0, end=parent.length() - 10)
+      } else {
+        git_dir
+      }
+    }
+    None => git_dir
+  }
+}
+
+///|
 pub fn write_object_bytes(
   fs : &@bit.FileSystem,
   git_dir : String,
   id : @bit.ObjectId,
   compressed : Bytes,
 ) -> Unit raise @bit.GitError {
+  let git_dir = object_write_git_dir(git_dir)
   let hex = id.to_hex()
   let path = join_path(
     git_dir,
