@@ -1,6 +1,9 @@
 {
   "nodes": {
     "flake-parts": {
+      "inputs": {
+        "nixpkgs-lib": "nixpkgs-lib"
+      },
       "locked": {
         "lastModified": 1793576659,
         "narHash": "sha256-V1h85lUaJBQoHFrB2vpXZOE0Ju1MYSnIpsehoVZYlDo=",
@@ -13,12 +16,12 @@
         "owner": "hercules-ci",
         "repo": "flake-parts",
         "type": "github"
-      },
-      "inputs": {
-        "nixpkgs-lib": "nixpkgs-lib"
       }
     },
     "flake-utils": {
+      "inputs": {
+        "systems": "systems"
+      },
       "locked": {
         "lastModified": 1731533236,
         "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
@@ -31,12 +34,12 @@
       "original": {
         "type": "git",
         "url": "https://github.com/numtide/flake-utils.git"
-      },
-      "inputs": {
-        "systems": "systems"
       }
     },
     "flake-utils_2": {
+      "inputs": {
+        "systems": "systems_2"
+      },
       "locked": {
         "lastModified": 1731533236,
         "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
@@ -49,19 +52,16 @@
         "owner": "numtide",
         "repo": "flake-utils",
         "type": "github"
-      },
-      "inputs": {
-        "systems": "systems_2"
       }
     },
     "moon-registry": {
       "flake": false,
       "locked": {
-        "lastModified": 1794664578,
-        "narHash": "sha256-O8gZA56MNXmdiZTcoJPJvcG6x/FNI2nStlT5jBQB8os=",
+        "lastModified": 1794730897,
+        "narHash": "sha256-nOLG6PT2AiK6cUTng4RxBLpHD399t1RkOx4+PX+rbxM=",
         "ref": "refs/heads/main",
-        "rev": "f53d5f62f5fcec5e25c05a77f98e5c99f784ae03",
-        "revCount": 24092,
+        "rev": "83e481c4083efe3425f2c3ae9c47142dbbeb5f99",
+        "revCount": 24149,
         "type": "git",
         "url": "https://mooncakes.io/git/index"
       },
@@ -71,6 +71,10 @@
       }
     },
     "moonbit-overlay": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "treefmt-nix": "treefmt-nix"
+      },
       "locked": {
         "lastModified": 1794645942,
         "narHash": "sha256-IZpHUdqLkbe4SEBpt9IzKz563bMiiXLsWUQgEhHjyGA=",
@@ -83,13 +87,13 @@
         "owner": "moonbit-community",
         "repo": "moonbit-overlay",
         "type": "github"
-      },
-      "inputs": {
-        "nixpkgs": "nixpkgs_2",
-        "treefmt-nix": "treefmt-nix"
       }
     },
     "moonbit-overlay_2": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_3",
+        "treefmt-nix": "treefmt-nix_2"
+      },
       "locked": {
         "lastModified": 1785562289,
         "narHash": "sha256-Y08A4W3TNzJRt9oPRgTc9LC8m0WkMMM/Yy47Nl9VBeg=",
@@ -102,13 +106,13 @@
       "original": {
         "type": "git",
         "url": "https://github.com/moonbit-community/moonbit-overlay.git"
-      },
-      "inputs": {
-        "nixpkgs": "nixpkgs_3",
-        "treefmt-nix": "treefmt-nix_2"
       }
     },
     "moonbit-overlay_3": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_4",
+        "treefmt-nix": "treefmt-nix_3"
+      },
       "locked": {
         "lastModified": 1782454513,
         "narHash": "sha256-w7LuB7t/qfHYQpfxzozCuZwxdDT8NwNVT3SLTHFOV+o=",
@@ -121,19 +125,15 @@
         "owner": "moonbit-community",
         "repo": "moonbit-overlay",
         "type": "github"
-      },
-      "inputs": {
-        "nixpkgs": "nixpkgs_4",
-        "treefmt-nix": "treefmt-nix_3"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1794495034,
-        "narHash": "sha256-E0hYoioqUtM2XmPPvYYpJgdADF5AW9oOoPSEiM9dTHQ=",
+        "lastModified": 1793977579,
+        "narHash": "sha256-WrSODdZFVIs/Hh2NzC0bY+ROByi0bATg8WfePX8dPj8=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "2074cc672349f14240fb7ea90d509e0b643e9dd4",
+        "rev": "4fe25e12eb9f4c744966dd3de5a05246cf098601",
         "type": "github"
       },
       "original": {
@@ -160,11 +160,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1793977579,
-        "narHash": "sha256-WrSODdZFVIs/Hh2NzC0bY+ROByi0bATg8WfePX8dPj8=",
+        "lastModified": 1794495034,
+        "narHash": "sha256-E0hYoioqUtM2XmPPvYYpJgdADF5AW9oOoPSEiM9dTHQ=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "4fe25e12eb9f4c744966dd3de5a05246cf098601",
+        "rev": "2074cc672349f14240fb7ea90d509e0b643e9dd4",
         "type": "github"
       },
       "original": {
@@ -207,6 +207,13 @@
       }
     },
     "pkfire": {
+      "inputs": {
+        "flake-utils": "flake-utils",
+        "moonbit-overlay": "moonbit-overlay_2",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
       "locked": {
         "lastModified": 1791035792,
         "narHash": "sha256-vboZ8X5IOzovWuHffc4p73Kb7pFZpVX+PdhZgN9dPM8=",
@@ -219,16 +226,16 @@
         "owner": "mizchi",
         "repo": "pkfire",
         "type": "github"
-      },
-      "inputs": {
-        "flake-utils": "flake-utils",
-        "moonbit-overlay": "moonbit-overlay_2",
-        "nixpkgs": [
-          "nixpkgs"
-        ]
       }
     },
     "pkspec": {
+      "inputs": {
+        "flake-utils": "flake-utils_2",
+        "moonbit-overlay": "moonbit-overlay_3",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
       "locked": {
         "lastModified": 1791035786,
         "narHash": "sha256-15fEaNwVVKtcH1Y/OtXcK4tm95+YouFbr4m4M8fA8ck=",
@@ -241,13 +248,6 @@
         "owner": "mizchi",
         "repo": "pkspec",
         "type": "github"
-      },
-      "inputs": {
-        "flake-utils": "flake-utils_2",
-        "moonbit-overlay": "moonbit-overlay_3",
-        "nixpkgs": [
-          "nixpkgs"
-        ]
       }
     },
     "root": {
@@ -255,7 +255,7 @@
         "flake-parts": "flake-parts",
         "moon-registry": "moon-registry",
         "moonbit-overlay": "moonbit-overlay",
-        "nixpkgs": "nixpkgs",
+        "nixpkgs": "nixpkgs_2",
         "pkfire": "pkfire",
         "pkspec": "pkspec"
       }
@@ -291,6 +291,12 @@
       }
     },
     "treefmt-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "moonbit-overlay",
+          "nixpkgs"
+        ]
+      },
       "locked": {
         "lastModified": 1791885023,
         "narHash": "sha256-C3alQ2MEt0zVrUSho5NUDo3jmhbff72++bfwoqT9Omo=",
@@ -303,15 +309,16 @@
         "owner": "numtide",
         "repo": "treefmt-nix",
         "type": "github"
-      },
-      "inputs": {
-        "nixpkgs": [
-          "moonbit-overlay",
-          "nixpkgs"
-        ]
       }
     },
     "treefmt-nix_2": {
+      "inputs": {
+        "nixpkgs": [
+          "pkfire",
+          "moonbit-overlay",
+          "nixpkgs"
+        ]
+      },
       "locked": {
         "lastModified": 1784369104,
         "narHash": "sha256-47cxbcZODibHv3rELFQ9vZly0vUNkND/atn/U7HLeb0=",
@@ -324,16 +331,16 @@
         "owner": "numtide",
         "repo": "treefmt-nix",
         "type": "github"
-      },
-      "inputs": {
-        "nixpkgs": [
-          "pkfire",
-          "moonbit-overlay",
-          "nixpkgs"
-        ]
       }
     },
     "treefmt-nix_3": {
+      "inputs": {
+        "nixpkgs": [
+          "pkspec",
+          "moonbit-overlay",
+          "nixpkgs"
+        ]
+      },
       "locked": {
         "lastModified": 1780220602,
         "narHash": "sha256-eynAfOmbmxJnkp7YewvCEbShNnnYJ9gLLqkzsYtBPeM=",
@@ -346,13 +353,6 @@
         "owner": "numtide",
         "repo": "treefmt-nix",
         "type": "github"
-      },
-      "inputs": {
-        "nixpkgs": [
-          "pkspec",
-          "moonbit-overlay",
-          "nixpkgs"
-        ]
       }
     }
   },

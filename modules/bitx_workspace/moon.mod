@@ -10,7 +10,7 @@ import {
   "mizchi/bit_fingerprint@0.49.1",
   "mizchi/bit_osfs@0.49.1",
   "mizchi/bit_utils@0.49.1",
-  "mizchi/bitflow@0.4.2",
+  "mizchi/bitflow@0.4.3",
   "moonbitlang/x@0.5.7",
 }
 
