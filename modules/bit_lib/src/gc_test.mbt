@@ -519,3 +519,21 @@ test "repack keeps reflog-only objects in the pack" {
     }
   }
 }
+
+///|
+test "gc_repo keeps objects the index refers to" {
+  let fs = @bit.TestFs::new()
+  let root = "/repo"
+  let git_dir = root + "/.git"
+  let _ = build_simple_repo(fs, root)
+  // Stage a new file without committing it.
+  fs.write_string(root + "/staged.txt", "staged but not committed\n")
+  @bit_lib.add_paths(fs, fs, root, ["staged.txt"])
+  let staged_id = @bit.hash_blob(@utf8.encode("staged but not committed\n"))
+  let _ = @bit_lib.gc_repo(fs, fs, root)
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
+  assert_true(db.get(fs, staged_id) is Some(_))
+  // And the commit's objects are still there too.
+  let (hello_id, _) = @bit.create_blob_string("hello\n")
+  assert_true(db.get(fs, hello_id) is Some(_))
+}

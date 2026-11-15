@@ -91,6 +91,7 @@ fn repack_git_dir(
   // Reflog-referenced objects are roots too (git keeps them); repacking without
   // them would drop reflog-only objects from the new pack.
   collect_reflog_referenced_objects(db, rfs, git_dir, objects)
+  collect_index_referenced_objects(db, rfs, git_dir, objects)
   repack_from_objects(fs, git_dir, objects)
 }
 
@@ -114,6 +115,7 @@ fn gc_git_dir(
   collect_reachable_tag_objects(db, rfs, ref_ids, reachable)
   // Also include objects referenced by reflogs (intermediate merge commits etc.)
   collect_reflog_referenced_objects(db, rfs, git_dir, reachable)
+  collect_index_referenced_objects(db, rfs, git_dir, reachable)
   let reachable_hex : Map[String, Bool] = Map([])
   for obj in reachable {
     let id = @bit.hash_object_content(obj.obj_type, obj.data)
@@ -164,6 +166,7 @@ fn prune_git_dir(
   // Match gc_git_dir: reflog-referenced objects are protected roots, so a bare
   // `bit gc --prune` must not delete reflog-only loose objects.
   collect_reflog_referenced_objects(db, rfs, git_dir, reachable)
+  collect_index_referenced_objects(db, rfs, git_dir, reachable)
   let reachable_hex : Map[String, Bool] = Map([])
   for obj in reachable {
     let id = @bit.hash_object_content(obj.obj_type, obj.data)
@@ -685,6 +688,74 @@ fn prune_packfiles(
     }
     if entry.has_suffix(".pack") || entry.has_suffix(".idx") {
       fs.remove_file(join_path(pack_dir, entry))
+    }
+  }
+}
+
+///|
+/// Objects the index files name are reachability roots, as in git: blobs
+/// staged but not yet committed (all stages), and the trees the cache-tree
+/// extension records. Covers the main index and every linked worktree's.
+/// Without this, `gc` deleted staged content and left the index pointing
+/// at missing objects.
+fn collect_index_referenced_objects(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+  objects : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
+  let seen : Map[String, Bool] = Map([])
+  for obj in objects {
+    seen[@bit.hash_object_content(obj.obj_type, obj.data).to_hex()] = true
+  }
+  let index_paths = [join_path(git_dir, "index")]
+  let worktrees_dir = join_path(git_dir, "worktrees")
+  if fs.is_dir(worktrees_dir) {
+    for name in fs.readdir(worktrees_dir) {
+      index_paths.push(join_path(join_path(worktrees_dir, name), "index"))
+    }
+  }
+  let hash_size = index_repo_hash_size(fs, git_dir)
+  let add = fn(id : @bit.ObjectId) raise @bit.GitError {
+    let hex = id.to_hex()
+    if seen.contains(hex) || id.is_zero() {
+      return
+    }
+    match db.get(fs, id) {
+      Some(obj) => {
+        seen[hex] = true
+        objects.push(obj)
+      }
+      None => ()
+    }
+  }
+  for index_path in index_paths {
+    if !fs.is_file(index_path) {
+      continue
+    }
+    let raw = fs.read_file(index_path) catch { _ => continue }
+    let staged = index_read_stage_entries_from_bytes(raw, hash_size~) catch {
+      _ => continue
+    }
+    for item in staged {
+      if item.entry.mode != 0o160000 {
+        add(item.entry.id)
+      }
+    }
+    let cache_tree = index_read_cache_tree_from_bytes(raw, hash_size~) catch {
+      _ => None
+    }
+    let stack : Array[IndexCacheTree] = []
+    if cache_tree is Some(t) {
+      stack.push(t)
+    }
+    while stack.pop() is Some(node) {
+      if node.entry_count >= 0 && node.oid is Some(id) {
+        add(id)
+      }
+      for sub in node.subtrees {
+        stack.push(sub)
+      }
     }
   }
 }
