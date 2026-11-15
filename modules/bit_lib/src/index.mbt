@@ -875,6 +875,7 @@ fn index_preserve_cache_tree(
 fn index_build_cache_tree_from_entries(
   entries : Array[IndexEntry],
   name? : String = "",
+  trees? : Array[(@bit.ObjectId, Bytes)],
 ) -> IndexCacheTree {
   let file_entries : Array[@bit.TreeEntry] = []
   let dir_map : Map[String, Array[IndexEntry]] = Map([])
@@ -931,7 +932,11 @@ fn index_build_cache_tree_from_entries(
     }
   }
   for dir_name, list in dir_map {
-    let subtree = index_build_cache_tree_from_entries(list, name=dir_name)
+    let subtree = index_build_cache_tree_from_entries(
+      list,
+      name=dir_name,
+      trees?,
+    )
     file_entries.push(
       @bit.TreeEntry::new("40000", dir_name, subtree.oid.unwrap()),
     )
@@ -944,19 +949,57 @@ fn index_build_cache_tree_from_entries(
     compare_strings_lexicographic(a_key, b_key)
   })
   subtrees.sort_by(fn(a, b) { compare_strings_lexicographic(a.name, b.name) })
-  let (tree_id, _) = @bit.create_tree(file_entries)
+  let (tree_id, tree_data) = @bit.create_tree(file_entries)
+  if trees is Some(out) {
+    out.push((tree_id, tree_data))
+  }
   { name, entry_count, oid: Some(tree_id), subtrees }
 }
 
 ///|
 fn index_prepare_cache_tree(
+  wfs : &@bit.FileSystem,
   fs : &@bit.RepoFileSystem,
   git_dir : String,
   sorted : Array[IndexEntry],
-) -> IndexCacheTree {
+) -> IndexCacheTree raise @bit.GitError {
   match index_preserve_cache_tree(fs, git_dir, sorted) {
     Some(tree) => tree
-    None => index_build_cache_tree_from_entries(sorted)
+    None => {
+      // A valid cache-tree entry promises that its tree object exists
+      // (git fsck checks it). A freshly built one names trees nobody has
+      // written yet, so write them now.
+      let trees : Array[(@bit.ObjectId, Bytes)] = []
+      let tree = index_build_cache_tree_from_entries(sorted, trees~)
+      index_store_missing_trees(wfs, fs, git_dir, trees)
+      tree
+    }
+  }
+}
+
+///|
+fn index_store_missing_trees(
+  wfs : &@bit.FileSystem,
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+  trees : Array[(@bit.ObjectId, Bytes)],
+) -> Unit raise @bit.GitError {
+  if trees.length() == 0 {
+    return
+  }
+  let db = ObjectDb::load_lazy(fs, git_dir)
+  for item in trees {
+    let (id, data) = item
+    let present = (db.get(fs, id) catch { _ => None }) is Some(_)
+    if present {
+      continue
+    }
+    let written = write_loose_object(wfs, git_dir, @bit.ObjectType::Tree, data)
+    if written != id {
+      raise @bit.GitError::InvalidObject(
+        "cache-tree: tree id mismatch for \{id.to_hex()}",
+      )
+    }
   }
 }
 
@@ -1356,7 +1399,7 @@ pub fn write_index_entries_preserving_cache_tree(
   let hash_size = index_repo_hash_size(rfs, git_dir)
   let sorted = entries.copy()
   sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
-  let cache_tree = index_prepare_cache_tree(rfs, git_dir, sorted)
+  let cache_tree = index_prepare_cache_tree(fs, rfs, git_dir, sorted)
   let (skip_worktree_paths, assume_unchanged_paths) = index_preserved_flag_paths(
     rfs,
     git_dir,
@@ -1385,11 +1428,13 @@ pub fn write_index_entries_with_tree(
   let hash_size = index_repo_hash_size(rfs, git_dir)
   let sorted = entries.copy()
   sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
-  let cache_tree = index_build_cache_tree_from_entries(sorted)
+  let trees : Array[(@bit.ObjectId, Bytes)] = []
+  let cache_tree = index_build_cache_tree_from_entries(sorted, trees~)
   match cache_tree.oid {
     Some(id) if id == tree_id => ()
     _ => ()
   }
+  index_store_missing_trees(fs, rfs, git_dir, trees)
   let (skip_worktree_paths, assume_unchanged_paths) = index_preserved_flag_paths(
     rfs,
     git_dir,
