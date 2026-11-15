@@ -83,8 +83,28 @@ pub fn reset(
       let tree_id = reset_resolve_target_tree_id(db, rfs, target)
       let files = collect_tree_files_from_commit(db, rfs, target)
       // Sparse: skip-worktree paths that stay tracked keep their bit and
-      // are not materialized (git's reset --hard respects sparsity).
+      // are not materialized, and git re-applies the patterns: every
+      // out-of-cone entry gets the bit (its file is discarded, --hard).
       let skip = read_skip_worktree_paths(rfs, actual_git_dir)
+      if is_sparse_checkout_enabled(rfs, actual_git_dir) {
+        let patterns = read_sparse_patterns(rfs, actual_git_dir)
+        let emptied : Array[String] = []
+        for path, f in files {
+          if !is_gitlink_mode_int(f.mode) &&
+            !matches_sparse_pattern(path, patterns) &&
+            !skip.contains(path) {
+            skip[path] = true
+            let abs = join_path(root, path)
+            if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+              fs.remove_file(abs) catch {
+                _ => ()
+              }
+              emptied.push(parent_dir(abs))
+            }
+          }
+        }
+        tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
+      }
       let to_write : Map[String, TreeFileEntry] = Map([])
       for path, f in files {
         if !skip.contains(path) {
