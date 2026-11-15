@@ -635,7 +635,7 @@ pub fn stash_list(&@bit_types.RepoFileSystem, String) -> Array[StashEntry] raise
 
 pub fn stash_mode_str(Int32) -> String
 
-pub async fn stash_push(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, Int64) -> @bit_object.ObjectId? raise @bit_object.GitError
+pub async fn stash_push(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, Int64, include_untracked? : Bool) -> @bit_object.ObjectId? raise @bit_object.GitError
 
 pub async fn stash_push_patch(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, Int64, async (StashPatchHunk, Int32, Int32) -> Bool) -> @bit_object.ObjectId? raise @bit_object.GitError
 
