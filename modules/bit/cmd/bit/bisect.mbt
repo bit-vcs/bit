@@ -75,8 +75,8 @@ async fn bisect_start(
   let bisect_refs_dir = git_dir + "/refs/bisect"
   // Check if already in bisect
   if rfs.is_file(bisect_start_path) {
-    @stdio.stderr.write("error: bisect already in progress")
-    @stdio.stderr.write("use 'git bisect reset' to abort")
+    @stdio.stderr.write(@utf8.encode("error: bisect already in progress"))
+    @stdio.stderr.write(@utf8.encode("use 'git bisect reset' to abort"))
     @sys.exit(1)
   }
   // Get current branch
@@ -133,8 +133,8 @@ async fn bisect_mark(
   let bisect_log_path = git_dir + "/BISECT_LOG"
   let bisect_refs_dir = git_dir + "/refs/bisect"
   if !rfs.is_file(bisect_start_path) {
-    @stdio.stderr.write("error: not in a bisect session")
-    @stdio.stderr.write("use 'git bisect start' first")
+    @stdio.stderr.write(@utf8.encode("error: not in a bisect session"))
+    @stdio.stderr.write(@utf8.encode("use 'git bisect start' first"))
     @sys.exit(1)
   }
   let commit_ref = args.get(1).unwrap_or("HEAD")
@@ -172,7 +172,7 @@ async fn bisect_skip(
   let bisect_log_path = git_dir + "/BISECT_LOG"
   let bisect_refs_dir = git_dir + "/refs/bisect"
   if !rfs.is_file(bisect_start_path) {
-    @stdio.stderr.write("error: not in a bisect session")
+    @stdio.stderr.write(@utf8.encode("error: not in a bisect session"))
     @sys.exit(1)
   }
   let commit_ref = args.get(1).unwrap_or("HEAD")
@@ -430,10 +430,10 @@ async fn bisect_run_shell_command(
     ["-c", command],
     inherit_env=true,
     cwd~,
-    stdin=@stdio.stdin,
-    stdout=@stdio.stdout,
-    stderr=@stdio.stderr,
-  )
+    stdin=Stdin,
+    stdout=Stdout,
+    stderr=Stderr,
+  ).exit_code
 }
 
 ///|
@@ -636,7 +636,7 @@ async fn bisect_log(
 ) -> Unit raise Error {
   let bisect_log_path = git_dir + "/BISECT_LOG"
   if !rfs.is_file(bisect_log_path) {
-    @stdio.stderr.write("error: no bisect log found")
+    @stdio.stderr.write(@utf8.encode("error: no bisect log found"))
     @sys.exit(1)
   }
   let content = decode_bytes(rfs.read_file(bisect_log_path))

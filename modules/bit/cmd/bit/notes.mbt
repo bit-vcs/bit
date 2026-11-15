@@ -79,7 +79,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
         }
       }
       guard message is Some(msg) else {
-        @stdio.stderr.write("error: notes add requires -m <message>")
+        @stdio.stderr.write(@utf8.encode("error: notes add requires -m <message>"))
         @sys.exit(1)
       }
       notes_add(
@@ -117,7 +117,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
         }
       }
       guard message is Some(msg) else {
-        @stdio.stderr.write("error: notes append requires -m <message>")
+        @stdio.stderr.write(@utf8.encode("error: notes append requires -m <message>"))
         @sys.exit(1)
       }
       notes_append(
@@ -155,7 +155,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
         }
       }
       guard message is Some(msg) else {
-        @stdio.stderr.write("error: notes edit requires -m <message>")
+        @stdio.stderr.write(@utf8.encode("error: notes edit requires -m <message>"))
         @sys.exit(1)
       }
       notes_add(
@@ -188,11 +188,11 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
         }
       }
       guard from_ref is Some(from_commit) else {
-        @stdio.stderr.write("usage: git notes copy <from> <to>")
+        @stdio.stderr.write(@utf8.encode("usage: git notes copy <from> <to>"))
         @sys.exit(1)
       }
       guard to_ref is Some(to_commit) else {
-        @stdio.stderr.write("usage: git notes copy <from> <to>")
+        @stdio.stderr.write(@utf8.encode("usage: git notes copy <from> <to>"))
         @sys.exit(1)
       }
       notes_copy(
@@ -230,7 +230,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
         }
       }
       guard other_ref is Some(other_name) else {
-        @stdio.stderr.write("usage: git notes merge <ref>")
+        @stdio.stderr.write(@utf8.encode("usage: git notes merge <ref>"))
         @sys.exit(1)
       }
       match strategy {
@@ -239,7 +239,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
             s != "theirs" &&
             s != "union" &&
             s != "cat_sort_uniq" {
-            @stdio.stderr.write("error: unsupported merge strategy: \{s}")
+            @stdio.stderr.write(@utf8.encode("error: unsupported merge strategy: \{s}"))
             @sys.exit(1)
           }
         None => ()
@@ -283,7 +283,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
       if use_stdin {
         if from_ref is Some(_) || to_ref is Some(_) {
           @stdio.stderr.write(
-            "usage: git notes rewrite [--stdin] [-f] [<from> <to>]",
+            @utf8.encode("usage: git notes rewrite [--stdin] [-f] [<from> <to>]"),
           )
           @sys.exit(1)
         }
@@ -293,7 +293,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
         for line in lines {
           let parts = split_whitespace_tokens(line)
           if parts.length() != 2 {
-            @stdio.stderr.write("error: invalid rewrite line: \{line}")
+            @stdio.stderr.write(@utf8.encode("error: invalid rewrite line: \{line}"))
             @sys.exit(1)
           }
           let from = parts[0]
@@ -305,11 +305,11 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
         return
       }
       guard from_ref is Some(from_commit) else {
-        @stdio.stderr.write("usage: git notes rewrite <from> <to>")
+        @stdio.stderr.write(@utf8.encode("usage: git notes rewrite <from> <to>"))
         @sys.exit(1)
       }
       guard to_ref is Some(to_commit) else {
-        @stdio.stderr.write("usage: git notes rewrite <from> <to>")
+        @stdio.stderr.write(@utf8.encode("usage: git notes rewrite <from> <to>"))
         @sys.exit(1)
       }
       notes_rewrite(
@@ -323,7 +323,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
     "prune" => notes_prune(wfs, rfs, git_dir, common_git_dir, notes_ref)
     _ => {
       @stdio.stderr.write(
-        "usage: git notes [--ref <name>] [list | show | add | append | edit | copy | merge | rewrite | remove | prune]",
+        @utf8.encode("usage: git notes [--ref <name>] [list | show | add | append | edit | copy | merge | rewrite | remove | prune]"),
       )
       @sys.exit(1)
     }
@@ -367,13 +367,13 @@ async fn notes_show(
   let target_hex = tid.to_hex()
   // Check if notes ref exists
   guard @bitlib.resolve_ref(rfs, git_dir, notes_ref) is Some(commit_id) else {
-    @stdio.stderr.write("error: no note found for \{target_hex}")
+    @stdio.stderr.write(@utf8.encode("error: no note found for \{target_hex}"))
     @sys.exit(1)
   }
   let db = @bitlib.ObjectDb::load(rfs, common_git_dir)
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else {
-    @stdio.stderr.write("error: notes ref corrupt")
+    @stdio.stderr.write(@utf8.encode("error: notes ref corrupt"))
     @sys.exit(1)
   }
   let commit_info = @bitcore.parse_commit(o.data)
@@ -382,7 +382,7 @@ async fn notes_show(
     Some(blob_id) => {
       let note_obj = db.get(rfs, blob_id)
       guard note_obj is Some(no) else {
-        @stdio.stderr.write("error: note blob corrupt")
+        @stdio.stderr.write(@utf8.encode("error: note blob corrupt"))
         @sys.exit(1)
       }
       no.data |> decode_bytes |> print_line
@@ -390,7 +390,7 @@ async fn notes_show(
     }
     None => ()
   }
-  @stdio.stderr.write("error: no note found for \{target_hex}")
+  @stdio.stderr.write(@utf8.encode("error: no note found for \{target_hex}"))
   @sys.exit(1)
 }
 
@@ -553,9 +553,9 @@ async fn notes_add(
           if hex == target_hex {
             if !force {
               @stdio.stderr.write(
-                "error: note already exists for \{target_hex}",
+                @utf8.encode("error: note already exists for \{target_hex}"),
               )
-              @stdio.stderr.write("Use -f to overwrite existing note")
+              @stdio.stderr.write(@utf8.encode("Use -f to overwrite existing note"))
               @sys.exit(1)
             }
             // Skip existing note (will be replaced)
@@ -612,7 +612,7 @@ async fn notes_append(
     let db = @bitlib.ObjectDb::load(rfs, common_git_dir)
     let obj = db.get(rfs, commit_id)
     guard obj is Some(o) else {
-      @stdio.stderr.write("error: notes ref corrupt")
+      @stdio.stderr.write(@utf8.encode("error: notes ref corrupt"))
       @sys.exit(1)
     }
     let commit_info = @bitcore.parse_commit(o.data)
@@ -622,7 +622,7 @@ async fn notes_append(
       if hex == target_hex {
         let note_obj = db.get(rfs, id)
         guard note_obj is Some(no) else {
-          @stdio.stderr.write("error: note blob corrupt")
+          @stdio.stderr.write(@utf8.encode("error: note blob corrupt"))
           @sys.exit(1)
         }
         existing_text = no.data |> decode_bytes |> Some
@@ -687,18 +687,18 @@ async fn notes_copy(
   let from_hex = fid.to_hex()
   let to_hex = tid.to_hex()
   if from_hex == to_hex {
-    @stdio.stderr.write("error: note already exists for \{to_hex}")
+    @stdio.stderr.write(@utf8.encode("error: note already exists for \{to_hex}"))
     @sys.exit(1)
   }
   // Load notes tree
   guard @bitlib.resolve_ref(rfs, git_dir, notes_ref) is Some(commit_id) else {
-    @stdio.stderr.write("error: no note found for \{from_hex}")
+    @stdio.stderr.write(@utf8.encode("error: no note found for \{from_hex}"))
     @sys.exit(1)
   }
   let db = @bitlib.ObjectDb::load(rfs, common_git_dir)
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else {
-    @stdio.stderr.write("error: notes ref corrupt")
+    @stdio.stderr.write(@utf8.encode("error: notes ref corrupt"))
     @sys.exit(1)
   }
   let commit_info = @bitcore.parse_commit(o.data)
@@ -723,11 +723,11 @@ async fn notes_copy(
     }
   }
   guard source_blob is Some(src_id) else {
-    @stdio.stderr.write("error: no note found for \{from_hex}")
+    @stdio.stderr.write(@utf8.encode("error: no note found for \{from_hex}"))
     @sys.exit(1)
   }
   if dest_exists && !force {
-    @stdio.stderr.write("error: note already exists for \{to_hex}")
+    @stdio.stderr.write(@utf8.encode("error: note already exists for \{to_hex}"))
     @sys.exit(1)
   }
   notes.push((to_hex, src_id))
@@ -769,13 +769,13 @@ async fn notes_remove(
   let target_hex = tid.to_hex()
   // Check if notes ref exists
   guard @bitlib.resolve_ref(rfs, git_dir, notes_ref) is Some(commit_id) else {
-    @stdio.stderr.write("error: no note found for \{target_hex}")
+    @stdio.stderr.write(@utf8.encode("error: no note found for \{target_hex}"))
     @sys.exit(1)
   }
   let db = @bitlib.ObjectDb::load(rfs, common_git_dir)
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else {
-    @stdio.stderr.write("error: notes ref corrupt")
+    @stdio.stderr.write(@utf8.encode("error: notes ref corrupt"))
     @sys.exit(1)
   }
   let commit_info = @bitcore.parse_commit(o.data)
@@ -792,7 +792,7 @@ async fn notes_remove(
     }
   }
   if !found {
-    @stdio.stderr.write("error: no note found for \{target_hex}")
+    @stdio.stderr.write(@utf8.encode("error: no note found for \{target_hex}"))
     @sys.exit(1)
   }
   let tree_id = notes_write_tree(wfs, common_git_dir, notes)
@@ -888,14 +888,14 @@ async fn load_notes_tree(
   let db = @bitlib.ObjectDb::load(rfs, common_git_dir)
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else {
-    @stdio.stderr.write("error: notes ref corrupt")
+    @stdio.stderr.write(@utf8.encode("error: notes ref corrupt"))
     @sys.exit(1)
     return None
   }
   let commit_info = @bitcore.parse_commit(o.data)
   let tree_obj = db.get(rfs, commit_info.tree)
   guard tree_obj is Some(to) else {
-    @stdio.stderr.write("error: notes tree corrupt")
+    @stdio.stderr.write(@utf8.encode("error: notes tree corrupt"))
     @sys.exit(1)
     return None
   }
@@ -911,7 +911,7 @@ async fn note_text(
 ) -> String raise Error {
   let obj = db.get(rfs, entry.id)
   guard obj is Some(o) else {
-    @stdio.stderr.write("error: note blob corrupt")
+    @stdio.stderr.write(@utf8.encode("error: note blob corrupt"))
     @sys.exit(1)
     return ""
   }
@@ -1012,7 +1012,7 @@ async fn notes_merge(
   let current = load_notes_tree(rfs, git_dir, common_git_dir, notes_ref)
   let other = load_notes_tree(rfs, git_dir, common_git_dir, other_notes_ref)
   guard other is Some((other_commit_id, other_entries)) else {
-    @stdio.stderr.write("error: no notes found to merge")
+    @stdio.stderr.write(@utf8.encode("error: no notes found to merge"))
     @sys.exit(1)
   }
   match current {
@@ -1073,7 +1073,7 @@ async fn notes_merge(
         }
       }
       if conflicts > 0 {
-        @stdio.stderr.write("error: notes merge conflict")
+        @stdio.stderr.write(@utf8.encode("error: notes merge conflict"))
         @sys.exit(1)
       }
       let merged_entries : Array[@bitcore.TreeEntry] = []
@@ -1144,7 +1144,7 @@ async fn notes_rewrite(
   }
   guard source is Some(src) else { return }
   if dest_exists && !force {
-    @stdio.stderr.write("error: note already exists for \{to_hex}")
+    @stdio.stderr.write(@utf8.encode("error: note already exists for \{to_hex}"))
     @sys.exit(1)
   }
   entries.remove(from_hex)

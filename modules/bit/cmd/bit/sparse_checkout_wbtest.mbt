@@ -9,12 +9,15 @@ async fn sparse_checkout_wbtest_run_git(
   cwd : String,
   args : Array[String],
 ) -> Unit raise Error {
-  let (code, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
 }
 
@@ -23,14 +26,17 @@ async fn sparse_checkout_wbtest_git_stdout(
   cwd : String,
   args : Array[String],
 ) -> String raise Error {
-  let (code, stdout, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, stdout, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
-  stdout.text() catch {
+  @utf8.decode(stdout) catch {
     _ => ""
   }
 }
@@ -40,14 +46,17 @@ async fn sparse_checkout_wbtest_shell_stdout(
   cwd : String,
   script : String,
 ) -> String raise Error {
-  let (code, stdout, _) = @process.collect_output(
+  let proc_result = @process.run(
     "bash",
     ["-lc", script],
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, stdout, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
-  stdout.text() catch {
+  @utf8.decode(stdout) catch {
     _ => ""
   }
 }
@@ -70,7 +79,7 @@ async fn sparse_checkout_wbtest_shim_moon_path(
     wrapper_path,
     "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n",
   )
-  let chmod_code = @process.run("chmod", ["+x", wrapper_path], inherit_env=true)
+  let chmod_code = @process.run("chmod", ["+x", wrapper_path], inherit_env=true).exit_code
   @test.assert_eq(chmod_code, 0)
   wrapper_path
 }
@@ -130,15 +139,18 @@ async fn sparse_checkout_wbtest_collect_shim_git_output(
   for arg in args {
     git_args.push(arg)
   }
-  let (code, stdout, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     shim_git,
     git_args[:],
     extra_env=env,
     inherit_env=true,
+    stdout=Collect,
+    stderr=Collect,
   )
-  let stdout_text = stdout.text() catch { _ => "" }
+  let (code, stdout, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let stdout_text = @utf8.decode(stdout) catch { _ => "" }
   let stderr_text = sparse_checkout_wbtest_strip_moon_warnings(
-    stderr.text() catch {
+    @utf8.decode(stderr) catch {
       _ => ""
     },
   )
@@ -187,16 +199,19 @@ async fn sparse_checkout_wbtest_collect_shim_git_shell_output(
     "SHIM_CMDS": "sparse-checkout",
     "SHIM_STRICT": "1",
   }
-  let (code, stdout, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     "bash",
     ["-lc", script],
     extra_env=env,
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=Collect,
   )
-  let stdout_text = stdout.text() catch { _ => "" }
+  let (code, stdout, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let stdout_text = @utf8.decode(stdout) catch { _ => "" }
   let stderr_text = sparse_checkout_wbtest_strip_moon_warnings(
-    stderr.text() catch {
+    @utf8.decode(stderr) catch {
       _ => ""
     },
   )

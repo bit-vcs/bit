@@ -353,7 +353,7 @@ async fn scalar_start_fsmonitor(repo : String) -> Unit {
 
 ///|
 async fn scalar_stderr_is_tty() -> Bool {
-  @process.run("sh", ["-c", "test -t 2"], inherit_env=true) == 0
+  @process.run("sh", ["-c", "test -t 2"], inherit_env=true).exit_code == 0
 }
 
 ///|
@@ -809,7 +809,7 @@ async fn scalar_handle_diagnose(
       temp_dir + "/objects-local.txt",
     ],
     inherit_env=true,
-  )
+  ).exit_code
   if zip_code != 0 {
     scalar_die(1, "scalar diagnose: failed to create diagnostics archive")
     return

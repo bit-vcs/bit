@@ -475,7 +475,7 @@ async fn sparse_checkout_run_check_rules(
   let output = sparse_checkout_filter_check_rules_input(
     input, patterns, nul_terminated,
   )
-  @stdio.stdout.write(output)
+  @stdio.stdout.write(@utf8.encode(output))
 }
 
 ///|
@@ -698,7 +698,7 @@ async fn sparse_checkout_run_clean(
 
   if !force && !dry_run && sparse_checkout_clean_requires_force(fs, git_dir) {
     @stdio.stderr.write(
-      "fatal: clean.requireForce defaults to true and neither -i, -n, nor -f given; refusing to clean",
+      @utf8.encode("fatal: clean.requireForce defaults to true and neither -i, -n, nor -f given; refusing to clean"),
     )
     @sys.exit(1)
   }

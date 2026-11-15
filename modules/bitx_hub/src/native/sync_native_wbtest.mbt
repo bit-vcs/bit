@@ -378,7 +378,7 @@ async test "relay: relay push adds relay signature headers when key env is set" 
     "openssl",
     ["genpkey", "-algorithm", "Ed25519", "-out", key_path],
     inherit_env=true,
-  ) catch {
+  ).exit_code catch {
     _ => -1
   }
   if keygen_code != 0 {
@@ -438,7 +438,7 @@ async test "relay: relay push adds relay signature headers when key env is set" 
   @env.unset_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE")
   @env.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
   ignore(
-    @process.run("rm", ["-f", key_path], inherit_env=true) catch {
+    @process.run("rm", ["-f", key_path], inherit_env=true).exit_code catch {
       _ => -1
     },
   )

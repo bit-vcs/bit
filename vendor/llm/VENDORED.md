@@ -13,7 +13,8 @@ registry package for every module that imports `mizchi/llm@0.3.2`
 Local changes from the published 0.3.2:
 
 - `x.to_json()` on builtin types rewritten to `ToJson::to_json(x)`.
-- Dependency floors bumped to match the workspace (`mizchi/x`, `moonbitlang/async`).
+- Dependency floors bumped to match the workspace (`mizchi/x`), and the
+  `moonbitlang/async` dependency replaced by the bundled `moonbitlang/core/async`.
 - Each `moon.pkg` sets `warnings = "-25-29-79"` so upstream style/deprecation
   warnings don't fail the repo's `moon check --deny-warn` lint.
 - `justfile` dropped.

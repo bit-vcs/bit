@@ -345,26 +345,6 @@ fn http_serve_dispatch(
 }
 
 ///|
-/// Read a request body to completion.
-///
-/// A push body is a pack, so this must not stop early: a short read would be
-/// handed to `receive_pack` as a truncated pack.
-async fn http_read_body(reader : &@io.Reader) -> Bytes raise Error {
-  let chunks : Array[Byte] = []
-  while true {
-    let chunk = reader.read_some()
-    match chunk {
-      Some(part) =>
-        for b in part {
-          chunks.push(b)
-        }
-      None => break
-    }
-  }
-  Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i]))
-}
-
-///|
 /// Run the listener until interrupted.
 async fn http_serve_run(options : HttpServeOptions) -> Unit raise Error {
   let addr = @socket.Addr::resolve(options.host, port=options.port)
@@ -383,14 +363,16 @@ async fn http_serve_run(options : HttpServeOptions) -> Unit raise Error {
     )
   }
   server.run_forever(
-    (request, body, conn) => {
+    (request, conn) => {
       let verb = match request.meth {
         @http.RequestMethod::Get => "GET"
         @http.RequestMethod::Post => "POST"
         @http.RequestMethod::Head => "HEAD"
         _ => "OTHER"
       }
-      let payload = http_read_body(body)
+      // Read the body to completion: a push body is a pack, and a short read
+      // would hand `receive_pack` a truncated pack.
+      let payload = conn.read_all()
       let auth = http_header(request.headers, "authorization")
       let protocol_version = match http_header(request.headers, "git-protocol") {
         Some(value) => if value.contains("version=2") { 2 } else { 0 }

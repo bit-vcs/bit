@@ -20,16 +20,6 @@ async fn run_git(
     }
   let stdout_path = stdout_file.path()
   let stderr_path = stderr_file.path()
-  let stdout = @process.redirect_to_file(
-    stdout_path,
-    create_mode=CreateOrTruncate,
-    permission=420,
-  )
-  let stderr = @process.redirect_to_file(
-    stderr_path,
-    create_mode=CreateOrTruncate,
-    permission=420,
-  )
   let stdin_file : @tempfile.NamedTempFile? = match stdin_data {
     None => None
     Some(data) => {
@@ -47,36 +37,36 @@ async fn run_git(
   }
   let stdin = match stdin_file {
     None => None
-    Some(f) => Some(@process.redirect_from_file(f.path()))
+    Some(f) => Some(f.path())
   }
   let code = match cwd {
     None =>
       match stdin {
-        None => @process.run("git", args, inherit_env=true, stdout~, stderr~)
+        None => @process.run("git", args, inherit_env=true, stdout=ToFile(stdout_path), stderr=ToFile(stderr_path)).exit_code
         Some(input) =>
           @process.run(
             "git",
             args,
             inherit_env=true,
-            stdin=input,
-            stdout~,
-            stderr~,
-          )
+            stdin=FromFile(input),
+            stdout=ToFile(stdout_path),
+            stderr=ToFile(stderr_path),
+          ).exit_code
       }
     Some(dir) =>
       match stdin {
         None =>
-          @process.run("git", args, inherit_env=true, stdout~, stderr~, cwd=dir)
+          @process.run("git", args, inherit_env=true, stdout=ToFile(stdout_path), stderr=ToFile(stderr_path), cwd=dir).exit_code
         Some(input) =>
           @process.run(
             "git",
             args,
             inherit_env=true,
-            stdin=input,
-            stdout~,
-            stderr~,
+            stdin=FromFile(input),
+            stdout=ToFile(stdout_path),
+            stderr=ToFile(stderr_path),
             cwd=dir,
-          )
+          ).exit_code
       }
   }
   let out = @fs.read_file_to_bytes(stdout_path) catch { _ => Default::default() }
@@ -128,7 +118,7 @@ fn create_temp_dir(prefix : String) -> String {
 
 ///|
 async fn remove_dir_recursive(path : String) -> Unit {
-  ignore(@process.run("rm", ["-rf", path], inherit_env=true))
+  ignore(@process.run("rm", ["-rf", path], inherit_env=true).exit_code)
 }
 
 ///|
@@ -1114,7 +1104,7 @@ async test "git oracle: executable file mode 100755" {
     "chmod",
     ["+x", "\{repo_dir}/script.sh"],
     inherit_env=true,
-  )
+  ).exit_code
   if chmod_code != 0 {
     // chmod might not be available or fail on some systems
     remove_dir_recursive(repo_dir)
@@ -1198,7 +1188,7 @@ async test "git oracle: symlink mode 120000" {
     "ln",
     ["-s", "target.txt", "\{repo_dir}/link.txt"],
     inherit_env=true,
-  )
+  ).exit_code
   if symlink_code != 0 {
     remove_dir_recursive(repo_dir)
     return ()

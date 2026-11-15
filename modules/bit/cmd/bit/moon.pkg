@@ -37,14 +37,14 @@ import {
   "mizchi/bit_runtime" @runtime,
   "mizchi/bit_utils" @string_utils,
   "mizchi/bit_object/zlib",
-  "moonbitlang/async",
-  "moonbitlang/async/js_async",
-  "moonbitlang/async/fs" @asyncfs,
-  "moonbitlang/async/http",
-  "moonbitlang/async/io",
-  "moonbitlang/async/socket",
-  "moonbitlang/async/process",
-  "moonbitlang/async/stdio",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/js_async",
+  "moonbitlang/core/async/fs" @asyncfs,
+  "moonbitlang/core/async/http",
+  "moonbitlang/core/async/io",
+  "moonbitlang/core/async/socket",
+  "moonbitlang/core/async/process",
+  "moonbitlang/core/async/stdio",
   "moonbitlang/core/bench",
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
@@ -69,6 +69,16 @@ import {
 } for "wbtest"
 
 options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/fs",
+    "moonbitlang/core/async/http",
+    "moonbitlang/core/async/io",
+    "moonbitlang/core/async/js_async",
+    "moonbitlang/core/async/process",
+    "moonbitlang/core/async/socket",
+    "moonbitlang/core/async/stdio",
+  ],
   "native-stub": [
     "bench_suppress_stub.c",
     "hub_tty_stub.c",
@@ -77,6 +87,7 @@ options(
   ],
   targets: {
     "add.mbt": [ "native" ],
+    "async_compat.mbt": [ "native" ],
     "add_wbtest.mbt": [ "native" ],
     "ai.mbt": [ "native" ],
     "am.mbt": [ "native" ],

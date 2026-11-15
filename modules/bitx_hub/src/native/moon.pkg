@@ -9,8 +9,8 @@ import {
   "mizchi/bit_lib" @lib,
   "mizchi/bitx_hub" @hub,
   "mizchi/bitx_hub/crypto",
-  "moonbitlang/async",
-  "moonbitlang/async/process",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/process",
   "moonbitlang/core/bench",
   "moonbitlang/core/env",
   "moonbitlang/core/encoding/base64",
@@ -28,6 +28,10 @@ import {
 } for "wbtest"
 
 options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/process",
+  ],
   targets: {
     "claim_native.mbt": [ "native" ],
     "github_api.mbt": [ "native" ],

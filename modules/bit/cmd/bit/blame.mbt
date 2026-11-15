@@ -25,10 +25,10 @@ async fn delegate_blame_to_real_git(args : Array[String], cwd : String) -> Unit 
     argv,
     inherit_env=true,
     cwd~,
-    stdin=@stdio.stdin,
-    stdout=@stdio.stdout,
-    stderr=@stdio.stderr,
-  )
+    stdin=Stdin,
+    stdout=Stdout,
+    stderr=Stderr,
+  ).exit_code
   @sys.exit(code)
 }
 
@@ -329,7 +329,7 @@ async fn handle_blame(args : Array[String]) -> Unit raise Error {
     }
   }
   guard file_path is Some(path) else {
-    @stdio.stderr.write("fatal: no file specified")
+    @stdio.stderr.write(@utf8.encode("fatal: no file specified"))
     @sys.exit(128)
   }
   // Get blame info

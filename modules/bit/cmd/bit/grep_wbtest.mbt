@@ -3,12 +3,15 @@ async fn grep_test_run_git(
   root : String,
   args : Array[String],
 ) -> Unit raise Error {
-  let (code, _, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, _, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
 }
 
@@ -17,14 +20,17 @@ async fn grep_test_git_stdout(
   root : String,
   args : Array[String],
 ) -> String raise Error {
-  let (code, stdout, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
+  let (code, stdout, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   @test.assert_eq(code, 0)
-  stdout.text() catch {
+  @utf8.decode(stdout) catch {
     _ => ""
   }
 }
@@ -34,13 +40,16 @@ async fn grep_test_git_stderr(
   root : String,
   args : Array[String],
 ) -> (Int, String) raise Error {
-  let (code, _, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
-  let text = stderr.text() catch { _ => "" }
+  let (code, _, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let text = @utf8.decode(stderr) catch { _ => "" }
   (code, text)
 }
 
@@ -49,13 +58,16 @@ async fn grep_test_git_collect_stdout(
   root : String,
   args : Array[String],
 ) -> (Int, String) raise Error {
-  let (code, stdout, _) = @process.collect_output(
+  let proc_result = @process.run(
     "git",
     args[:],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
+    stderr=Collect,
   )
-  let text = stdout.text() catch { _ => "" }
+  let (code, stdout, _) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let text = @utf8.decode(stdout) catch { _ => "" }
   (code, text)
 }
 

@@ -238,7 +238,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
     if arg == "--ref-format" && i + 1 < args.length() {
       let value = args[i + 1]
       if value != "files" && value != "reftable" {
-        @stdio.stderr.write("fatal: unknown ref storage format '\{value}'\n")
+        @stdio.stderr.write(@utf8.encode("fatal: unknown ref storage format '\{value}'\n"))
         @sys.exit(128)
       }
       ref_format = value
@@ -248,7 +248,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
     if arg.has_prefix("--ref-format=") {
       let value = String::unsafe_substring(arg, start=13, end=arg.length())
       if value != "files" && value != "reftable" {
-        @stdio.stderr.write("fatal: unknown ref storage format '\{value}'\n")
+        @stdio.stderr.write(@utf8.encode("fatal: unknown ref storage format '\{value}'\n"))
         @sys.exit(128)
       }
       ref_format = value
@@ -841,7 +841,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
         if clone_has_missing_parent_history(fs, clone_git_dir, head_id) {
           cleanup_failed_clone(fs, clone_root, separate_git_dir)
           @stdio.stderr.write(
-            "fatal: source repository is shallow, reject to clone.\n",
+            @utf8.encode("fatal: source repository is shallow, reject to clone.\n"),
           )
           @sys.exit(1)
         }
@@ -1262,7 +1262,7 @@ async fn resolve_clone_transport_filter(
   if clone_remote_supports_filter(caps, version) {
     return requested
   }
-  @stdio.stderr.write("warning: filtering not recognized by server, ignoring\n")
+  @stdio.stderr.write(@utf8.encode("warning: filtering not recognized by server, ignoring\n"))
   @protocol.FilterSpec::NoFilter
 }
 
@@ -1899,9 +1899,9 @@ async fn warn_case_insensitive_collisions_from_commit(
   let paths = files.keys().to_array()
   let collided_paths = collect_case_collision_paths(paths)
   if collided_paths.length() > 0 {
-    @stdio.stderr.write("warning: the following paths have collided:\n")
+    @stdio.stderr.write(@utf8.encode("warning: the following paths have collided:\n"))
     for path in collided_paths {
-      @stdio.stderr.write("  " + path + "\n")
+      @stdio.stderr.write(@utf8.encode("  " + path + "\n"))
     }
   }
 }

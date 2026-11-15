@@ -1308,24 +1308,24 @@ async fn report_collect_error(err : @bitcore.GitError) -> Unit {
   match err {
     @bitcore.GitError::InvalidObject(msg) =>
       if msg.contains("Missing tree object") {
-        @stdio.stderr.write("fatal: bad tree object\n")
+        @stdio.stderr.write(@utf8.encode("fatal: bad tree object\n"))
       } else if msg.contains("Missing commit object") {
-        @stdio.stderr.write("fatal: bad commit object\n")
+        @stdio.stderr.write(@utf8.encode("fatal: bad commit object\n"))
       } else if msg.contains("Missing blob object") {
-        @stdio.stderr.write("fatal: missing blob object\n")
+        @stdio.stderr.write(@utf8.encode("fatal: missing blob object\n"))
       } else {
-        @stdio.stderr.write("fatal: " + msg + "\n")
+        @stdio.stderr.write(@utf8.encode("fatal: " + msg + "\n"))
       }
     @bitcore.GitError::HashMismatch(expected, actual) =>
       @stdio.stderr.write(
-        "fatal: hash mismatch (expected " + expected + ", got " + actual + ")\n",
+        @utf8.encode("fatal: hash mismatch (expected " + expected + ", got " + actual + ")\n"),
       )
     @bitcore.GitError::PackfileError(msg) =>
-      @stdio.stderr.write("fatal: " + msg + "\n")
+      @stdio.stderr.write(@utf8.encode("fatal: " + msg + "\n"))
     @bitcore.GitError::ProtocolError(msg) =>
-      @stdio.stderr.write("fatal: " + msg + "\n")
+      @stdio.stderr.write(@utf8.encode("fatal: " + msg + "\n"))
     @bitcore.GitError::IoError(msg) =>
-      @stdio.stderr.write("fatal: " + msg + "\n")
+      @stdio.stderr.write(@utf8.encode("fatal: " + msg + "\n"))
   }
   @sys.exit(1)
 }
@@ -2307,7 +2307,7 @@ async fn collect_objects_from_stdin_packs(
     match resolve_pack_path(fs, pack_dir, alt_dirs, name) {
       Some(path) => include_paths.push(path)
       None => {
-        @stdio.stderr.write("fatal: could not find pack '" + name + "'\n")
+        @stdio.stderr.write(@utf8.encode("fatal: could not find pack '" + name + "'\n"))
         @sys.exit(1)
       }
     }
@@ -2322,9 +2322,9 @@ async fn collect_objects_from_stdin_packs(
     for path in include_paths {
       if is_promisor_pack(fs, path) {
         @stdio.stderr.write(
-          "fatal: packfile '" +
+          @utf8.encode("fatal: packfile '" +
           path +
-          "' is a promisor but --exclude-promisor-objects was given\n",
+          "' is a promisor but --exclude-promisor-objects was given\n"),
         )
         @sys.exit(1)
       }
@@ -2432,7 +2432,7 @@ async fn try_reuse_single_stdin_pack(
   let base_name = match cfg.base_name {
     Some(name) => name
     None => {
-      @stdio.stderr.write("fatal: missing base-name\n")
+      @stdio.stderr.write(@utf8.encode("fatal: missing base-name\n"))
       @sys.exit(1)
       ""
     }
@@ -2442,7 +2442,7 @@ async fn try_reuse_single_stdin_pack(
   let idx_out = base_name + "-" + hash_hex + ".idx"
   fs.write_file(pack_out, pack)
   fs.write_file(idx_out, idx)
-  @stdio.stdout.write(hash_hex + "\n")
+  @stdio.stdout.write(@utf8.encode(hash_hex + "\n"))
   true
 }
 
@@ -2450,24 +2450,24 @@ async fn try_reuse_single_stdin_pack(
 async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
   for arg in args {
     if arg == "-h" || arg == "--help" || arg == "--help-all" {
-      @stdio.stdout.write("usage: git pack-objects [<options>] <base-name>\n")
+      @stdio.stdout.write(@utf8.encode("usage: git pack-objects [<options>] <base-name>\n"))
       @sys.exit(129)
     }
   }
   match parse_pack_objects_args(args) {
     PackObjectsParse::Unsupported => {
       @stdio.stderr.write(
-        "bit pack-objects: unsupported options in standalone mode\n",
+        @utf8.encode("bit pack-objects: unsupported options in standalone mode\n"),
       )
       @sys.exit(1)
     }
     PackObjectsParse::Error(msg) => {
-      @stdio.stderr.write(msg + "\n")
+      @stdio.stderr.write(@utf8.encode(msg + "\n"))
       @sys.exit(1)
     }
     PackObjectsParse::Ok(cfg) => {
       if cfg.threads_warning {
-        @stdio.stderr.write("warning: no threads support, ignoring --threads\n")
+        @stdio.stderr.write(@utf8.encode("warning: no threads support, ignoring --threads\n"))
       }
       let fs = OsFs::new()
       let git_dir = find_git_dir(fs)
@@ -2496,11 +2496,11 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         version == 2 &&
         !cfg.stdout {
         @stdio.stderr.write(
-          "warning: currently, --write-bitmap-index requires --name-hash-version=1\n",
+          @utf8.encode("warning: currently, --write-bitmap-index requires --name-hash-version=1\n"),
         )
       }
       if !fs.is_dir(git_dir) && !(cfg.all || cfg.revs) {
-        @stdio.stderr.write("fatal: not a git repository\n")
+        @stdio.stderr.write(@utf8.encode("fatal: not a git repository\n"))
         @sys.exit(1)
       }
       // Read pack.packSizeLimit from config; CLI --max-pack-size overrides
@@ -2559,7 +2559,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         let base_name = match cfg.base_name {
           Some(name) => resolve_in_cwd(name)
           None => {
-            @stdio.stderr.write("fatal: missing base-name\n")
+            @stdio.stderr.write(@utf8.encode("fatal: missing base-name\n"))
             @sys.exit(1)
             ""
           }
@@ -2569,7 +2569,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           cruft_size_limit {
           Some(limit) if limit > 0L => {
             let effective_limit = if limit < 1048576L {
-              @stdio.stderr.write("warning: minimum pack size limit is 1 MiB\n")
+              @stdio.stderr.write(@utf8.encode("warning: minimum pack size limit is 1 MiB\n"))
               1048576L
             } else {
               limit
@@ -2649,7 +2649,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           }
           let pack_checksum = get_pack_checksum_bytes(pack)
           write_mtimes_file(fs, mtimes_path, pack_ids, mtime_map, pack_checksum)
-          @stdio.stdout.write(hash_hex + "\n")
+          @stdio.stdout.write(@utf8.encode(hash_hex + "\n"))
         }
         return ()
       }
@@ -2757,7 +2757,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
                   match @bitrepo.rev_parse(fs, git_dir, right) {
                     None => {
                       @stdio.stderr.write(
-                        "fatal: bad revision '" + right + "'\n",
+                        @utf8.encode("fatal: bad revision '" + right + "'\n"),
                       )
                       @sys.exit(1)
                     }
@@ -2777,7 +2777,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
                   match @bitrepo.rev_parse(fs, git_dir, left) {
                     None => {
                       @stdio.stderr.write(
-                        "fatal: bad revision '" + left + "'\n",
+                        @utf8.encode("fatal: bad revision '" + left + "'\n"),
                       )
                       @sys.exit(1)
                     }
@@ -2798,7 +2798,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           if !handled {
             match @bitrepo.rev_parse(fs, git_dir, spec) {
               None => {
-                @stdio.stderr.write("fatal: bad revision '" + spec + "'\n")
+                @stdio.stderr.write(@utf8.encode("fatal: bad revision '" + spec + "'\n"))
                 @sys.exit(1)
               }
               Some(id) => {
@@ -2925,7 +2925,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             }
           }
           if has_sha256 {
-            @stdio.stderr.write("bit: SHA256 object format is not supported\n")
+            @stdio.stderr.write(@utf8.encode("bit: SHA256 object format is not supported\n"))
             @sys.exit(1)
           }
           let ends_with_newline = input.length() > 0 &&
@@ -2935,7 +2935,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             let trimmed = trim_line_bytes(line)
             if trimmed.length() == 0 {
               if !(ends_with_newline && i == lines.length() - 1) {
-                @stdio.stderr.write(invalid_object_line_message(""))
+                @stdio.stderr.write(@utf8.encode(invalid_object_line_message("")))
                 @sys.exit(1)
               }
               continue
@@ -2943,7 +2943,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             match parse_object_id_bytes(line) {
               None => {
                 @stdio.stderr.write(
-                  line |> line_to_string |> invalid_object_line_message,
+                  @utf8.encode(line |> line_to_string |> invalid_object_line_message),
                 )
                 @sys.exit(1)
               }
@@ -2957,7 +2957,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
                       ()
                     } else {
                       @stdio.stderr.write(
-                        "fatal: bad object " + id.to_hex() + "\n",
+                        @utf8.encode("fatal: bad object " + id.to_hex() + "\n"),
                       )
                       @sys.exit(1)
                     }
@@ -2968,12 +2968,12 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         }
       }
       if cfg.path_walk {
-        @stdio.stderr.write("Compressing objects by path\n")
+        @stdio.stderr.write(@utf8.encode("Compressing objects by path\n"))
       }
       // Handle sparse:path (security-dropped) error before filtering
       if cfg.filter is SparsePathUnsupported {
         @stdio.stderr.write(
-          "fatal: --filter=sparse:path is no longer supported\n",
+          @utf8.encode("fatal: --filter=sparse:path is no longer supported\n"),
         )
         @sys.exit(1)
       }
@@ -3097,9 +3097,9 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       if cfg.progress {
         let enumerated = objects.length()
         @stdio.stderr.write(
-          "Enumerating objects: " + enumerated.to_string() + ", done\n",
+          @utf8.encode("Enumerating objects: " + enumerated.to_string() + ", done\n"),
         )
-        @stdio.stderr.write("pack-reused " + pack_reused.to_string() + "\n")
+        @stdio.stderr.write(@utf8.encode("pack-reused " + pack_reused.to_string() + "\n"))
       }
       let reuse_only = cfg.window == 0
       // Apply pack size limit (only for file output, not stdout)
@@ -3109,7 +3109,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         match pack_size_limit {
           Some(limit) =>
             if limit > 0L && limit < 1048576L {
-              @stdio.stderr.write("warning: minimum pack size limit is 1 MiB\n")
+              @stdio.stderr.write(@utf8.encode("warning: minimum pack size limit is 1 MiB\n"))
               Some(1048576L)
             } else {
               Some(limit)
@@ -3171,7 +3171,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           let base_name = match cfg.base_name {
             Some(name) => name
             None => {
-              @stdio.stderr.write("fatal: missing base-name\n")
+              @stdio.stderr.write(@utf8.encode("fatal: missing base-name\n"))
               @sys.exit(1)
               ""
             }
@@ -3199,7 +3199,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           if db.saw_corrupt_pack {
             corrupt_pack_file(fs, pack_path)
           }
-          @stdio.stdout.write(hash_hex + "\n")
+          @stdio.stdout.write(@utf8.encode(hash_hex + "\n"))
         }
       }
       // Write filtered-out objects to separate pack (--filter-to)
@@ -3228,16 +3228,16 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             cfg.index_version,
             cfg.off64_threshold,
           )
-          @stdio.stdout.write(ft_hash + "\n")
+          @stdio.stdout.write(@utf8.encode(ft_hash + "\n"))
         }
       }
       if cfg.progress {
         @stdio.stderr.write(
-          "Total " +
+          @utf8.encode("Total " +
           objects.length().to_string() +
           " (delta " +
           total_delta_count.to_string() +
-          ")\n",
+          ")\n"),
         )
       }
       if cfg.stdout {
@@ -3362,7 +3362,7 @@ async fn loosen_unused_packed_objects(
     let pack_mtime = if cfg.unpack_unreachable_expiration > 0L {
       let pack_name = base + ".pack"
       let pack_path = pack_dir + "/" + pack_name
-      let (sec, _) = @asyncfs.mtime(pack_path[:], follow_symlink=true) catch {
+      let (sec, _) = asyncfs_mtime_pair(pack_path[:], follow_symlink=true) catch {
         _ => (0L, 0)
       }
       sec

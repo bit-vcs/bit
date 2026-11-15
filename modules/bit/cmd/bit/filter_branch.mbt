@@ -18,9 +18,9 @@ async fn handle_filter_branch(args : Array[String]) -> Unit raise Error {
     argv,
     inherit_env=true,
     cwd~,
-    stdin=@stdio.stdin,
-    stdout=@stdio.stdout,
-    stderr=@stdio.stderr,
-  )
+    stdin=Stdin,
+    stdout=Stdout,
+    stderr=Stderr,
+  ).exit_code
   @sys.exit(code)
 }

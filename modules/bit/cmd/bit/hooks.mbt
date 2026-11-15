@@ -366,7 +366,7 @@ async fn hooks_prompt_approve_checksum(
   let bytes : Array[Byte] = []
   let mut finished = false
   while !finished {
-    match @stdio.stdin.read_some(max_len=64) {
+    match @stdio.stdin.read() {
       None => finished = true
       Some(chunk) =>
         for b in chunk {

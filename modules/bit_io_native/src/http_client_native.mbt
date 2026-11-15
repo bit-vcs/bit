@@ -147,27 +147,33 @@ async fn bit_credential_fill(
   username : String?,
 ) -> (String, String)? raise @bit.GitError {
   let input = build_credential_input(protocol, host, path, username)
-  let (stdin, writer) = @process.write_to_process() catch {
-    err => raise @bit.GitError::IoError("git credential pipe failed: \{err}")
-  }
-  writer.write(input) catch {
-    err => raise @bit.GitError::IoError("git credential write failed: \{err}")
-  }
-  writer.close()
-  let (code, stdout, stderr) = @process.collect_output(
+  // The child owns its pipes: feed the request through `child.stdin`, close
+  // it to send EOF, then collect stdout (stderr is not needed).
+  let child = @process.spawn_orphan(
     "git",
     ["credential", "fill"],
     inherit_env=true,
-    stdin~,
     extra_env={ "GIT_TERMINAL_PROMPT": "0" },
+    stdin=FeedFromParent,
+    stdout=Collect,
+    stderr=Discard,
   ) catch {
     err => raise @bit.GitError::IoError("git credential fill failed: \{err}")
   }
+  child.stdin.write(@utf8.encode(input)) catch {
+    err => raise @bit.GitError::IoError("git credential write failed: \{err}")
+  }
+  child.stdin.close()
+  let stdout = child.stdout.read_all() catch {
+    err => raise @bit.GitError::IoError("git credential read failed: \{err}")
+  }
+  let code = child.wait() catch {
+    err => raise @bit.GitError::IoError("git credential fill failed: \{err}")
+  }
   if code != 0 {
-    ignore(stderr)
     return None
   }
-  let text = stdout.text() catch { _ => "" }
+  let text = @utf8.decode_lossy(stdout[:])
   let mut user : String? = None
   let mut pass : String? = None
   for line_view in text.split("\n") {
@@ -221,7 +227,7 @@ fn build_credential_input(
 /// A read error is treated as end of body rather than raised, because some
 /// servers close abruptly once the body is complete. `drain_response_strict`
 /// is the variant for callers that cannot tolerate a silent truncation.
-async fn drain_response(client : @http.Client) -> Bytes raise @bit.GitError {
+async fn drain_response(client : @http.ClientConnection) -> Bytes raise @bit.GitError {
   let data = collect_response(client, false)
   client.close()
   data
@@ -233,7 +239,7 @@ async fn drain_response(client : @http.Client) -> Bytes raise @bit.GitError {
 /// Object storage reads must not truncate silently: a short pack that reports
 /// success is worse than a failed request.
 async fn drain_response_strict(
-  client : @http.Client,
+  client : @http.ClientConnection,
 ) -> Bytes raise @bit.GitError {
   errdefer client.close()
   let data = collect_response(client, true)
@@ -243,12 +249,12 @@ async fn drain_response_strict(
 
 ///|
 async fn collect_response(
-  client : @http.Client,
+  client : @http.ClientConnection,
   strict : Bool,
 ) -> Bytes raise @bit.GitError {
   let chunks : Array[Byte] = []
   while true {
-    let chunk = client.read_some() catch {
+    let chunk = client.read() catch {
       err =>
         if strict {
           raise @bit.GitError::IoError("HTTP response body truncated: \{err}")
@@ -272,7 +278,7 @@ async fn collect_response(
 ///
 /// They were previously dropped, which made ETags invisible and so made
 /// compare-and-swap against an object store impossible.
-fn http_response_of(response : @http.Response) -> @bit.HttpResponse {
+fn http_response_of(response : @http.ResponseHeader) -> @bit.HttpResponse {
   let headers : Map[String, String] = Map([])
   for name, value in response.headers {
     headers[name.0] = value
@@ -316,7 +322,7 @@ pub async fn native_http_get(
   headers : Map[String, String],
 ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
-  let (response, client) = @http.get_stream(
+  let (response, client) = @http.get(
     url,
     headers=to_http_headers(auth_headers),
   ) catch {
@@ -333,7 +339,7 @@ pub async fn native_http_post(
   headers : Map[String, String],
 ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
-  let client = @http.post_stream(url, headers=to_http_headers(auth_headers)) catch {
+  let client = @http.post(url, headers=to_http_headers(auth_headers)) catch {
     e => raise @bit.GitError::IoError("HTTP POST failed: \{e}")
   }
   client.write(body) catch {
@@ -375,7 +381,7 @@ pub async fn native_http_put(
   headers : Map[String, String],
 ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
-  let client = @http.put_stream(url, headers=to_http_headers(auth_headers)) catch {
+  let client = @http.put(url, headers=to_http_headers(auth_headers)) catch {
     e => raise @bit.GitError::IoError("HTTP PUT failed: \{e}")
   }
   client.write(body) catch {
@@ -400,7 +406,7 @@ pub async fn native_http_delete(
 ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
   let (origin, path) = split_url_origin(url)
-  let client = @http.Client::Client(origin) catch {
+  let client = @http.ClientConnection::ClientConnection(origin) catch {
     e => raise @bit.GitError::IoError("HTTP DELETE connect failed: \{e}")
   }
   let response = try {
@@ -447,7 +453,7 @@ pub async fn native_objstore_send(
   }
   // The request is already SigV4-signed, so no credential helper may add to
   // it: an extra header would invalidate the signature.
-  let client = @http.Client::Client(origin) catch {
+  let client = @http.ClientConnection::ClientConnection(origin) catch {
     e => raise @bit.GitError::IoError("connect to \{origin} failed: \{e}")
   }
   let response = try {

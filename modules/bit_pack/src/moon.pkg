@@ -13,8 +13,8 @@ import {
   "mizchi/bit_object" @object,
   "mizchi/bit_types" @types,
   "mizchi/bit_repo" @repo,
-  "moonbitlang/async",
-  "moonbitlang/async/process",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/process",
   "moonbitlang/x/fs",
   "mizchi/tempfile",
   "moonbitlang/core/bench",
@@ -30,6 +30,10 @@ import {
 warnings = "-29"
 
 options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/process",
+  ],
   "native-stub": [ "delta_copy_native.c" ],
   targets: {
     "bench_profile_test.mbt": [ "native" ],

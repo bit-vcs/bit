@@ -5,7 +5,7 @@ async test "native worktree probes handle UTF-8 paths and missing entries" {
   let directory = root + "/目录"
   @afs.mkdir(directory)
   let path = directory + "/文件.txt"
-  @afs.write_file(path, "hello")
+  @afs.write_text(path, "hello")
   guard native_lstat_meta(path) is Some(meta) else {
     fail("missing file metadata")
   }

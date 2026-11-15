@@ -149,7 +149,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   if filter_specs.length() > 0 {
     if bitmap_from_cmdline {
       @stdio.stderr.write(
-        "error: cannot use --filter with --write-bitmap-index\n",
+        @utf8.encode("error: cannot use --filter with --write-bitmap-index\n"),
       )
       @sys.exit(1)
     }
@@ -233,27 +233,29 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
       return
     }
   }
+  defer stdin_input.close()
   // Close stdin writer immediately — pack-objects with --all doesn't read stdin
   stdin_writer.close()
-  let dev_null = @process.redirect_to_file("/dev/null")
   // We collect stdout to get the pack hash(es), stderr for errors
-  let (code, stdout_data, stderr_data) = @process.collect_output(
+  let proc_result = @process.run(
     bit_exe,
     po_args[:],
     inherit_env=true,
-    stdin=stdin_input,
+    stdin=Shared(stdin_input),
     cwd=root[:],
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
     _ => {
       repack_fallback(fs, root, all, delete_redundant, quiet)
       return
     }
   }
-  ignore(dev_null)
+  let (code, stdout_data, stderr_data) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
   if code != 0 {
-    let err_text = stderr_data.text() catch { _ => "" }
+    let err_text = @utf8.decode(stderr_data) catch { _ => "" }
     if err_text.length() > 0 && !quiet {
-      @stdio.stderr.write(err_text)
+      @stdio.stderr.write(@utf8.encode(err_text))
     }
     // pack-objects returns 1 with --non-empty when nothing to pack — that's ok
     if code != 1 {
@@ -263,7 +265,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
     }
   }
   // Parse stdout to get new pack hashes (one per line)
-  let stdout_text = stdout_data.text() catch { _ => "" }
+  let stdout_text = @utf8.decode(stdout_data) catch { _ => "" }
   let new_packs : Array[String] = []
   for line_view in stdout_text.split("\n") {
     let line = trim_string(line_view.to_owned())

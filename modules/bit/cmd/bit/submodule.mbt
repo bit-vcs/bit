@@ -150,7 +150,7 @@ async fn handle_submodule(args : Array[String]) -> Unit raise Error {
     "absorbgitdirs" => handle_submodule_absorbgitdirs(fs, root, git_dir, rest)
     "summary" => handle_submodule_summary(fs, root, git_dir, rest)
     _ => {
-      @stdio.stderr.write("error: unknown submodule command: \{subcmd}")
+      @stdio.stderr.write(@utf8.encode("error: unknown submodule command: \{subcmd}"))
       @sys.exit(1)
     }
   }
@@ -569,9 +569,10 @@ fn normalize_submodule_add_path(
 
 ///|
 async fn submodule_canonical_dir(path : String) -> String {
-  let (code, stdout) = @process.collect_stdout("pwd", ["-P"], cwd=path)
+  let proc_result = @process.run("pwd", ["-P"], cwd=path, stdout=Collect)
+  let (code, stdout) = (proc_result.exit_code, proc_result.stdout_binary())
   if code == 0 {
-    let out = stdout.text() catch { _ => "" }
+    let out = @utf8.decode(stdout) catch { _ => "" }
     let canonical = trim_string(out)
     if canonical.length() > 0 {
       return normalize_path(canonical)
@@ -2846,7 +2847,7 @@ async fn submodule_run_post_checkout_hook(
     [old_hex, new_hex, "1"],
     inherit_env=true,
     cwd=work_tree,
-  ) catch {
+  ).exit_code catch {
     _ => 1
   }
 }
@@ -2964,7 +2965,7 @@ async fn handle_submodule_deinit(
                 raise err
               }
               @stdio.stderr.write(
-                "error: could not inspect submodule '\{sub.path}'",
+                @utf8.encode("error: could not inspect submodule '\{sub.path}'"),
               )
               @sys.exit(1)
               panic()
@@ -2978,7 +2979,7 @@ async fn handle_submodule_deinit(
               sub.path,
             ) {
             @stdio.stderr.write(
-              "error: '\{sub.path}' has local modifications (use --force)",
+              @utf8.encode("error: '\{sub.path}' has local modifications (use --force)"),
             )
             @sys.exit(1)
             return
@@ -3541,7 +3542,7 @@ async fn handle_submodule_foreach(
       extra_env=env,
       inherit_env=true,
       cwd=sub_path,
-    )
+    ).exit_code
     if code != 0 {
       raise @bitcore.GitError::InvalidObject(
         "Stopping at '\{sub.path}'; script returned non-zero status.",
@@ -3677,7 +3678,7 @@ async fn absorb_git_dir(
   for entry in entries {
     let src = src_git_dir + "/" + entry
     let dst = dest_git_dir + "/" + entry
-    let code = @process.run("mv", [src, dst], inherit_env=true)
+    let code = @process.run("mv", [src, dst], inherit_env=true).exit_code
     if code != 0 {
       raise @bitcore.GitError::InvalidObject("failed to move \{src} to \{dst}")
     }

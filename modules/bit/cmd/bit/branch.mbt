@@ -53,7 +53,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
           i = base + 1
           continue
         }
-        @stdio.stderr.write("error: branch name required\n")
+        @stdio.stderr.write(@utf8.encode("error: branch name required\n"))
         @sys.exit(128)
         return
       }
@@ -142,7 +142,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
   )
   if verbose && explicit_column_enabled {
     @stdio.stderr.write(
-      "fatal: options '--column' and '--verbose' cannot be used together\n",
+      @utf8.encode("fatal: options '--column' and '--verbose' cannot be used together\n"),
     )
     @sys.exit(128)
     return
@@ -238,7 +238,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
               Some(name) => {
                 if name == "HEAD" {
                   @stdio.stderr.write(
-                    "fatal: 'HEAD' is not a valid branch name",
+                    @utf8.encode("fatal: 'HEAD' is not a valid branch name"),
                   )
                   @sys.exit(1)
                 }
@@ -246,7 +246,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                 if !force_create &&
                   @bitlib.resolve_ref(fs, git_dir, refname) is Some(_) {
                   @stdio.stderr.write(
-                    "fatal: a branch named '\{name}' already exists",
+                    @utf8.encode("fatal: a branch named '\{name}' already exists"),
                   )
                   @sys.exit(1)
                 }

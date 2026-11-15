@@ -790,7 +790,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
       if input_eof {
         break
       }
-      match @stdio.stdin.read_some(max_len=8192) {
+      match @stdio.stdin.read() {
         Some(bytes) =>
           for b in bytes {
             if b == batch_input_separator {
@@ -2762,11 +2762,12 @@ async fn cat_file_run_textconv(
   let temp_path = git_dir + "/bit-cat-file-textconv.tmp"
   fs.write_file(temp_path, input)
   let shell_cmd = cat_file_build_textconv_shell_command(command)
-  let (code, stdout) = @process.collect_stdout(
+  let proc_result = @process.run(
     "sh",
     ["-c", shell_cmd, "cat-file-textconv", temp_path],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
   ) catch {
     err => {
       fs.remove_file(temp_path) catch {
@@ -2775,14 +2776,15 @@ async fn cat_file_run_textconv(
       raise @bitcore.GitError::IoError("textconv failed: \{err}")
     }
   }
+  let (code, stdout) = (proc_result.exit_code, proc_result.stdout_binary())
   fs.remove_file(temp_path) catch {
     _ => ()
   }
   if code != 0 {
     raise @bitcore.GitError::IoError("textconv failed with status \{code}")
   }
-  let text = stdout.text() catch {
-    err => raise @bitcore.GitError::IoError(err.to_string())
+  let text = @utf8.decode(stdout) catch {
+    _ => raise @bitcore.GitError::IoError("textconv output is not valid UTF-8")
   }
   cat_file_string_to_bytes(text)
 }

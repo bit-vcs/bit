@@ -30,10 +30,10 @@ async fn run_add_interactive_process(
         program,
         argv,
         inherit_env=true,
-        stdin=@stdio.stdin,
-        stdout=@stdio.stdout,
-        stderr=@stdio.stderr,
-      )
+        stdin=Stdin,
+        stdout=Stdout,
+        stderr=Stderr,
+      ).exit_code
   }
 }
 
@@ -114,7 +114,7 @@ async fn run_editor_on_path(editor_cmd : String, path : String) -> Int {
     "/bin/sh",
     ["-c", command + " \"$1\"", "sh", path],
     inherit_env=true,
-  )
+  ).exit_code
 }
 
 ///|

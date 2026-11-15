@@ -23,11 +23,12 @@ pub async fn run_filter_command(
       )
   }
   let shell_cmd = build_filter_shell_command(command)
-  let (code, stdout) = @process.collect_stdout(
+  let proc_result = @process.run(
     "sh",
     ["-c", shell_cmd, "bit-filter", temp_path],
     inherit_env=true,
     cwd=root,
+    stdout=Collect,
   ) catch {
     err => {
       @fs.remove_file(temp_path) catch {
@@ -36,6 +37,7 @@ pub async fn run_filter_command(
       raise @bit.GitError::IoError("filter command failed: \{err}")
     }
   }
+  let (code, stdout) = (proc_result.exit_code, proc_result.stdout_binary())
   @fs.remove_file(temp_path) catch {
     _ => ()
   }
@@ -44,7 +46,7 @@ pub async fn run_filter_command(
       "filter command '\{command}' failed with status \{code}",
     )
   }
-  stdout.binary()
+  stdout
 }
 
 ///|

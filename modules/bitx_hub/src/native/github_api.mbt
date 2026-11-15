@@ -85,16 +85,19 @@ pub async fn github_check_repo_push_permission(
 async fn gh_api_collect_output(
   args : Array[String],
 ) -> String raise @bit.GitError {
-  let (code, stdout, stderr) = @process.collect_output(
+  let proc_result = @process.run(
     "gh",
     args,
     inherit_env=true,
+    stdout=Collect,
+    stderr=Collect,
   ) catch {
     err => raise @bit.GitError::IoError("gh api failed: \{err}")
   }
-  let out = stdout.text() catch { _ => "" }
+  let (code, stdout, stderr) = (proc_result.exit_code, proc_result.stdout_binary(), proc_result.stderr_binary())
+  let out = @utf8.decode(stdout) catch { _ => "" }
   if code != 0 {
-    let err_text = stderr.text() catch { _ => "" }
+    let err_text = @utf8.decode(stderr) catch { _ => "" }
     let normalized = err_text.trim(chars=" \n\r\t").to_owned()
     raise @bit.GitError::IoError("gh api failed (\{code}): \{normalized}")
   }

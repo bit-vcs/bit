@@ -68,7 +68,7 @@ async fn run_hook_command_streaming(
   args : Array[String],
   cwd : String,
 ) -> Int {
-  @process.run(command, args, inherit_env=true, cwd~) catch {
+  @process.run(command, args, inherit_env=true, cwd~).exit_code catch {
     _ => 1
   }
 }
@@ -83,15 +83,18 @@ async fn run_hook_command_buffered(
   args : Array[String],
   cwd : String,
 ) -> (Int, Bytes) {
-  let (code, data) = @process.collect_output_merged(
+  let proc_result = @process.run(
     command,
     args,
     inherit_env=true,
     cwd~,
+    stdout=Collect,
+    stderr=DuplicateStdout,
   ) catch {
     _ => return (1, b"")
   }
-  (code, data.binary())
+  let (code, data) = (proc_result.exit_code, proc_result.stdout_binary())
+  (code, data)
 }
 
 ///|

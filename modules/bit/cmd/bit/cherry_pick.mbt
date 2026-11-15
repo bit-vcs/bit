@@ -148,7 +148,7 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
   let subdir_info = get_subdir_info(fs, git_dir)
   if unsupported_args.length() > 0 {
     for arg in unsupported_args {
-      @stdio.stderr.write("error: cherry-pick: unsupported option '\{arg}'\n")
+      @stdio.stderr.write(@utf8.encode("error: cherry-pick: unsupported option '\{arg}'\n"))
     }
     @sys.exit(1)
   }
