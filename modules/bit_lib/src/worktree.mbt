@@ -168,6 +168,14 @@ pub fn add_paths(
   }
   let core_filemode = read_core_filemode_setting(rfs, common_git_dir)
   let all_paths = expand_paths(rfs, root, paths)
+  all_paths.append(
+    expand_tracked_missing(
+      entries,
+      read_skip_worktree_paths(rfs, actual_git_dir),
+      paths,
+      all_paths,
+    ),
+  )
   for path in all_paths {
     let abs = join_path(root, path)
     // lstat, never following a symlink: a symlink is staged as itself
@@ -289,6 +297,14 @@ pub async fn add_paths_async(
     map[e.path] = e
   }
   let all_paths = expand_paths_async(rfs, root, paths)
+  all_paths.append(
+    expand_tracked_missing(
+      entries,
+      read_skip_worktree_paths(rfs, actual_git_dir),
+      paths,
+      all_paths,
+    ),
+  )
   for path in all_paths {
     let abs = join_path(root, path)
     let meta = @bitio.worktree_entry_meta(rfs, abs)
@@ -574,6 +590,43 @@ pub fn commit(
     write_index_entries_with_tree(fs, rfs, actual_git_dir, entries, tree_id)
   }
   commit_id
+}
+
+///|
+/// Tracked paths (from `entries`) that a pathspec in `paths` covers but
+/// that `expanded` (built from the worktree) lacks: files deleted from the
+/// worktree, including whole deleted directories. `add <pathspec>` must
+/// stage their removal, like git. Skip-worktree entries (outside a sparse
+/// checkout) are absent on purpose and are not included.
+fn expand_tracked_missing(
+  entries : Array[IndexEntry],
+  skip_worktree : Map[String, Bool],
+  paths : Array[String],
+  expanded : Array[String],
+) -> Array[String] raise @bit.GitError {
+  let have : Map[String, Bool] = Map([])
+  for p in expanded {
+    have[p] = true
+  }
+  let specs : Array[String] = []
+  for p in paths {
+    specs.push(normalize_rel_path(p))
+  }
+  let out : Array[String] = []
+  for e in entries {
+    if have.contains(e.path) || skip_worktree.contains(e.path) {
+      continue
+    }
+    for spec in specs {
+      let prefix = if spec.has_suffix("/") { spec } else { spec + "/" }
+      if spec == "." || e.path == spec || e.path.has_prefix(prefix) {
+        out.push(e.path)
+        have[e.path] = true
+        break
+      }
+    }
+  }
+  out
 }
 
 ///|
