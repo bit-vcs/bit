@@ -147,46 +147,51 @@ fn merge_detect_renames(
 }
 
 ///|
-/// Compute similarity score (0-100) between two text contents.
-/// Uses line-based comparison: score = 100 * common_lines / max(lines_a, lines_b)
+/// Compute similarity score (0-100) between two text contents, weighted by
+/// bytes like git's diffcore (bytes of shared lines over the larger size),
+/// so a few short common lines do not make two files "renames".
 fn rename_similarity_score(a : String, b : String) -> Int {
-  let a_lines : Array[String] = []
-  for line in a.split("\n") {
-    let s = line.to_owned()
-    if s.length() > 0 {
-      a_lines.push(s)
+  let a_lines : Array[String] = a.split("\n").map(l => l.to_owned()).collect()
+  let b_lines : Array[String] = b.split("\n").map(l => l.to_owned()).collect()
+  // Each line counts with its newline; a trailing "" after the final \n
+  // is not a line.
+  let weight = fn(l : String) { l.length() + 1 }
+  let total = fn(lines : Array[String]) {
+    let mut t = 0
+    for i, l in lines {
+      if i == lines.length() - 1 && l.length() == 0 {
+        continue
+      }
+      t += weight(l)
     }
+    t
   }
-  let b_lines : Array[String] = []
-  for line in b.split("\n") {
-    let s = line.to_owned()
-    if s.length() > 0 {
-      b_lines.push(s)
-    }
-  }
-  if a_lines.length() == 0 && b_lines.length() == 0 {
+  let total_a = total(a_lines)
+  let total_b = total(b_lines)
+  if total_a == 0 && total_b == 0 {
     return 100
   }
-  if a_lines.length() == 0 || b_lines.length() == 0 {
+  if total_a == 0 || total_b == 0 {
     return 0
   }
-  // Count common lines using a set
   let b_set : Map[String, Int] = Map([])
-  for line in b_lines {
+  for i, line in b_lines {
+    if i == b_lines.length() - 1 && line.length() == 0 {
+      continue
+    }
     b_set[line] = b_set.get(line).unwrap_or(0) + 1
   }
   let mut common = 0
-  for line in a_lines {
+  for i, line in a_lines {
+    if i == a_lines.length() - 1 && line.length() == 0 {
+      continue
+    }
     let count = b_set.get(line).unwrap_or(0)
     if count > 0 {
-      common += 1
+      common += weight(line)
       b_set[line] = count - 1
     }
   }
-  let max_lines = if a_lines.length() > b_lines.length() {
-    a_lines.length()
-  } else {
-    b_lines.length()
-  }
-  100 * common / max_lines
+  let max_total = if total_a > total_b { total_a } else { total_b }
+  100 * common / max_total
 }

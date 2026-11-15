@@ -186,8 +186,18 @@ pub async fn stash_push(
   )
   stash_reset_hard(fs, rfs, root, git_dir, common_dir, head_id)
   if untracked.length() > 0 {
+    // Like `git clean` after the reset: a path HEAD tracks (e.g. one the
+    // index had dropped) was just restored and is not untracked any more.
+    let head_paths = collect_tree_files_from_commit(
+      ObjectDb::load_lazy(rfs, common_dir),
+      rfs,
+      head_id,
+    )
     let emptied : Array[String] = []
     for path in untracked {
+      if head_paths.contains(path) {
+        continue
+      }
       let abs = join_path(root, path)
       if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
         fs.remove_file(abs) catch { _ => () }
