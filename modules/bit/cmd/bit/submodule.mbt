@@ -2413,8 +2413,12 @@ async fn handle_submodule_update(
     // tracked symlink would otherwise put the checkout outside the worktree.
     @bitlib.verify_worktree_dir_path(root, sub.path) catch {
       err => {
+        let reason = match err {
+          @bitcore.GitError::InvalidObject(msg) => msg
+          _ => err.to_string()
+        }
         eprint_line(
-          "fatal: refusing to update submodule '\{sub.path}': \{err}",
+          "fatal: refusing to update submodule '\{sub.path}': \{reason}",
         )
         @sys.exit(128)
       }
