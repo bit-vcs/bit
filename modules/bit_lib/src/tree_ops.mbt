@@ -465,7 +465,7 @@ pub fn tree_files_to_index(
       }
     }
   }
-  entries.sort_by((a, b) => String::compare(a.path, b.path))
+  entries.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
   entries
 }
 

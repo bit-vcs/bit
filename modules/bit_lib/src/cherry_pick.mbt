@@ -281,7 +281,8 @@ fn sequencer_check_local_changes(
     }
     match (ours.get(path), on_disk) {
       (Some(o), Some(id)) => if o.id != id { dirty.push(path) }
-      (Some(_), None) => dirty.push(path)
+      // A missing file loses nothing when rewritten or deleted (git).
+      (Some(_), None) => ()
       // An untracked file identical to what would be written is fine.
       (None, Some(id)) =>
         if !(theirs.get(path) is Some(t) && t.id == id) {

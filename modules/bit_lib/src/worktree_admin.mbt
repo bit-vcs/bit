@@ -2076,7 +2076,7 @@ fn write_index_entries_to_path(
   entries : Array[IndexEntry],
 ) -> Unit raise @bit.GitError {
   let sorted = entries.copy()
-  sorted.sort_by((a, b) => String::compare(a.path, b.path))
+  sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
   // Serialize index
   let buf : Array[Byte] = []
   // Header: DIRC + version 2 + entry count

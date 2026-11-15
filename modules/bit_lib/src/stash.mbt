@@ -1071,7 +1071,8 @@ fn stash_check_local_changes(
     }
     match (ours.get(path), on_disk) {
       (Some(o), Some(id)) => if o.id != id { dirty.push(path) }
-      (Some(_), None) => dirty.push(path)
+      // A missing file loses nothing when rewritten or deleted (git).
+      (Some(_), None) => ()
       (None, Some(_)) => untracked.push(path)
       (None, None) => ()
     }

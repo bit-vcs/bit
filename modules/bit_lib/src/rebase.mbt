@@ -753,7 +753,7 @@ fn rebase_map_to_index(
       None => raise @bit.GitError::InvalidObject("Missing blob object")
     }
   }
-  entries.sort_by((a, b) => String::compare(a.path, b.path))
+  entries.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
   entries
 }
 
