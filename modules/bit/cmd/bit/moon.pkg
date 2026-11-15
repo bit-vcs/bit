@@ -153,6 +153,7 @@ options(
     "fallback_wbtest.mbt": [ "native" ],
     "fast_export.mbt": [ "native" ],
     "fast_import.mbt": [ "native" ],
+    "fast_import_wbtest.mbt": [ "native" ],
     "fetch.mbt": [ "native" ],
     "fetch_pack.mbt": [ "native" ],
     "fetch_serve_js.mbt": [ "js" ],

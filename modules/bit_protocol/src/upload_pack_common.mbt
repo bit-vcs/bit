@@ -96,14 +96,20 @@ pub fn parse_symrefs_from_capabilities(
             start=idx + 1,
             end=raw.length(),
           )
-          symrefs[source] = target
+          // Server-controlled: drop names that could escape `.git/refs`.
+          if @object.is_valid_remote_refname(source) &&
+            @object.is_valid_remote_symref_target(target) {
+            symrefs[source] = target
+          }
         }
       }
       continue
     }
     if cap.has_prefix("symref-target:") {
       let target = String::unsafe_substring(cap, start=14, end=cap.length())
-      symrefs["HEAD"] = target
+      if @object.is_valid_remote_symref_target(target) {
+        symrefs["HEAD"] = target
+      }
       continue
     }
   }
@@ -148,16 +154,28 @@ pub fn parse_ls_refs_response(data : Bytes) -> LsRefsResult raise @bit.GitError 
     if parts.length() < 2 {
       continue
     }
-    let id = @bit.ObjectId::from_hex(parts[0])
+    // Ref names and symref targets come from the server: drop any that are
+    // not well-formed `refs/` names (or HEAD) before they can be used as
+    // paths or written into HEAD (cf. CVE-2026-113408).
     let name = parts[1]
-    refs.push((id, name))
+    if !@object.is_valid_remote_refname(name) {
+      continue
+    }
     for i in 2..<parts.length() {
       let attr = parts[i]
       if attr.has_prefix("symref-target:") {
         let target = String::unsafe_substring(attr, start=14, end=attr.length())
-        symrefs[name] = target
+        if @object.is_valid_remote_symref_target(target) {
+          symrefs[name] = target
+        }
       }
     }
+    // `unborn HEAD symref-target:<ref>` (requested via `unborn`): an empty
+    // repository's HEAD. Keep the symref, but there is no object to record.
+    if parts[0] == "unborn" {
+      continue
+    }
+    refs.push((@bit.ObjectId::from_hex(parts[0]), name))
   }
   { refs, symrefs }
 }

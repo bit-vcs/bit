@@ -9,6 +9,9 @@ async fn handle_fast_import(args : Array[String]) -> Unit raise Error {
   let mut import_marks_file : String? = None
   let mut export_marks_file : String? = None
   let mut date_format = "raw"
+  // Like git, in-stream `feature import-marks` / `export-marks` read and write
+  // arbitrary files, so a stream may only use them when the caller opts in.
+  let mut allow_unsafe_features = false
   for arg in args {
     match arg {
       "-h" | "--help" => {
@@ -22,6 +25,7 @@ async fn handle_fast_import(args : Array[String]) -> Unit raise Error {
       "--quiet" => quiet = true
       "--stats" => quiet = false
       "--done" => require_done = true
+      "--allow-unsafe-features" => allow_unsafe_features = true
       _ if arg.has_prefix("--import-marks=") =>
         import_marks_file = Some(
           String::unsafe_substring(arg, start=15, end=arg.length()),
@@ -119,6 +123,12 @@ async fn handle_fast_import(args : Array[String]) -> Unit raise Error {
       // No-op: all objects already written as loose
     } else if cmd.has_prefix("feature ") {
       let feature = String::unsafe_substring(cmd, start=8, end=cmd.length())
+      if fast_import_feature_is_unsafe(feature) && !allow_unsafe_features {
+        eprint_line(
+          "fatal: feature '\{fast_import_feature_name(feature)}' forbidden in input without --allow-unsafe-features",
+        )
+        @sys.exit(128)
+      }
       if feature == "done" {
         require_done = true
       } else if feature.has_prefix("import-marks=") {
@@ -881,5 +891,29 @@ async fn fast_import_parse_reset(
   // Consume optional LF
   if parser.has_more() && parser.peek_line().length() == 0 {
     parser.skip_line()
+  }
+}
+
+///|
+/// The feature name of a `feature <name>[=<arg>]` command.
+fn fast_import_feature_name(feature : String) -> String {
+  match feature.find("=") {
+    Some(eq) => String::unsafe_substring(feature, start=0, end=eq)
+    None => feature
+  }
+}
+
+///|
+/// Features that let the input stream read or write arbitrary files. git
+/// fast-import rejects them unless `--allow-unsafe-features` is given (see
+/// CVE-2019-1348 and, for the submodule rewriting features, CVE-2026-114466).
+fn fast_import_feature_is_unsafe(feature : String) -> Bool {
+  match fast_import_feature_name(feature) {
+    "import-marks"
+    | "import-marks-if-exists"
+    | "export-marks"
+    | "rewrite-submodules-from"
+    | "rewrite-submodules-to" => true
+    _ => false
   }
 }

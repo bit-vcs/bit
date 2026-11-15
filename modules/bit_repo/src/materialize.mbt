@@ -51,6 +51,7 @@ fn write_head_and_refs(
     write_text(fs, head_path, commit_id.to_hex() + "\n")
     return
   }
+  @object.ensure_valid_remote_refname(refname)
   write_text(fs, head_path, "ref: \{refname}\n")
   let ref_path = join_path(git_dir, refname)
   let dir = parent_dir(ref_path)

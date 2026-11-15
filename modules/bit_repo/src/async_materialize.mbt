@@ -66,6 +66,7 @@ async fn[FS : @types.AsyncFileSystem] write_head_and_refs_async(
     )
     return
   }
+  @object.ensure_valid_remote_refname(refname)
   @types.AsyncFileSystem::write_string(fs, head_path, "ref: \{refname}\n")
   let ref_path = join_path(git_dir, refname)
   @types.AsyncFileSystem::mkdir_p(fs, parent_dir(ref_path))

@@ -1132,6 +1132,13 @@ pub fn update_head_ref(
   match head {
     Branch(name) => {
       let refname = "refs/heads/" + name
+      // HEAD's target becomes a path below: refuse one that could escape
+      // `.git/refs` (e.g. a HEAD planted by a malicious remote).
+      if !@object.check_refname_format(refname) {
+        raise @bit.GitError::InvalidObject(
+          "refusing to update HEAD's branch: invalid ref name \{refname}",
+        )
+      }
       if rfs.is_dir(join_path(common_git_dir, "reftable")) {
         update_ref_reftable(fs, rfs, common_git_dir, refname, commit_id)
       } else {
