@@ -1,5 +1,5 @@
 diff --git a/t/t0000-basic.sh b/t/t0000-basic.sh
-index 2b63e1c86c..c73fdd4352 100755
+index 7bd1f4e..4b851cf 100755
 --- a/t/t0000-basic.sh
 +++ b/t/t0000-basic.sh
 @@ -835,7 +835,7 @@ test_expect_success 'test_oid can look up data for SHA-1' '
@@ -30,7 +30,7 @@ index 2b63e1c86c..c73fdd4352 100755
  
  test_expect_success 'test_bool_env' '
 diff --git a/t/t0001-init.sh b/t/t0001-init.sh
-index e89feca544..0b6e393557 100755
+index 5cf2e5a..b6b1c79 100755
 --- a/t/t0001-init.sh
 +++ b/t/t0001-init.sh
 @@ -522,10 +522,13 @@ test_expect_success 'init honors GIT_DEFAULT_HASH' '
@@ -141,7 +141,7 @@ index e89feca544..0b6e393557 100755
  	test_must_fail git -C sha256 init --object-format=sha1
  '
 diff --git a/t/t1500-rev-parse.sh b/t/t1500-rev-parse.sh
-index 38067d95f7..fb731dd9f7 100755
+index 4174ca4..4572a52 100755
 --- a/t/t1500-rev-parse.sh
 +++ b/t/t1500-rev-parse.sh
 @@ -208,7 +208,7 @@ test_expect_success 'rev-parse --show-object-format in repo' '
@@ -154,10 +154,10 @@ index 38067d95f7..fb731dd9f7 100755
  	(
  		sane_unset GIT_DEFAULT_HASH &&
 diff --git a/t/t5300-pack-object.sh b/t/t5300-pack-object.sh
-index 73445782e7..2d8a768b22 100755
+index aac139e..1619ccc 100755
 --- a/t/t5300-pack-object.sh
 +++ b/t/t5300-pack-object.sh
-@@ -531,6 +531,10 @@ test_expect_success DEFAULT_HASH_ALGORITHM 'show-index works OK outside a reposi
+@@ -555,6 +555,10 @@ test_expect_success DEFAULT_HASH_ALGORITHM 'show-index works OK outside a reposi
  
  for hash in sha1 sha256
  do
@@ -168,7 +168,7 @@ index 73445782e7..2d8a768b22 100755
  	test_expect_success 'show-index works OK outside a repository with hash algo passed in via --object-format' '
  		test_when_finished "rm -rf explicit-hash-$hash" &&
  		git init --object-format=$hash explicit-hash-$hash &&
-@@ -652,6 +656,10 @@ test_expect_success 'prefetch objects' '
+@@ -676,6 +680,10 @@ test_expect_success 'prefetch objects' '
  
  for hash in sha1 sha256
  do
@@ -180,11 +180,11 @@ index 73445782e7..2d8a768b22 100755
  		test_when_finished "rm -rf repo" &&
  		git init --object-format=$hash repo &&
 diff --git a/t/t5700-protocol-v1.sh b/t/t5700-protocol-v1.sh
-index a73b4d4ff6..7e0c055e36 100755
+index ffeb01a..d4897df 100755
 --- a/t/t5700-protocol-v1.sh
 +++ b/t/t5700-protocol-v1.sh
 @@ -244,7 +244,7 @@ test_expect_success 'push with ssh:// using protocol v1' '
- 	grep "push< version 1" log
+ 	test_grep "push< version 1" log
  '
  
 -test_expect_success 'clone propagates object-format from empty repo' '
@@ -207,7 +207,7 @@ index a73b4d4ff6..7e0c055e36 100755
  
  test_expect_success 'clone with http:// using protocol v1' '
 @@ -282,7 +285,7 @@ test_expect_success 'clone with http:// using protocol v1' '
- 	grep "git< version 1" log
+ 	test_grep "git< version 1" log
  '
  
 -test_expect_success 'clone with http:// using protocol v1 with empty SHA-256 repo' '
@@ -216,11 +216,11 @@ index a73b4d4ff6..7e0c055e36 100755
  		clone "$HTTPD_URL/smart/sha256" sha256 2>log &&
  
 diff --git a/t/t5702-protocol-v2.sh b/t/t5702-protocol-v2.sh
-index 9f6cf4142d..e2479e29f1 100755
+index 609c80d..6c3a9c5 100755
 --- a/t/t5702-protocol-v2.sh
 +++ b/t/t5702-protocol-v2.sh
 @@ -314,7 +314,7 @@ test_expect_success 'clone propagates unborn HEAD from non-empty repo' '
- 	grep "warning: remote HEAD refers to nonexistent ref" stderr
+ 	test_grep "warning: remote HEAD refers to nonexistent ref" stderr
  '
  
 -test_expect_success 'clone propagates object-format from empty repo' '
@@ -229,7 +229,7 @@ index 9f6cf4142d..e2479e29f1 100755
  
  	echo sha256 >expect &&
 diff --git a/t/test-lib.sh b/t/test-lib.sh
-index ceefb99bff..e7f2048e4a 100644
+index 1f0505e..68459ee 100644
 --- a/t/test-lib.sh
 +++ b/t/test-lib.sh
 @@ -1978,6 +1978,10 @@ test_lazy_prereq SHA1 '
