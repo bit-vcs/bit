@@ -58,7 +58,9 @@ test_expect_success 'git fsck passes after submodule update' '
         git commit -m "add submodule" >/dev/null
     ) &&
     git_cmd clone main clone &&
-    (cd clone && git_cmd submodule update --init --recursive) &&
+    # Local submodule URLs need the file transport explicitly allowed,
+    # as in git >= 2.38.1 (protocol.file.allow defaults to "user").
+    (cd clone && GIT_ALLOW_PROTOCOL=file git_cmd submodule update --init --recursive) &&
     command git -C clone fsck --strict &&
     command git -C clone/third_party/sub fsck --strict
 '
