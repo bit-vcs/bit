@@ -653,6 +653,7 @@ async fn resolve_submodule_target_id(
   url : String,
   branch : String?,
 ) -> @bitcore.ObjectId raise Error {
+  submodule_ensure_transport_allowed(fs, root, url)
   if branch is None {
     return resolve_submodule_head_id(fs, root, url)
   }
@@ -820,6 +821,9 @@ async fn handle_submodule_add(
   let fetch_url = match reusable_repo_git_dir {
     Some(_) => resolve_submodule_config_url(fs, root, git_dir, url)
     None => resolve_submodule_fetch_url(fs, root, git_dir, url)
+  }
+  if reusable_repo_git_dir is None {
+    submodule_ensure_transport_allowed(fs, root, fetch_url)
   }
   let source_git_dir = submodule_add_source_git_dir(
     rfs, root, fetch_url, reusable_repo_git_dir,
@@ -1958,6 +1962,7 @@ async fn resolve_submodule_head_id(
   root : String,
   url : String,
 ) -> @bitcore.ObjectId raise Error {
+  submodule_ensure_transport_allowed(fs, root, url)
   let rfs : &@bitcore.RepoFileSystem = fs
   match @bitlib.resolve_local_repo_path(rfs, root, url) {
     Some(src_path) =>
@@ -2403,6 +2408,21 @@ async fn handle_submodule_update(
         None => continue
       }
     }
+    // Never populate a submodule through a symlink (at the path itself or
+    // a parent): `--remote` has no gitlink to anchor the path, and a
+    // tracked symlink would otherwise put the checkout outside the worktree.
+    @bitlib.verify_worktree_dir_path(root, sub.path) catch {
+      err => {
+        let reason = match err {
+          @bitcore.GitError::InvalidObject(msg) => msg
+          _ => err.to_string()
+        }
+        eprint_line(
+          "fatal: refusing to update submodule '\{sub.path}': \{reason}",
+        )
+        @sys.exit(128)
+      }
+    }
     if load_submodule_update_path_blocker(rfs, sub_path, sub_git) {
       exit_submodule_existing_path(sub.path)
     }
@@ -2722,6 +2742,7 @@ async fn fetch_submodule_objects(
   depth? : Int? = None,
   quiet? : Bool = false,
 ) -> Unit raise Error {
+  submodule_ensure_transport_allowed(fs, root, url)
   let rfs : &@bitcore.RepoFileSystem = fs
   match @bitlib.resolve_local_repo_path(rfs, root, url) {
     Some(src_path) => {

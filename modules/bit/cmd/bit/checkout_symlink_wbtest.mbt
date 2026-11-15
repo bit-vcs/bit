@@ -168,3 +168,32 @@ async test "revert: does not restore a file through a symlinked parent" {
   @test.assert_eq(fs.read_file(repo_dir + "/.git/config"), config_before)
   cleanup_tree(fs, root)
 }
+
+///|
+async test "verify_worktree_dir_path: a symlinked submodule path is refused" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-dir-path-symlink-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root + "/repo/real")
+  fs.mkdir_p(root + "/outside")
+  @test.assert_eq(
+    checkout_symlink_wbtest_run(root + "/repo", "ln", ["-s", "../outside", "sub"]),
+    0,
+  )
+  let rejected = fn(rel : String) -> Bool {
+    try {
+      @bitlib.verify_worktree_dir_path(root + "/repo", rel)
+      false
+    } catch {
+      _ => true
+    }
+  }
+  assert_false(rejected("real"))
+  assert_false(rejected("not-yet-created"))
+  assert_true(rejected("sub"))
+  assert_true(rejected("sub/inner"))
+  assert_true(rejected(".git"))
+  cleanup_tree(fs, root)
+}
