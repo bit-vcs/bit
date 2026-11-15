@@ -382,14 +382,51 @@ async fn home_run_bit(args : Array[String]) -> Int {
 }
 
 ///|
+async fn home_capture_trimmed(args : Array[String]) -> String? {
+  let (code, out) = home_capture_bit(args)
+  if code != 0 {
+    return None
+  }
+  let v = out.trim(chars=" \t\r\n").to_owned()
+  if v.length() == 0 {
+    None
+  } else {
+    Some(v)
+  }
+}
+
+///|
 async fn home_repo_status(abs : String) -> @home.RepoStatus? {
   let (code, out) = home_capture_bit([
-    "-C", abs, "status", "--porcelain=v2", "--branch",
+    "-C", abs, "status", "--porcelain", "--branch",
   ])
   if code != 0 {
     return None
   }
-  Some(@home.parse_porcelain_v2_status(out))
+  let status = @home.parse_porcelain_status(out)
+  guard status.branch is Some(branch) else { return Some(status) }
+  let remote = home_capture_trimmed([
+    "-C", abs, "config", "branch.\{branch}.remote",
+  ])
+  let merge = home_capture_trimmed([
+    "-C", abs, "config", "branch.\{branch}.merge",
+  ])
+  guard (remote, merge) is (Some(r), Some(m)) &&
+    @home.upstream_from_config(r, m) is Some((name, upstream_ref)) else {
+    return Some(status)
+  }
+  let count = async fn(range : String) -> Int? {
+    match home_capture_trimmed(["-C", abs, "rev-list", "--count", range]) {
+      Some(v) => Some(@string.parse_int(v) catch { _ => 0 })
+      None => None
+    }
+  }
+  match (count(upstream_ref + "..HEAD"), count("HEAD.." + upstream_ref)) {
+    (Some(ahead), Some(behind)) =>
+      Some({ ..status, upstream: Some(name), ahead, behind })
+    // The upstream ref does not exist (never fetched, or deleted).
+    _ => Some({ ..status, upstream: Some(name + " (gone)") })
+  }
 }
 
 ///|
@@ -427,10 +464,9 @@ async fn home_sync_one(
     fs.mkdir_p(get_parent_dir(abs)) catch {
       _ => ()
     }
+    // A plain clone followed by `sparse-checkout set`: the checkout is
+    // trimmed to `subdir` right after cloning.
     let clone_args = ["clone", "-q"]
-    if subdir is Some(_) {
-      clone_args.push("--no-checkout")
-    }
     if branch is Some(b) {
       clone_args.push("--branch")
       clone_args.push(b)
@@ -678,9 +714,10 @@ async fn handle_home_wt(fs : OsFs, args : Array[String]) -> Unit raise Error {
         @sys.exit(128)
       }
       if repo.subdir is Some(dir) {
-        if !home_apply_sparse(wt, dir) {
-          eprint_line("warning: sparse checkout of \{dir}/ failed in the worktree")
-        }
+        // bit's sparse-checkout does not support linked worktrees yet.
+        eprint_line(
+          "note: the worktree is a full checkout (sparse checkout of \{dir}/ is not supported in linked worktrees yet)",
+        )
       }
       print_line("\{repo.name}: worktree \{contract_path_hq(wt)} on branch \{feature}")
     }

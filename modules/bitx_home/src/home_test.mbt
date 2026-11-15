@@ -121,18 +121,26 @@ test "feature names" {
 }
 
 ///|
-test "parse_porcelain_v2_status and describe_status" {
-  let s = @home.parse_porcelain_v2_status(
-    #|# branch.oid 0123
-    #|# branch.head main
-    #|# branch.upstream origin/main
-    #|# branch.ab +2 -1
-    #|1 .M N... 100644 100644 100644 aaa bbb file.txt
-    #|? new.txt
+test "parse_porcelain_status, upstream_from_config and describe_status" {
+  let s = @home.parse_porcelain_status(
+    #|## main...origin/main [ahead 2]
+    #| M file.txt
+    #|?? new.txt
     ,
   )
-  assert_eq(s, { branch: Some("main"), upstream: Some("origin/main"), ahead: 2, behind: 1, changes: 2 })
-  assert_eq(@home.describe_status(s), "main, ahead 2, behind 1 vs origin/main, 2 changed")
-  let clean = @home.parse_porcelain_v2_status("# branch.head (detached)\n")
+  assert_eq(s.branch, Some("main"))
+  assert_eq(s.changes, 2)
+  assert_eq(@home.parse_porcelain_status("## main\n").branch, Some("main"))
+  assert_eq(@home.parse_porcelain_status("## No commits yet on master\n").branch, Some("master"))
+  assert_eq(@home.parse_porcelain_status("## HEAD (no branch)\n").branch, None)
+  assert_eq(
+    @home.upstream_from_config("origin\n", "refs/heads/main\n"),
+    Some(("origin/main", "refs/remotes/origin/main")),
+  )
+  assert_eq(@home.upstream_from_config(".", "refs/heads/dev"), Some(("dev", "refs/heads/dev")))
+  assert_eq(@home.upstream_from_config("", "refs/heads/main"), None)
+  let full : @home.RepoStatus = { ..s, upstream: Some("origin/main"), ahead: 2, behind: 1 }
+  assert_eq(@home.describe_status(full), "main, ahead 2, behind 1 vs origin/main, 2 changed")
+  let clean = @home.parse_porcelain_status("## HEAD (no branch)\n")
   assert_eq(@home.describe_status(clean), "(detached), no upstream, clean")
 }

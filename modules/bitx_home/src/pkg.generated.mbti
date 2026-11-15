@@ -28,7 +28,7 @@ pub fn normalize_subdir(String) -> String raise HomeError
 
 pub fn parse_manifest(String) -> HomeManifest raise HomeError
 
-pub fn parse_porcelain_v2_status(String) -> RepoStatus
+pub fn parse_porcelain_status(String) -> RepoStatus
 
 pub fn path_basename(String) -> String
 
@@ -43,6 +43,8 @@ pub fn sparse_pattern(String) -> String
 pub fn toml_quote(String) -> String
 
 pub fn update_agents_md(String, String) -> String
+
+pub fn upstream_from_config(String, String) -> (String, String)?
 
 pub fn worktree_path(String, String) -> String
 

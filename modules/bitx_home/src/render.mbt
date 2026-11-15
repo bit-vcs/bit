@@ -145,8 +145,9 @@ pub fn worktree_path(repo_abs : String, feature : String) -> String {
 }
 
 ///|
-/// Branch / dirty summary of one repository, from
-/// `status --porcelain=v2 --branch`.
+/// Branch / dirty summary of one repository. `branch` and `changes` come
+/// from `status --porcelain --branch`; `upstream`, `ahead` and `behind` are
+/// filled in separately (see `upstream_from_config`).
 pub(all) struct RepoStatus {
   branch : String?
   upstream : String?
@@ -162,44 +163,57 @@ pub extend RepoStatus with Debug::{to_repr}
 pub extend RepoStatus with Eq::{not_equal, equal}
 
 ///|
-pub fn parse_porcelain_v2_status(output : String) -> RepoStatus {
+/// Parse `status --porcelain --branch` (v1): the `## ` header gives the
+/// branch (`None` when detached), every other line is one change.
+pub fn parse_porcelain_status(output : String) -> RepoStatus {
   let mut branch : String? = None
-  let mut upstream : String? = None
-  let mut ahead = 0
-  let mut behind = 0
   let mut changes = 0
   for line_view in output.split("\n") {
     let line = line_view.to_owned()
     if line.length() == 0 {
       continue
     }
-    if line.has_prefix("# branch.head ") {
-      let head = String::unsafe_substring(line, start=14, end=line.length())
-      branch = if head == "(detached)" { None } else { Some(head) }
-    } else if line.has_prefix("# branch.upstream ") {
-      upstream = Some(String::unsafe_substring(line, start=18, end=line.length()))
-    } else if line.has_prefix("# branch.ab ") {
-      for tok in line.split(" ") {
-        let t = tok.to_owned()
-        if t.has_prefix("+") {
-          ahead = @string.parse_int(
-              String::unsafe_substring(t, start=1, end=t.length()),
-            ) catch {
-            _ => 0
-          }
-        } else if t.has_prefix("-") {
-          behind = @string.parse_int(
-              String::unsafe_substring(t, start=1, end=t.length()),
-            ) catch {
-            _ => 0
-          }
-        }
+    if line.has_prefix("## ") {
+      let head = String::unsafe_substring(line, start=3, end=line.length())
+      let head = if head.has_prefix("No commits yet on ") {
+        String::unsafe_substring(head, start=18, end=head.length())
+      } else if head.has_prefix("Initial commit on ") {
+        String::unsafe_substring(head, start=18, end=head.length())
+      } else {
+        head
       }
-    } else if !line.has_prefix("#") {
+      let name = match head.find("...") {
+        Some(i) => String::unsafe_substring(head, start=0, end=i)
+        None =>
+          match head.find(" ") {
+            Some(i) => String::unsafe_substring(head, start=0, end=i)
+            None => head
+          }
+      }
+      branch = if name == "HEAD" || name.length() == 0 { None } else { Some(name) }
+    } else {
       changes += 1
     }
   }
-  { branch, upstream, ahead, behind, changes }
+  { branch, upstream: None, ahead: 0, behind: 0, changes }
+}
+
+///|
+/// The upstream of a branch from its `branch.<b>.remote` / `.merge`
+/// config: `(display name, ref to compare against)`, e.g.
+/// `("origin/main", "refs/remotes/origin/main")`.
+pub fn upstream_from_config(remote : String, merge : String) -> (String, String)? {
+  let remote = remote.trim(chars=" \t\r\n").to_owned()
+  let merge = merge.trim(chars=" \t\r\n").to_owned()
+  if remote.length() == 0 || !merge.has_prefix("refs/heads/") {
+    return None
+  }
+  let short = String::unsafe_substring(merge, start=11, end=merge.length())
+  if remote == "." {
+    Some((short, merge))
+  } else {
+    Some((remote + "/" + short, "refs/remotes/" + remote + "/" + short))
+  }
 }
 
 ///|
