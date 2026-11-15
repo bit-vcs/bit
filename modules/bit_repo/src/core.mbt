@@ -223,7 +223,7 @@ fn collect_tree_paths(
       }
       let entries = parse_tree(obj.data)
       for entry in entries {
-        verify_tree_entry_name(entry.name)
+        verify_tree_entry_name(entry.name, mode=entry.mode)
         let path = if prefix.length() == 0 {
           entry.name
         } else {
@@ -324,7 +324,7 @@ fn walk_tree(
       }
       let entries = parse_tree(obj.data)
       for entry in entries {
-        verify_tree_entry_name(entry.name)
+        verify_tree_entry_name(entry.name, mode=entry.mode)
         let path = if prefix.length() == 0 {
           entry.name
         } else {
@@ -368,7 +368,7 @@ fn walk_tree_to_fs(
       }
       let entries = parse_tree(obj.data)
       for entry in entries {
-        verify_tree_entry_name(entry.name)
+        verify_tree_entry_name(entry.name, mode=entry.mode)
         let path = if prefix.length() == 0 {
           entry.name
         } else {
@@ -438,9 +438,24 @@ pub fn parent_dir(path : String) -> String {
 /// worktree path.
 ///
 /// Rejects: empty string, `.`, `..`, any name containing `/` or NUL,
-/// and `.git` case-insensitively (the canonical foothold for hooks,
-/// config, refs). Mirrors the subset of git's `verify_path()` that
-/// matters for path-traversal during checkout / clone / fetch.
+/// and any spelling of a repository marker (`.git`, and bit's own `.bit`)
+/// that a filesystem may resolve to the marker itself:
+///
+/// - ASCII case-insensitively (`.GIT`, `.Bit`);
+/// - NTFS forms, as git's `is_ntfs_dotgit`: trailing dots/spaces
+///   (`.git.`, `.git `), the 8.3 short name `git~1`, an alternate data
+///   stream (`.git::$INDEX_ALLOCATION`), and each `\\`-separated segment;
+/// - HFS+ forms, as git's `is_hfs_dotgit`: the marker with Unicode
+///   ignorable code points interleaved (`.g\u{200c}it`).
+///
+/// The NTFS and HFS+ sets follow `core.protectNTFS` / `core.protectHFS`
+/// (see `set_tree_path_protection`); both are on by default.
+///
+/// `mode`, when given, is the entry's tree mode. A symlink (`120000`)
+/// named `.gitmodules`, `.gitattributes`, `.gitignore` or `.mailmap`
+/// (in any of the spellings above) is rejected, as git does: bit and git
+/// read those files from the worktree and must not follow a link out
+/// of it.
 ///
 /// Called at the bytes→worktree boundary (`walk_tree_to_fs`,
 /// `lib.collect_tree_files_inner`). Reading the bytes via
@@ -449,7 +464,10 @@ pub fn parent_dir(path : String) -> String {
 /// materialize them. Use `git fsck --strict` upstream to catch the
 /// commit; bit will not silently write into `.git/` or above the
 /// worktree.
-pub fn verify_tree_entry_name(name : String) -> Unit raise @object.GitError {
+pub fn verify_tree_entry_name(
+  name : String,
+  mode? : String = "",
+) -> Unit raise @object.GitError {
   if name.length() == 0 {
     raise @object.GitError::InvalidObject("tree entry: empty name")
   }
@@ -464,27 +482,141 @@ pub fn verify_tree_entry_name(name : String) -> Unit raise @object.GitError {
       )
     }
   }
-  // Case-insensitive `.git` check. We compare ASCII letters only;
-  // bit currently does not implement git's HFS/NTFS-specific
-  // expansions (e.g. `git~1`, `.gi‌t`). Those would be the next
-  // layer of hardening.
-  if name.length() == 4 {
-    let c0 = name.unsafe_get(0).to_int()
-    let c1 = name.unsafe_get(1).to_int()
-    let c2 = name.unsafe_get(2).to_int()
-    let c3 = name.unsafe_get(3).to_int()
-    let lower = fn(c : Int) -> Int {
-      if c >= 0x41 && c <= 0x5A {
-        c + 32
-      } else {
-        c
-      }
-    }
-    if c0 == 0x2E && // '.'
-      lower(c1) == 0x67 && // 'g'
-      lower(c2) == 0x69 && // 'i'
-      lower(c3) == 0x74 { // 't'
-      raise @object.GitError::InvalidObject("tree entry: name aliases '.git'")
+  let (protect_hfs, protect_ntfs) = tree_path_protection.val
+  let aliases = fn(base : String) {
+    tree_name_ascii_fold(name) == "." + base ||
+    (protect_ntfs && tree_name_is_ntfs_dot(name, base)) ||
+    (protect_hfs && tree_name_is_hfs_dot(name, base))
+  }
+  for marker in ["git", "bit"] {
+    if aliases(marker) {
+      raise @object.GitError::InvalidObject(
+        "tree entry: name aliases '.\{marker}': '\{name}'",
+      )
     }
   }
+  if mode == "120000" {
+    for dotfile in ["gitmodules", "gitattributes", "gitignore", "mailmap"] {
+      if aliases(dotfile) {
+        raise @object.GitError::InvalidObject(
+          "tree entry: '.\{dotfile}' is a symbolic link",
+        )
+      }
+    }
+  }
+}
+
+///|
+/// (core.protectHFS, core.protectNTFS) as applied by
+/// `verify_tree_entry_name`. Both default to on: git enables protectNTFS
+/// everywhere, and bit also enables the HFS+ checks off macOS because a
+/// clone may later be used from one. The CLI lowers them from repository
+/// config via `set_tree_path_protection`.
+let tree_path_protection : Ref[(Bool, Bool)] = { val: (true, true) }
+
+///|
+/// Set which filesystem-specific `.git` aliases `verify_tree_entry_name`
+/// rejects (git's `core.protectHFS` / `core.protectNTFS`). Plain `.git`
+/// and `.bit`, in any ASCII case, are always rejected.
+pub fn set_tree_path_protection(hfs~ : Bool, ntfs~ : Bool) -> Unit {
+  tree_path_protection.val = (hfs, ntfs)
+}
+
+///|
+fn tree_name_ascii_fold(name : String) -> String {
+  let out = StringBuilder::new()
+  for c in name {
+    out.write_char(Int::unsafe_to_char(tree_name_ascii_lower(c.to_int())))
+  }
+  out.to_string()
+}
+
+///|
+fn tree_name_ascii_lower(c : Int) -> Int {
+  if c >= 0x41 && c <= 0x5A {
+    c + 32
+  } else {
+    c
+  }
+}
+
+///|
+/// `seg[start:]` begins with `word` (ASCII, compared case-insensitively).
+fn tree_name_has_word_at(seg : String, start : Int, word : String) -> Bool {
+  if start + word.length() > seg.length() {
+    return false
+  }
+  for i in 0..<word.length() {
+    if tree_name_ascii_lower(seg.unsafe_get(start + i).to_int()) !=
+      word.unsafe_get(i).to_int() {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// NTFS resolves `seg` to `.<marker>`: `.<marker>` or the 8.3 short name
+/// `<first 6 of marker>~1`, followed only by dots/spaces, or by `:` (an
+/// alternate data stream such as `::$INDEX_ALLOCATION`). Each
+/// backslash-separated segment is checked, since `\\` is a separator
+/// on Windows.
+fn tree_name_is_ntfs_dot(name : String, marker : String) -> Bool {
+  let stem = if marker.length() > 6 {
+    String::unsafe_substring(marker, start=0, end=6)
+  } else {
+    marker
+  }
+  let short = stem + "~1"
+  for seg_view in name.split("\\") {
+    let seg = seg_view.to_owned()
+    let rest = if seg.length() > 0 &&
+      seg.unsafe_get(0) == '.' &&
+      tree_name_has_word_at(seg, 1, marker) {
+      1 + marker.length()
+    } else if tree_name_has_word_at(seg, 0, short) {
+      short.length()
+    } else {
+      continue
+    }
+    let mut only_trailing = true
+    for i in rest..<seg.length() {
+      let c = seg.unsafe_get(i)
+      if c == ':' {
+        break
+      }
+      if c != '.' && c != ' ' {
+        only_trailing = false
+        break
+      }
+    }
+    if only_trailing {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// Code points HFS+ ignores when comparing names (git's `next_hfs_char`).
+fn tree_name_is_hfs_ignorable(c : Int) -> Bool {
+  (c >= 0x200C && c <= 0x200F) || // ZWNJ, ZWJ, LRM, RLM
+  (c >= 0x202A && c <= 0x202E) || // bidi embeddings / overrides
+  (c >= 0x206A && c <= 0x206F) || // deprecated format characters
+  c == 0xFEFF // zero-width no-break space
+}
+
+///|
+/// HFS+ resolves `name` to `.<marker>` once ignorable code points are
+/// dropped and ASCII is folded to lower case.
+fn tree_name_is_hfs_dot(name : String, marker : String) -> Bool {
+  let folded = StringBuilder::new()
+  for c in name {
+    let cp = c.to_int()
+    if tree_name_is_hfs_ignorable(cp) {
+      continue
+    }
+    folded.write_char(Int::unsafe_to_char(tree_name_ascii_lower(cp)))
+  }
+  folded.to_string() == "." + marker
 }

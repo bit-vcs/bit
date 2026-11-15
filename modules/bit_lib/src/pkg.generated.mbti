@@ -243,6 +243,8 @@ pub fn is_subdir_clone(&@bit_types.RepoFileSystem, String) -> Bool
 
 pub fn is_valid_remote_name(String) -> Bool
 
+pub fn is_valid_submodule_name(String) -> Bool
+
 pub fn last_modified_collect_entries(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String, Int32, Int32, Bool, Array[String], Array[LmPath]) -> Unit raise @bit_object.GitError
 
 pub fn last_modified_committer_ts(Bytes) -> Int64

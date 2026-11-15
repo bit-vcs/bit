@@ -194,6 +194,7 @@ options(
     "hook_runner.mbt": [ "native" ],
     "hooks.mbt": [ "native" ],
     "hooks_wbtest.mbt": [ "native" ],
+    "audit_hardening_wbtest.mbt": [ "native" ],
     "hq.mbt": [ "native" ],
     "http_fetch.mbt": [ "native" ],
     "http_serve_js.mbt": [ "js" ],

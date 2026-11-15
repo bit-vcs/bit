@@ -236,7 +236,7 @@ fn collect_tree_entries(
       }
       let entries = parse_tree(obj.data)
       for entry in entries {
-        verify_tree_entry_name(entry.name)
+        verify_tree_entry_name(entry.name, mode=entry.mode)
         let path = if prefix.length() == 0 {
           entry.name
         } else {

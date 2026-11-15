@@ -203,8 +203,20 @@ fn is_sensitive_hook(name : String) -> Bool {
 }
 
 ///|
-fn hooks_approved_checksum_path(root : String, hook_name : String) -> String {
-  join_repo_marker(root, ".bit/hooks/.approved/" + hook_name + ".sha1")
+/// Approved checksums live in the git directory, never in the worktree:
+/// a worktree path (the old `<root>/.bit/hooks/.approved`) could be
+/// shipped by the repository itself with pre-approved checksums.
+fn hooks_approved_dir(rfs : &@bitcore.RepoFileSystem, root : String) -> String {
+  resolve_git_dir(rfs, root) + "/hooks/.approved"
+}
+
+///|
+fn hooks_approved_checksum_path(
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  hook_name : String,
+) -> String {
+  hooks_approved_dir(rfs, root) + "/" + hook_name + ".sha1"
 }
 
 ///|
@@ -263,7 +275,7 @@ fn hooks_read_approved_checksum(
   root : String,
   hook_name : String,
 ) -> String? {
-  let path = hooks_approved_checksum_path(root, hook_name)
+  let path = hooks_approved_checksum_path(rfs, root, hook_name)
   if !rfs.is_file(path) {
     return None
   }
@@ -283,14 +295,14 @@ fn hooks_write_approved_checksum(
   hook_name : String,
   checksum : String,
 ) -> Unit {
-  let dir = join_repo_marker(root, ".bit/hooks/.approved")
+  let dir = hooks_approved_dir(rfs, root)
   if !rfs.is_dir(dir) {
     wfs.mkdir_p(dir) catch {
       _ => ()
     }
   }
   wfs.write_string(
-    hooks_approved_checksum_path(root, hook_name),
+    hooks_approved_checksum_path(rfs, root, hook_name),
     checksum + "\n",
   ) catch {
     _ => ()

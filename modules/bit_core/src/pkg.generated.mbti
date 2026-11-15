@@ -51,6 +51,8 @@ pub fn serialize_commit_content(@bit_object.Commit) -> Bytes
 
 pub fn serialize_tree(Array[@bit_object.TreeEntry]) -> Bytes
 
+pub fn set_tree_path_protection(hfs~ : Bool, ntfs~ : Bool) -> Unit
+
 pub fn sha1(Bytes) -> @bit_object.ObjectId
 
 pub fn sha1_array(Array[Byte]) -> @bit_object.ObjectId
@@ -63,7 +65,7 @@ pub fn sha256_array_prefix(Array[Byte], Int32) -> @bit_object.ObjectId
 
 pub fn sha256_prefix(Bytes, Int32) -> @bit_object.ObjectId
 
-pub fn verify_tree_entry_name(String) -> Unit raise @bit_object.GitError
+pub fn verify_tree_entry_name(String, mode? : String) -> Unit raise @bit_object.GitError
 
 pub fn write_git_metadata(@bit_repo.ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
 

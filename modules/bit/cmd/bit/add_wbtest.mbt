@@ -120,6 +120,8 @@ async test "add: dot expansion includes submodule gitlink path" {
 ///|
 async test "add: stages parent-relative path from subdirectory" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test-add-parent-relative-" +
     get_current_timestamp().to_string()
@@ -152,6 +154,8 @@ async test "add: stages parent-relative path from subdirectory" {
 ///|
 async test "add: explicit add is clean for real git diff-files" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test-add-real-git-clean-" +
     get_current_timestamp().to_string()
@@ -188,6 +192,8 @@ async test "add: explicit add is clean for real git diff-files" {
 ///|
 async test "add: update from subdirectory is clean for real git diff-files" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test-add-update-subdir-" +
     get_current_timestamp().to_string()

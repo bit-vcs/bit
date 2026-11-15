@@ -1272,6 +1272,7 @@ async fn dispatch_command(
       }
     }
   }
+  apply_tree_path_protection_config()
   dispatch_known_command(normalized_cmd, rest) catch {
     err => {
       if @async.is_being_cancelled() {
@@ -1280,6 +1281,23 @@ async fn dispatch_command(
       exit_with_error(command_error_name(normalized_cmd), err)
     }
   }
+}
+
+///|
+/// Honour `core.protectHFS` / `core.protectNTFS = false` from the
+/// repository config, as git does. Both protections stay on otherwise
+/// (including outside a repository).
+fn apply_tree_path_protection_config() -> Unit {
+  let fs = OsFs::new()
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let config_path = resolve_git_dir(rfs, get_work_root()) + "/config"
+  let read = fn(name : String) -> Bool {
+    @bitlib.read_config_bool(rfs, config_path, "core", name).unwrap_or(true)
+  }
+  @bitcore.set_tree_path_protection(
+    hfs=read("protecthfs"),
+    ntfs=read("protectntfs"),
+  )
 }
 
 ///|
