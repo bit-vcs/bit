@@ -665,6 +665,8 @@ pub fn upload_pack(&@bit_types.RepoFileSystem, String, UploadPackRequest, git_di
 
 pub fn upload_pack_v2(&@bit_types.RepoFileSystem, String, UploadPackRequestV2, UploadPackConfig, git_dir_override? : String) -> Bytes raise @bit_object.GitError
 
+pub fn verify_worktree_path(String, String) -> Unit raise @bit_object.GitError
+
 pub fn working_files_cache(String) -> Array[String]?
 
 pub fn write_index_entries(&@bit_types.FileSystem, String, Array[IndexEntry], hash_size? : Int32) -> Unit raise @bit_object.GitError
@@ -694,6 +696,8 @@ pub fn write_tree_from_index(&@bit_types.FileSystem, &@bit_types.RepoFileSystem,
 pub fn write_tree_to_worktree(ObjectDb, &@bit_types.RepoFileSystem, &@bit_types.FileSystem, @bit_object.ObjectId, String) -> Unit raise @bit_object.GitError
 
 pub fn write_worktree_and_build_index(ObjectDb, &@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Map[String, TreeFileEntry], remove_missing? : Bool, preserve_removed_gitlinks? : Bool) -> Array[IndexEntry] raise @bit_object.GitError
+
+pub fn write_worktree_file_safely(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Bytes) -> Unit raise @bit_object.GitError
 
 pub fn write_worktree_from_files(ObjectDb, &@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Map[String, TreeFileEntry], remove_missing? : Bool, preserve_removed_gitlinks? : Bool) -> Unit raise @bit_object.GitError
 

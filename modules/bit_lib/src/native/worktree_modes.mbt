@@ -159,6 +159,16 @@ async fn apply_symlink(
 
 ///|
 async fn apply_file_mode(path : String, mode : Int) -> Unit raise @bit.GitError {
+  // chmod follows symlinks: never change the mode of whatever a worktree
+  // symlink points to.
+  let is_symlink = try (
+    @afs.kind(path, follow_symlink=false) is @afs.FileKind::SymLink
+  ) catch {
+    _ => false
+  }
+  if is_symlink {
+    return
+  }
   @afs.chmod(path, mode) catch {
     err => raise @bit.GitError::IoError(err.to_string())
   }
