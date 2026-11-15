@@ -2,8 +2,9 @@
 async fn handle_stash(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   check_and_exit_unsupported_attrs(root)
-  let git_dir = root + "/.git"
   let fs = OsFs::new()
+  let wt_git_dir = resolve_git_dir(fs, root)
+  let git_dir = @bitlib.resolve_common_git_dir(fs, wt_git_dir)
   // Determine subcommand (default: push if args are empty or start with -)
   let subcmd = if args.length() == 0 {
     "push"
@@ -20,15 +21,22 @@ async fn handle_stash(args : Array[String]) -> Unit raise Error {
   } else {
     args.iter().collect()
   }
+  let quiet = rest.contains("-q") || rest.contains("--quiet")
   match subcmd {
     "push" | "save" => {
       // Parse push options
       let mut message = ""
       let mut patch = false
+      let mut include_untracked = false
       let mut i = 0
       while i < rest.length() {
         let arg = rest[i]
         match arg {
+          "-u" | "--include-untracked" => {
+            include_untracked = true
+            i += 1
+            continue
+          }
           "-p" | "--patch" => {
             patch = true
             i += 1
@@ -77,14 +85,24 @@ async fn handle_stash(args : Array[String]) -> Unit raise Error {
           fs, fs, root, message, author, timestamp, selector,
         )
       } else {
-        @bitlib.stash_push(fs, fs, root, message, author, timestamp)
+        @bitlib.stash_push(
+          fs,
+          fs,
+          root,
+          message,
+          author,
+          timestamp,
+          include_untracked~,
+        )
       }
       match result {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
-          print_line("Saved working directory and index state [\{short}]")
+          if !quiet {
+            print_line("Saved working directory and index state [\{short}]")
+          }
         }
-        None => print_line("No local changes to save")
+        None => if !quiet { print_line("No local changes to save") }
       }
     }
     "list" => {
@@ -97,7 +115,9 @@ async fn handle_stash(args : Array[String]) -> Unit raise Error {
     "pop" => {
       let index = parse_stash_index(rest)
       @bitlib.stash_apply(fs, fs, root, index, true)
-      print_line("Dropped stash@{" + index.to_string() + "}")
+      if !quiet {
+        print_line("Dropped stash@{" + index.to_string() + "}")
+      }
     }
     "apply" => {
       let index = parse_stash_index(rest)
@@ -151,7 +171,7 @@ async fn handle_stash(args : Array[String]) -> Unit raise Error {
         let parent_id = stash_info.parents[0]
         let ref_path = git_dir + "/refs/heads/" + branch_name
         @fs.write_string_to_file(ref_path, parent_id.to_hex() + "\n")
-        let head_path = git_dir + "/HEAD"
+        let head_path = wt_git_dir + "/HEAD"
         @fs.write_string_to_file(
           head_path,
           "ref: refs/heads/" + branch_name + "\n",

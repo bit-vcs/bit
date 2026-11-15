@@ -175,7 +175,18 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
         switch_apply_tracking_config(
           fs, rfs, git_dir, branch_name, start_point, track_mode,
         )
-        @bitlib.switch_branch(fs, rfs, root, branch_name)
+        // Two-tree switch like git: local changes are carried over (and
+        // block the switch only where the start point differs).
+        let short_name = if branch_name.has_prefix("refs/heads/") {
+          String::unsafe_substring(
+            branch_name,
+            start=11,
+            end=branch_name.length(),
+          )
+        } else {
+          branch_name
+        }
+        ignore(checkout_with_promisor_retry(fs, root, short_name))
       }
       None => {
         @bitlib.create_branch(fs, rfs, root, branch_name, start_point~)

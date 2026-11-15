@@ -87,7 +87,11 @@ pub fn stash_list(
 }
 
 ///|
-/// Push current changes to stash.
+/// Push current changes to stash, like `git stash push`: an index commit
+/// (I), an optional untracked-files commit (U, `include_untracked`) and the
+/// worktree commit (W, parents HEAD, I[, U]) with git's messages, then a
+/// hard reset to HEAD (skip-worktree entries are left alone) and, with
+/// `include_untracked`, removal of the stashed untracked files.
 pub async fn stash_push(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -95,41 +99,184 @@ pub async fn stash_push(
   message : String,
   author : String,
   timestamp : Int64,
+  include_untracked? : Bool = false,
 ) -> @bit.ObjectId? raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
-  // Check if there are changes
+  let (git_dir, common_dir) = stash_git_dirs(rfs, root)
   let st = status(rfs, root)
+  let untracked = if include_untracked { st.untracked } else { [] }
   if st.staged_added.length() == 0 &&
     st.staged_modified.length() == 0 &&
     st.staged_deleted.length() == 0 &&
     st.unstaged_modified.length() == 0 &&
-    st.unstaged_deleted.length() == 0 {
+    st.unstaged_deleted.length() == 0 &&
+    untracked.length() == 0 {
     return None
   }
-  // Get current HEAD
   let head = resolve_head_commit(rfs, git_dir)
   guard head is Some(head_id) else {
-    raise @bit.GitError::InvalidObject("HEAD not found")
+    raise @bit.GitError::InvalidObject("You do not have the initial commit yet")
   }
-  // Create tree from current index
+  if read_unmerged_paths(rfs, git_dir).length() > 0 {
+    raise @bit.GitError::InvalidObject("could not write index")
+  }
+  let index_path = join_path(git_dir, "index")
+  let saved_index = if rfs.is_file(index_path) {
+    Some(rfs.read_file(index_path))
+  } else {
+    None
+  }
   let index_entries = read_index_entries(rfs, git_dir)
-  let index_tree = write_tree_from_index(fs, rfs, git_dir, index_entries)
-  // Create tree from worktree (also writes blobs to object store)
-  let worktree_entries = build_worktree_index(
-    fs, rfs, git_dir, root, index_entries,
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let index_tree = write_tree_from_index(fs, rfs, common_dir, index_entries)
+  // W: the index with every tracked (non skip-worktree, non gitlink) path
+  // re-staged from the worktree, exactly as `git add -u` would.
+  let tracked : Array[String] = []
+  for e in index_entries {
+    if !skip.contains(e.path) && !is_gitlink_mode_int(e.mode) {
+      tracked.push(e.path)
+    }
+  }
+  let worktree_entries = if tracked.length() > 0 {
+    add_paths(fs, rfs, root, tracked)
+    read_index_entries(rfs, git_dir)
+  } else {
+    index_entries
+  }
+  let untracked_tree = if untracked.length() > 0 {
+    write_index_entries(fs, git_dir, [])
+    add_paths(fs, rfs, root, untracked)
+    let u_entries = read_index_entries(rfs, git_dir)
+    Some(write_tree_from_index(fs, rfs, common_dir, u_entries))
+  } else {
+    None
+  }
+  match saved_index {
+    Some(bytes) => fs.write_file(index_path, bytes)
+    None => fs.remove_file(index_path) catch { _ => () }
+  }
+  let worktree_tree = write_tree_from_index(
+    fs, rfs, common_dir, worktree_entries,
   )
-  let worktree_tree = write_tree_from_index(fs, rfs, git_dir, worktree_entries)
   let stash_id = stash_store_entry(
-    fs, rfs, git_dir, head_id, index_tree, worktree_tree, message, author, timestamp,
+    fs,
+    rfs,
+    git_dir,
+    head_id,
+    index_tree,
+    worktree_tree,
+    message,
+    author,
+    timestamp,
+    untracked_tree~,
   )
-  // Reset worktree to HEAD
-  let db = ObjectDb::load(rfs, git_dir)
-  let head_files = collect_tree_files_from_commit(db, rfs, head_id)
-  write_worktree_from_files(db, fs, rfs, root, git_dir, head_files)
-  // Reset index to HEAD
-  let head_entries = tree_files_to_index(db, rfs, head_files)
-  write_index_entries(fs, git_dir, head_entries)
+  stash_reset_hard(fs, rfs, root, git_dir, common_dir, head_id)
+  if untracked.length() > 0 {
+    let emptied : Array[String] = []
+    for path in untracked {
+      let abs = join_path(root, path)
+      if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+        fs.remove_file(abs) catch { _ => () }
+        emptied.push(parent_dir(abs))
+      }
+    }
+    tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
+  }
   Some(stash_id)
+}
+
+///|
+/// The worktree's git dir and the common git dir (objects, refs) for
+/// `root`, which may be a linked worktree whose `.git` is a file.
+fn stash_git_dirs(
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+) -> (String, String) {
+  let marker = join_path(root, ".git")
+  let git_dir = if rfs.is_file(marker) {
+    resolve_gitdir(rfs, marker)
+  } else {
+    marker
+  }
+  (git_dir, resolve_common_git_dir(rfs, git_dir))
+}
+
+///|
+/// `git reset --hard HEAD` for stash: index and worktree back to HEAD,
+/// removing files only the index tracked. Skip-worktree paths keep their
+/// flag and are not materialized.
+fn stash_reset_hard(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  common_dir : String,
+  head_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
+  let db = ObjectDb::load(rfs, common_dir)
+  let head_files = collect_tree_files_from_commit(db, rfs, head_id)
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let entries = read_index_entries(rfs, git_dir)
+  let emptied : Array[String] = []
+  for e in entries {
+    if head_files.contains(e.path) || skip.contains(e.path) {
+      continue
+    }
+    let abs = join_path(root, e.path)
+    if is_gitlink_mode_int(e.mode) {
+      continue
+    }
+    if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+      fs.remove_file(abs) catch { _ => () }
+      emptied.push(parent_dir(abs))
+    }
+  }
+  tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
+  let to_write : Map[String, TreeFileEntry] = Map([])
+  for path, f in head_files {
+    if !skip.contains(path) {
+      to_write[path] = f
+    }
+  }
+  write_worktree_from_files(db, fs, rfs, root, git_dir, to_write)
+  let head_entries = tree_files_to_index(db, rfs, head_files)
+  let keep_skip : Map[String, Bool] = Map([])
+  for path, _ in skip {
+    if head_files.contains(path) {
+      keep_skip[path] = true
+    }
+  }
+  write_index_entries_with_skip_worktree(fs, git_dir, head_entries, keep_skip)
+}
+
+///|
+/// git's stash subject for HEAD: "<branch>: <short> <subject>", with
+/// "(no branch)" on a detached HEAD and the commit's first paragraph
+/// joined into one line.
+fn stash_head_label(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  common_dir : String,
+  head_id : @bit.ObjectId,
+) -> (String, String) raise @bit.GitError {
+  let branch = match read_head_ref(rfs, git_dir) {
+    Branch(name) => name
+    Detached(_) => "(no branch)"
+  }
+  let db = ObjectDb::load_lazy(rfs, common_dir)
+  let msg = rebase_parse_commit_full(db, rfs, head_id).message
+  let para = match msg.find("\n\n") {
+    Some(i) => String::unsafe_substring(msg, start=0, end=i)
+    None => msg
+  }
+  let words : Array[String] = []
+  for line in para.split("\n") {
+    let t = line.trim(chars=" \t\r").to_owned()
+    if t.length() > 0 {
+      words.push(t)
+    }
+  }
+  let short = String::unsafe_substring(head_id.to_hex(), start=0, end=7)
+  (branch, "\{branch}: \{short} \{words.join(" ")}")
 }
 
 ///|
@@ -142,7 +289,7 @@ pub async fn stash_push_patch(
   timestamp : Int64,
   select_hunk : async (StashPatchHunk, Int, Int) -> Bool,
 ) -> @bit.ObjectId? raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let (git_dir, _) = stash_git_dirs(rfs, root)
   let head = resolve_head_commit(rfs, git_dir)
   guard head is Some(head_id) else {
     raise @bit.GitError::InvalidObject("HEAD not found")
@@ -238,35 +385,45 @@ fn stash_store_entry(
   message : String,
   author : String,
   timestamp : Int64,
+  untracked_tree? : @bit.ObjectId? = None,
 ) -> @bit.ObjectId raise @bit.GitError {
-  let index_commit = @bit.Commit::new(
+  let common_dir = resolve_common_git_dir(rfs, git_dir)
+  let (branch, label) = stash_head_label(rfs, git_dir, common_dir, head_id)
+  // git writes the stash messages verbatim: W has no trailing newline.
+  let new_commit = fn(tree, parents, msg) raise @bit.GitError {
+    let commit = @bit.Commit::new(
+      tree,
+      parents,
+      author,
+      timestamp,
+      "+0000",
+      author,
+      timestamp,
+      "+0000",
+      msg,
+      verbatim_message=true,
+    )
+    let (id, data) = @bit.create_commit(commit)
+    write_object_bytes(fs, common_dir, id, data)
+    id
+  }
+  let index_commit_id = new_commit(
     index_tree,
     [head_id],
-    author,
-    timestamp,
-    "+0000",
-    author,
-    timestamp,
-    "+0000",
-    "index on HEAD",
+    "index on \{label}\n",
   )
-  let (index_commit_id, index_commit_data) = @bit.create_commit(index_commit)
-  write_object_bytes(fs, git_dir, index_commit_id, index_commit_data)
-  let stash_msg = if message.length() > 0 { message } else { "WIP on HEAD" }
-  let stash_commit = @bit.Commit::new(
-    worktree_tree,
-    [head_id, index_commit_id],
-    author,
-    timestamp,
-    "+0000",
-    author,
-    timestamp,
-    "+0000",
-    stash_msg,
-  )
-  let (stash_id, stash_data) = @bit.create_commit(stash_commit)
-  write_object_bytes(fs, git_dir, stash_id, stash_data)
-  let stash_ref_path = git_dir + "/refs/stash"
+  let parents = [head_id, index_commit_id]
+  match untracked_tree {
+    Some(tree) => parents.push(new_commit(tree, [], "untracked files on \{label}\n"))
+    None => ()
+  }
+  let stash_msg = if message.length() > 0 {
+    "On \{branch}: \{message}"
+  } else {
+    "WIP on \{label}"
+  }
+  let stash_id = new_commit(worktree_tree, parents, stash_msg)
+  let stash_ref_path = common_dir + "/refs/stash"
   let old_id = if rfs.is_file(stash_ref_path) {
     let content = @utf8.decode_lossy(rfs.read_file(stash_ref_path)[:])
     let hex = content.trim_end(chars="\n\r ").to_owned()
@@ -277,10 +434,14 @@ fn stash_store_entry(
     @bit.ObjectId::zero()
   }
   fs.write_string(stash_ref_path, stash_id.to_hex() + "\n")
-  let reflog_dir = git_dir + "/logs/refs"
+  let reflog_dir = common_dir + "/logs/refs"
   fs.mkdir_p(reflog_dir)
   let reflog_path = reflog_dir + "/stash"
-  let reflog_entry = "\{old_id.to_hex()} \{stash_id.to_hex()} \{author} \{timestamp} +0000\t\{stash_msg}\n"
+  let reflog_msg = match stash_msg.find("\n") {
+    Some(i) => String::unsafe_substring(stash_msg, start=0, end=i)
+    None => stash_msg
+  }
+  let reflog_entry = "\{old_id.to_hex()} \{stash_id.to_hex()} \{author} \{timestamp} +0000\t\{reflog_msg}\n"
   let existing = if rfs.is_file(reflog_path) {
     @utf8.decode_lossy(rfs.read_file(reflog_path)[:])
   } else {
@@ -288,40 +449,6 @@ fn stash_store_entry(
   }
   fs.write_string(reflog_path, existing + reflog_entry)
   stash_id
-}
-
-///|
-fn build_worktree_index(
-  fs : &@bit.FileSystem,
-  rfs : &@bit.RepoFileSystem,
-  git_dir : String,
-  root : String,
-  index_entries : Array[IndexEntry],
-) -> Array[IndexEntry] raise @bit.GitError {
-  let result : Array[IndexEntry] = []
-  for e in index_entries {
-    let abs = join_path(root, e.path)
-    if rfs.is_file(abs) {
-      let content = rfs.read_file(abs)
-      // Write blob to object store
-      let id = write_loose_object(fs, git_dir, @bit.ObjectType::Blob, content)
-      result.push({
-        path: e.path,
-        id,
-        mode: e.mode,
-        size: content.length(),
-        mtime_sec: 0,
-        mtime_nsec: 0,
-        intent_to_add: false,
-        dev: 0,
-        ino: 0,
-        uid: 0,
-        gid: 0,
-      })
-    }
-    // Skip deleted files
-  }
-  result
 }
 
 ///|
@@ -771,7 +898,12 @@ fn stash_write_patch_remaining_worktree(
 }
 
 ///|
-/// Apply stash entry (optionally dropping it).
+/// Apply stash entry (optionally dropping it), like `git stash apply|pop`
+/// without `--index`: untracked files (third parent) are restored first,
+/// then the stash's changes (base = its first parent, theirs = its tree)
+/// are merged into the current index. On success the index is reset to
+/// what it was except for files the stash adds, which stay staged; on
+/// conflict the conflicted index is left and the entry is kept.
 pub fn stash_apply(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -779,49 +911,186 @@ pub fn stash_apply(
   index : Int,
   drop : Bool,
 ) -> Unit raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
-  let entries = stash_list(rfs, git_dir)
+  let (git_dir, common_dir) = stash_git_dirs(rfs, root)
+  let entries = stash_list(rfs, common_dir)
   if index >= entries.length() {
     raise @bit.GitError::InvalidObject("No stash entry at index \{index}")
   }
   let entry = entries[index]
-  // Get stash commit
-  let db = ObjectDb::load(rfs, git_dir)
-  let obj = db.get(rfs, entry.id)
-  guard obj is Some(stash_obj) else {
-    raise @bit.GitError::InvalidObject("Stash object not found")
+  let db = ObjectDb::load(rfs, common_dir)
+  let stash = rebase_parse_commit_full(db, rfs, entry.id)
+  if stash.parents.length() < 2 {
+    raise @bit.GitError::InvalidObject(
+      "'\{entry.id.to_hex()}' is not a stash-like commit",
+    )
   }
-  if stash_obj.obj_type != @bit.ObjectType::Commit {
-    raise @bit.GitError::InvalidObject("Invalid stash entry")
+  if read_unmerged_paths(rfs, git_dir).length() > 0 {
+    raise @bit.GitError::InvalidObject("Cannot apply a stash in the middle of a merge")
   }
-  let commit_info = @bit.parse_commit(stash_obj.data)
-  // Apply worktree state from stash
-  let stash_files = collect_tree_files(db, rfs, commit_info.tree)
-  write_worktree_from_files(
+  let index_entries = read_index_entries(rfs, git_dir)
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let ours : Map[String, TreeFileEntry] = Map([])
+  let ours_entries : Map[String, IndexEntry] = Map([])
+  for e in index_entries {
+    ours[e.path] = { id: e.id, mode: e.mode }
+    ours_entries[e.path] = e
+  }
+  let base_files = collect_tree_files_from_commit(db, rfs, stash.parents[0])
+  let theirs = collect_tree_files(db, rfs, stash.tree)
+  // Untracked files come back first; an existing file blocks that.
+  if stash.parents.length() >= 3 {
+    let u_files = collect_tree_files_from_commit(db, rfs, stash.parents[2])
+    let existing : Array[String] = []
+    for path, _ in u_files {
+      if @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+        existing.push(path)
+      }
+    }
+    if existing.length() > 0 {
+      existing.sort()
+      raise @bit.GitError::InvalidObject(
+        existing.map(p => "\{p} already exists, no checkout").join("\n") +
+        "\ncould not restore untracked files from stash",
+      )
+    }
+    write_worktree_from_files(db, fs, rfs, root, git_dir, u_files)
+  }
+  stash_check_local_changes(rfs, root, ours, base_files, theirs, skip)
+  let tw = merge_three_way(
     db,
     fs,
     rfs,
     root,
     git_dir,
-    stash_files,
-    remove_missing=false,
+    base_files,
+    ours,
+    theirs,
+    ours_label="Updated upstream",
+    theirs_label="Stashed changes",
   )
-  // Also update index from first parent's second parent (index commit) if exists
-  if commit_info.parents.length() >= 2 {
-    let index_commit_id = commit_info.parents[1]
-    let index_obj = db.get(rfs, index_commit_id)
-    match index_obj {
-      Some(idx_obj) if idx_obj.obj_type == @bit.ObjectType::Commit => {
-        let idx_info = @bit.parse_commit(idx_obj.data)
-        let idx_files = collect_tree_files(db, rfs, idx_info.tree)
-        let idx_entries = tree_files_to_index(db, rfs, idx_files)
-        write_index_entries(fs, git_dir, idx_entries)
+  if tw.conflicts.length() > 0 {
+    merge_write_conflicted(
+      db, fs, rfs, root, git_dir, base_files, ours, theirs, tw,
+    )
+    let conflicts = tw.conflicts.copy()
+    conflicts.sort()
+    raise @bit.GitError::InvalidObject(
+      conflicts.map(p => "CONFLICT (content): Merge conflict in \{p}").join(
+        "\n",
+      ) +
+      "\nThe stash entry is kept in case you need it again.",
+    )
+  }
+  // Worktree: write what changed, remove what the stash deleted.
+  let emptied : Array[String] = []
+  for path, _ in ours {
+    if !tw.merged.contains(path) && !skip.contains(path) {
+      let abs = join_path(root, path)
+      if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+        fs.remove_file(abs) catch { _ => () }
+        emptied.push(parent_dir(abs))
       }
-      _ => ()
     }
   }
+  tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
+  let to_write : Map[String, TreeFileEntry] = Map([])
+  for path, f in tw.merged {
+    match ours.get(path) {
+      Some(o) if o.id == f.id && o.mode == f.mode => ()
+      _ => to_write[path] = f
+    }
+  }
+  write_worktree_from_files(db, fs, rfs, root, git_dir, to_write)
+  // Index: unchanged except for files new to it, which are staged.
+  let new_index : Array[IndexEntry] = []
+  for e in index_entries {
+    new_index.push(e)
+  }
+  let added : Map[String, TreeFileEntry] = Map([])
+  for path, f in tw.merged {
+    if !ours.contains(path) {
+      added[path] = f
+    }
+  }
+  for e in tree_files_to_index(db, rfs, added) {
+    new_index.push(e)
+  }
+  write_index_entries_with_skip_worktree(fs, git_dir, new_index, skip)
   if drop {
-    stash_drop_at(fs, rfs, git_dir, index)
+    stash_drop_at(fs, rfs, common_dir, index)
+  }
+}
+
+///|
+/// git refuses to apply a stash over unstaged edits (or untracked files)
+/// at paths the stash changes and the current index does not already
+/// match.
+fn stash_check_local_changes(
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  ours : Map[String, TreeFileEntry],
+  base_files : Map[String, TreeFileEntry],
+  theirs : Map[String, TreeFileEntry],
+  skip : Map[String, Bool],
+) -> Unit raise @bit.GitError {
+  let same = fn(a : TreeFileEntry?, b : TreeFileEntry?) {
+    match (a, b) {
+      (Some(x), Some(y)) => x.id == y.id && x.mode == y.mode
+      (None, None) => true
+      _ => false
+    }
+  }
+  let changed : Map[String, Bool] = Map([])
+  for path, _ in theirs {
+    changed[path] = true
+  }
+  for path, _ in base_files {
+    changed[path] = true
+  }
+  let dirty : Array[String] = []
+  let untracked : Array[String] = []
+  for path, _ in changed {
+    if skip.contains(path) ||
+      same(base_files.get(path), theirs.get(path)) ||
+      same(ours.get(path), theirs.get(path)) {
+      continue
+    }
+    let abs = join_path(root, path)
+    let on_disk : @bit.ObjectId? = match
+      @bitio.worktree_entry_meta_sync(rfs, abs) {
+      Some(info) =>
+        match info.kind {
+          @bitio.WorktreeKindMeta::Symlink =>
+            @bitio.read_symlink_target_path(abs).map(fn(t) {
+              @bit.hash_blob(@utf8.encode(t))
+            })
+          @bitio.WorktreeKindMeta::Regular =>
+            Some(@bit.hash_blob(rfs.read_file(abs) catch { _ => Bytes::new(0) }))
+        }
+      None => None
+    }
+    match (ours.get(path), on_disk) {
+      (Some(o), Some(id)) => if o.id != id { dirty.push(path) }
+      (Some(_), None) => dirty.push(path)
+      (None, Some(_)) => untracked.push(path)
+      (None, None) => ()
+    }
+  }
+  if dirty.length() > 0 {
+    dirty.sort()
+    raise @bit.GitError::InvalidObject(
+      "Your local changes to the following files would be overwritten by merge:\n\t" +
+      dirty.join("\n\t") +
+      "\nPlease commit your changes or stash them before you merge.\nAborting\nThe stash entry is kept in case you need it again.",
+    )
+  }
+  if untracked.length() > 0 {
+    untracked.sort()
+    raise @bit.GitError::InvalidObject(
+      "The following untracked working tree files would be overwritten by merge:\n\t" +
+      untracked.join("\n\t") +
+      "\nPlease move or remove them before you merge.\nAborting\nThe stash entry is kept in case you need it again.",
+    )
   }
 }
 
@@ -833,8 +1102,8 @@ pub fn stash_drop(
   root : String,
   index : Int,
 ) -> Unit raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
-  stash_drop_at(fs, rfs, git_dir, index)
+  let (_, common_dir) = stash_git_dirs(rfs, root)
+  stash_drop_at(fs, rfs, common_dir, index)
 }
 
 ///|

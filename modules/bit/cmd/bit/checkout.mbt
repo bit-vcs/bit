@@ -117,8 +117,16 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
         }
         // Checkout the start point first (detached)
         let _ = checkout_with_promisor_retry(fs, root, ref_name, detach=true)
-        // Then create and switch to new branch
-        @bitlib.switch_branch(fs, fs, root, branch_name, create=true)
+        // Then create the branch there and point HEAD at it; the
+        // worktree (with any carried-over local changes) is already right.
+        @bitlib.switch_branch(
+          fs,
+          fs,
+          root,
+          branch_name,
+          create=true,
+          checkout_files=false,
+        )
         if track_branch {
           checkout_apply_tracking_config(
             fs, rfs, git_dir, branch_name, ref_name,
