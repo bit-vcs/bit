@@ -217,15 +217,18 @@ fn sequencer_check_local_changes(
 ) -> Unit raise @bit.GitError {
   let entries = read_index_entries(rfs, git_dir)
   let skip = read_skip_worktree_paths(rfs, git_dir)
-  let mut staged = entries.length() != ours.length()
+  // On an unborn branch (no HEAD tree) an index already matching the
+  // picked tree is fine, as in git.
+  let unborn = ours.length() == 0
+  let mut staged = !unborn && entries.length() != ours.length()
   if !staged {
     for e in entries {
-      match ours.get(e.path) {
-        Some(o) if o.id == e.id && o.mode == e.mode => ()
-        _ => {
-          staged = true
-          break
-        }
+      let matches = fn(t : TreeFileEntry?) {
+        t is Some(o) && o.id == e.id && o.mode == e.mode
+      }
+      if !(matches(ours.get(e.path)) || (unborn && matches(theirs.get(e.path)))) {
+        staged = true
+        break
       }
     }
   }
@@ -269,7 +272,11 @@ fn sequencer_check_local_changes(
     match (ours.get(path), on_disk) {
       (Some(o), Some(id)) => if o.id != id { dirty.push(path) }
       (Some(_), None) => dirty.push(path)
-      (None, Some(_)) => untracked.push(path)
+      // An untracked file identical to what would be written is fine.
+      (None, Some(id)) =>
+        if !(theirs.get(path) is Some(t) && t.id == id) {
+          untracked.push(path)
+        }
       (None, None) => ()
     }
   }
