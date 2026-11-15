@@ -430,7 +430,7 @@ pub fn merge(
   }
   merge_write_changed_paths(db, fs, rfs, root, git_dir, ours, merged)
   let entries = tree_files_to_index(db, rfs, merged)
-  write_index_entries(fs, git_dir, entries)
+  merge_write_index_keeping_skip(fs, rfs, git_dir, entries)
   let tree_id = write_tree_from_index(fs, rfs, git_dir, entries)
   let commit = @bit.Commit::new(
     tree_id,
@@ -1080,9 +1080,13 @@ fn merge_write_changed_paths(
   ours : Map[String, TreeFileEntry],
   merged : Map[String, TreeFileEntry],
 ) -> Unit raise @bit.GitError {
+  // Sparse: skip-worktree paths are updated in the index only.
+  let skip = read_skip_worktree_paths(rfs, git_dir)
   let emptied : Array[String] = []
   for path, o in ours {
-    if merged.contains(path) || is_gitlink_mode_int(o.mode) {
+    if merged.contains(path) ||
+      is_gitlink_mode_int(o.mode) ||
+      skip.contains(path) {
       continue
     }
     let abs = join_path(root, path)
@@ -1096,12 +1100,38 @@ fn merge_write_changed_paths(
   tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
   let changed : Map[String, TreeFileEntry] = Map([])
   for path, f in merged {
+    if skip.contains(path) {
+      continue
+    }
     match ours.get(path) {
       Some(o) if o.id == f.id && o.mode == f.mode => ()
       _ => changed[path] = f
     }
   }
   write_worktree_from_files(db, fs, rfs, root, git_dir, changed)
+}
+
+///|
+/// Write a merge-family result index, keeping the skip-worktree bit of
+/// every entry that is still there (sparse checkouts).
+fn merge_write_index_keeping_skip(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  entries : Array[IndexEntry],
+) -> Unit raise @bit.GitError {
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  if skip.length() == 0 {
+    write_index_entries(fs, git_dir, entries)
+    return
+  }
+  let keep : Map[String, Bool] = Map([])
+  for e in entries {
+    if skip.contains(e.path) {
+      keep[e.path] = true
+    }
+  }
+  write_index_entries_with_skip_worktree(fs, git_dir, entries, keep)
 }
 
 ///|

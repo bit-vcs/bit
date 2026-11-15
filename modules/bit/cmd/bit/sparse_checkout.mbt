@@ -880,7 +880,13 @@ async fn handle_sparse_checkout_at_root_inner(
         fs, git_dir, cone_flag,
       )
       if !@bitlib.is_sparse_checkout_enabled(fs, git_dir) {
-        @bitlib.sparse_checkout_init(fs, fs, root, cone=effective_cone)
+        @bitlib.sparse_checkout_init(
+          fs,
+          fs,
+          root,
+          cone=effective_cone,
+          update_worktree=false,
+        )
       }
       match cone_flag {
         Some(flag) => @bitlib.sparse_set_cone_config(fs, fs, git_dir, flag)

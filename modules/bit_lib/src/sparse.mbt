@@ -281,8 +281,8 @@ fn sparse_canonicalize_cone_patterns(patterns : Array[String]) -> Array[String] 
             sparse_cone_is_descendant(normalized, existing) {
             covered = true
           }
-          if existing != normalized &&
-            !sparse_cone_is_descendant(existing, normalized) {
+          // A duplicate stays (once): only descendants are dropped.
+          if !sparse_cone_is_descendant(existing, normalized) {
             kept.push(existing)
           }
         }
@@ -480,6 +480,7 @@ pub fn sparse_checkout_init(
   rfs : &@bit.RepoFileSystem,
   root : String,
   cone? : Bool = false,
+  update_worktree? : Bool = true,
 ) -> Unit raise @bit.GitError {
   let git_dir = resolve_root_git_dir(rfs, root)
   let config_path = join_path(git_dir, "config")
@@ -496,7 +497,9 @@ pub fn sparse_checkout_init(
   if !rfs.is_file(sparse_path) {
     write_sparse_patterns(fs, rfs, git_dir, sparse_default_patterns())
   }
-  sparse_update_worktree(fs, rfs, root)
+  if update_worktree {
+    sparse_update_worktree(fs, rfs, root)
+  }
 }
 
 ///|
@@ -508,9 +511,10 @@ pub fn sparse_checkout_set(
   patterns : Array[String],
 ) -> Unit raise @bit.GitError {
   let git_dir = resolve_root_git_dir(rfs, root)
-  // Ensure sparse checkout is initialized
+  // Ensure sparse checkout is initialized -- without applying the default
+  // patterns first: git goes straight to the new ones.
   if !is_sparse_checkout_enabled(rfs, git_dir) {
-    sparse_checkout_init(fs, rfs, root)
+    sparse_checkout_init(fs, rfs, root, update_worktree=false)
   }
   sparse_enable_worktree_config(fs, rfs, git_dir)
   let stored_patterns = if is_sparse_checkout_cone_enabled(rfs, git_dir) {

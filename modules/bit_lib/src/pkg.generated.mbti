@@ -615,7 +615,7 @@ pub fn sparse_checkout_add(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, S
 
 pub fn sparse_checkout_disable(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit raise @bit_object.GitError
 
-pub fn sparse_checkout_init(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, cone? : Bool) -> Unit raise @bit_object.GitError
+pub fn sparse_checkout_init(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, cone? : Bool, update_worktree? : Bool) -> Unit raise @bit_object.GitError
 
 pub fn sparse_checkout_reapply(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit raise @bit_object.GitError
 
