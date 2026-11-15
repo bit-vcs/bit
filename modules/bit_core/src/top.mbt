@@ -38,6 +38,7 @@ pub using @repo {
   write_git_metadata,
   write_git_metadata_async,
   verify_tree_entry_name,
+  set_tree_path_protection,
 }
 
 ///|

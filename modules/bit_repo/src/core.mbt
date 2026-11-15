@@ -448,9 +448,8 @@ pub fn parent_dir(path : String) -> String {
 /// - HFS+ forms, as git's `is_hfs_dotgit`: the marker with Unicode
 ///   ignorable code points interleaved (`.g\u{200c}it`).
 ///
-/// git enables the NTFS checks on every platform by default
-/// (`core.protectNTFS`); bit applies both sets unconditionally, since a
-/// clone made on Linux may later be checked out on Windows or macOS.
+/// The NTFS and HFS+ sets follow `core.protectNTFS` / `core.protectHFS`
+/// (see `set_tree_path_protection`); both are on by default.
 ///
 /// `mode`, when given, is the entry's tree mode. A symlink (`120000`)
 /// named `.gitmodules`, `.gitattributes`, `.gitignore` or `.mailmap`
@@ -483,9 +482,14 @@ pub fn verify_tree_entry_name(
       )
     }
   }
+  let (protect_hfs, protect_ntfs) = tree_path_protection.val
+  let aliases = fn(base : String) {
+    tree_name_ascii_fold(name) == "." + base ||
+    (protect_ntfs && tree_name_is_ntfs_dot(name, base)) ||
+    (protect_hfs && tree_name_is_hfs_dot(name, base))
+  }
   for marker in ["git", "bit"] {
-    if tree_name_is_ntfs_dot(name, marker) ||
-      tree_name_is_hfs_dot(name, marker) {
+    if aliases(marker) {
       raise @object.GitError::InvalidObject(
         "tree entry: name aliases '.\{marker}': '\{name}'",
       )
@@ -493,14 +497,38 @@ pub fn verify_tree_entry_name(
   }
   if mode == "120000" {
     for dotfile in ["gitmodules", "gitattributes", "gitignore", "mailmap"] {
-      if tree_name_is_hfs_dot(name, dotfile) ||
-        tree_name_is_ntfs_dot(name, dotfile) {
+      if aliases(dotfile) {
         raise @object.GitError::InvalidObject(
           "tree entry: '.\{dotfile}' is a symbolic link",
         )
       }
     }
   }
+}
+
+///|
+/// (core.protectHFS, core.protectNTFS) as applied by
+/// `verify_tree_entry_name`. Both default to on: git enables protectNTFS
+/// everywhere, and bit also enables the HFS+ checks off macOS because a
+/// clone may later be used from one. The CLI lowers them from repository
+/// config via `set_tree_path_protection`.
+let tree_path_protection : Ref[(Bool, Bool)] = { val: (true, true) }
+
+///|
+/// Set which filesystem-specific `.git` aliases `verify_tree_entry_name`
+/// rejects (git's `core.protectHFS` / `core.protectNTFS`). Plain `.git`
+/// and `.bit`, in any ASCII case, are always rejected.
+pub fn set_tree_path_protection(hfs~ : Bool, ntfs~ : Bool) -> Unit {
+  tree_path_protection.val = (hfs, ntfs)
+}
+
+///|
+fn tree_name_ascii_fold(name : String) -> String {
+  let out = StringBuilder::new()
+  for c in name {
+    out.write_char(Int::unsafe_to_char(tree_name_ascii_lower(c.to_int())))
+  }
+  out.to_string()
 }
 
 ///|

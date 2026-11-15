@@ -61,3 +61,20 @@ test "verify_tree_entry_name: symlinked git dotfiles are rejected" {
     fail("expected an ordinary symlink to be accepted")
   }
 }
+
+///|
+test "verify_tree_entry_name: core.protectHFS/protectNTFS off allow the aliases" {
+  set_tree_path_protection(hfs=false, ntfs=false)
+  defer set_tree_path_protection(hfs=true, ntfs=true)
+  for name in [".g\u{200c}it", "git~1", ".git.", ".git::$INDEX_ALLOCATION"] {
+    if tree_entry_name_rejected(name) {
+      fail("expected '\{name}' to be accepted with protection off")
+    }
+  }
+  // The plain marker names are always rejected.
+  for name in [".git", ".GIT", ".bit"] {
+    if !tree_entry_name_rejected(name) {
+      fail("expected '\{name}' to be rejected")
+    }
+  }
+}

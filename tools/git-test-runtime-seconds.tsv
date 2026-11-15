@@ -585,7 +585,7 @@ t1601-index-bogus.sh	1
 t1700-split-index.sh	3
 t1701-racy-split-index.sh	6
 t1800-hook.sh	1
-t1900-repo.sh	1
+t1900-repo-info.sh	1
 t1901-repo-structure.sh	2
 t2000-conflict-when-checking-files-out.sh	1
 t2002-checkout-cache-u.sh	1
