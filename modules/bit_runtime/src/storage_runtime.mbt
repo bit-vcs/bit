@@ -707,6 +707,14 @@ fn storage_handle_commit(
       "storage runtime commit requires -m/--message",
     )
   }
+  // `-a` stages into what is effectively a temporary index: if the commit
+  // fails, the index is restored (git leaves it untouched).
+  let index_path = git_dir + "/index"
+  let saved_index = if args.all_modified && rfs.is_file(index_path) {
+    Some(rfs.read_file(index_path))
+  } else {
+    None
+  }
   if args.all_modified {
     let all_modified_paths = storage_collect_commit_all_modified_paths(
       rfs, root,
@@ -721,6 +729,12 @@ fn storage_handle_commit(
   let timezone = storage_get_commit_timezone()
   let committer = storage_get_committer_string()
   let committer_timestamp = timestamp
+  errdefer {
+    match saved_index {
+      Some(bytes) => fs.write_file(index_path, bytes) catch { _ => () }
+      None => ()
+    }
+  }
   let commit_id = @bitlib.commit(
     fs,
     rfs,

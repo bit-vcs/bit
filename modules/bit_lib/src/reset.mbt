@@ -51,24 +51,70 @@ pub fn reset(
       let tree_id = reset_resolve_target_tree_id(db, rfs, target)
       let files = collect_tree_files_from_commit(db, rfs, target)
       let entries = tree_files_to_index(db, rfs, files)
-      write_index_entries_with_tree(fs, rfs, actual_git_dir, entries, tree_id)
+      let skip = read_skip_worktree_paths(rfs, actual_git_dir)
+      if skip.length() > 0 {
+        // Sparse: entries that stay keep their skip-worktree bit.
+        let keep : Map[String, Bool] = Map([])
+        for e in entries {
+          if skip.contains(e.path) {
+            keep[e.path] = true
+          }
+        }
+        write_index_entries_with_skip_worktree(fs, actual_git_dir, entries, keep)
+      } else {
+        write_index_entries_with_tree(fs, rfs, actual_git_dir, entries, tree_id)
+      }
       target
     }
     Hard => {
       let db = ObjectDb::load(rfs, object_git_dir)
       let tree_id = reset_resolve_target_tree_id(db, rfs, target)
       let files = collect_tree_files_from_commit(db, rfs, target)
-      write_worktree_from_files(
-        db,
-        fs,
-        rfs,
-        root,
-        actual_git_dir,
-        files,
-        remove_missing=true,
-      )
+      // Sparse: skip-worktree paths that stay tracked keep their bit and
+      // are not materialized (git's reset --hard respects sparsity).
+      let skip = read_skip_worktree_paths(rfs, actual_git_dir)
+      let to_write : Map[String, TreeFileEntry] = Map([])
+      for path, f in files {
+        if !skip.contains(path) {
+          to_write[path] = f
+        }
+      }
+      if skip.length() > 0 {
+        // Keep skipped paths from being "removed" by remove_missing.
+        let keep_paths : Map[String, TreeFileEntry] = to_write.copy()
+        for path, _ in skip {
+          match files.get(path) {
+            Some(f) => keep_paths[path] = f
+            None => ()
+          }
+        }
+        tree_ops_remove_missing_paths(
+          fs, rfs, root, actual_git_dir, keep_paths, false,
+        )
+        write_worktree_from_files(db, fs, rfs, root, actual_git_dir, to_write)
+      } else {
+        write_worktree_from_files(
+          db,
+          fs,
+          rfs,
+          root,
+          actual_git_dir,
+          files,
+          remove_missing=true,
+        )
+      }
       let entries = tree_files_to_index(db, rfs, files)
-      write_index_entries_with_tree(fs, rfs, actual_git_dir, entries, tree_id)
+      if skip.length() > 0 {
+        let keep : Map[String, Bool] = Map([])
+        for e in entries {
+          if skip.contains(e.path) {
+            keep[e.path] = true
+          }
+        }
+        write_index_entries_with_skip_worktree(fs, actual_git_dir, entries, keep)
+      } else {
+        write_index_entries_with_tree(fs, rfs, actual_git_dir, entries, tree_id)
+      }
       target
     }
   }

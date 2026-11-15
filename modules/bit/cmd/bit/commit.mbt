@@ -93,6 +93,32 @@ fn commit_storage_runtime_delegate_args(
 
 ///|
 async fn handle_commit(args : Array[String]) -> Unit raise Error {
+  // git stages `-a` into a temporary index: a commit that fails (e.g.
+  // nothing to commit) leaves the real index untouched.
+  let stages_all = args.iter().any(a => a == "-a" ||
+    a == "--all" ||
+    (a.has_prefix("-") && !a.has_prefix("--") && a.contains("a") && a.length() <= 4))
+  if !stages_all {
+    return handle_commit_inner(args)
+  }
+  let fs = OsFs::new()
+  let index_path = resolve_git_dir(fs, get_work_root()) + "/index"
+  let saved = if fs.is_file(index_path) {
+    Some(fs.read_file(index_path))
+  } else {
+    None
+  }
+  errdefer {
+    match saved {
+      Some(bytes) => fs.write_file(index_path, bytes) catch { _ => () }
+      None => ()
+    }
+  }
+  handle_commit_inner(args)
+}
+
+///|
+async fn handle_commit_inner(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs

@@ -485,7 +485,8 @@ fn tree_ops_remove_missing_paths(
       continue
     }
     let path = join_path(root, entry.path)
-    if rfs.is_file(path) {
+    // lstat: a symlink (even dangling or self-referencing) is removed.
+    if worktree_path_is_symlink(path) || rfs.is_file(path) {
       fs.remove_file(path)
       emptied_candidates.push(parent_dir(path))
     } else if is_gitlink_mode_int(entry.mode) && rfs.is_dir(path) {
