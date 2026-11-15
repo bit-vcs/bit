@@ -26,7 +26,7 @@ test "cat-file: compat sha1 tree raw bytes rewrite entry ids" {
   let root = "/tmp/bit-cat-file-tree-compat-" +
     get_current_timestamp().to_string()
   let fs = cat_file_wbtest_setup_sha256_compat_repo(root)
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   let blob = @utf8.encode("hello\n")
   let storage_blob = @bitcore.hash_object_content_with_algo(
     @bitcore.HashAlgorithm::Sha256,
@@ -64,7 +64,7 @@ test "cat-file: compat sha1 commit raw bytes rewrite tree and parent ids" {
   let root = "/tmp/bit-cat-file-commit-compat-" +
     get_current_timestamp().to_string()
   let fs = cat_file_wbtest_setup_sha256_compat_repo(root)
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   let blob = @utf8.encode("hello\n")
   let storage_blob = @bitcore.hash_object_content_with_algo(
     @bitcore.HashAlgorithm::Sha256,
@@ -144,7 +144,7 @@ test "cat-file: compat sha1 tag raw bytes rewrite object ids" {
   let root = "/tmp/bit-cat-file-tag-compat-" +
     get_current_timestamp().to_string()
   let fs = cat_file_wbtest_setup_sha256_compat_repo(root)
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   let storage_target = @bitcore.ObjectId::from_hex(
     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
   )

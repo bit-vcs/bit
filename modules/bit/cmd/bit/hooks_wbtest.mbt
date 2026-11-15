@@ -16,7 +16,7 @@ test "hooks: is_valid_hook_name validates simple names" {
 test "hooks: list_hooks sorts and filters installed hooks" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hooks-list-" + get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir + "/hooks")
   fs.write_string(git_dir + "/hooks/pre-add", "#!/bin/sh\n")
   fs.write_string(git_dir + "/hooks/post-add", "#!/bin/sh\n")
@@ -51,7 +51,7 @@ test "hooks: list_hooks_with_status merges .git/hooks and .bit/hooks" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hooks-list-status-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir + "/hooks")
   fs.mkdir_p(root + "/.bit/hooks")
   fs.write_string(root + "/.bit/hooks/pre-add", "#!/bin/sh\n")
@@ -91,7 +91,7 @@ test "hooks: list_hooks_with_status merges .git/hooks and .bit/hooks" {
 async test "hooks: set registers available hook and approve/unapprove operate independently" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hooks-flow-" + get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(root)
   fs.mkdir_p(git_dir)
   let source = root + "/source-hook"
@@ -124,7 +124,7 @@ test "hooks: hooks_is_current_checksum_approved monitors sensitive hook modifica
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hooks-sensitive-check-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir + "/hooks")
   fs.mkdir_p(root + "/.bit")
   fs.write_string(git_dir + "/hooks/post-checkout", "#!/bin/sh\necho pre\n")
@@ -160,7 +160,7 @@ async test "hooks: approving sensitive hook writes approved checksum metadata" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hooks-sensitive-approve-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(root)
   fs.mkdir_p(git_dir)
   let source = root + "/source-hook"
@@ -199,7 +199,7 @@ test "hooks: always requiring user approval works for postclone" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hooks-postclone-approve-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir + "/hooks")
   fs.mkdir_p(root + "/.bit")
   fs.write_string(git_dir + "/hooks/postclone", "#!/bin/sh\necho hi\n")
@@ -239,7 +239,7 @@ async test "hooks: approving postinstall still requires approval on every run" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hooks-postinstall-approve-no-persist-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(root)
   fs.mkdir_p(git_dir)
   let source = root + "/source-hook"
@@ -278,7 +278,7 @@ test "hooks: postinstall never becomes auto-approved by checksum" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hooks-postinstall-approve-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir + "/hooks")
   fs.mkdir_p(root + "/.bit")
   fs.write_string(git_dir + "/hooks/postinstall", "#!/bin/sh\necho hi\n")
@@ -306,7 +306,7 @@ test "hooks: read_hook_config returns empty for missing section" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hook-config-empty-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir)
   fs.write_string(
     git_dir + "/config",
@@ -331,7 +331,7 @@ test "hooks: read_hook_config parses multi-command + parallel flag" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hook-config-multi-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir)
   // Match upstream's section name format: `[hook "<name>"]` with the
   // hook name quoted. `command` is multivalued.
@@ -360,7 +360,7 @@ test "hooks: read_hook_config treats parallel=false as default" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hook-config-seq-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir)
   fs.write_string(
     git_dir + "/config",
@@ -399,7 +399,7 @@ test "hooks: read_hook_config skips other hook sections" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hook-config-other-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir)
   fs.write_string(
     git_dir + "/config",

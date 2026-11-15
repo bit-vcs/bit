@@ -304,7 +304,7 @@ async test "commit: amend preserves distinct author and committer dates" {
     err => fail("handle_commit failed: \{err}")
   }
 
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   let head = @bitlib.resolve_head_commit(fs, git_dir).unwrap()
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   let commit_obj = db.get(fs, head).unwrap()
@@ -377,7 +377,7 @@ async test "commit: merge state commit records MERGE_HEAD as second parent" {
     err => fail("handle_commit failed: \{err}")
   }
 
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   let head = @bitlib.resolve_head_commit(fs, git_dir).unwrap()
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   let commit_obj = db.get(fs, head).unwrap()
@@ -429,7 +429,7 @@ async test "commit: -S stores gpgsig header via configured signing program" {
     err => fail("handle_commit failed: \{err}")
   }
 
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   let head = @bitlib.resolve_head_commit(fs, git_dir).unwrap()
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   let commit_obj = db.get(fs, head).unwrap()
@@ -489,7 +489,7 @@ async test "commit: -S stores ssh signature header via ssh signing format" {
     err => fail("handle_commit failed: \{err}")
   }
 
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   let head = @bitlib.resolve_head_commit(fs, git_dir).unwrap()
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   let commit_obj = db.get(fs, head).unwrap()

@@ -2,7 +2,7 @@
 /// Branch handlers: branch, checkout, switch, reset, rebase, stash, cherry-pick
 async fn handle_branch(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = if rfs.is_file(git_dir) {

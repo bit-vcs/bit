@@ -3,7 +3,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let root = get_work_root()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   if rfs.is_file(git_dir) {
     let gitfile = decode_bytes(
       rfs.read_file(git_dir) catch {

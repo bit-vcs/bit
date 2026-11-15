@@ -52,7 +52,7 @@ fn cgraph_setup_sha256_repo(
   fs : OsFs,
   root : String,
 ) -> (String, @bitcore.ObjectId) raise @bitcore.GitError {
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   @bitlib.init_repo_with_options(fs, root, {
     default_branch: "main",
     bare: false,

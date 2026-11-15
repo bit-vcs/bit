@@ -349,7 +349,7 @@ async test "submodule update --init: active filters keep named active unset for 
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   let super_dir = root
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir)
   fs.write_string(
     git_dir + "/config",
@@ -380,7 +380,7 @@ async test "submodule update --init: no global active filters reinitialize all k
   let root = "/tmp/bit-test-submodule-update-init-known-paths-" +
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir)
   fs.write_string(
     git_dir + "/config",

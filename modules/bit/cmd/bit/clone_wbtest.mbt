@@ -305,7 +305,7 @@ test "clone: file URL depth and filter select native transport clone" {
 test "clone: sparse flag initializes cone sparse-checkout metadata" {
   let fs = OsFs::new()
   let root = "/tmp/bit-clone-sparse-" + get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   cleanup_clone_wbtest_tree(fs, root)
   fs.mkdir_p(git_dir)
   fs.write_string(
@@ -334,7 +334,7 @@ async test "clone: run_postclone_hook is no-op when hook is absent" {
   let root = "/tmp/bit-test-postclone-noop-" +
     get_current_timestamp().to_string()
   cleanup_clone_wbtest_tree(fs, root)
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir + "/hooks")
   run_postclone_hook(fs, fs, root, git_dir, false) catch {
     err => fail("unexpected error: \{err}")
@@ -347,7 +347,7 @@ async test "clone: run_postclone_hook remains skipped without hook file even wit
   let fs = OsFs::new()
   let root = "/tmp/bit-test-postclone-skip-with-cache-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   cleanup_clone_wbtest_tree(fs, root)
   fs.mkdir_p(git_dir + "/hooks")
   fs.write_string(git_dir + "/hooks/postclone", "#!/bin/sh\necho executed\n")
@@ -368,7 +368,7 @@ async test "clone: run_postclone_hook skips execution when skip-hooks is enabled
   let fs = OsFs::new()
   let root = "/tmp/bit-test-postclone-skip-hook-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   cleanup_clone_wbtest_tree(fs, root)
   fs.mkdir_p(git_dir + "/hooks")
   fs.write_string(
@@ -389,7 +389,7 @@ test "clone transport tracking: writes origin head and branch config for checked
   let fs = OsFs::new()
   let root = "/tmp/bit-clone-transport-tracking-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   let head_id = @bitcore.ObjectId::from_hex(
     "1111111111111111111111111111111111111111",
   )
@@ -442,7 +442,7 @@ test "clone empty transport: initializes empty repo metadata" {
     err => fail("unexpected error: \{err}")
   }
   assert_true(initialized)
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   @test.assert_eq(
     decode_bytes(fs.read_file(git_dir + "/HEAD")),
     "ref: refs/heads/main\n",

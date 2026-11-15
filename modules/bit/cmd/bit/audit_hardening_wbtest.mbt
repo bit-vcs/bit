@@ -38,7 +38,7 @@ test "hooks: approvals are stored in the git dir, not the worktree" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-hooks-approval-location-" +
     get_current_timestamp().to_string()
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   fs.mkdir_p(git_dir + "/hooks")
   fs.write_string(git_dir + "/hooks/post-checkout", "#!/bin/sh\necho hi\n")
   let rfs : &@bitcore.RepoFileSystem = fs

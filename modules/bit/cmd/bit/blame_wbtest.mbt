@@ -118,7 +118,7 @@ async test "blame: textconv transforms target blob content" {
     "add", ".gitattributes", "textconv.sh", "file.bin",
   ])
   commit_wbtest_run_git(root, ["commit", "-q", "-m", "base"])
-  let git_dir = resolve_git_dir(OsFs::new(), root)
+  let git_dir = root + "/.git"
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
   guard @bitrepo.rev_parse(rfs, git_dir, "HEAD") is Some(head) else {
     assert_true(false)
