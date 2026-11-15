@@ -667,6 +667,8 @@ pub fn upload_pack(&@bit_types.RepoFileSystem, String, UploadPackRequest, git_di
 
 pub fn upload_pack_v2(&@bit_types.RepoFileSystem, String, UploadPackRequestV2, UploadPackConfig, git_dir_override? : String) -> Bytes raise @bit_object.GitError
 
+pub fn verify_worktree_dir_path(String, String) -> Unit raise @bit_object.GitError
+
 pub fn verify_worktree_path(String, String) -> Unit raise @bit_object.GitError
 
 pub fn working_files_cache(String) -> Array[String]?

@@ -323,7 +323,10 @@ fn restore_gitlink_worktree(
 ) -> Unit raise @bit.GitError {
   let full_path = join_path(root, path)
   let worktree_git_path = join_path(full_path, ".git")
-  if rfs.is_file(full_path) {
+  // A symlink left at the gitlink path (from an earlier commit) is replaced,
+  // never followed: following it would create the submodule's `.git` and
+  // checkout inside the link target.
+  if worktree_path_is_symlink(full_path) || rfs.is_file(full_path) {
     fs.remove_file(full_path)
   }
   let has_existing_worktree = rfs.is_file(worktree_git_path) ||
@@ -568,6 +571,22 @@ pub fn verify_worktree_path(
     @bit.verify_tree_entry_name(component.to_owned())
   }
   verify_no_symlink_in_parents(root, rel_path)
+}
+
+///|
+/// Like `verify_worktree_path`, and additionally refuse when `rel_path`
+/// itself is a symlink: for a directory the caller is about to populate
+/// (a submodule worktree), following it would write outside the worktree.
+pub fn verify_worktree_dir_path(
+  root : String,
+  rel_path : String,
+) -> Unit raise @bit.GitError {
+  verify_worktree_path(root, rel_path)
+  if worktree_path_is_symlink(join_path(root, rel_path)) {
+    raise @bit.GitError::InvalidObject(
+      "'\{rel_path}' is a symbolic link",
+    )
+  }
 }
 
 ///|
