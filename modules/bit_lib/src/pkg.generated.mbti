@@ -573,6 +573,8 @@ pub fn rev_parse_parse_config_bool(String) -> Bool?
 
 pub fn rev_parse_parse_parent_suffix(String) -> (String, String)?
 
+pub fn revert(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, String, Int64, mainline? : Int32?, no_commit? : Bool, allow_empty? : Bool) -> CherryPickResult raise @bit_object.GitError
+
 pub fn rewrite_packed_refs(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, (String) -> String?) -> Unit raise @bit_object.GitError
 
 pub fn rewrite_subdir_commit(Bytes, @bit_object.ObjectId, Array[@bit_object.ObjectId]) -> Bytes
@@ -736,6 +738,7 @@ pub struct CherryPickResult {
 pub enum CherryPickStatus {
   Success
   Conflict
+  Empty
 }
 
 pub(all) struct CommitGraphCommitInfo {

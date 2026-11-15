@@ -614,7 +614,10 @@ fn expand_tracked_missing(
   }
   let out : Array[String] = []
   for e in entries {
-    if have.contains(e.path) || skip_worktree.contains(e.path) {
+    // Gitlinks (submodules) are directories, never in `expanded`.
+    if have.contains(e.path) ||
+      skip_worktree.contains(e.path) ||
+      e.mode == 0o160000 {
       continue
     }
     for spec in specs {

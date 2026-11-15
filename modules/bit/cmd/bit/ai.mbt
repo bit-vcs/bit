@@ -967,6 +967,8 @@ async fn handle_ai_cherry_pick(args : Array[String]) -> Unit raise Error {
         }
         None => print_line("Cherry-pick successful")
       }
+    @bitlib.CherryPickStatus::Empty =>
+      print_line("Cherry-pick is empty: \{commit_ref.unwrap()} is already applied")
     @bitlib.CherryPickStatus::Conflict =>
       resolve_cherry_pick_conflict_and_commit(
         fs,

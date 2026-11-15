@@ -604,6 +604,20 @@ async fn add_collect_unmatched_pathspecs(
       visible_folded[folded] = p
     }
   }
+  // Tracked paths absent from the worktree (deleted), except skip-worktree
+  // entries, which a sparse checkout leaves out on purpose.
+  let skip_worktree = @bitlib.read_skip_worktree_paths(fs, git_dir)
+  let tracked_missing : Array[String] = []
+  if !force {
+    for entry in tracked_entries {
+      let normalized = normalize_add_path(entry.path)
+      if !visible_map.contains(normalized) &&
+        !skip_worktree.contains(entry.path) &&
+        entry.mode != 0o160000 {
+        tracked_missing.push(normalized)
+      }
+    }
+  }
   for raw_path in paths {
     let path = add_normalize_input_path(root, raw_path)
     if path.length() == 0 || path == "." {
@@ -948,6 +962,20 @@ async fn expand_add_stage_paths(
       visible_folded[folded] = p
     }
   }
+  // Tracked paths absent from the worktree (deleted), except skip-worktree
+  // entries, which a sparse checkout leaves out on purpose.
+  let skip_worktree = @bitlib.read_skip_worktree_paths(fs, git_dir)
+  let tracked_missing : Array[String] = []
+  if !force {
+    for entry in tracked_entries {
+      let normalized = normalize_add_path(entry.path)
+      if !visible_map.contains(normalized) &&
+        !skip_worktree.contains(entry.path) &&
+        entry.mode != 0o160000 {
+        tracked_missing.push(normalized)
+      }
+    }
+  }
   for raw_path in paths {
     let path = add_normalize_input_path(root, raw_path)
     if path.length() == 0 {
@@ -962,21 +990,38 @@ async fn expand_add_stage_paths(
         add_push_unique_stage_path(seen, out, p)
       }
       add_collect_embedded_repo_paths(fs, root, "", seen, out)
+      // Tracked files deleted from the worktree: stage their removal.
+      for p in tracked_missing {
+        add_push_unique_stage_path(seen, out, p)
+      }
       continue
     }
     let abs = root + "/" + path
+    let prefix = path + "/"
     if fs.is_dir(abs) {
       if add_is_embedded_repo_dir(fs, root, path) {
         add_push_unique_stage_path(seen, out, path)
         continue
       }
-      let prefix = path + "/"
       for p in visible_paths {
         if p.has_prefix(prefix) {
           add_push_unique_stage_path(seen, out, p)
         }
       }
       add_collect_embedded_repo_paths(fs, root, path, seen, out)
+      for p in tracked_missing {
+        if p.has_prefix(prefix) {
+          add_push_unique_stage_path(seen, out, p)
+        }
+      }
+      continue
+    }
+    // A directory deleted from the worktree that the index still tracks.
+    let tracked_under = tracked_missing.filter(p => p.has_prefix(prefix))
+    if !visible_map.contains(path) && tracked_under.length() > 0 {
+      for p in tracked_under {
+        add_push_unique_stage_path(seen, out, p)
+      }
       continue
     }
     if visible_map.get(path) is Some(_) {

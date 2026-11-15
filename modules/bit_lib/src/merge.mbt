@@ -123,67 +123,32 @@ fn merge_fast_forward(
 }
 
 ///|
-pub fn merge(
+/// Outcome of a three-way merge of trees (files keyed by path).
+priv struct MergeThreeWay {
+  merged : Map[String, TreeFileEntry]
+  conflicts : Array[String]
+  conflict_types : Map[String, String]
+  rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)]
+  removed_paths : Array[String]
+}
+
+///|
+/// Three-way merge of `ours` and `theirs` against `base_files`: file-level
+/// resolution, content merges (conflict markers are written to the
+/// worktree), rename and file/directory conflicts. Shared by merge,
+/// cherry-pick and revert, which differ only in which trees they pass.
+fn merge_three_way(
+  db : ObjectDb,
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
-  target : @bit.ObjectId,
-  message : String,
-  author : String,
-  timestamp : Int64,
-  ours_label? : String = "HEAD",
-  theirs_label? : String = "incoming",
-) -> MergeResult raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
-  let head = match resolve_head_commit(rfs, git_dir) {
-    None =>
-      match read_head_ref(rfs, git_dir) {
-        Branch(_) => {
-          merge_fast_forward(fs, rfs, root, git_dir, target)
-          return {
-            status: FastForward,
-            commit_id: Some(target),
-            conflicts: [],
-            conflict_types: Map([]),
-          }
-        }
-        Detached(_) => raise @bit.GitError::InvalidObject("HEAD not found")
-      }
-    Some(id) => id
-  }
-  if head == target {
-    return {
-      status: AlreadyUpToDate,
-      commit_id: Some(head),
-      conflicts: [],
-      conflict_types: Map([]),
-    }
-  }
-  let db = ObjectDb::load(rfs, git_dir)
-  if merge_is_ancestor(db, rfs, head, target) {
-    merge_fast_forward(fs, rfs, root, git_dir, target)
-    return {
-      status: FastForward,
-      commit_id: Some(target),
-      conflicts: [],
-      conflict_types: Map([]),
-    }
-  }
-  if merge_is_ancestor(db, rfs, target, head) {
-    return {
-      status: AlreadyUpToDate,
-      commit_id: Some(head),
-      conflicts: [],
-      conflict_types: Map([]),
-    }
-  }
-  let base = merge_find_base(db, rfs, head, target)
-  let base_files = match base {
-    None => Map([])
-    Some(id) => collect_tree_files_from_commit(db, rfs, id)
-  }
-  let ours = collect_tree_files_from_commit(db, rfs, head)
-  let theirs = collect_tree_files_from_commit(db, rfs, target)
+  git_dir : String,
+  base_files : Map[String, TreeFileEntry],
+  ours : Map[String, TreeFileEntry],
+  theirs : Map[String, TreeFileEntry],
+  ours_label~ : String,
+  theirs_label~ : String,
+) -> MergeThreeWay raise @bit.GitError {
   let file_result = merge_files(base_files, ours, theirs, db, rfs)
   let merged = file_result.merged
   let conflicts = file_result.conflicts
@@ -381,29 +346,141 @@ pub fn merge(
       None => ()
     }
   }
-  if conflicts.length() > 0 {
-    write_worktree_from_files(
-      db,
-      fs,
-      rfs,
-      root,
-      git_dir,
-      merged,
-      remove_missing=false,
-    )
-    // Remove worktree files for paths that were renamed away
-    for path in file_result.removed_paths {
-      let full_path = join_path(root, path)
-      if rfs.is_file(full_path) {
-        fs.remove_file(full_path) catch {
-          _ => ()
-        }
+  {
+    merged,
+    conflicts,
+    conflict_types: all_conflict_types,
+    rename_conflict_stages,
+    removed_paths: file_result.removed_paths,
+  }
+}
+
+///|
+/// Write a conflicted three-way result: merged paths to the worktree (the
+/// conflicting ones already hold markers), renamed-away paths removed, and
+/// stages 1-3 in the index.
+fn merge_write_conflicted(
+  db : ObjectDb,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  base_files : Map[String, TreeFileEntry],
+  ours : Map[String, TreeFileEntry],
+  theirs : Map[String, TreeFileEntry],
+  tw : MergeThreeWay,
+) -> Unit raise @bit.GitError {
+  write_worktree_from_files(
+    db,
+    fs,
+    rfs,
+    root,
+    git_dir,
+    tw.merged,
+    remove_missing=false,
+  )
+  for path in tw.removed_paths {
+    let full_path = join_path(root, path)
+    if rfs.is_file(full_path) {
+      fs.remove_file(full_path) catch {
+        _ => ()
       }
     }
-    let entries = merge_conflicted_index_entries_with_renames(
-      db, rfs, base_files, ours, theirs, merged, conflicts, rename_conflict_stages,
+  }
+  let entries = merge_conflicted_index_entries_with_renames(
+    db,
+    rfs,
+    base_files,
+    ours,
+    theirs,
+    tw.merged,
+    tw.conflicts,
+    tw.rename_conflict_stages,
+  )
+  write_index_stage_entries(fs, git_dir, entries)
+}
+
+///|
+pub fn merge(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  target : @bit.ObjectId,
+  message : String,
+  author : String,
+  timestamp : Int64,
+  ours_label? : String = "HEAD",
+  theirs_label? : String = "incoming",
+) -> MergeResult raise @bit.GitError {
+  let git_dir = join_path(root, ".git")
+  let head = match resolve_head_commit(rfs, git_dir) {
+    None =>
+      match read_head_ref(rfs, git_dir) {
+        Branch(_) => {
+          merge_fast_forward(fs, rfs, root, git_dir, target)
+          return {
+            status: FastForward,
+            commit_id: Some(target),
+            conflicts: [],
+            conflict_types: Map([]),
+          }
+        }
+        Detached(_) => raise @bit.GitError::InvalidObject("HEAD not found")
+      }
+    Some(id) => id
+  }
+  if head == target {
+    return {
+      status: AlreadyUpToDate,
+      commit_id: Some(head),
+      conflicts: [],
+      conflict_types: Map([]),
+    }
+  }
+  let db = ObjectDb::load(rfs, git_dir)
+  if merge_is_ancestor(db, rfs, head, target) {
+    merge_fast_forward(fs, rfs, root, git_dir, target)
+    return {
+      status: FastForward,
+      commit_id: Some(target),
+      conflicts: [],
+      conflict_types: Map([]),
+    }
+  }
+  if merge_is_ancestor(db, rfs, target, head) {
+    return {
+      status: AlreadyUpToDate,
+      commit_id: Some(head),
+      conflicts: [],
+      conflict_types: Map([]),
+    }
+  }
+  let base = merge_find_base(db, rfs, head, target)
+  let base_files = match base {
+    None => Map([])
+    Some(id) => collect_tree_files_from_commit(db, rfs, id)
+  }
+  let ours = collect_tree_files_from_commit(db, rfs, head)
+  let theirs = collect_tree_files_from_commit(db, rfs, target)
+  let tw = merge_three_way(
+    db,
+    fs,
+    rfs,
+    root,
+    git_dir,
+    base_files,
+    ours,
+    theirs,
+    ours_label~,
+    theirs_label~,
+  )
+  let merged = tw.merged
+  let conflicts = tw.conflicts
+  let all_conflict_types = tw.conflict_types
+  if conflicts.length() > 0 {
+    merge_write_conflicted(
+      db, fs, rfs, root, git_dir, base_files, ours, theirs, tw,
     )
-    write_index_stage_entries(fs, git_dir, entries)
     fs.write_string(git_dir + "/MERGE_HEAD", target.to_hex() + "\n")
     fs.write_string(git_dir + "/ORIG_HEAD", head.to_hex() + "\n")
     fs.write_string(git_dir + "/MERGE_MSG", message + "\n")
