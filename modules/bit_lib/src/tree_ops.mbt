@@ -733,6 +733,7 @@ pub fn write_worktree_from_files(
         }
         let output = smudge_for_checkout(data, attrs, autocrlf, core_eol~)
         fs.write_file(full_path, output)
+        tree_ops_apply_entry_mode(fs, full_path, info.mode, o.data)
       }
     }
   }
@@ -839,6 +840,7 @@ pub fn write_worktree_and_build_index(
           }
           let output = smudge_for_checkout(data, attrs, autocrlf, core_eol~)
           fs.write_file(full_path, output)
+        tree_ops_apply_entry_mode(fs, full_path, info.mode, o.data)
         }
         // Get actual mtime from the file we just wrote
         let (mtime_sec, mtime_nsec) = match
@@ -902,5 +904,36 @@ fn collect_tree_files_inner(
         }
       }
     }
+  }
+}
+
+///|
+/// After writing a blob: make a symlink entry a real symlink and give a
+/// regular file its 644/755 mode, where the platform supports it (native);
+/// otherwise the plain file just written stays.
+fn tree_ops_apply_entry_mode(
+  fs : &@bit.FileSystem,
+  full_path : String,
+  mode : Int,
+  data : Bytes,
+) -> Unit {
+  if mode == 0o120000 {
+    let target = @utf8.decode_lossy(data[:])
+    let removed = try {
+      fs.remove_file(full_path)
+      true
+    } catch {
+      _ => false
+    }
+    if removed && !@bitio.worktree_make_symlink(target, full_path) {
+      // Unsupported: put the plain file back.
+      fs.write_file(full_path, data) catch {
+        _ => ()
+      }
+    }
+  } else if mode == 0o100755 {
+    ignore(@bitio.worktree_set_mode(full_path, 0o755))
+  } else if mode == 0o100644 {
+    ignore(@bitio.worktree_set_mode(full_path, 0o644))
   }
 }

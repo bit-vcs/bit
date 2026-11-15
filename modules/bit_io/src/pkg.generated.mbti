@@ -21,11 +21,17 @@ pub fn set_env_provider(EnvProvider) -> Unit
 
 pub fn set_worktree_probe(WorktreeProbeProvider) -> Unit
 
+pub fn set_worktree_writer(WorktreeWriterProvider) -> Unit
+
 pub async fn worktree_entry(&@bit_types.RepoFileSystem, String) -> WorktreeEntry? noraise
 
 pub async fn worktree_entry_meta(&@bit_types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise
 
 pub fn worktree_entry_meta_sync(&@bit_types.RepoFileSystem, String) -> WorktreeEntryMeta?
+
+pub fn worktree_make_symlink(String, String) -> Bool
+
+pub fn worktree_set_mode(String, Int32) -> Bool
 
 // Errors
 
@@ -102,6 +108,12 @@ pub struct WorktreeProbeProvider {
 }
 pub fn WorktreeProbeProvider::new(async (&@bit_types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise, (String) -> String?, entry_meta_sync? : (&@bit_types.RepoFileSystem, String) -> WorktreeEntryMeta?, lstat? : (String) -> WorktreeEntryMeta?, readdir_typed? : (String) -> Array[(String, Int32)]?) -> Self
 pub fn WorktreeProbeProvider::none() -> Self
+
+pub struct WorktreeWriterProvider {
+  make_symlink : (String, String) -> Bool
+  set_mode : (String, Int32) -> Bool
+}
+pub fn WorktreeWriterProvider::new((String, String) -> Bool, (String, Int32) -> Bool) -> Self
 
 // Type aliases
 pub using @bit_types {type HttpResponse}

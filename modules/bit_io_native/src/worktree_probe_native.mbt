@@ -19,7 +19,24 @@ pub fn init_worktree_probe() -> Unit {
     readdir_typed=native_readdir_typed,
   )
   @bitio.set_worktree_probe(provider)
+  @bitio.set_worktree_writer(
+    @bitio.WorktreeWriterProvider::new(
+      fn(target, path) {
+        bit_symlink(native_string_to_cstring(target), native_string_to_cstring(path)) ==
+        0
+      },
+      fn(path, mode) { bit_chmod(native_string_to_cstring(path), mode) == 0 },
+    ),
+  )
 }
+
+///|
+#borrow(target_buf, path_buf)
+extern "c" fn bit_symlink(target_buf : Bytes, path_buf : Bytes) -> Int = "bit_symlink"
+
+///|
+#borrow(path_buf)
+extern "c" fn bit_chmod(path_buf : Bytes, mode : Int) -> Int = "bit_chmod"
 
 ///|
 fn native_lstat_meta(abs_path : String) -> @bitio.WorktreeEntryMeta? {
