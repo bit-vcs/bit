@@ -67,6 +67,7 @@ async fn show_help() -> Unit {
     #|   repo         Run regular bit command without workspace translation
     #|   subdir-clone  Clone subdirectory as independent repository
     #|   hq            ghq-compatible repository management (~/bhq)
+    #|   home          Home Repo: one repo that points agents at many repos
     #|
     #|setup
     #|   completion    Generate shell completion scripts (bash/zsh)
@@ -587,6 +588,12 @@ async fn show_command_help(cmd : String, silent? : Bool = false) -> Bool {
       }
       true
     }
+    "home" => {
+      if !silent {
+        print_home_usage()
+      }
+      true
+    }
     "subdir-clone" => {
       if !silent {
         print_subdir_clone_usage()
@@ -1032,6 +1039,7 @@ fn is_bit_only_command(cmd : String) -> Bool {
     | "workspace"
     | "repo"
     | "hq"
+    | "home"
     | "subdir-clone"
     | "ai"
     | "rebase-ai"
@@ -1404,6 +1412,7 @@ async fn dispatch_known_command(
     "debug" => handle_debug(rest)
     "workspace" => handle_workspace(rest)
     "repo" => handle_repo(rest)
+    "home" => handle_home(rest)
     "hq" => handle_hq(rest)
     "sparse-checkout" => handle_sparse_checkout(rest)
     "rev-parse" => handle_rev_parse(rest)
