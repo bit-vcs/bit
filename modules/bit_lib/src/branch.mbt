@@ -1060,6 +1060,8 @@ pub fn delete_tag(
   git_dir : String,
   name : String,
 ) -> Unit raise @bit.GitError {
+  // Tags are shared refs: the common dir, also from a linked worktree.
+  let git_dir = resolve_common_git_dir(rfs, git_dir)
   let refname = normalize_tag_ref(name)
   let ref_path = join_path(git_dir, refname)
   if rfs.is_file(ref_path) {
@@ -1089,6 +1091,8 @@ pub fn create_lightweight_tag(
   name : String,
   target : @bit.ObjectId,
 ) -> Unit raise @bit.GitError {
+  // Tags are shared refs: the common dir, also from a linked worktree.
+  let git_dir = resolve_common_git_dir(rfs, git_dir)
   let refname = normalize_tag_ref(name)
   validate_tag_ref_path(rfs, git_dir, refname)
   let ref_path = join_path(git_dir, refname)
@@ -1109,6 +1113,8 @@ pub fn create_annotated_tag(
   timestamp : Int64,
   timezone? : String = "+0000",
 ) -> Unit raise @bit.GitError {
+  // Tags are shared refs: the common dir, also from a linked worktree.
+  let git_dir = resolve_common_git_dir(rfs, git_dir)
   let db = ObjectDb::load(rfs, git_dir)
   let target_obj = db.get(rfs, target)
   guard target_obj is Some(obj) else {

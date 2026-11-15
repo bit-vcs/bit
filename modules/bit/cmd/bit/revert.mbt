@@ -50,7 +50,12 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
         " \t\r\n",
       )
       // Reset to ORIG_HEAD
-      ignore(@bitlib.reset(wfs, rfs, root, orig_hex, @bitlib.ResetMode::Hard))
+      @bitlib.reset_merge(
+        wfs,
+        rfs,
+        root,
+        @bitcore.ObjectId::from_hex(orig_hex),
+      )
       wfs.remove_file(orig_head_path) catch {
         _ => ()
       }

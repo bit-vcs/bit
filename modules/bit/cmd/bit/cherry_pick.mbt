@@ -147,7 +147,11 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
       eprint_line("fatal: cherry-pick failed")
       @sys.exit(128)
     }
-    ignore(@bitlib.reset(wfs, rfs, root, "HEAD", @bitlib.ResetMode::Hard))
+    // git: `reset --merge` -- unrelated local edits survive the abort.
+    match @bitlib.resolve_head_commit(rfs, git_dir) {
+      Some(head) => @bitlib.reset_merge(wfs, rfs, root, head)
+      None => ()
+    }
     for name in ["CHERRY_PICK_HEAD", "MERGE_MSG"] {
       wfs.remove_file(git_dir + "/" + name) catch {
         _ => ()

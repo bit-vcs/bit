@@ -110,3 +110,87 @@ fn reset_resolve_common_git_dir(
     normalize_path(join_path(git_dir, rel))
   }
 }
+
+///|
+/// `git reset --merge <target>` as used by cherry-pick / revert --abort:
+/// unmerged paths and paths whose index entry differs from `target` are
+/// reset (index and worktree); every other path, and its unstaged edits,
+/// is left alone. HEAD moves to `target`.
+pub fn reset_merge(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  target : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
+  let marker = join_path(root, ".git")
+  let git_dir = if rfs.is_file(marker) {
+    resolve_gitdir(rfs, marker)
+  } else {
+    marker
+  }
+  let common = resolve_common_git_dir(rfs, git_dir)
+  let db = ObjectDb::load(rfs, common)
+  let target_files = collect_tree_files_from_commit(db, rfs, target)
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let stage0 : Map[String, IndexEntry] = Map([])
+  let unmerged : Map[String, Bool] = Map([])
+  for item in read_index_stage_entries(rfs, git_dir) {
+    if item.stage == 0 {
+      stage0[item.entry.path] = item.entry
+    } else {
+      unmerged[item.entry.path] = true
+    }
+  }
+  let reset_paths : Map[String, Bool] = Map([])
+  for path, _ in unmerged {
+    reset_paths[path] = true
+  }
+  for path, e in stage0 {
+    match target_files.get(path) {
+      Some(t) if t.id == e.id && t.mode == e.mode => ()
+      _ => reset_paths[path] = true
+    }
+  }
+  for path, _ in target_files {
+    if !stage0.contains(path) {
+      reset_paths[path] = true
+    }
+  }
+  let to_write : Map[String, TreeFileEntry] = Map([])
+  let emptied : Array[String] = []
+  for path, _ in reset_paths {
+    match target_files.get(path) {
+      Some(t) => if !skip.contains(path) { to_write[path] = t }
+      None => {
+        let abs = join_path(root, path)
+        if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+          fs.remove_file(abs) catch {
+            _ => ()
+          }
+          emptied.push(parent_dir(abs))
+        }
+      }
+    }
+  }
+  tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
+  write_worktree_from_files(db, fs, rfs, root, git_dir, to_write)
+  // Index: kept entries plus the target's version of every reset path.
+  let out : Array[IndexEntry] = []
+  for path, e in stage0 {
+    if !reset_paths.contains(path) {
+      out.push(e)
+    }
+  }
+  let reset_files : Map[String, TreeFileEntry] = Map([])
+  for path, _ in reset_paths {
+    match target_files.get(path) {
+      Some(t) => reset_files[path] = t
+      None => ()
+    }
+  }
+  for e in tree_files_to_index(db, rfs, reset_files) {
+    out.push(e)
+  }
+  write_index_entries_with_skip_worktree(fs, git_dir, out, skip)
+  update_head_ref(fs, rfs, git_dir, target)
+}

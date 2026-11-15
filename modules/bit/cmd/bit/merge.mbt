@@ -290,7 +290,8 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       let orig_hex = rfs.read_file(orig_head_path)
         |> decode_bytes
         |> trim_string
-      ignore(@bitlib.reset(wfs, rfs, root, orig_hex, @bitlib.ResetMode::Hard))
+      // git: `reset --merge ORIG_HEAD`, keeping unrelated local edits.
+      @bitlib.reset_merge(wfs, rfs, root, @bitcore.ObjectId::from_hex(orig_hex))
       wfs.remove_file(orig_head_path) catch {
         _ => ()
       }

@@ -521,6 +521,8 @@ pub fn repo_hash_algorithm(&@bit_types.RepoFileSystem, String) -> @bit_object.Ha
 
 pub fn reset(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, ResetMode, committer? : String, timestamp? : Int64, timezone? : String) -> @bit_object.ObjectId raise @bit_object.GitError
 
+pub fn reset_merge(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId) -> Unit raise @bit_object.GitError
+
 pub fn resolve_checkout_common_git_dir(&@bit_types.RepoFileSystem, String) -> String
 
 pub fn resolve_common_git_dir(&@bit_types.RepoFileSystem, String) -> String
