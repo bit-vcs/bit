@@ -1839,6 +1839,33 @@ fn worktree_has_local_changes(
   let common_git_dir = resolve_commondir_from_admin(fs, admin_dir)
   let core_filemode = core_filemode_enabled(fs, common_git_dir)
   let db = ObjectDb::load_lazy(fs, common_git_dir)
+  // Staged changes count too (git: anything `git status` would show).
+  let head_files : Map[String, TreeFileEntry] = match
+    resolve_head_commit(fs, admin_dir) {
+    Some(h) => collect_tree_files_from_commit(db, fs, h)
+    None => Map([])
+  }
+  // (Gitlinks are left to the submodule checks.)
+  let mut head_count = 0
+  for _, h in head_files {
+    if !is_gitlink_mode_int(h.mode) {
+      head_count += 1
+    }
+  }
+  let mut index_count = 0
+  for entry in index_entries {
+    if is_gitlink_mode_int(entry.mode) {
+      continue
+    }
+    index_count += 1
+    match head_files.get(entry.path) {
+      Some(h) if h.id == entry.id && h.mode == entry.mode => ()
+      _ => return true
+    }
+  }
+  if head_count != index_count {
+    return true
+  }
   for entry in index_entries {
     tracked_paths.push(entry.path)
     if is_gitlink_mode_int(entry.mode) {

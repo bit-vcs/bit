@@ -151,6 +151,11 @@ async fn apply_symlink(
   path : String,
   target : String,
 ) -> Unit raise @bit.GitError {
+  // Already the right link (e.g. the tree writer created it): keep it.
+  if @bitio.read_symlink_target_path(path) is Some(existing) &&
+    existing == target {
+    return
+  }
   remove_path_if_exists(path)
   @afs.symlink(target~, path) catch {
     err => raise @bit.GitError::IoError(err.to_string())
@@ -176,7 +181,11 @@ async fn apply_file_mode(path : String, mode : Int) -> Unit raise @bit.GitError 
 
 ///|
 async fn remove_path_if_exists(path : String) -> Unit raise @bit.GitError {
-  let exists = @afs.exists(path) catch {
+  // lstat-based: a dangling symlink exists too and must be removed.
+  let exists = try {
+    ignore(@afs.kind(path, follow_symlink=false))
+    true
+  } catch {
     _ => false
   }
   if !exists {

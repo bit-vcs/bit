@@ -106,15 +106,7 @@ pub fn cherry_pick(
     conflicts.sort()
     return { status: CherryPickStatus::Conflict, commit_id: None, conflicts }
   }
-  write_worktree_from_files(
-    db,
-    fs,
-    rfs,
-    root,
-    git_dir,
-    tw.merged,
-    remove_missing=true,
-  )
+  merge_write_changed_paths(db, fs, rfs, root, git_dir, ours, tw.merged)
   let entries = tree_files_to_index(db, rfs, tw.merged)
   write_index_entries(fs, git_dir, entries)
   if no_commit {
@@ -403,15 +395,7 @@ pub fn revert(
     conflicts.sort()
     return { status: CherryPickStatus::Conflict, commit_id: None, conflicts }
   }
-  write_worktree_from_files(
-    db,
-    fs,
-    rfs,
-    root,
-    git_dir,
-    tw.merged,
-    remove_missing=true,
-  )
+  merge_write_changed_paths(db, fs, rfs, root, git_dir, ours, tw.merged)
   let entries = tree_files_to_index(db, rfs, tw.merged)
   write_index_entries(fs, git_dir, entries)
   if no_commit {

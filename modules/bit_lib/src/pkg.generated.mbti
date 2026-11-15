@@ -319,6 +319,8 @@ pub fn merge_base_independent(ObjectDb, &@bit_types.RepoFileSystem, Array[@bit_o
 
 pub fn merge_base_is_ancestor(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, @bit_object.ObjectId) -> Bool raise @bit_object.GitError
 
+pub fn merge_require_clean_index(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId) -> Unit raise @bit_object.GitError
+
 pub fn move_directory(&@bit_types.RepoFileSystem, &@bit_types.FileSystem, String, String) -> Unit
 
 pub fn move_tree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit raise @bit_object.GitError

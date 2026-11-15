@@ -346,10 +346,21 @@ fn checkout_two_way(
   let index_only : Array[String] = []
   let dirty : Array[String] = []
   let untracked : Array[String] = []
+  let removed_untracked : Array[String] = []
   for path, _ in paths {
     let o = old_files.get(path)
     let n = new_files.get(path)
     let i : TreeFileEntry? = index.get(path).map(fn(e) { { id: e.id, mode: e.mode } })
+    // git refuses to delete an untracked file the old tree had (the
+    // index no longer tracks it, so the switch would lose it).
+    if i is None &&
+      o is Some(_) &&
+      n is None &&
+      !skip.contains(path) &&
+      checkout_worktree_entry(rfs, root, path) is Some(_) {
+      removed_untracked.push(path)
+      continue
+    }
     if checkout_entry_eq(o, n) || checkout_entry_eq(i, n) {
       continue
     }
@@ -394,6 +405,14 @@ fn checkout_two_way(
     raise @bit.GitError::InvalidObject(
       "The following untracked working tree files would be overwritten by checkout:\n\t" +
       untracked.join("\n\t") +
+      "\nPlease move or remove them before you switch branches.\nAborting",
+    )
+  }
+  if removed_untracked.length() > 0 {
+    removed_untracked.sort()
+    raise @bit.GitError::InvalidObject(
+      "The following untracked working tree files would be removed by checkout:\n\t" +
+      removed_untracked.join("\n\t") +
       "\nPlease move or remove them before you switch branches.\nAborting",
     )
   }

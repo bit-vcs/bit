@@ -142,9 +142,12 @@ pub async fn stash_push(
   } else {
     index_entries
   }
-  let untracked_tree = if untracked.length() > 0 {
+  // With -u git always records the U commit, even with an empty tree.
+  let untracked_tree = if include_untracked {
     write_index_entries(fs, git_dir, [])
-    add_paths(fs, rfs, root, untracked)
+    if untracked.length() > 0 {
+      add_paths(fs, rfs, root, untracked)
+    }
     let u_entries = read_index_entries(rfs, git_dir)
     Some(write_tree_from_index(fs, rfs, common_dir, u_entries))
   } else {
@@ -1032,7 +1035,13 @@ fn stash_check_local_changes(
   base_files : Map[String, TreeFileEntry],
   theirs : Map[String, TreeFileEntry],
   skip : Map[String, Bool],
+  stash_note? : Bool = true,
 ) -> Unit raise @bit.GitError {
+  let note = if stash_note {
+    "\nThe stash entry is kept in case you need it again."
+  } else {
+    ""
+  }
   let same = fn(a : TreeFileEntry?, b : TreeFileEntry?) {
     match (a, b) {
       (Some(x), Some(y)) => x.id == y.id && x.mode == y.mode
@@ -1082,7 +1091,8 @@ fn stash_check_local_changes(
     raise @bit.GitError::InvalidObject(
       "Your local changes to the following files would be overwritten by merge:\n\t" +
       dirty.join("\n\t") +
-      "\nPlease commit your changes or stash them before you merge.\nAborting\nThe stash entry is kept in case you need it again.",
+      "\nPlease commit your changes or stash them before you merge.\nAborting" +
+      note,
     )
   }
   if untracked.length() > 0 {
@@ -1090,7 +1100,8 @@ fn stash_check_local_changes(
     raise @bit.GitError::InvalidObject(
       "The following untracked working tree files would be overwritten by merge:\n\t" +
       untracked.join("\n\t") +
-      "\nPlease move or remove them before you merge.\nAborting\nThe stash entry is kept in case you need it again.",
+      "\nPlease move or remove them before you merge.\nAborting" +
+      note,
     )
   }
 }

@@ -99,7 +99,9 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     let missing_worktree_paths : Map[String, Bool] = Map([])
     for path in removed_paths {
       let abs_path = root + "/" + path
-      if !fs.is_file(abs_path) && !fs.is_dir(abs_path) {
+      // lstat: a symlink (dangling or not) is present.
+      if @bitio.worktree_entry_meta_sync(fs, abs_path) is None &&
+        !fs.is_dir(abs_path) {
         missing_worktree_paths[path] = true
       }
     }

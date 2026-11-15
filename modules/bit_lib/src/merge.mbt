@@ -17,83 +17,8 @@ pub struct MergeResult {
   conflict_types : Map[String, String]
 }
 
-///|
-priv struct MergePreservedGitlink {
-  path : String
-  backup_path : String
-}
 
-///|
-fn merge_preserve_removed_gitlinks(
-  fs : &@bit.FileSystem,
-  rfs : &@bit.RepoFileSystem,
-  root : String,
-  git_dir : String,
-  files : Map[String, TreeFileEntry],
-) -> Array[MergePreservedGitlink] raise @bit.GitError {
-  let entries = read_index_entries(rfs, git_dir)
-  let preserved : Array[MergePreservedGitlink] = []
-  let backup_root = ".bit-merge-preserve"
-  let mut backup_index = 0
-  for entry in entries {
-    if files.contains(entry.path) || !is_gitlink_mode_int(entry.mode) {
-      continue
-    }
-    let full_path = join_path(root, entry.path)
-    let git_marker = join_path(full_path, ".git")
-    if !rfs.is_dir(full_path) {
-      continue
-    }
-    if !(rfs.is_file(git_marker) || rfs.is_dir(git_marker)) {
-      continue
-    }
-    let backup_path = join_path(backup_root, backup_index.to_string())
-    let backup_abs = join_path(root, backup_path)
-    mv_copy_directory_recursive(fs, rfs, full_path, backup_abs)
-    let backup_gitfile = join_path(backup_abs, ".git")
-    if rfs.is_file(git_marker) && rfs.is_file(backup_gitfile) {
-      mv_rewrite_gitfile_after_directory_move(
-        fs, rfs, full_path, backup_abs, backup_gitfile,
-      )
-    }
-    remove_worktree_path_recursive(fs, rfs, full_path)
-    preserved.push({ path: entry.path, backup_path })
-    backup_index += 1
-  }
-  preserved
-}
 
-///|
-fn merge_restore_preserved_gitlinks(
-  fs : &@bit.FileSystem,
-  rfs : &@bit.RepoFileSystem,
-  root : String,
-  preserved : Array[MergePreservedGitlink],
-) -> Unit raise @bit.GitError {
-  for item in preserved {
-    let full_path = join_path(root, item.path)
-    if rfs.is_dir(full_path) {
-      continue
-    }
-    let backup_abs = join_path(root, item.backup_path)
-    if !rfs.is_dir(backup_abs) {
-      continue
-    }
-    mv_copy_directory_recursive(fs, rfs, backup_abs, full_path)
-    let backup_gitfile = join_path(backup_abs, ".git")
-    let full_gitfile = join_path(full_path, ".git")
-    if rfs.is_file(backup_gitfile) && rfs.is_file(full_gitfile) {
-      mv_rewrite_gitfile_after_directory_move(
-        fs, rfs, backup_abs, full_path, full_gitfile,
-      )
-    }
-    remove_worktree_path_recursive(fs, rfs, backup_abs)
-  }
-  let backup_root = join_path(root, ".bit-merge-preserve")
-  if rfs.is_dir(backup_root) {
-    remove_worktree_path_recursive(fs, rfs, backup_root)
-  }
-}
 
 ///|
 fn merge_fast_forward(
@@ -103,23 +28,11 @@ fn merge_fast_forward(
   git_dir : String,
   target : @bit.ObjectId,
 ) -> Unit raise @bit.GitError {
-  let db = ObjectDb::load(rfs, git_dir)
-  let files = collect_tree_files_from_commit(db, rfs, target)
-  let preserved = merge_preserve_removed_gitlinks(fs, rfs, root, git_dir, files)
-  write_worktree_from_files(
-    db,
-    fs,
-    rfs,
-    root,
-    git_dir,
-    files,
-    remove_missing=true,
-    preserve_removed_gitlinks=true,
-  )
-  let entries = tree_files_to_index(db, rfs, files)
-  write_index_entries(fs, git_dir, entries)
+  // A fast-forward is a two-tree checkout like git's: local changes are
+  // carried over and block it only where the target differs.
+  let object_git_dir = resolve_common_git_dir(rfs, git_dir)
+  checkout_two_way(fs, rfs, root, git_dir, object_git_dir, target)
   update_head_ref(fs, rfs, git_dir, target)
-  merge_restore_preserved_gitlinks(fs, rfs, root, preserved)
 }
 
 ///|
@@ -370,13 +283,21 @@ fn merge_write_conflicted(
   theirs : Map[String, TreeFileEntry],
   tw : MergeThreeWay,
 ) -> Unit raise @bit.GitError {
+  // Only what the merge changes: unstaged edits elsewhere survive.
+  let changed : Map[String, TreeFileEntry] = Map([])
+  for path, f in tw.merged {
+    match ours.get(path) {
+      Some(o) if o.id == f.id && o.mode == f.mode => ()
+      _ => if !tw.conflicts.contains(path) { changed[path] = f }
+    }
+  }
   write_worktree_from_files(
     db,
     fs,
     rfs,
     root,
     git_dir,
-    tw.merged,
+    changed,
     remove_missing=false,
   )
   for path in tw.removed_paths {
@@ -467,6 +388,16 @@ pub fn merge(
   }
   let ours = collect_tree_files_from_commit(db, rfs, head)
   let theirs = collect_tree_files_from_commit(db, rfs, target)
+  merge_check_clean_index(rfs, git_dir, ours)
+  stash_check_local_changes(
+    rfs,
+    root,
+    ours,
+    base_files,
+    theirs,
+    read_skip_worktree_paths(rfs, git_dir),
+    stash_note=false,
+  )
   let tw = merge_three_way(
     db,
     fs,
@@ -497,15 +428,7 @@ pub fn merge(
       conflict_types: all_conflict_types,
     }
   }
-  write_worktree_from_files(
-    db,
-    fs,
-    rfs,
-    root,
-    git_dir,
-    merged,
-    remove_missing=true,
-  )
+  merge_write_changed_paths(db, fs, rfs, root, git_dir, ours, merged)
   let entries = tree_files_to_index(db, rfs, merged)
   write_index_entries(fs, git_dir, entries)
   let tree_id = write_tree_from_index(fs, rfs, git_dir, entries)
@@ -1142,4 +1065,84 @@ fn merge_conflicted_index_entries_with_renames(
     }
   }
   out
+}
+
+///|
+/// Write a clean merge result over the worktree like git: only paths whose
+/// content changes from `ours` are written, and paths `merged` drops are
+/// removed (lstat); unstaged edits on untouched paths survive.
+fn merge_write_changed_paths(
+  db : ObjectDb,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  ours : Map[String, TreeFileEntry],
+  merged : Map[String, TreeFileEntry],
+) -> Unit raise @bit.GitError {
+  let emptied : Array[String] = []
+  for path, o in ours {
+    if merged.contains(path) || is_gitlink_mode_int(o.mode) {
+      continue
+    }
+    let abs = join_path(root, path)
+    if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+      fs.remove_file(abs) catch {
+        _ => ()
+      }
+      emptied.push(parent_dir(abs))
+    }
+  }
+  tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
+  let changed : Map[String, TreeFileEntry] = Map([])
+  for path, f in merged {
+    match ours.get(path) {
+      Some(o) if o.id == f.id && o.mode == f.mode => ()
+      _ => changed[path] = f
+    }
+  }
+  write_worktree_from_files(db, fs, rfs, root, git_dir, changed)
+}
+
+///|
+/// merge-ort refuses to run when the index differs from HEAD at all.
+fn merge_check_clean_index(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  ours : Map[String, TreeFileEntry],
+) -> Unit raise @bit.GitError {
+  let changed : Map[String, Bool] = Map([])
+  let seen : Map[String, Bool] = Map([])
+  for e in read_index_entries(rfs, git_dir) {
+    seen[e.path] = true
+    match ours.get(e.path) {
+      Some(o) if o.id == e.id && o.mode == e.mode => ()
+      _ => changed[e.path] = true
+    }
+  }
+  for path, _ in ours {
+    if !seen.contains(path) {
+      changed[path] = true
+    }
+  }
+  if changed.length() > 0 {
+    let paths = changed.keys().to_array()
+    paths.sort()
+    raise @bit.GitError::InvalidObject(
+      "Your local changes to the following files would be overwritten by merge:\n  " +
+      paths.join(" ") +
+      "\nMerge with strategy ort failed.",
+    )
+  }
+}
+
+///|
+/// Raise git's merge-ort error when the index differs from `head`'s tree.
+pub fn merge_require_clean_index(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  head : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
+  let db = ObjectDb::load_lazy(rfs, resolve_common_git_dir(rfs, git_dir))
+  merge_check_clean_index(rfs, git_dir, collect_tree_files_from_commit(db, rfs, head))
 }
