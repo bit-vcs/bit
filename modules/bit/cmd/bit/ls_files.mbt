@@ -961,7 +961,10 @@ fn validate_submodule_entry(name : String, path : String, url : String) -> Bool 
   }
   for i in 0..<name.length() {
     let c = name.unsafe_get(i).to_int()
-    if c == 0 || c == 0x0A || c == 0x0D || c == 0x5C { // \0 \n \r \\
+    // \0 \n \r \\ and `"`, which would close the quoted
+    // `[submodule "<name>"]` subsection and let the rest of the name
+    // inject sections and keys into .git/config.
+    if c == 0 || c == 0x0A || c == 0x0D || c == 0x5C || c == 0x22 {
       return false
     }
   }

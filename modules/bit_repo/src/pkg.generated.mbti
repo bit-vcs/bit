@@ -33,7 +33,7 @@ pub fn parse_tree(Bytes) -> Array[@bit_object.TreeEntry] raise @bit_object.GitEr
 
 pub fn read_shallow_boundaries(&@bit_types.RepoFileSystem, String) -> Array[@bit_object.ObjectId]
 
-pub fn verify_tree_entry_name(String) -> Unit raise @bit_object.GitError
+pub fn verify_tree_entry_name(String, mode? : String) -> Unit raise @bit_object.GitError
 
 pub fn write_git_metadata(ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String, &@bit_types.RepoFileSystem) -> Unit raise @bit_object.GitError
 

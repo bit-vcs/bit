@@ -283,6 +283,35 @@ fn tree_ops_read_target_gitmodules_content(
 }
 
 ///|
+/// A submodule name is safe to use as `<git_dir>/modules/<name>` and as a
+/// `[submodule "<name>"]` config subsection. Mirrors git's
+/// `check_submodule_name` (non-empty, no `..` component with `/` or `\\`
+/// as separator), and additionally rejects an absolute name and the
+/// characters that would end the quoted config subsection or the line
+/// (`"`, CR, LF, NUL).
+pub fn is_valid_submodule_name(name : String) -> Bool {
+  if name.length() == 0 || name.has_prefix("/") {
+    return false
+  }
+  let mut seg_start = 0
+  for i in 0..<=name.length() {
+    let c = if i < name.length() { name.unsafe_get(i) } else { '/' }
+    if c == '"' || c == '\n' || c == '\r' || c == 0 {
+      return false
+    }
+    if c == '/' || c == '\\' {
+      if i - seg_start == 2 &&
+        name.unsafe_get(seg_start) == '.' &&
+        name.unsafe_get(seg_start + 1) == '.' {
+        return false
+      }
+      seg_start = i + 1
+    }
+  }
+  true
+}
+
+///|
 fn restore_gitlink_worktree(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -305,8 +334,13 @@ fn restore_gitlink_worktree(
     path,
     gitmodules_content~,
   )
-  let modules_dir = join_path(join_path(git_dir, "modules"), submodule_name)
   fs.mkdir_p(full_path)
+  // The name comes from the checked-out `.gitmodules`; an unchecked
+  // `../../x` would make a tracked directory the submodule's git dir.
+  if !is_valid_submodule_name(submodule_name) {
+    return ()
+  }
+  let modules_dir = join_path(join_path(git_dir, "modules"), submodule_name)
   if !rfs.is_dir(modules_dir) {
     return ()
   }
@@ -835,7 +869,7 @@ fn collect_tree_files_inner(
         // Reject names that would let a malicious tree write outside
         // the worktree or into .git. Done here (the bytes→path
         // boundary) so parsing legacy bytes still succeeds.
-        @bit.verify_tree_entry_name(entry.name)
+        @bit.verify_tree_entry_name(entry.name, mode=entry.mode)
         let path = if prefix.length() == 0 {
           entry.name
         } else {

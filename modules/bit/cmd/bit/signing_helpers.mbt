@@ -356,60 +356,80 @@ fn signing_copy_line_range(
 }
 
 ///|
+/// Split a commit into (payload, signature) for verification.
+///
+/// The signature is taken from the first `gpgsig`/`gpgsig-sha256` header
+/// (continuation lines included). The payload drops *every* signature
+/// header, as git does: keeping a second header in the payload would let
+/// a signature over one payload be presented with extra unsigned
+/// headers, or make the stripped payload depend on header order.
 fn signing_extract_commit_signature(data : Bytes) -> (Bytes, String)? {
   let lines = signing_collect_line_ranges(data)
   let mut header_end = lines.length()
-  let mut sig_start = -1
-  let mut sig_end = -1
-  let mut prefix_len = 0
   for i in 0..<lines.length() {
     let line = lines[i]
     if line.1 == line.0 {
       header_end = i
       break
     }
-    if signing_bytes_starts_with(data, line.0, line.1, "gpgsig ") {
-      sig_start = i
-      prefix_len = 7
-      break
-    }
-    if signing_bytes_starts_with(data, line.0, line.1, "gpgsig-sha256 ") {
-      sig_start = i
-      prefix_len = 14
-      break
-    }
   }
-  if sig_start < 0 {
-    return None
-  }
-  sig_end = sig_start + 1
-  while sig_end < header_end {
-    let line = lines[sig_end]
-    if line.1 > line.0 && data[line.0] == b' ' {
-      sig_end += 1
-    } else {
-      break
-    }
-  }
+  let in_signature : Array[Bool] = Array::make(lines.length(), false)
   let signature_lines : Array[String] = []
-  let first_line = lines[sig_start]
-  signature_lines.push(
-    decode_bytes(
-      bytes_from_array(data[first_line.0 + prefix_len:first_line.1].to_array()),
-    ),
-  )
-  for i in (sig_start + 1)..<sig_end {
+  let mut found = false
+  let mut i = 0
+  while i < header_end {
     let line = lines[i]
-    signature_lines.push(
-      decode_bytes(bytes_from_array(data[line.0 + 1:line.1].to_array())),
-    )
-  }
-  let out : Array[Byte] = []
-  for i in 0..<lines.length() {
-    if i >= sig_start && i < sig_end {
+    let prefix_len = if signing_bytes_starts_with(
+        data,
+        line.0,
+        line.1,
+        "gpgsig ",
+      ) {
+      7
+    } else if signing_bytes_starts_with(data, line.0, line.1, "gpgsig-sha256 ") {
+      14
+    } else {
+      0
+    }
+    if prefix_len == 0 {
+      i += 1
       continue
     }
-    signing_copy_line_range(data, out, lines[i])
+    let collect = !found
+    found = true
+    in_signature[i] = true
+    if collect {
+      signature_lines.push(
+        decode_bytes(
+          bytes_from_array(data[line.0 + prefix_len:line.1].to_array()),
+        ),
+      )
+    }
+    i += 1
+    while i < header_end {
+      let cont = lines[i]
+      if cont.1 > cont.0 && data[cont.0] == b' ' {
+        in_signature[i] = true
+        if collect {
+          signature_lines.push(
+            decode_bytes(bytes_from_array(data[cont.0 + 1:cont.1].to_array())),
+          )
+        }
+        i += 1
+      } else {
+        break
+      }
+    }
+  }
+  if !found {
+    return None
+  }
+  let out : Array[Byte] = []
+  for j in 0..<lines.length() {
+    if in_signature[j] {
+      continue
+    }
+    signing_copy_line_range(data, out, lines[j])
   }
   Some(
     (

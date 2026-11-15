@@ -298,7 +298,7 @@ fn write_subdir_tree_to_worktree(
   guard obj is Some(tree_obj) else { return }
   let entries = @bitcore.parse_tree(tree_obj.data) catch { _ => return }
   for entry in entries {
-    @bitcore.verify_tree_entry_name(entry.name)
+    @bitcore.verify_tree_entry_name(entry.name, mode=entry.mode)
     let rel_path = if rel.length() == 0 {
       entry.name
     } else {
