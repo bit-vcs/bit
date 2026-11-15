@@ -1150,3 +1150,19 @@ fn sparse_prune_empty_dirs(
 fn sparse_trim(s : String) -> String {
   @string_utils.trim_string(s)
 }
+
+///|
+/// Keep only `paths` inside the sparse-checkout patterns (all of them when
+/// sparse checkout is off): git's `commit -a` / `add -u` leave tracked
+/// paths outside the cone alone even when they are dirty.
+pub fn filter_paths_in_sparse_checkout(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  paths : Array[String],
+) -> Array[String] {
+  if !is_sparse_checkout_enabled(rfs, git_dir) {
+    return paths
+  }
+  let patterns = read_sparse_patterns(rfs, git_dir) catch { _ => return paths }
+  paths.filter(p => matches_sparse_pattern(p, patterns))
+}

@@ -52,11 +52,23 @@ pub fn reset(
       let files = collect_tree_files_from_commit(db, rfs, target)
       let entries = tree_files_to_index(db, rfs, files)
       let skip = read_skip_worktree_paths(rfs, actual_git_dir)
-      if skip.length() > 0 {
-        // Sparse: entries that stay keep their skip-worktree bit.
+      let sparse = is_sparse_checkout_enabled(rfs, actual_git_dir)
+      if skip.length() > 0 || sparse {
+        // Sparse: entries that stay keep their skip-worktree bit, and an
+        // out-of-cone entry missing from the worktree gets it (git).
+        let patterns = if sparse {
+          read_sparse_patterns(rfs, actual_git_dir)
+        } else {
+          []
+        }
         let keep : Map[String, Bool] = Map([])
         for e in entries {
           if skip.contains(e.path) {
+            keep[e.path] = true
+          } else if sparse &&
+            !matches_sparse_pattern(e.path, patterns) &&
+            @bitio.worktree_entry_meta_sync(rfs, join_path(root, e.path))
+            is None {
             keep[e.path] = true
           }
         }

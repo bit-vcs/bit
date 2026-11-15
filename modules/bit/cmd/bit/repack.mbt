@@ -444,7 +444,10 @@ async fn repack_fallback(
         )
       }
       if all && delete_redundant {
-        let git_dir = root + "/.git"
+        let git_dir = @bitlib.resolve_common_git_dir(
+    OsFs::new(),
+    resolve_git_dir(OsFs::new(), root),
+  )
         let pack_dir = git_dir + "/objects/pack"
         let new_pack_name = "pack-" + info.pack_id.to_hex() + ".pack"
         let entries = fs.readdir(pack_dir) catch { _ => [] }

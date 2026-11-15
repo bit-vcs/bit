@@ -140,7 +140,7 @@ async test "verify: ssh verifier uses commit timestamp for key validity" {
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
 
   let prev_shim_cwd = @env.get_env_var("GIT_SHIM_CWD")
   let prev_shim_pwd = @env.get_env_var("GIT_SHIM_PWD")

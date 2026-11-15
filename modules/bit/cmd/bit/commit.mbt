@@ -449,6 +449,9 @@ async fn handle_commit_inner(args : Array[String]) -> Unit raise Error {
     for p in status.unstaged_deleted {
       paths_to_add.push(p)
     }
+    let paths_to_add = @bitlib.filter_paths_in_sparse_checkout(
+      fs, git_dir, paths_to_add,
+    )
     if paths_to_add.length() > 0 {
       @bitlib.add_paths_async(fs, fs, root, paths_to_add)
     }

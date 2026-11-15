@@ -282,13 +282,8 @@ fn sequencer_check_local_changes(
       (Some(o), Some((id, _))) => if o.id != id { dirty.push(path) }
       // A missing file loses nothing when rewritten or deleted (git).
       (Some(_), None) => ()
-      // An untracked file identical to what would be written is fine.
-      (None, Some((id, is_link))) =>
-        if !(theirs.get(path) is Some(t) &&
-          t.id == id &&
-          (t.mode == 0o120000) == is_link) {
-          untracked.push(path)
-        }
+      // git refuses to overwrite any untracked file, even an identical one.
+      (None, Some(_)) => untracked.push(path)
       (None, None) => ()
     }
   }

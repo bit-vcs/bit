@@ -1,7 +1,7 @@
 ///|
 async fn handle_revert(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   let fs = OsFs::new()
   let mut no_commit = false
   let mut mainline : Int? = None

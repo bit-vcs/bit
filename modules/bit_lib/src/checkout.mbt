@@ -382,8 +382,9 @@ fn checkout_two_way(
           dirty.push(path)
           continue
         }
+      // git refuses to overwrite any untracked file, even an identical one.
       None =>
-        if w is Some(_) && !checkout_entry_eq(w, n) {
+        if w is Some(_) {
           untracked.push(path)
           continue
         }

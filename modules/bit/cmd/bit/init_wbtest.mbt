@@ -80,7 +80,7 @@ async test "init: --object-format sha256 creates SHA-256 repo with valid config"
   @test.assert_eq(recovered.hash_size(), 32)
 
   // Write object to SHA-256 repo and read it back
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   let (write_id, compressed) = @bitobject.create_object_with_algo(
     @bitobject.HashAlgorithm::Sha256,
     @bitcore.ObjectType::Blob,

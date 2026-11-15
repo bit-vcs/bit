@@ -823,7 +823,7 @@ async fn handle_sparse_checkout_at_root(
   args : Array[String],
 ) -> Unit raise Error {
   let fs = OsFs::new()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   let updates = args.length() > 0 &&
     ["init", "set", "add", "reapply", "disable"].contains(args[0])
   let missing_before = if updates {
@@ -842,7 +842,7 @@ async fn handle_sparse_checkout_at_root_inner(
   root : String,
   args : Array[String],
 ) -> Unit raise Error {
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   let fs = OsFs::new()
   if args.length() == 0 {
     raise @bitcore.GitError::InvalidObject(

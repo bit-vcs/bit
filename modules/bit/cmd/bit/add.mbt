@@ -461,9 +461,16 @@ async fn add_collect_update_requested_paths(
   let entries = @bitlib.read_index_entries(fs, git_dir)
   // Like git, `add -u` leaves skip-worktree (sparse) entries alone.
   let skip = @bitlib.read_skip_worktree_paths(fs, git_dir)
+  let sparse_patterns = if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+    @bitlib.read_sparse_patterns(fs, git_dir) catch { _ => [] }
+  } else {
+    []
+  }
   let tracked_paths : Array[String] = []
   for entry in entries {
-    if !skip.contains(entry.path) {
+    if !skip.contains(entry.path) &&
+      (sparse_patterns.length() == 0 ||
+      @bitlib.matches_sparse_pattern(entry.path, sparse_patterns)) {
       tracked_paths.push(entry.path)
     }
   }
@@ -1484,8 +1491,10 @@ fn add_split_outside_sparse(
   for p in paths {
     if !tracked.contains(p) && !@bitlib.matches_sparse_pattern(p, patterns) {
       outside.push(p)
-    } else if skip.contains(p) {
-      // A skip-worktree entry is never updated; naming it is an error.
+    } else if skip.contains(p) ||
+      (tracked.contains(p) && !@bitlib.matches_sparse_pattern(p, patterns)) {
+      // A skip-worktree or out-of-cone entry is never updated; naming it
+      // explicitly is an error (git's path_in_sparse_checkout).
       if explicit.contains(p) {
         outside.push(p)
       }

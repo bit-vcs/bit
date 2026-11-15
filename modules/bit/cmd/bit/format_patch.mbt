@@ -236,7 +236,7 @@ fn format_patch_concat(parts : Array[String]) -> String {
 ///|
 async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   let fs = OsFs::new()
   let wfs : &@bitcore.FileSystem = fs
   let rfs : &@bitcore.RepoFileSystem = fs

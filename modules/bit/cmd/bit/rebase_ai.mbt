@@ -184,7 +184,7 @@ fn rebase_ai_options(parsed : RebaseAiArgs) -> @rebase_ai.AiRebaseOptions {
 ///|
 async fn handle_rebase_ai(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   let fs = OsFs::new()
   let wfs : &@bitcore.FileSystem = fs
   let rfs : &@bitcore.RepoFileSystem = fs

@@ -716,8 +716,10 @@ fn storage_handle_commit(
     None
   }
   if args.all_modified {
-    let all_modified_paths = storage_collect_commit_all_modified_paths(
-      rfs, root,
+    let all_modified_paths = @bitlib.filter_paths_in_sparse_checkout(
+      rfs,
+      git_dir,
+      storage_collect_commit_all_modified_paths(rfs, root),
     )
     if all_modified_paths.length() > 0 {
       @bitlib.add_paths(fs, rfs, root, all_modified_paths)

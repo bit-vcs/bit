@@ -155,6 +155,8 @@ pub fn expand_sparse_skip_worktree_paths(&@bit_types.RepoFileSystem, String, Arr
 
 pub async fn fast_forward_to(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, run_filter_cmd? : FilterCmd) -> Unit raise @bit_object.GitError
 
+pub fn filter_paths_in_sparse_checkout(&@bit_types.RepoFileSystem, String, Array[String]) -> Array[String]
+
 pub fn find_tree_entry(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String) -> @bit_object.TreeEntry? raise @bit_object.GitError
 
 pub fn format_remove_warning(Array[String]) -> String

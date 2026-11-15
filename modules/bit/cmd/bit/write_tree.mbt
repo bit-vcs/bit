@@ -27,7 +27,7 @@ fn write_tree_should_use_storage_runtime(args : Array[String]) -> Bool {
 ///|
 async fn handle_write_tree(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   if write_tree_repo_requires_standalone_error(rfs, git_dir) {

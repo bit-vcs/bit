@@ -109,7 +109,7 @@ async test "bisect: compute_next finds first bad commit" {
     commit_wbtest_run_git(root, ["commit", "-q", "-m", "commit \{i}"])
     commit_ids.push(bisect_wbtest_git_stdout(root, ["rev-parse", "HEAD"]))
   }
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   // Set up bisect state directly
   bisect_wbtest_setup_session(wfs, rfs, git_dir, commit_ids[4], [commit_ids[0]])
   assert_true(rfs.is_file(git_dir + "/BISECT_START"))
@@ -145,7 +145,7 @@ async test "bisect: run with injectable command finds first bad" {
     commit_wbtest_run_git(root, ["commit", "-q", "-m", "commit \{i}"])
     commit_ids.push(bisect_wbtest_git_stdout(root, ["rev-parse", "HEAD"]))
   }
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   // Set up bisect state directly (bad=HEAD, good=commit1)
   bisect_wbtest_setup_session(wfs, rfs, git_dir, commit_ids[9], [commit_ids[0]])
   // Track tested commits
@@ -205,7 +205,7 @@ async test "bisect: replay restores state from log" {
     commit_wbtest_run_git(root, ["commit", "-q", "-m", "commit \{i}"])
     commit_ids.push(bisect_wbtest_git_stdout(root, ["rev-parse", "HEAD"]))
   }
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   // Create a log file to replay
   let log_content = "git bisect start\ngit bisect bad \{commit_ids[4]}\ngit bisect good \{commit_ids[0]}\n"
   let log_file = root + "/bisect-log.txt"
@@ -243,7 +243,7 @@ async test "bisect: terms file contains bad and good" {
   fs.write_string(root + "/file.txt", "init\n")
   commit_wbtest_run_git(root, ["add", "file.txt"])
   commit_wbtest_run_git(root, ["commit", "-q", "-m", "initial"])
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   let cid = bisect_wbtest_git_stdout(root, ["rev-parse", "HEAD"])
   bisect_wbtest_setup_session(wfs, rfs, git_dir, cid, [])
   assert_true(rfs.is_file(git_dir + "/BISECT_TERMS"))
