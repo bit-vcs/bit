@@ -83,6 +83,8 @@ pub fn checkout(
   detach? : Bool = false,
   update_worktree? : Bool = true,
   update_index? : Bool = true,
+  keep_local_changes? : Bool = false,
+  updated_paths? : Array[String],
 ) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -154,6 +156,27 @@ pub fn checkout(
     None => raise @bit.GitError::InvalidObject("Invalid ref: \{spec}")
     Some(id) => id
   }
+  if keep_local_changes && update_worktree && update_index {
+    // git's two-tree checkout: only paths that differ between the old and
+    // new commits are touched; local changes elsewhere carry over, and a
+    // change that would be lost aborts the checkout before anything
+    // (HEAD included) is written.
+    checkout_two_way(
+      fs,
+      rfs,
+      root,
+      actual_git_dir,
+      object_git_dir,
+      commit_id,
+      updated_paths?,
+    )
+    if refname is Some(name) {
+      fs.write_string(head_path, "ref: \{name}\n")
+    } else {
+      fs.write_string(head_path, commit_id.to_hex() + "\n")
+    }
+    return commit_id
+  }
   if refname is Some(name) {
     fs.write_string(head_path, "ref: \{name}\n")
   } else {
@@ -213,5 +236,202 @@ pub fn resolve_checkout_common_git_dir(
     normalize_path(rel)
   } else {
     normalize_path(join_path(git_dir, rel))
+  }
+}
+
+///|
+fn checkout_entry_eq(a : TreeFileEntry?, b : TreeFileEntry?) -> Bool {
+  match (a, b) {
+    (None, None) => true
+    (Some(x), Some(y)) => x.id == y.id && x.mode == y.mode
+    _ => false
+  }
+}
+
+///|
+/// The worktree file at `path` as a (blob id, mode) pair, read without
+/// following a symlink; None when absent (or a directory).
+fn checkout_worktree_entry(
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  path : String,
+) -> TreeFileEntry? {
+  let abs = join_path(root, path)
+  match @bitio.worktree_entry_meta_sync(rfs, abs) {
+    Some(info) =>
+      match info.kind {
+        @bitio.WorktreeKindMeta::Symlink =>
+          @bitio.read_symlink_target_path(abs).map(fn(t) {
+            { id: @bit.hash_blob(@utf8.encode(t)), mode: 0o120000 }
+          })
+        @bitio.WorktreeKindMeta::Regular => {
+          let data = rfs.read_file(abs) catch { _ => return None }
+          Some({ id: @bit.hash_blob(data), mode: info.mode })
+        }
+      }
+    None =>
+      if rfs.is_file(abs) {
+        let data = rfs.read_file(abs) catch { _ => return None }
+        Some({ id: @bit.hash_blob(data), mode: 0o100644 })
+      } else {
+        None
+      }
+  }
+}
+
+///|
+fn checkout_two_way(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  object_git_dir : String,
+  target : @bit.ObjectId,
+  updated_paths? : Array[String],
+) -> Unit raise @bit.GitError {
+  if read_unmerged_paths(rfs, git_dir).length() > 0 {
+    raise @bit.GitError::InvalidObject(
+      "you need to resolve your current index first",
+    )
+  }
+  let db = ObjectDb::load_lazy(rfs, object_git_dir)
+  db.set_skip_verify(true)
+  let old_files : Map[String, TreeFileEntry] = match
+    resolve_head_commit(rfs, git_dir) {
+    Some(h) => collect_tree_files_from_commit(db, rfs, h)
+    None => Map([])
+  }
+  let new_files = collect_tree_files_from_commit(db, rfs, target)
+  let entries = read_index_entries(rfs, git_dir)
+  let index : Map[String, IndexEntry] = Map([])
+  for e in entries {
+    index[e.path] = e
+  }
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let paths : Map[String, Bool] = Map([])
+  for p, _ in old_files {
+    paths[p] = true
+  }
+  for p, _ in new_files {
+    paths[p] = true
+  }
+  for p, _ in index {
+    paths[p] = true
+  }
+  let to_write : Map[String, TreeFileEntry] = Map([])
+  let to_delete : Array[String] = []
+  let index_only : Array[String] = []
+  let dirty : Array[String] = []
+  let untracked : Array[String] = []
+  for path, _ in paths {
+    let o = old_files.get(path)
+    let n = new_files.get(path)
+    let i : TreeFileEntry? = index.get(path).map(fn(e) { { id: e.id, mode: e.mode } })
+    if checkout_entry_eq(o, n) || checkout_entry_eq(i, n) {
+      continue
+    }
+    if !checkout_entry_eq(i, o) {
+      // A staged change that the switch would discard.
+      dirty.push(path)
+      continue
+    }
+    if skip.contains(path) || (n is Some(e) && is_gitlink_mode_int(e.mode)) ||
+      (o is Some(e) && is_gitlink_mode_int(e.mode)) {
+      index_only.push(path)
+      continue
+    }
+    let w = checkout_worktree_entry(rfs, root, path)
+    match i {
+      Some(_) =>
+        if !checkout_entry_eq(w, i) {
+          dirty.push(path)
+          continue
+        }
+      None =>
+        if w is Some(_) && !checkout_entry_eq(w, n) {
+          untracked.push(path)
+          continue
+        }
+    }
+    match n {
+      Some(e) => to_write[path] = e
+      None => to_delete.push(path)
+    }
+  }
+  if dirty.length() > 0 {
+    dirty.sort()
+    raise @bit.GitError::InvalidObject(
+      "Your local changes to the following files would be overwritten by checkout:\n\t" +
+      dirty.join("\n\t") +
+      "\nPlease commit your changes or stash them before you switch branches.\nAborting",
+    )
+  }
+  if untracked.length() > 0 {
+    untracked.sort()
+    raise @bit.GitError::InvalidObject(
+      "The following untracked working tree files would be overwritten by checkout:\n\t" +
+      untracked.join("\n\t") +
+      "\nPlease move or remove them before you switch branches.\nAborting",
+    )
+  }
+  // Apply: deletions first (a file may become a directory), then writes.
+  to_delete.sort()
+  for path in to_delete {
+    let abs = join_path(root, path)
+    if worktree_path_is_symlink(abs) || rfs.is_file(abs) {
+      fs.remove_file(abs) catch {
+        _ => ()
+      }
+    }
+    // Remove directories the deletion left empty, like git.
+    let mut dir = parent_dir(abs)
+    while dir.length() > root.length() && dir.has_prefix(root) {
+      let children = rfs.readdir(dir) catch { _ => break }
+      if children.length() > 0 {
+        break
+      }
+      fs.remove_dir(dir) catch {
+        _ => break
+      }
+      dir = parent_dir(dir)
+    }
+    index.remove(path)
+  }
+  if to_write.length() > 0 {
+    write_worktree_from_files(
+      db,
+      fs,
+      rfs,
+      root,
+      git_dir,
+      to_write,
+      remove_missing=false,
+    )
+    for e in tree_files_to_index(db, rfs, to_write) {
+      index[e.path] = e
+    }
+  }
+  for path in index_only {
+    match new_files.get(path) {
+      Some(e) => {
+        let entry = IndexEntry::new(path, e.id, e.mode, 0)
+        index[path] = entry
+      }
+      None => index.remove(path)
+    }
+  }
+  write_index_entries_preserving_cache_tree(
+    fs,
+    rfs,
+    git_dir,
+    index.values().to_array(),
+  )
+  if updated_paths is Some(out) {
+    for p, _ in to_write {
+      out.push(p)
+    }
+    for p in to_delete {
+      out.push(p)
+    }
   }
 }

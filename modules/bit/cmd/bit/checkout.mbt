@@ -636,12 +636,17 @@ async fn checkout_with_promisor_retry(
   }
   let mut attempts = 0
   while attempts < 16 {
+    // The user-facing checkout/switch keeps local changes (two-tree
+    // checkout) and only re-applies modes to the paths it wrote.
+    let updated : Array[String] = []
     let id = run_checkout_with_sensitive_hooks(
       fs,
       fs,
       root,
       checkout_spec,
       detach=checkout_detach,
+      keep_local_changes=true,
+      updated_paths=updated,
     ) catch {
       err => {
         match parse_checkout_missing_object_id(err) {
@@ -675,7 +680,9 @@ async fn checkout_with_promisor_retry(
     if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
       @bitlib.sparse_checkout_reapply(fs, fs, root)
     }
-    @bitlibnative.apply_worktree_modes_from_commit(fs, fs, root, git_dir, id) catch {
+    @bitlibnative.apply_worktree_modes_for_paths(
+      fs, fs, root, git_dir, id, updated,
+    ) catch {
       _ => ()
     }
     return id

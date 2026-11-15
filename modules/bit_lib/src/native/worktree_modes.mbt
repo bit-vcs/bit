@@ -228,3 +228,30 @@ fn worktree_modes_join_path(root : String, path : String) -> String {
     root + "/" + path
   }
 }
+
+///|
+/// Like `apply_worktree_modes_from_commit`, restricted to `paths` (the ones
+/// a checkout actually wrote): files it left alone keep their local mode,
+/// and a symlink the user deleted is not recreated.
+pub async fn apply_worktree_modes_for_paths(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  commit_id : @bit.ObjectId,
+  paths : Array[String],
+) -> Unit raise @bit.GitError {
+  if paths.length() == 0 {
+    return
+  }
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let all = @bitlib.collect_tree_files_from_commit(db, rfs, commit_id)
+  let files : Map[String, @bitlib.TreeFileEntry] = Map([])
+  for p in paths {
+    match all.get(p) {
+      Some(e) => files[p] = e
+      None => ()
+    }
+  }
+  apply_worktree_modes_from_files(db, rfs, fs, root, git_dir, files)
+}

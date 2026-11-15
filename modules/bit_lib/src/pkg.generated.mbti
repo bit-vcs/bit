@@ -45,7 +45,7 @@ pub fn check_shorthand_ambiguity(String, (String) -> Bool) -> String?
 
 pub fn check_unsupported_gitattributes(&@bit_types.RepoFileSystem, String) -> String?
 
-pub fn checkout(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, detach? : Bool, update_worktree? : Bool, update_index? : Bool) -> @bit_object.ObjectId raise @bit_object.GitError
+pub fn checkout(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, detach? : Bool, update_worktree? : Bool, update_index? : Bool, keep_local_changes? : Bool, updated_paths? : Array[String]) -> @bit_object.ObjectId raise @bit_object.GitError
 
 pub fn cherry_pick(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, String, Int64, allow_empty? : Bool, no_commit? : Bool, message_suffix? : String, signoff_committer? : String) -> CherryPickResult raise @bit_object.GitError
 
