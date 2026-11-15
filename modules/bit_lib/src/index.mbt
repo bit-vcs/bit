@@ -949,9 +949,9 @@ fn index_build_cache_tree_from_entries(
     compare_strings_lexicographic(a_key, b_key)
   })
   subtrees.sort_by(fn(a, b) { compare_strings_lexicographic(a.name, b.name) })
-  let (tree_id, tree_data) = @bit.create_tree(file_entries)
+  let (tree_id, tree_compressed) = @bit.create_tree(file_entries)
   if trees is Some(out) {
-    out.push((tree_id, tree_data))
+    out.push((tree_id, tree_compressed))
   }
   { name, entry_count, oid: Some(tree_id), subtrees }
 }
@@ -994,12 +994,8 @@ fn index_store_missing_trees(
     if present {
       continue
     }
-    let written = write_loose_object(wfs, git_dir, @bit.ObjectType::Tree, data)
-    if written != id {
-      raise @bit.GitError::InvalidObject(
-        "cache-tree: tree id mismatch for \{id.to_hex()}",
-      )
-    }
+    // `data` is the compressed object `create_tree` produced for `id`.
+    write_object_bytes(wfs, git_dir, id, data)
   }
 }
 
