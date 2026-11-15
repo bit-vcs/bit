@@ -259,7 +259,12 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     requested_stage_paths
   }
   let (stage_paths, outside_sparse) = if sparse_enabled && !allow_sparse {
-    add_split_outside_sparse(fs, git_dir, stage_paths)
+    add_split_outside_sparse(
+      fs,
+      git_dir,
+      stage_paths,
+      explicit=paths.map(p => add_normalize_input_path(root, p)),
+    )
   } else {
     (stage_paths, [])
   }
@@ -454,9 +459,13 @@ async fn add_collect_update_requested_paths(
 ) -> Array[String] raise Error {
   let git_dir = resolve_git_dir(fs, root)
   let entries = @bitlib.read_index_entries(fs, git_dir)
+  // Like git, `add -u` leaves skip-worktree (sparse) entries alone.
+  let skip = @bitlib.read_skip_worktree_paths(fs, git_dir)
   let tracked_paths : Array[String] = []
   for entry in entries {
-    tracked_paths.push(entry.path)
+    if !skip.contains(entry.path) {
+      tracked_paths.push(entry.path)
+    }
   }
   if raw_paths.length() == 0 {
     return tracked_paths
@@ -1459,7 +1468,9 @@ fn add_split_outside_sparse(
   fs : OsFs,
   git_dir : String,
   paths : Array[String],
+  explicit? : Array[String] = [],
 ) -> (Array[String], Array[String]) {
+  let skip = @bitlib.read_skip_worktree_paths(fs, git_dir)
   let patterns = @bitlib.read_sparse_patterns(fs, git_dir) catch {
     _ => return (paths, [])
   }
@@ -1473,6 +1484,11 @@ fn add_split_outside_sparse(
   for p in paths {
     if !tracked.contains(p) && !@bitlib.matches_sparse_pattern(p, patterns) {
       outside.push(p)
+    } else if skip.contains(p) {
+      // A skip-worktree entry is never updated; naming it is an error.
+      if explicit.contains(p) {
+        outside.push(p)
+      }
     } else {
       kept.push(p)
     }
