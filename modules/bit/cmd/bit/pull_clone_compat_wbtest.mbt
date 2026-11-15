@@ -11,10 +11,17 @@ async fn pcc_wbtest_bit(
   if !fs.is_file(bit_exe) {
     fail("bit.exe not found at \{bit_exe}; build it first")
   }
+  // bit resolves its working directory from PWD / GIT_SHIM_CWD before the
+  // process cwd, so pin all of them (and pass -C) to `cwd`.
+  let full_args = ["-C", cwd]
+  for a in args {
+    full_args.push(a)
+  }
   let result = @process.run(
     bit_exe,
-    args[:],
+    full_args[:],
     inherit_env=true,
+    extra_env={ "PWD": cwd, "GIT_SHIM_CWD": cwd, "GIT_SHIM_PWD": cwd },
     cwd~,
     stdout=Collect,
     stderr=Collect,
