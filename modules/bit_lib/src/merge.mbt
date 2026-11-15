@@ -70,6 +70,17 @@ fn merge_three_way(
   )
   // Try content-level merge for files modified on both sides
   for candidate in file_result.needs_content_merge {
+    // Trivial resolutions first, byte for byte (e.g. one side only
+    // renamed the file): no text round-trip at all.
+    if candidate.ours_id == candidate.theirs_id ||
+      candidate.base_id == Some(candidate.theirs_id) {
+      merged[candidate.path] = { id: candidate.ours_id, mode: candidate.mode }
+      continue
+    }
+    if candidate.base_id == Some(candidate.ours_id) {
+      merged[candidate.path] = { id: candidate.theirs_id, mode: candidate.mode }
+      continue
+    }
     let base_content = match candidate.base_id {
       Some(id) => merge_get_blob_text(db, rfs, id)
       None => ""
@@ -79,8 +90,17 @@ fn merge_three_way(
     // Skip binary files
     let ours_data = merge_get_blob_data(db, rfs, candidate.ours_id)
     let theirs_data = merge_get_blob_data(db, rfs, candidate.theirs_id)
+    // Content that is not valid UTF-8 cannot go through the text merge
+    // without being mangled: treat it like binary (a conflict).
+    let base_data = match candidate.base_id {
+      Some(id) => merge_get_blob_data(db, rfs, id)
+      None => Bytes::new(0)
+    }
     if @diff3.is_binary_content(ours_data) ||
-      @diff3.is_binary_content(theirs_data) {
+      @diff3.is_binary_content(theirs_data) ||
+      !merge_is_valid_utf8(ours_data) ||
+      !merge_is_valid_utf8(theirs_data) ||
+      !merge_is_valid_utf8(base_data) {
       conflicts.push(candidate.path)
       if !all_conflict_types.contains(candidate.path) {
         all_conflict_types[candidate.path] = "content"
@@ -998,7 +1018,17 @@ fn merge_resolve_rename_content(
         return Some((ours_id, ours_entry.unwrap().mode))
       }
   }
-  // Both modified - content merge
+  // Both modified - content merge (text only: anything that is not valid
+  // UTF-8 would be mangled, so leave it unresolved).
+  let base_bytes = match base_id {
+    Some(id) => merge_get_blob_data(db, rfs, id)
+    None => Bytes::new(0)
+  }
+  if !merge_is_valid_utf8(base_bytes) ||
+    !merge_is_valid_utf8(merge_get_blob_data(db, rfs, ours_id)) ||
+    !merge_is_valid_utf8(merge_get_blob_data(db, rfs, theirs_id)) {
+    return None
+  }
   let base_content = match base_id {
     Some(id) => merge_get_blob_text(db, rfs, id)
     None => ""
@@ -1194,4 +1224,11 @@ pub fn merge_require_clean_index(
 ) -> Unit raise @bit.GitError {
   let db = ObjectDb::load_lazy(rfs, resolve_common_git_dir(rfs, git_dir))
   merge_check_clean_index(rfs, git_dir, collect_tree_files_from_commit(db, rfs, head))
+}
+
+///|
+/// Whether `data` is valid UTF-8 (so the text merge round-trips it).
+fn merge_is_valid_utf8(data : Bytes) -> Bool {
+  let text = @utf8.decode(data[:]) catch { _ => return false }
+  @utf8.encode(text) == data
 }
