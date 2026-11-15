@@ -183,6 +183,8 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
       if !parent_files.contains(path) {
         // File was added in commit, remove it
         let abs_path = root + "/" + path
+        // Never follow a symlinked parent out of the worktree.
+        @bitlib.verify_worktree_path(root, path)
         if rfs.is_file(abs_path) {
           wfs.remove_file(abs_path)
         }
@@ -196,16 +198,8 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
         // File was deleted in commit, restore it
         let blob_obj = db.get(rfs, entry.id)
         guard blob_obj is Some(bo) else { continue }
-        let abs_path = root + "/" + path
-        // Ensure parent dir exists
-        match abs_path.rev_find("/") {
-          Some(idx) => {
-            let parent = String::unsafe_substring(abs_path, start=0, end=idx)
-            wfs.mkdir_p(parent)
-          }
-          None => ()
-        }
-        wfs.write_file(abs_path, bo.data)
+        // Restore as checkout would: no writing through symlinks.
+        @bitlib.write_worktree_file_safely(wfs, rfs, root, path, bo.data)
         // Add to index
         @bitlib.add_paths_async(wfs, rfs, root, [path])
       }
@@ -231,7 +225,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
             // Restore parent version
             let blob_obj = db.get(rfs, parent_entry.id)
             guard blob_obj is Some(bo) else { continue }
-            wfs.write_file(abs_path, bo.data)
+            @bitlib.write_worktree_file_safely(wfs, rfs, root, path, bo.data)
             @bitlib.add_paths_async(wfs, rfs, root, [path])
           }
         None => ()

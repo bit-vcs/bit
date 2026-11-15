@@ -123,6 +123,7 @@ options(
     "check_ref_format.mbt": [ "native" ],
     "checkout.mbt": [ "native" ],
     "checkout_index.mbt": [ "native" ],
+    "checkout_symlink_wbtest.mbt": [ "native" ],
     "checkout_wbtest.mbt": [ "native" ],
     "cherry.mbt": [ "native" ],
     "cherry_pick.mbt": [ "native" ],

@@ -282,31 +282,40 @@ async fn handle_subdir_merge(
 }
 
 ///|
+/// Write `tree_id` into the worktree at `rel` below `root`. Entries go
+/// through `write_worktree_file_safely`, so an upstream tree cannot use
+/// `.git`/`..` names or symlinks to write outside the worktree.
 fn write_subdir_tree_to_worktree(
   db : @bitlib.ObjectDb,
   fs : OsFs,
   tree_id : @bitcore.ObjectId,
-  dir : String,
+  root : String,
+  rel? : String = "",
 ) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   let obj = db.get(rfs, tree_id)
   guard obj is Some(tree_obj) else { return }
   let entries = @bitcore.parse_tree(tree_obj.data) catch { _ => return }
   for entry in entries {
-    let path = dir + "/" + entry.name
+    @bitcore.verify_tree_entry_name(entry.name)
+    let rel_path = if rel.length() == 0 {
+      entry.name
+    } else {
+      rel + "/" + entry.name
+    }
     if entry.mode == "40000" || entry.mode == "040000" {
-      fs.mkdir_p(path) catch {
+      @bitlib.verify_worktree_path(root, rel_path)
+      fs.mkdir_p(root + "/" + rel_path) catch {
         _ => ()
       }
-      write_subdir_tree_to_worktree(db, fs, entry.id, path) catch {
+      write_subdir_tree_to_worktree(db, fs, entry.id, root, rel=rel_path) catch {
         _ => ()
       }
     } else {
       let blob_obj = db.get(rfs, entry.id)
       guard blob_obj is Some(blob) else { continue }
-      fs.write_file(path, blob.data) catch {
-        _ => ()
-      }
+      @bitlib.write_worktree_file_safely(wfs, rfs, root, rel_path, blob.data)
     }
   }
 }

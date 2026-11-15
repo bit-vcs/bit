@@ -66,11 +66,30 @@ fn detect_case_insensitive_collision_skips(
 }
 
 ///|
+/// Whether `path` itself (not what it points to) is a symbolic link.
+/// `is_file` / `is_dir` follow links, so a worktree symlink must be detected
+/// with lstat before it is written over or removed. On targets without lstat
+/// (JS, in-memory filesystems) there are no symlinks and this is false.
+fn worktree_path_is_symlink(path : String) -> Bool {
+  match @bitio.lstat_entry_meta(path) {
+    Some(info) => info.kind is @bitio.WorktreeKindMeta::Symlink
+    None => false
+  }
+}
+
+///|
+/// Remove a worktree path. A symlink is unlinked itself and never followed:
+/// recursing through a link to a directory would delete the link target's
+/// contents, which may lie outside the worktree.
 fn remove_worktree_path_recursive(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   path : String,
 ) -> Unit raise @bit.GitError {
+  if worktree_path_is_symlink(path) {
+    fs.remove_file(path)
+    return ()
+  }
   if rfs.is_file(path) {
     fs.remove_file(path)
     return ()
@@ -483,6 +502,14 @@ fn tree_ops_prepare_blob_path(
   full_path : String,
   path : String,
 ) -> Unit raise @bit.GitError {
+  // A symlink left at this path by an earlier checkout must be replaced, not
+  // written through: opening it for writing would follow the link and
+  // overwrite whatever it points to (`.git/config`, a file outside the
+  // worktree, ...). Unlink it so the blob is written as a fresh file.
+  if worktree_path_is_symlink(full_path) {
+    fs.remove_file(full_path)
+    return
+  }
   if !rfs.is_dir(full_path) {
     return
   }
@@ -493,6 +520,43 @@ fn tree_ops_prepare_blob_path(
     )
   }
   remove_worktree_path_recursive(fs, rfs, full_path)
+}
+
+///|
+/// Check that `rel_path` is safe to touch below `root`: each component is a
+/// valid tree entry name (no `.git`, `..`, empty or `/`-containing parts) and
+/// no parent directory on disk is a symlink.
+pub fn verify_worktree_path(
+  root : String,
+  rel_path : String,
+) -> Unit raise @bit.GitError {
+  for component in rel_path.split("/") {
+    @bit.verify_tree_entry_name(component.to_owned())
+  }
+  verify_no_symlink_in_parents(root, rel_path)
+}
+
+///|
+/// Write `data` to the worktree file at `rel_path` (relative to `root`) the
+/// way checkout does: every path component must be a valid tree entry name
+/// (no `.git`, `..`, empty or `/`-containing components), no parent
+/// directory on disk may be a symlink, and a symlink or directory already at
+/// the path is replaced rather than written through. For commands that
+/// write worktree files outside the checkout machinery (revert, subdir
+/// merge), so tree content cannot redirect the write into `.git` or outside
+/// the worktree.
+pub fn write_worktree_file_safely(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  rel_path : String,
+  data : Bytes,
+) -> Unit raise @bit.GitError {
+  verify_worktree_path(root, rel_path)
+  let full_path = join_path(root, rel_path)
+  tree_ops_prepare_blob_path(fs, rfs, full_path, rel_path)
+  fs.mkdir_p(parent_dir(full_path))
+  fs.write_file(full_path, data)
 }
 
 ///|
