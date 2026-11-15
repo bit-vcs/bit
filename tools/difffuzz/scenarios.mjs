@@ -127,9 +127,13 @@ export function coreStep(pair, rel) {
     return {
       edit: [`write ${p} (${data.length} bytes)`, (root) => {
         const abs = path.join(root, p);
-        if (fs.existsSync(abs) && fs.lstatSync(abs).isDirectory()) return;
+        // lstat, not existsSync: a dangling symlink must be replaced too,
+        // never written through (that would depend on empty directories
+        // elsewhere, which git and bit may prune differently).
+        const st = fs.lstatSync(abs, { throwIfNoEntry: false });
+        if (st && st.isDirectory()) return;
         fs.mkdirSync(path.dirname(abs), { recursive: true });
-        if (fs.existsSync(abs) && fs.lstatSync(abs).isSymbolicLink()) fs.rmSync(abs);
+        if (st && st.isSymbolicLink()) fs.rmSync(abs);
         fs.writeFileSync(abs, data);
       }],
     };

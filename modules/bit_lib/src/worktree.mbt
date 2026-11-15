@@ -623,7 +623,9 @@ fn expand_paths(
       continue
     }
     let abs = join_path(root, path)
-    if fs.is_dir(abs) {
+    // A symlink to a directory is a path of its own (mode 120000), never
+    // expanded into its target's contents.
+    if fs.is_dir(abs) && !worktree_path_is_symlink(abs) {
       let prefix = if path.has_suffix("/") { path } else { path + "/" }
       for f in all {
         if f.has_prefix(prefix) {
@@ -655,7 +657,9 @@ async fn expand_paths_async(
       continue
     }
     let abs = join_path(root, path)
-    if fs.is_dir(abs) {
+    // A symlink to a directory is a path of its own (mode 120000), never
+    // expanded into its target's contents.
+    if fs.is_dir(abs) && !worktree_path_is_symlink(abs) {
       let prefix = if path.has_suffix("/") { path } else { path + "/" }
       for f in all {
         if f.has_prefix(prefix) {

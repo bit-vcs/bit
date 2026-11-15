@@ -259,25 +259,34 @@ fn sequencer_check_local_changes(
     }
     let abs = join_path(root, path)
     let meta = @bitio.worktree_entry_meta_sync(rfs, abs)
-    let on_disk : @bit.ObjectId? = match meta {
+    // (blob, kind) on disk: a symlink and a file with the same bytes
+    // differ (mode 120000 vs 100644).
+    let on_disk : (@bit.ObjectId, Bool)? = match meta {
       Some(info) =>
         match info.kind {
           @bitio.WorktreeKindMeta::Symlink =>
             @bitio.read_symlink_target_path(abs).map(fn(t) {
-              @bit.hash_blob(@utf8.encode(t))
+              (@bit.hash_blob(@utf8.encode(t)), true)
             })
           @bitio.WorktreeKindMeta::Regular =>
-            Some(@bit.hash_blob(rfs.read_file(abs) catch { _ => Bytes::new(0) }))
+            Some(
+              (
+                @bit.hash_blob(rfs.read_file(abs) catch { _ => Bytes::new(0) }),
+                false,
+              ),
+            )
         }
       None => None
     }
     match (ours.get(path), on_disk) {
-      (Some(o), Some(id)) => if o.id != id { dirty.push(path) }
+      (Some(o), Some((id, _))) => if o.id != id { dirty.push(path) }
       // A missing file loses nothing when rewritten or deleted (git).
       (Some(_), None) => ()
       // An untracked file identical to what would be written is fine.
-      (None, Some(id)) =>
-        if !(theirs.get(path) is Some(t) && t.id == id) {
+      (None, Some((id, is_link))) =>
+        if !(theirs.get(path) is Some(t) &&
+          t.id == id &&
+          (t.mode == 0o120000) == is_link) {
           untracked.push(path)
         }
       (None, None) => ()

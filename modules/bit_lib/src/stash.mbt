@@ -131,9 +131,21 @@ pub async fn stash_push(
   // W: the index with every tracked (non skip-worktree, non gitlink) path
   // re-staged from the worktree, exactly as `git add -u` would.
   let tracked : Array[String] = []
+  let in_index : Map[String, Bool] = Map([])
   for e in index_entries {
+    in_index[e.path] = true
     if !skip.contains(e.path) && !is_gitlink_mode_int(e.mode) {
       tracked.push(e.path)
+    }
+  }
+  // git's W also takes HEAD paths the index dropped (e.g. `rm --cached`)
+  // from the worktree: it updates every path that differs from HEAD.
+  let head_db = ObjectDb::load_lazy(rfs, common_dir)
+  for path, f in collect_tree_files_from_commit(head_db, rfs, head_id) {
+    if !in_index.contains(path) &&
+      !is_gitlink_mode_int(f.mode) &&
+      @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+      tracked.push(path)
     }
   }
   let worktree_entries = if tracked.length() > 0 {

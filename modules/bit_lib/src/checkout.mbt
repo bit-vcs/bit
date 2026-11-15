@@ -376,8 +376,9 @@ fn checkout_two_way(
     }
     let w = checkout_worktree_entry(rfs, root, path)
     match i {
+      // A tracked file missing from the worktree loses nothing (git).
       Some(_) =>
-        if !checkout_entry_eq(w, i) {
+        if w is Some(_) && !checkout_entry_eq(w, i) {
           dirty.push(path)
           continue
         }
