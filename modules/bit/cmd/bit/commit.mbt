@@ -124,17 +124,6 @@ async fn handle_commit_inner(args : Array[String]) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   ignore(commit_args_require_standalone_error(args))
-  if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
-    eprint_line(
-      "error: Committing is not possible because you have unmerged files.",
-    )
-    eprint_line(
-      "hint: Fix them up in the work tree, and then use 'git add/rm <file>'",
-    )
-    eprint_line("hint: as appropriate to mark resolution and make a commit.")
-    eprint_line("fatal: Exiting because of an unresolved conflict.")
-    @sys.exit(128)
-  }
 
   if commit_should_use_storage_runtime(args) &&
     !commit_signing_requested(git_dir, args) {
@@ -460,6 +449,12 @@ async fn handle_commit_inner(args : Array[String]) -> Unit raise Error {
     for p in status.unstaged_deleted {
       paths_to_add.push(p)
     }
+    // -a also stages (resolves) conflicted paths, as git does.
+    for p, _ in @bitlib.read_unmerged_paths(fs, git_dir) {
+      if !paths_to_add.contains(p) {
+        paths_to_add.push(p)
+      }
+    }
     let paths_to_add = @bitlib.filter_paths_in_sparse_checkout(
       fs, git_dir, paths_to_add,
     )
@@ -467,6 +462,18 @@ async fn handle_commit_inner(args : Array[String]) -> Unit raise Error {
       @bitlib.add_paths_async(fs, fs, root, paths_to_add)
     }
   }
+  if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+    eprint_line(
+      "error: Committing is not possible because you have unmerged files.",
+    )
+    eprint_line(
+      "hint: Fix them up in the work tree, and then use 'git add/rm <file>'",
+    )
+    eprint_line("hint: as appropriate to mark resolution and make a commit.")
+    eprint_line("fatal: Exiting because of an unresolved conflict.")
+    @sys.exit(128)
+  }
+
   // Handle pathspec-based partial commit (--include / --only / positional args)
   if pathspecs.length() > 0 {
     commit_handle_pathspec_staging(

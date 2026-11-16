@@ -46,6 +46,8 @@ priv struct MergeThreeWay {
   /// "distinct types" conflicts (a regular file on one side, a symlink on
   /// the other): path -> (path the regular file is recorded at, its stage)
   distinct_types : Map[String, (String, Int)]
+  /// rename/delete conflicts: new path -> base entry (index stage 1)
+  rename_delete_base : Map[String, TreeFileEntry]
 }
 
 ///|
@@ -346,6 +348,7 @@ fn merge_three_way(
     rename_conflict_stages,
     removed_paths: file_result.removed_paths,
     distinct_types,
+    rename_delete_base: file_result.rename_delete_base,
   }
 }
 
@@ -423,10 +426,15 @@ fn merge_write_conflicted(
       }
     }
   }
+  // rename/delete: the base version sits at the new path's stage 1.
+  let index_base = base_files.copy()
+  for path, b in tw.rename_delete_base {
+    index_base[path] = b
+  }
   let entries = merge_conflicted_index_entries_with_renames(
     db,
     rfs,
-    base_files,
+    index_base,
     ours,
     theirs,
     tw.merged,
@@ -669,6 +677,8 @@ priv struct MergeFilesResult {
   conflict_types : Map[String, String]
   /// Paths that were renamed away and should be removed from worktree
   removed_paths : Array[String]
+  /// rename/delete conflicts: new path -> the base entry (index stage 1)
+  rename_delete_base : Map[String, TreeFileEntry]
 }
 
 ///|
@@ -701,6 +711,7 @@ fn merge_files(
   let merged : Map[String, TreeFileEntry] = Map([])
   let conflicts : Array[String] = []
   let needs_content_merge : Array[ContentMergeCandidate] = []
+  let rename_delete_base : Map[String, TreeFileEntry] = Map([])
   let rename_2to1 : Array[Rename2to1Candidate] = []
   let conflict_types : Map[String, String] = Map([])
   let removed_paths : Array[String] = []
@@ -806,6 +817,15 @@ fn merge_files(
               // was renamed. Handle renamed content at new_path, and the
               // new files at old_path will be merged in Step 4.
               merged[new_path] = o
+            } else if (b.mode == 0o120000) != (t.mode == 0o120000) {
+              // Theirs changed the type (symlink <-> file): git does not
+              // pair that with the path, it is a delete plus an add. So:
+              // rename/delete at new_path, theirs' new file at old_path.
+              merged[new_path] = o
+              conflicts.push(new_path)
+              conflict_types[new_path] = "rename/delete"
+              rename_delete_base[new_path] = b
+              merged[old_path] = t
             } else {
               // Theirs modified at old_path, ours renamed to new_path
               // -> content merge at new_path
@@ -988,6 +1008,7 @@ fn merge_files(
     rename_2to1,
     conflict_types,
     removed_paths,
+    rename_delete_base,
   }
 }
 

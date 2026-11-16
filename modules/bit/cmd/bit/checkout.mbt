@@ -138,7 +138,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
           )
         }
       }
-      None =>
+      None => {
         // Same commit, just create branch ref and update HEAD
         @bitlib.switch_branch(
           fs,
@@ -148,6 +148,11 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
           create=true,
           checkout_files=false,
         )
+        // A switch re-applies the sparse patterns, as git's does.
+        if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+          @bitlib.sparse_checkout_reapply(fs, fs, root)
+        }
+      }
     }
     save_previous_checkout_location(fs, git_dir, previous_location)
     return ()
@@ -213,6 +218,11 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       _ => false
     }
     if is_branch && current_branch_matches {
+      // Even a no-op switch refuses an unmerged index (git).
+      if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+        eprint_line("error: you need to resolve your current index first")
+        @sys.exit(1)
+      }
       return ()
     }
     let previous_location = current_checkout_location(rfs, git_dir)

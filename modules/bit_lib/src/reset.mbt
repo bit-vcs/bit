@@ -86,13 +86,30 @@ pub fn reset(
       // are not materialized, and git re-applies the patterns: every
       // out-of-cone entry gets the bit (its file is discarded, --hard).
       let skip = read_skip_worktree_paths(rfs, actual_git_dir)
-      if is_sparse_checkout_enabled(rfs, actual_git_dir) {
+      // Out-of-cone untracked files the reset brings back into the index
+      // stay as they are on disk (not written over, no skip bit).
+      let leave : Map[String, Bool] = Map([])
+      let sparse_on = is_sparse_checkout_enabled(rfs, actual_git_dir)
+      if sparse_on {
         let patterns = read_sparse_patterns(rfs, actual_git_dir)
         let emptied : Array[String] = []
+        let indexed : Map[String, Bool] = Map([])
+        for e in read_index_entries(rfs, actual_git_dir) {
+          indexed[e.path] = true
+        }
         for path, f in files {
+          // Only entries the index already had: an untracked file at a
+          // path the reset brings back is left alone (git).
           if !is_gitlink_mode_int(f.mode) &&
             !matches_sparse_pattern(path, patterns) &&
-            !skip.contains(path) {
+            !skip.contains(path) &&
+            !indexed.contains(path) &&
+            @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+            leave[path] = true
+          } else if !is_gitlink_mode_int(f.mode) &&
+            !matches_sparse_pattern(path, patterns) &&
+            !skip.contains(path) &&
+            indexed.contains(path) {
             skip[path] = true
             let abs = join_path(root, path)
             if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
@@ -107,11 +124,11 @@ pub fn reset(
       }
       let to_write : Map[String, TreeFileEntry] = Map([])
       for path, f in files {
-        if !skip.contains(path) {
+        if !skip.contains(path) && !leave.contains(path) {
           to_write[path] = f
         }
       }
-      if skip.length() > 0 {
+      if skip.length() > 0 || sparse_on {
         // Keep skipped paths from being "removed" by remove_missing.
         let keep_paths : Map[String, TreeFileEntry] = to_write.copy()
         for path, _ in skip {

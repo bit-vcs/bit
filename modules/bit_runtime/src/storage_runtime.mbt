@@ -674,6 +674,13 @@ fn storage_collect_add_all_paths(
   for p in snapshot.unstaged_deleted {
     paths.push(p)
   }
+  // -a also stages (resolves) conflicted paths, as git does.
+  let git_dir = storage_resolve_git_dir(rfs, root)
+  for p, _ in @bitlib.read_unmerged_paths(rfs, git_dir) {
+    if !paths.contains(p) {
+      paths.push(p)
+    }
+  }
   paths
 }
 
