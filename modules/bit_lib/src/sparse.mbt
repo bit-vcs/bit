@@ -1016,6 +1016,7 @@ fn sparse_update_worktree(
       let all_files : Map[String, TreeFileEntry] = Map([])
       let to_write : Map[String, TreeFileEntry] = Map([])
       let skip_paths : Array[String] = []
+      let emptied : Array[String] = []
       for entry in current_entries {
         all_files[entry.path] = { id: entry.id, mode: entry.mode }
         let abs = join_path(root, entry.path)
@@ -1050,12 +1051,14 @@ fn sparse_update_worktree(
             continue
           }
           fs.remove_file(abs)
+          emptied.push(parent_dir(abs))
           skip_paths.push(entry.path)
         }
         // A dirty file stays, and stays tracked normally (git warns).
       }
       write_worktree_from_files(db, fs, rfs, root, git_dir, to_write)
-      ignore(sparse_prune_empty_dirs(fs, rfs, root, root))
+      // Only directories this update emptied go (git), not every empty one.
+      tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
       write_skip_worktree_paths(fs, git_dir, skip_paths)
       let use_sparse_index = sparse_is_index_sparse_enabled(rfs, git_dir) &&
         is_sparse_checkout_cone_enabled(rfs, git_dir)
@@ -1110,46 +1113,6 @@ fn sparse_worktree_matches_index_entry(
         }
       }
   }
-}
-
-///|
-fn sparse_prune_empty_dirs(
-  fs : &@bit.FileSystem,
-  rfs : &@bit.RepoFileSystem,
-  root : String,
-  path : String,
-) -> Bool {
-  if path != root && path.has_prefix(join_path(root, ".git")) {
-    return false
-  }
-  if !rfs.is_dir(path) {
-    return false
-  }
-  let entries = rfs.readdir(path) catch { _ => return false }
-  for entry in entries {
-    if entry == "." || entry == ".." {
-      continue
-    }
-    let child = join_path(path, entry)
-    if rfs.is_dir(child) {
-      ignore(sparse_prune_empty_dirs(fs, rfs, root, child))
-    }
-  }
-  let remaining = rfs.readdir(path) catch { _ => return false }
-  let mut has_entries = false
-  for entry in remaining {
-    if entry != "." && entry != ".." {
-      has_entries = true
-      break
-    }
-  }
-  if path != root && !has_entries {
-    fs.remove_dir(path) catch {
-      _ => ()
-    }
-    return true
-  }
-  false
 }
 
 ///|
