@@ -239,8 +239,12 @@ export function runHome(ctx, steps) {
             .split("\n")
             .filter(Boolean)
             .sort();
-          const expected = coneFiles(treeFiles, t.subdir).sort();
-          const actual = worktreeFiles(d).filter((x) => !x.startsWith("untracked-"));
+          // untracked-* files are the model's own scratch files; once a
+          // "commit wip" step has committed one it is tracked too, so the
+          // filter applies to both sides.
+          const scratch = (x) => path.basename(x).startsWith("untracked-");
+          const expected = coneFiles(treeFiles, t.subdir).filter((x) => !scratch(x)).sort();
+          const actual = worktreeFiles(d).filter((x) => !scratch(x));
           check(
             JSON.stringify(actual) === JSON.stringify(expected),
             `${t.name}: checkout does not match subdir=${t.subdir}\n    expected: ${expected.join(" ")}\n    actual:   ${actual.join(" ")}`,
