@@ -193,10 +193,8 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
         if start_point is None {
           // No start point: git skips the tree merge (do_merge = 0), so an
           // unmerged index does not block it; only HEAD moves.
+          // switch never merges here, so the sparsity is not re-applied.
           switch_write_head_ref(fs, git_dir, branch_name)
-          if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
-            @bitlib.sparse_checkout_reapply(fs, fs, root)
-          }
         } else {
           ignore(checkout_with_promisor_retry(fs, root, short_name))
         }

@@ -104,10 +104,11 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       eprint_line("fatal: a branch named '\{branch_name}' already exists")
       @sys.exit(128)
     }
-    // Only a start point merges the tree, and so refuses an unmerged
-    // index; without one git skips the merge entirely (do_merge = 0).
-    if start_point is Some(_) &&
-      @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+    // git skips the tree merge (do_merge = 0) only for exactly
+    // `checkout -b <name>`; any other argument (-q, a start point) merges,
+    // which refuses an unmerged index and re-applies the sparse patterns.
+    let no_merge = args.length() == 2 && args[0] == "-b" && start_point is None
+    if !no_merge && @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
       eprint_line("error: you need to resolve your current index first")
       @sys.exit(1)
     }
@@ -148,8 +149,8 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
           create=true,
           checkout_files=false,
         )
-        // A switch re-applies the sparse patterns, as git's does.
-        if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+        // The merge re-applies the sparse patterns (not for a bare -b).
+        if !no_merge && @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
           @bitlib.sparse_checkout_reapply(fs, fs, root)
         }
       }
