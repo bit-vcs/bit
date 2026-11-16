@@ -29,11 +29,13 @@ pub fn restore_paths(
     let safe_path = normalize_checkout_path(path)
     let mut matched = false
     for e in index_entries {
-      if safe_path == "" ||
+      // Skip-worktree (sparse) entries do not match a pathspec, as in git.
+      if !skip.contains(e.path) &&
+        (safe_path == "" ||
         e.path == safe_path ||
-        e.path.has_prefix(safe_path + "/") {
+        e.path.has_prefix(safe_path + "/")) {
         matched = true
-        if !seen.contains(e.path) && !skip.contains(e.path) {
+        if !seen.contains(e.path) {
           seen[e.path] = true
           selected.push(e)
         }

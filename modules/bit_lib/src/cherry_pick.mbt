@@ -63,6 +63,12 @@ pub fn cherry_pick(
   } else {
     msg_with_suffix
   }
+  // git: a merge needs -m to say which parent the change is relative to.
+  if commit_info.parents.length() > 1 {
+    raise @bit.GitError::InvalidObject(
+      "commit \{commit_id.to_hex()} is a merge but no -m option was given.",
+    )
+  }
   let head = resolve_head_commit(rfs, git_dir)
   let base_files : Map[String, TreeFileEntry] = if commit_info.parents.length() ==
     0 {
