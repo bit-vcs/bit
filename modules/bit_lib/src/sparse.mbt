@@ -1091,9 +1091,7 @@ fn sparse_worktree_matches_index_entry(
     Some(info) =>
       match info.kind {
         @bitio.WorktreeKindMeta::Regular => {
-          // Content decides (git's sparsity update ignores the exec bit),
-          // but a symlink entry is never matched by a regular file.
-          if entry.mode == 0o120000 {
+          if info.mode != entry.mode {
             return false
           }
           let content = rfs.read_file(abs)
