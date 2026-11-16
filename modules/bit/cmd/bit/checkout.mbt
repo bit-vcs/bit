@@ -95,6 +95,11 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       None => ()
     }
     // Check if branch already exists
+    // git refuses to switch with an unmerged index, also for -b.
+    if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+      eprint_line("error: you need to resolve your current index first")
+      @sys.exit(1)
+    }
     let branch_exists = @bitlib.resolve_ref(
         fs,
         git_dir,

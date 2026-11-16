@@ -100,6 +100,11 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       raise @bitcore.GitError::InvalidObject("No branch specified")
     }
     let branch_name = normalize_switch_branch_ref(name)
+    // git refuses to switch with an unmerged index, also for -c.
+    if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+      eprint_line("error: you need to resolve your current index first")
+      @sys.exit(1)
+    }
     if !ignore_other_worktrees {
       match switch_branch_in_use_path(rfs, root, branch_name) {
         Some(_) => {
