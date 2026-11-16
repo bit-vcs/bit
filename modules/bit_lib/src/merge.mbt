@@ -105,12 +105,10 @@ fn merge_three_way(
       merged[candidate.path] = { id: candidate.theirs_id, mode: candidate.mode }
       continue
     }
-    let base_content = match candidate.base_id {
-      Some(id) => merge_get_blob_text(db, rfs, id)
-      None => ""
+    let base_bytes_raw = match candidate.base_id {
+      Some(id) => merge_get_blob_data(db, rfs, id)
+      None => Bytes::new(0)
     }
-    let ours_content = merge_get_blob_text(db, rfs, candidate.ours_id)
-    let theirs_content = merge_get_blob_text(db, rfs, candidate.theirs_id)
     // Skip binary files
     let ours_data = merge_get_blob_data(db, rfs, candidate.ours_id)
     let theirs_data = merge_get_blob_data(db, rfs, candidate.theirs_id)
@@ -121,39 +119,56 @@ fn merge_three_way(
       None => Bytes::new(0)
     }
     if @diff3.is_binary_content(ours_data) ||
-      @diff3.is_binary_content(theirs_data) ||
-      !merge_is_valid_utf8(ours_data) ||
-      !merge_is_valid_utf8(theirs_data) ||
-      !merge_is_valid_utf8(base_data) {
+      @diff3.is_binary_content(theirs_data) {
       conflicts.push(candidate.path)
       if !all_conflict_types.contains(candidate.path) {
         all_conflict_types[candidate.path] = "content"
       }
       continue
     }
+    // Text merge of the raw bytes: UTF-8 when all three sides are valid
+    // UTF-8, otherwise byte-for-char (Latin-1) so nothing is mangled (git
+    // merges such content as text too; only NUL bytes make it binary).
+    let utf8 = merge_is_valid_utf8(base_bytes_raw) &&
+      merge_is_valid_utf8(ours_data) &&
+      merge_is_valid_utf8(theirs_data)
     let result = @diff3.content_merge(
-      base_content,
-      ours_content,
-      theirs_content,
+      merge_bytes_to_text(base_bytes_raw, utf8),
+      merge_bytes_to_text(ours_data, utf8),
+      merge_bytes_to_text(theirs_data, utf8),
       @diff3.ContentMergeOptions::default().with_labels(
         ours=ours_label,
         base="",
         theirs=theirs_label,
       ),
     )
+    ignore(base_data)
     if result.has_conflicts {
       // Write conflict markers to worktree
       let full_path = join_path(root, candidate.path)
       let dir = rebase_parent_dir(full_path)
       fs.mkdir_p(dir)
-      fs.write_string(full_path, result.content)
+      fs.write_file(full_path, merge_text_to_bytes(result.content, utf8))
+      // The conflicted file carries the merged mode (git merges the exec
+      // bit separately: a side that changed it wins).
+      let mm = merge_three_way_mode(
+        base_files.get(candidate.path).map(e => e.mode),
+        ours.get(candidate.path).map(e => e.mode),
+        theirs.get(candidate.path).map(e => e.mode),
+        candidate.mode,
+      )
+      if mm == 0o100755 {
+        ignore(@bitio.worktree_set_mode(full_path, 0o755))
+      } else if mm == 0o100644 {
+        ignore(@bitio.worktree_set_mode(full_path, 0o644))
+      }
       conflicts.push(candidate.path)
       if !all_conflict_types.contains(candidate.path) {
         all_conflict_types[candidate.path] = "content"
       }
     } else {
       // Clean merge - create new blob
-      let content_bytes = @utf8.encode(result.content)
+      let content_bytes = merge_text_to_bytes(result.content, utf8)
       let (blob_id, compressed) = @bit.create_blob(content_bytes)
       write_object_bytes(fs, git_dir, blob_id, compressed)
       // If this path has a rename/add conflict, store resolved as stage 2
@@ -189,7 +204,15 @@ fn merge_three_way(
         fs.mkdir_p(dir)
         fs.write_string(full_path, conflict_result.content)
       } else {
-        merged[candidate.path] = { id: blob_id, mode: candidate.mode }
+        merged[candidate.path] = {
+          id: blob_id,
+          mode: merge_three_way_mode(
+            base_files.get(candidate.path).map(e => e.mode),
+            ours.get(candidate.path).map(e => e.mode),
+            theirs.get(candidate.path).map(e => e.mode),
+            candidate.mode,
+          ),
+        }
       }
     }
   }
@@ -1061,30 +1084,24 @@ fn merge_resolve_rename_content(
         return Some((ours_id, ours_entry.unwrap().mode))
       }
   }
-  // Both modified - content merge (text only: anything that is not valid
-  // UTF-8 would be mangled, so leave it unresolved).
+  // Both modified - content merge of the raw bytes (UTF-8, or one char per
+  // byte when any side is not valid UTF-8, so nothing is mangled).
   let base_bytes = match base_id {
     Some(id) => merge_get_blob_data(db, rfs, id)
     None => Bytes::new(0)
   }
-  if !merge_is_valid_utf8(base_bytes) ||
-    !merge_is_valid_utf8(merge_get_blob_data(db, rfs, ours_id)) ||
-    !merge_is_valid_utf8(merge_get_blob_data(db, rfs, theirs_id)) {
-    return None
-  }
-  let base_content = match base_id {
-    Some(id) => merge_get_blob_text(db, rfs, id)
-    None => ""
-  }
-  let ours_content = merge_get_blob_text(db, rfs, ours_id)
-  let theirs_content = merge_get_blob_text(db, rfs, theirs_id)
+  let ours_bytes = merge_get_blob_data(db, rfs, ours_id)
+  let theirs_bytes = merge_get_blob_data(db, rfs, theirs_id)
+  let utf8 = merge_is_valid_utf8(base_bytes) &&
+    merge_is_valid_utf8(ours_bytes) &&
+    merge_is_valid_utf8(theirs_bytes)
   let result = @diff3.content_merge(
-    base_content,
-    ours_content,
-    theirs_content,
+    merge_bytes_to_text(base_bytes, utf8),
+    merge_bytes_to_text(ours_bytes, utf8),
+    merge_bytes_to_text(theirs_bytes, utf8),
     @diff3.ContentMergeOptions::default(),
   )
-  let content_bytes = @utf8.encode(result.content)
+  let content_bytes = merge_text_to_bytes(result.content, utf8)
   let (blob_id, compressed) = @bit.create_blob(content_bytes)
   write_object_bytes(fs, git_dir, blob_id, compressed)
   Some((blob_id, ours_entry.unwrap().mode))
@@ -1313,4 +1330,55 @@ pub fn merge_require_clean_index(
 fn merge_is_valid_utf8(data : Bytes) -> Bool {
   let text = @utf8.decode(data[:]) catch { _ => return false }
   @utf8.encode(text) == data
+}
+
+///|
+/// Blob bytes as merge text: UTF-8 decoding, or one char per byte.
+fn merge_bytes_to_text(data : Bytes, utf8 : Bool) -> String {
+  if utf8 {
+    return @utf8.decode_lossy(data[:])
+  }
+  let sb = StringBuilder()
+  for b in data {
+    sb.write_char(Int::unsafe_to_char(b.to_int()))
+  }
+  sb.to_string()
+}
+
+///|
+/// Inverse of `merge_bytes_to_text`.
+fn merge_text_to_bytes(text : String, utf8 : Bool) -> Bytes {
+  if utf8 {
+    return @utf8.encode(text)
+  }
+  let out : Array[Byte] = []
+  for c in text {
+    let code = c.to_int()
+    if code < 256 {
+      out.push(code.to_byte())
+    } else {
+      // Only marker text / labels can be outside Latin-1: keep them UTF-8.
+      for b in @utf8.encode(c.to_string()) {
+        out.push(b)
+      }
+    }
+  }
+  Bytes::from_array(out)
+}
+
+///|
+/// Three-way merge of a file mode: a side that changed it from the base
+/// wins (ours if both did).
+fn merge_three_way_mode(
+  base : Int?,
+  ours : Int?,
+  theirs : Int?,
+  fallback : Int,
+) -> Int {
+  match (base, ours, theirs) {
+    (Some(b), Some(o), Some(t)) => if o == b { t } else { o }
+    (_, Some(o), _) => o
+    (_, _, Some(t)) => t
+    _ => fallback
+  }
 }

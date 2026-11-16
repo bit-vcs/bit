@@ -1479,6 +1479,7 @@ fn add_split_outside_sparse(
   root? : String = "",
   explicit? : Array[(String, String)] = [],
 ) -> (Array[String], Array[String]) {
+  ignore(root)
   let skip = @bitlib.read_skip_worktree_paths(fs, git_dir)
   let patterns = @bitlib.read_sparse_patterns(fs, git_dir) catch {
     _ => return (paths, [])
@@ -1487,6 +1488,9 @@ fn add_split_outside_sparse(
   let entries = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
   for e in entries {
     tracked[e.path] = e
+  }
+  let in_cone = fn(p : String) {
+    !skip.contains(p) && @bitlib.matches_sparse_pattern(p, patterns)
   }
   let kept : Array[String] = []
   let outside : Array[String] = []
@@ -1498,55 +1502,61 @@ fn add_split_outside_sparse(
     }
   }
   for p in paths {
-    match tracked.get(p) {
-      None =>
-        if @bitlib.matches_sparse_pattern(p, patterns) {
-          kept.push(p)
-        } else {
-          // An untracked file outside the cone is reported by name.
-          report(p)
+    if tracked.contains(p) {
+      // A tracked entry outside the cone (or skip-worktree) is never
+      // updated; in-cone entries are added normally.
+      if in_cone(p) {
+        kept.push(p)
+      }
+    } else if @bitlib.matches_sparse_pattern(p, patterns) {
+      kept.push(p)
+    } else {
+      // An untracked file outside the cone is reported by name.
+      report(p)
+    }
+  }
+  // git (builtin/add.c): a pathspec that matched nothing in the index
+  // (skip-worktree entries aside) and no file, but does match sparse
+  // entries, is reported as such.
+  let covers = fn(norm : String, p : String) {
+    norm == "" || norm == "." || norm == p || p.has_prefix(norm + "/")
+  }
+  for item in explicit {
+    let (norm, raw) = item
+    let mut seen = false
+    let mut sparse_match = false
+    for e in entries {
+      if covers(norm, e.path) {
+        if in_cone(e.path) {
+          seen = true
+          break
         }
-      Some(e) =>
-        if skip.contains(p) || !@bitlib.matches_sparse_pattern(p, patterns) {
-          // A tracked entry outside the cone is never updated. When it
-          // would have been (its file changed), git reports the pathspec
-          // that matched it; without pathspecs (-A / -u) it stays quiet.
-          if root != "" && add_worktree_differs(fs, root + "/" + p, e) {
-            for item in explicit {
-              let (norm, raw) = item
-              if norm == "" || norm == "." || norm == p || p.has_prefix(norm + "/") {
-                report(raw)
-              }
-            }
-          }
-        } else {
-          kept.push(p)
+        sparse_match = true
+      }
+    }
+    if !seen {
+      for p in kept {
+        if covers(norm, p) {
+          seen = true
+          break
         }
+      }
+    }
+    if !seen {
+      for p in outside {
+        if covers(norm, p) {
+          seen = true
+          break
+        }
+      }
+    }
+    if !seen && sparse_match {
+      report(raw)
     }
   }
   (kept, outside)
 }
 
-///|
-/// Whether the worktree file differs from its index entry (missing counts
-/// as unchanged here: there is nothing to add).
-fn add_worktree_differs(fs : OsFs, abs : String, e : @bitlib.IndexEntry) -> Bool {
-  match @bitio.worktree_entry_meta_sync(fs, abs) {
-    None => false
-    Some(info) =>
-      match info.kind {
-        @bitio.WorktreeKindMeta::Symlink =>
-          match @bitio.read_symlink_target_path(abs) {
-            Some(t) => @bitcore.hash_blob(@utf8.encode(t)) != e.id
-            None => false
-          }
-        @bitio.WorktreeKindMeta::Regular => {
-          let data = fs.read_file(abs) catch { _ => return false }
-          @bitcore.hash_blob(data) != e.id
-        }
-      }
-  }
-}
 
 ///|
 async fn add_report_outside_sparse(outside : Array[String]) -> Unit {
