@@ -1522,11 +1522,18 @@ pub fn write_index_entries_with_flags(
 fn write_index_stage_buf(
   entries : Array[IndexStageEntry],
   hash_size? : Int = 20,
+  skip? : Map[String, Bool] = Map([]),
 ) -> FixedArray[Byte] {
   let mut total_size = 12
   let mut version = 2
+  let is_skip = fn(item : IndexStageEntry) {
+    item.stage == 0 && skip.contains(item.entry.path)
+  }
   for item in entries {
-    let has_extended = index_extended_flags(item.entry.intent_to_add, false) !=
+    let has_extended = index_extended_flags(
+        item.entry.intent_to_add,
+        is_skip(item),
+      ) !=
       0
     if has_extended {
       version = 3
@@ -1552,7 +1559,7 @@ fn write_index_stage_buf(
       pos,
       item.entry,
       item.stage,
-      false,
+      is_skip(item),
       false,
       hash_size~,
     )
@@ -1571,6 +1578,7 @@ pub fn write_index_stage_entries(
   git_dir : String,
   entries : Array[IndexStageEntry],
   hash_size? : Int = 20,
+  skip? : Map[String, Bool] = Map([]),
 ) -> Unit raise @bit.GitError {
   let sorted = entries.copy()
   sorted.sort_by(fn(a, b) {
@@ -1582,7 +1590,7 @@ pub fn write_index_stage_entries(
     }
   })
   let effective_hash_size = index_hash_size_for_stage_entries(sorted, hash_size)
-  let buf = write_index_stage_buf(sorted, hash_size=effective_hash_size)
+  let buf = write_index_stage_buf(sorted, hash_size=effective_hash_size, skip~)
   let index_path = join_path(git_dir, "index")
   fs.write_file(index_path, Bytes::from_array(buf[:]))
 }

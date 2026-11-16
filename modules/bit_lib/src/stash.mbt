@@ -109,7 +109,8 @@ pub async fn stash_push(
     st.staged_deleted.length() == 0 &&
     st.unstaged_modified.length() == 0 &&
     st.unstaged_deleted.length() == 0 &&
-    untracked.length() == 0 {
+    untracked.length() == 0 &&
+    !stash_index_differs_from_head(rfs, git_dir, common_dir) {
     return None
   }
   let head = resolve_head_commit(rfs, git_dir)
@@ -950,11 +951,11 @@ fn stash_write_patch_remaining_worktree(
 
 ///|
 /// Apply stash entry (optionally dropping it), like `git stash apply|pop`
-/// without `--index`: untracked files (third parent) are restored first,
-/// then the stash's changes (base = its first parent, theirs = its tree)
+/// without `--index`: the stash's changes (base = its first parent, theirs = its tree)
 /// are merged into the current index. On success the index is reset to
 /// what it was except for files the stash adds, which stay staged; on
-/// conflict the conflicted index is left and the entry is kept.
+/// conflict the conflicted index is left and the entry is kept. Untracked
+/// files (third parent) are restored afterwards, as in git.
 pub fn stash_apply(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -988,34 +989,32 @@ pub fn stash_apply(
   }
   let base_files = collect_tree_files_from_commit(db, rfs, stash.parents[0])
   let theirs = collect_tree_files(db, rfs, stash.tree)
-  // Untracked files come back first; existing ones fail the apply at the
-  // end (after the merge), as in git.
-  let mut untracked_error : String? = None
-  if stash.parents.length() >= 3 {
+  // Untracked files (third parent) are restored after the merge, like
+  // git's checkout-index --all: files that do not exist yet are written,
+  // existing ones are reported and fail the apply (the entry is kept).
+  let restore_untracked = fn() -> String? raise @bit.GitError {
+    if stash.parents.length() < 3 {
+      return None
+    }
     let u_files = collect_tree_files_from_commit(db, rfs, stash.parents[2])
     let existing : Array[String] = []
-    for path, _ in u_files {
-      if @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
-        existing.push(path)
-      }
-    }
-    // Like git: every untracked file that does not exist yet is restored;
-    // existing ones are reported, the merge still runs, and the apply
-    // fails at the end (the entry is kept).
     let to_restore : Map[String, TreeFileEntry] = Map([])
     for path, f in u_files {
-      if !existing.contains(path) {
+      if @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+        existing.push(path)
+      } else {
         to_restore[path] = f
       }
     }
     write_worktree_from_files(db, fs, rfs, root, git_dir, to_restore)
-    if existing.length() > 0 {
-      existing.sort()
-      untracked_error = Some(
-        existing.map(p => "\{p} already exists, no checkout").join("\n") +
-        "\ncould not restore untracked files from stash",
-      )
+    if existing.length() == 0 {
+      return None
     }
+    existing.sort()
+    Some(
+      existing.map(p => "\{p} already exists, no checkout").join("\n") +
+      "\ncould not restore untracked files from stash",
+    )
   }
   let already_present = stash_check_local_changes(
     rfs,
@@ -1053,10 +1052,15 @@ pub fn stash_apply(
     )
     let conflicts = tw.conflicts.copy()
     conflicts.sort()
+    let u_note = match restore_untracked() {
+      Some(msg) => "\n" + msg
+      None => ""
+    }
     raise @bit.GitError::InvalidObject(
       conflicts.map(p => "CONFLICT (content): Merge conflict in \{p}").join(
         "\n",
       ) +
+      u_note +
       "\nThe stash entry is kept in case you need it again.",
     )
   }
@@ -1095,7 +1099,7 @@ pub fn stash_apply(
     new_index.push(e)
   }
   write_index_entries_with_skip_worktree(fs, git_dir, new_index, skip)
-  match untracked_error {
+  match restore_untracked() {
     Some(msg) => raise @bit.GitError::InvalidObject(msg)
     None => ()
   }
@@ -1300,4 +1304,33 @@ pub fn stash_collect_paths(
 /// Convert Int mode to String representation.
 pub fn stash_mode_str(mode : Int) -> String {
   @string_utils.mode_to_string(mode)
+}
+
+///|
+/// Whether the index differs from HEAD at all -- also for skip-worktree
+/// entries, which status leaves out but git's stash still saves (a staged
+/// file the sparse patterns then hid).
+fn stash_index_differs_from_head(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  common_dir : String,
+) -> Bool raise @bit.GitError {
+  guard resolve_head_commit(rfs, git_dir) is Some(head) else { return false }
+  let db = ObjectDb::load(rfs, common_dir)
+  let head_files = collect_tree_files_from_commit(db, rfs, head)
+  let entries = read_index_entries(rfs, git_dir)
+  // A sparse index (directory entries) is left to status.
+  if entries.iter().any(e => e.mode == 0o040000) {
+    return false
+  }
+  if entries.length() != head_files.length() {
+    return true
+  }
+  for e in entries {
+    match head_files.get(e.path) {
+      Some(f) if f.id == e.id && f.mode == e.mode => ()
+      _ => return true
+    }
+  }
+  false
 }

@@ -134,7 +134,7 @@ pub fn cherry_pick(
     tw.merged,
   )
   let entries = tree_files_to_index(db, rfs, tw.merged)
-  merge_write_index_keeping_skip(fs, rfs, git_dir, entries)
+  merge_write_index_keeping_skip(fs, rfs, root, git_dir, entries)
   if no_commit {
     return { status: CherryPickStatus::Success, commit_id: None, conflicts: [] }
   }
@@ -471,7 +471,7 @@ pub fn revert(
     tw.merged,
   )
   let entries = tree_files_to_index(db, rfs, tw.merged)
-  merge_write_index_keeping_skip(fs, rfs, git_dir, entries)
+  merge_write_index_keeping_skip(fs, rfs, root, git_dir, entries)
   if no_commit {
     return { status: CherryPickStatus::Success, commit_id: None, conflicts: [] }
   }

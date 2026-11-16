@@ -409,6 +409,28 @@ fn merge_write_conflicted(
       _ => ()
     }
   }
+  // Sparse: a clean (not conflicted) path outside the cone, or one that
+  // already had the skip-worktree bit, is updated in the index only and
+  // keeps / gets the bit; conflicts are always written (git).
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let sparse = is_sparse_checkout_enabled(rfs, git_dir)
+  let patterns = if sparse { read_sparse_patterns(rfs, git_dir) } else { [] }
+  let index_skip : Map[String, Bool] = Map([])
+  for path, f in tw.merged {
+    if tw.conflicts.contains(path) || is_gitlink_mode_int(f.mode) {
+      continue
+    }
+    if skip.contains(path) {
+      index_skip[path] = true
+      changed.remove(path)
+    } else if sparse &&
+      !matches_sparse_pattern(path, patterns) &&
+      (changed.contains(path) ||
+      @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is None) {
+      index_skip[path] = true
+      changed.remove(path)
+    }
+  }
   write_worktree_from_files(
     db,
     fs,
@@ -442,7 +464,7 @@ fn merge_write_conflicted(
     tw.rename_conflict_stages,
     distinct_types=tw.distinct_types,
   )
-  write_index_stage_entries(fs, git_dir, entries)
+  write_index_stage_entries(fs, git_dir, entries, skip=index_skip)
 }
 
 ///|
@@ -559,7 +581,7 @@ pub fn merge(
   }
   merge_write_changed_paths(db, fs, rfs, root, git_dir, ours, merged)
   let entries = tree_files_to_index(db, rfs, merged)
-  merge_write_index_keeping_skip(fs, rfs, git_dir, entries)
+  merge_write_index_keeping_skip(fs, rfs, root, git_dir, entries)
   let tree_id = write_tree_from_index(fs, rfs, git_dir, entries)
   let commit = @bit.Commit::new(
     tree_id,
@@ -812,8 +834,12 @@ fn merge_files(
         match (base_entry, ours_entry, theirs_entry) {
           (Some(b), Some(o), Some(t)) =>
             if b.id == t.id {
-              // Theirs didn't modify - just take ours rename
-              merged[new_path] = o
+              // Theirs didn't modify the content - take ours rename, with
+              // a mode change theirs made (the exec bit merges apart).
+              merged[new_path] = {
+                id: o.id,
+                mode: merge_three_way_mode(Some(b.mode), Some(o.mode), Some(t.mode), o.mode),
+              }
             } else if is_add_source &&
               theirs_renames.add_source_paths.contains(old_path) {
               // Both sides replaced old_path with new content; the original
@@ -837,7 +863,12 @@ fn merge_files(
                 base_id: Some(b.id),
                 ours_id: o.id,
                 theirs_id: t.id,
-                mode: o.mode,
+                mode: merge_three_way_mode(
+                  Some(b.mode),
+                  Some(o.mode),
+                  Some(t.mode),
+                  o.mode,
+                ),
               })
             }
           (_, Some(o), None) => {
@@ -892,8 +923,12 @@ fn merge_files(
     match (base_entry, ours_entry, theirs_entry) {
       (Some(b), Some(o), Some(t)) =>
         if b.id == o.id {
-          // Ours didn't modify - just take theirs rename
-          merged[new_path] = t
+          // Ours didn't modify the content - take theirs rename, with a
+          // mode change ours made.
+          merged[new_path] = {
+            id: t.id,
+            mode: merge_three_way_mode(Some(b.mode), Some(o.mode), Some(t.mode), t.mode),
+          }
         } else if is_add_source &&
           ours_renames.add_source_paths.contains(old_path) {
           // Both sides replaced; handled in Step 2
@@ -906,7 +941,12 @@ fn merge_files(
             base_id: Some(b.id),
             ours_id: o.id,
             theirs_id: t.id,
-            mode: t.mode,
+            mode: merge_three_way_mode(
+              Some(b.mode),
+              Some(o.mode),
+              Some(t.mode),
+              t.mode,
+            ),
           })
         }
       (_, None, Some(t)) => {
@@ -1302,17 +1342,27 @@ fn merge_write_changed_paths(
 fn merge_write_index_keeping_skip(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
+  root : String,
   git_dir : String,
   entries : Array[IndexEntry],
 ) -> Unit raise @bit.GitError {
   let skip = read_skip_worktree_paths(rfs, git_dir)
-  if skip.length() == 0 {
+  let sparse = is_sparse_checkout_enabled(rfs, git_dir)
+  if skip.length() == 0 && !sparse {
     write_index_entries(fs, git_dir, entries)
     return
   }
+  let patterns = if sparse { read_sparse_patterns(rfs, git_dir) } else { [] }
   let keep : Map[String, Bool] = Map([])
   for e in entries {
     if skip.contains(e.path) {
+      keep[e.path] = true
+    } else if sparse &&
+      !is_gitlink_mode_int(e.mode) &&
+      !matches_sparse_pattern(e.path, patterns) &&
+      @bitio.worktree_entry_meta_sync(rfs, join_path(root, e.path)) is None {
+      // An out-of-cone entry the merge did not write (a path it brings
+      // back or adds) is skip-worktree, as git's sparse checkout makes it.
       keep[e.path] = true
     }
   }

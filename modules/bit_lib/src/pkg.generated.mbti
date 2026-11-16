@@ -695,7 +695,7 @@ pub fn write_index_entries_with_skip_worktree(&@bit_types.FileSystem, String, Ar
 
 pub fn write_index_entries_with_tree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[IndexEntry], @bit_object.ObjectId) -> Unit raise @bit_object.GitError
 
-pub fn write_index_stage_entries(&@bit_types.FileSystem, String, Array[IndexStageEntry], hash_size? : Int32) -> Unit raise @bit_object.GitError
+pub fn write_index_stage_entries(&@bit_types.FileSystem, String, Array[IndexStageEntry], hash_size? : Int32, skip? : Map[String, Bool]) -> Unit raise @bit_object.GitError
 
 pub fn write_loose_object(&@bit_types.FileSystem, String, @bit_object.ObjectType, Bytes, algo? : @bit_object.HashAlgorithm) -> @bit_object.ObjectId raise @bit_object.GitError
 
