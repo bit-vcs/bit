@@ -127,7 +127,7 @@ pub async fn stash_push(
     None
   }
   let index_entries = read_index_entries(rfs, git_dir)
-  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let skip = effective_skip_worktree_paths(rfs, root, git_dir)
   let index_tree = write_tree_from_index(fs, rfs, common_dir, index_entries)
   // W: the index with every tracked (non skip-worktree, non gitlink) path
   // re-staged from the worktree, exactly as `git add -u` would.
@@ -292,7 +292,7 @@ fn stash_reset_hard(
 ) -> Unit raise @bit.GitError {
   let db = ObjectDb::load(rfs, common_dir)
   let head_files = collect_tree_files_from_commit(db, rfs, head_id)
-  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let skip = effective_skip_worktree_paths(rfs, root, git_dir)
   let emptied : Array[String] = []
   let entries = read_index_entries(rfs, git_dir)
   // reset --hard re-applies the sparse patterns: out-of-cone entries get
@@ -1037,7 +1037,7 @@ pub fn stash_apply(
     raise @bit.GitError::InvalidObject("Cannot apply a stash in the middle of a merge")
   }
   let index_entries = read_index_entries(rfs, git_dir)
-  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let skip = effective_skip_worktree_paths(rfs, root, git_dir)
   let ours : Map[String, TreeFileEntry] = Map([])
   let ours_entries : Map[String, IndexEntry] = Map([])
   for e in index_entries {

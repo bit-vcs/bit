@@ -932,11 +932,16 @@ fn merge_files(
                 ),
               })
             }
-          (_, Some(o), None) => {
+          (b, Some(o), None) => {
             // Theirs deleted old_path, ours renamed: rename/delete conflict
+            // (the base version sits at the new path's stage 1).
             merged[new_path] = o
             conflicts.push(new_path)
             conflict_types[new_path] = "rename/delete"
+            match b {
+              Some(be) => rename_delete_base[new_path] = be
+              None => ()
+            }
           }
           _ =>
             match ours_entry {
@@ -1010,11 +1015,16 @@ fn merge_files(
             ),
           })
         }
-      (_, None, Some(t)) => {
+      (b, None, Some(t)) => {
         // Ours deleted old_path, theirs renamed: rename/delete conflict
+        // (the base version sits at the new path's stage 1).
         merged[new_path] = t
         conflicts.push(new_path)
         conflict_types[new_path] = "rename/delete"
+        match b {
+          Some(be) => rename_delete_base[new_path] = be
+          None => ()
+        }
       }
       _ =>
         match theirs_entry {

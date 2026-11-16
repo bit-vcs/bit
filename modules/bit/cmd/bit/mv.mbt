@@ -216,22 +216,26 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
     }
   }
   if plain.length() > 0 {
-    let entries = @bitlib.read_index_entries(fs, git_dir)
-    let out : Array[@bitlib.IndexEntry] = []
+    // Stage by stage, so conflict stages of other paths survive.
+    let entries = @bitlib.read_index_stage_entries(fs, git_dir)
+    let out : Array[@bitlib.IndexStageEntry] = []
     let moved_dst : Map[String, Bool] = Map([])
     for mv in plain {
       moved_dst[mv.dst] = true
     }
-    for e in entries {
+    for item in entries {
+      let e = item.entry
       let mut path = e.path
-      for mv in plain {
-        if path == mv.src {
-          path = mv.dst
-          break
-        } else if path.has_prefix(mv.src + "/") {
-          path = mv.dst +
-            String::unsafe_substring(path, start=mv.src.length(), end=path.length())
-          break
+      if item.stage == 0 {
+        for mv in plain {
+          if path == mv.src {
+            path = mv.dst
+            break
+          } else if path.has_prefix(mv.src + "/") {
+            path = mv.dst +
+              String::unsafe_substring(path, start=mv.src.length(), end=path.length())
+            break
+          }
         }
       }
       if path == e.path && moved_dst.contains(path) {
@@ -239,7 +243,8 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
         continue
       }
       out.push(
-        @bitlib.IndexEntry::new(
+        @bitlib.IndexStageEntry::new(
+          @bitlib.IndexEntry::new(
           path,
           e.id,
           e.mode,
@@ -251,10 +256,12 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
           ino=e.ino,
           uid=e.uid,
           gid=e.gid,
+          ),
+          item.stage,
         ),
       )
     }
-    @bitlib.write_index_entries_with_skip_worktree(fs, git_dir, out, skip)
+    @bitlib.write_index_stage_entries(fs, git_dir, out, skip~)
   }
   for mv in moves.filter(m => m.gitlink) {
     @bitlib.mv_path(fs, fs, root, mv.src, mv.dst, force~)

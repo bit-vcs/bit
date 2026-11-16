@@ -27,7 +27,9 @@ pub async fn status(
   }
   let common_git_dir = resolve_common_git_dir(fs, actual_git_dir)
   let autocrlf = read_autocrlf_setting(fs, common_git_dir)
-  let skip_worktree_paths = read_skip_worktree_paths(fs, actual_git_dir)
+  let skip_worktree_paths = effective_skip_worktree_paths(
+    fs, root, actual_git_dir,
+  )
   let racy_git = racy_git_enabled()
   let (index_entries, cache_tree) = read_index_entries_with_cache_tree(
     fs, actual_git_dir,

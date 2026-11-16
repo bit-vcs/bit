@@ -51,7 +51,7 @@ pub fn reset(
       let tree_id = reset_resolve_target_tree_id(db, rfs, target)
       let files = collect_tree_files_from_commit(db, rfs, target)
       let entries = tree_files_to_index(db, rfs, files)
-      let skip = read_skip_worktree_paths(rfs, actual_git_dir)
+      let skip = effective_skip_worktree_paths(rfs, root, actual_git_dir)
       let sparse = is_sparse_checkout_enabled(rfs, actual_git_dir)
       if skip.length() > 0 || sparse {
         // Sparse: entries that stay keep their skip-worktree bit, and an
@@ -85,7 +85,7 @@ pub fn reset(
       // Sparse: skip-worktree paths that stay tracked keep their bit and
       // are not materialized, and git re-applies the patterns: every
       // out-of-cone entry gets the bit (its file is discarded, --hard).
-      let skip = read_skip_worktree_paths(rfs, actual_git_dir)
+      let skip = effective_skip_worktree_paths(rfs, root, actual_git_dir)
       // Out-of-cone untracked files the reset brings back into the index
       // stay as they are on disk (not written over), with the skip bit.
       let leave : Map[String, Bool] = Map([])
