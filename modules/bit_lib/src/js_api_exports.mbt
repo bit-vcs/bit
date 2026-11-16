@@ -1065,6 +1065,7 @@ fn js_cherry_pick_status_text(status : CherryPickStatus) -> String {
   match status {
     CherryPickStatus::Success => "success"
     CherryPickStatus::Conflict => "conflict"
+    CherryPickStatus::Empty => "empty"
   }
 }
 

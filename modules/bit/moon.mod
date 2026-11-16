@@ -48,6 +48,7 @@ import {
   "mizchi/bit_worktree@0.49.1",
   "mizchi/bitx_bitconfig@0.49.1",
   "mizchi/bitx_doc@0.49.1",
+  "mizchi/bitx_home@0.49.1",
   "mizchi/bitx_hq@0.49.1",
   "mizchi/bitx_hub@0.49.1",
   "mizchi/bitx_rebase_ai@0.49.1",

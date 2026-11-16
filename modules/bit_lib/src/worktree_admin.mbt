@@ -1839,6 +1839,33 @@ fn worktree_has_local_changes(
   let common_git_dir = resolve_commondir_from_admin(fs, admin_dir)
   let core_filemode = core_filemode_enabled(fs, common_git_dir)
   let db = ObjectDb::load_lazy(fs, common_git_dir)
+  // Staged changes count too (git: anything `git status` would show).
+  let head_files : Map[String, TreeFileEntry] = match
+    resolve_head_commit(fs, admin_dir) {
+    Some(h) => collect_tree_files_from_commit(db, fs, h)
+    None => Map([])
+  }
+  // (Gitlinks are left to the submodule checks.)
+  let mut head_count = 0
+  for _, h in head_files {
+    if !is_gitlink_mode_int(h.mode) {
+      head_count += 1
+    }
+  }
+  let mut index_count = 0
+  for entry in index_entries {
+    if is_gitlink_mode_int(entry.mode) {
+      continue
+    }
+    index_count += 1
+    match head_files.get(entry.path) {
+      Some(h) if h.id == entry.id && h.mode == entry.mode => ()
+      _ => return true
+    }
+  }
+  if head_count != index_count {
+    return true
+  }
   for entry in index_entries {
     tracked_paths.push(entry.path)
     if is_gitlink_mode_int(entry.mode) {
@@ -1924,7 +1951,11 @@ fn worktree_has_untracked_files(
           ) {
           return true
         }
-      } else {
+      } else if worktree_has_untracked_files(
+          fs, worktree_path, child_rel, tracked_paths, gitlink_paths,
+        ) {
+        // Only files count: an empty (untracked) directory is not
+        // "untracked files" for git.
         return true
       }
     } else if (is_symlink || fs.is_file(child_abs)) &&
@@ -2075,80 +2106,10 @@ fn write_index_entries_to_path(
   path : String,
   entries : Array[IndexEntry],
 ) -> Unit raise @bit.GitError {
+  // The shared index writer: git's entry order and UTF-8 path bytes.
   let sorted = entries.copy()
-  sorted.sort_by((a, b) => String::compare(a.path, b.path))
-  // Serialize index
-  let buf : Array[Byte] = []
-  // Header: DIRC + version 2 + entry count
-  buf.push(b'D')
-  buf.push(b'I')
-  buf.push(b'R')
-  buf.push(b'C')
-  // Version 2
-  buf.push(0)
-  buf.push(0)
-  buf.push(0)
-  buf.push(2)
-  // Entry count (big endian)
-  let count = sorted.length()
-  buf.push(((count >> 24) & 0xff).to_byte())
-  buf.push(((count >> 16) & 0xff).to_byte())
-  buf.push(((count >> 8) & 0xff).to_byte())
-  buf.push((count & 0xff).to_byte())
-  for entry in sorted {
-    // ctime, mtime (8 bytes each)
-    for _ in 0..<16 {
-      buf.push(0)
-    }
-    // dev, ino (4 bytes each)
-    for _ in 0..<8 {
-      buf.push(0)
-    }
-    // mode (4 bytes big endian)
-    let mode = entry.mode
-    buf.push(((mode >> 24) & 0xff).to_byte())
-    buf.push(((mode >> 16) & 0xff).to_byte())
-    buf.push(((mode >> 8) & 0xff).to_byte())
-    buf.push((mode & 0xff).to_byte())
-    // uid, gid (4 bytes each)
-    for _ in 0..<8 {
-      buf.push(0)
-    }
-    // size (4 bytes big endian)
-    let size = entry.size
-    buf.push(((size >> 24) & 0xff).to_byte())
-    buf.push(((size >> 16) & 0xff).to_byte())
-    buf.push(((size >> 8) & 0xff).to_byte())
-    buf.push((size & 0xff).to_byte())
-    // object id (20 bytes)
-    for b in entry.id.bytes {
-      buf.push(b)
-    }
-    // flags (2 bytes): name length in lower 12 bits
-    let name_len = entry.path.length()
-    let flags = if name_len > 0xfff { 0xfff } else { name_len }
-    buf.push(((flags >> 8) & 0xff).to_byte())
-    buf.push((flags & 0xff).to_byte())
-    // path name
-    for c in entry.path {
-      buf.push(c.to_int().to_byte())
-    }
-    buf.push(0) // NUL terminator
-    // Pad to 8-byte boundary (62 = fixed part before path)
-    let entry_len = 62 + entry.path.length() + 1
-    let padding = (8 - entry_len % 8) % 8
-    for _ in 0..<padding {
-      buf.push(0)
-    }
-  }
-  // Compute checksum
-  let data = Bytes::from_array(FixedArray::makei(buf.length(), i => buf[i]))
-  let checksum = @bit.sha1(data)
-  for b in checksum.bytes {
-    buf.push(b)
-  }
-  let final_data = Bytes::from_array(
-    FixedArray::makei(buf.length(), i => buf[i]),
-  )
-  fs.write_file(path, final_data)
+  sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
+  let hash_size = index_hash_size_for_entries(sorted, 20)
+  let buf = write_index_buf(sorted, None, None, hash_size~)
+  fs.write_file(path, Bytes::from_array(buf[:]))
 }

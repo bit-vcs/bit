@@ -17,83 +17,8 @@ pub struct MergeResult {
   conflict_types : Map[String, String]
 }
 
-///|
-priv struct MergePreservedGitlink {
-  path : String
-  backup_path : String
-}
 
-///|
-fn merge_preserve_removed_gitlinks(
-  fs : &@bit.FileSystem,
-  rfs : &@bit.RepoFileSystem,
-  root : String,
-  git_dir : String,
-  files : Map[String, TreeFileEntry],
-) -> Array[MergePreservedGitlink] raise @bit.GitError {
-  let entries = read_index_entries(rfs, git_dir)
-  let preserved : Array[MergePreservedGitlink] = []
-  let backup_root = ".bit-merge-preserve"
-  let mut backup_index = 0
-  for entry in entries {
-    if files.contains(entry.path) || !is_gitlink_mode_int(entry.mode) {
-      continue
-    }
-    let full_path = join_path(root, entry.path)
-    let git_marker = join_path(full_path, ".git")
-    if !rfs.is_dir(full_path) {
-      continue
-    }
-    if !(rfs.is_file(git_marker) || rfs.is_dir(git_marker)) {
-      continue
-    }
-    let backup_path = join_path(backup_root, backup_index.to_string())
-    let backup_abs = join_path(root, backup_path)
-    mv_copy_directory_recursive(fs, rfs, full_path, backup_abs)
-    let backup_gitfile = join_path(backup_abs, ".git")
-    if rfs.is_file(git_marker) && rfs.is_file(backup_gitfile) {
-      mv_rewrite_gitfile_after_directory_move(
-        fs, rfs, full_path, backup_abs, backup_gitfile,
-      )
-    }
-    remove_worktree_path_recursive(fs, rfs, full_path)
-    preserved.push({ path: entry.path, backup_path })
-    backup_index += 1
-  }
-  preserved
-}
 
-///|
-fn merge_restore_preserved_gitlinks(
-  fs : &@bit.FileSystem,
-  rfs : &@bit.RepoFileSystem,
-  root : String,
-  preserved : Array[MergePreservedGitlink],
-) -> Unit raise @bit.GitError {
-  for item in preserved {
-    let full_path = join_path(root, item.path)
-    if rfs.is_dir(full_path) {
-      continue
-    }
-    let backup_abs = join_path(root, item.backup_path)
-    if !rfs.is_dir(backup_abs) {
-      continue
-    }
-    mv_copy_directory_recursive(fs, rfs, backup_abs, full_path)
-    let backup_gitfile = join_path(backup_abs, ".git")
-    let full_gitfile = join_path(full_path, ".git")
-    if rfs.is_file(backup_gitfile) && rfs.is_file(full_gitfile) {
-      mv_rewrite_gitfile_after_directory_move(
-        fs, rfs, backup_abs, full_path, full_gitfile,
-      )
-    }
-    remove_worktree_path_recursive(fs, rfs, backup_abs)
-  }
-  let backup_root = join_path(root, ".bit-merge-preserve")
-  if rfs.is_dir(backup_root) {
-    remove_worktree_path_recursive(fs, rfs, backup_root)
-  }
-}
 
 ///|
 fn merge_fast_forward(
@@ -103,87 +28,45 @@ fn merge_fast_forward(
   git_dir : String,
   target : @bit.ObjectId,
 ) -> Unit raise @bit.GitError {
-  let db = ObjectDb::load(rfs, git_dir)
-  let files = collect_tree_files_from_commit(db, rfs, target)
-  let preserved = merge_preserve_removed_gitlinks(fs, rfs, root, git_dir, files)
-  write_worktree_from_files(
-    db,
-    fs,
-    rfs,
-    root,
-    git_dir,
-    files,
-    remove_missing=true,
-    preserve_removed_gitlinks=true,
-  )
-  let entries = tree_files_to_index(db, rfs, files)
-  write_index_entries(fs, git_dir, entries)
+  // A fast-forward is a two-tree checkout like git's: local changes are
+  // carried over and block it only where the target differs.
+  let object_git_dir = resolve_common_git_dir(rfs, git_dir)
+  checkout_two_way(fs, rfs, root, git_dir, object_git_dir, target)
   update_head_ref(fs, rfs, git_dir, target)
-  merge_restore_preserved_gitlinks(fs, rfs, root, preserved)
 }
 
 ///|
-pub fn merge(
+/// Outcome of a three-way merge of trees (files keyed by path).
+priv struct MergeThreeWay {
+  merged : Map[String, TreeFileEntry]
+  conflicts : Array[String]
+  conflict_types : Map[String, String]
+  rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)]
+  removed_paths : Array[String]
+  /// "distinct types" conflicts (a regular file on one side, a symlink on
+  /// the other): path -> (path the regular file is recorded at, its stage)
+  distinct_types : Map[String, (String, Int)]
+  /// rename/delete conflicts: new path -> base entry (index stage 1)
+  rename_delete_base : Map[String, TreeFileEntry]
+}
+
+///|
+/// Three-way merge of `ours` and `theirs` against `base_files`: file-level
+/// resolution, content merges (conflict markers are written to the
+/// worktree), rename and file/directory conflicts. Shared by merge,
+/// cherry-pick and revert, which differ only in which trees they pass.
+fn merge_three_way(
+  db : ObjectDb,
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
-  target : @bit.ObjectId,
-  message : String,
-  author : String,
-  timestamp : Int64,
-  ours_label? : String = "HEAD",
-  theirs_label? : String = "incoming",
-) -> MergeResult raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
-  let head = match resolve_head_commit(rfs, git_dir) {
-    None =>
-      match read_head_ref(rfs, git_dir) {
-        Branch(_) => {
-          merge_fast_forward(fs, rfs, root, git_dir, target)
-          return {
-            status: FastForward,
-            commit_id: Some(target),
-            conflicts: [],
-            conflict_types: Map([]),
-          }
-        }
-        Detached(_) => raise @bit.GitError::InvalidObject("HEAD not found")
-      }
-    Some(id) => id
-  }
-  if head == target {
-    return {
-      status: AlreadyUpToDate,
-      commit_id: Some(head),
-      conflicts: [],
-      conflict_types: Map([]),
-    }
-  }
-  let db = ObjectDb::load(rfs, git_dir)
-  if merge_is_ancestor(db, rfs, head, target) {
-    merge_fast_forward(fs, rfs, root, git_dir, target)
-    return {
-      status: FastForward,
-      commit_id: Some(target),
-      conflicts: [],
-      conflict_types: Map([]),
-    }
-  }
-  if merge_is_ancestor(db, rfs, target, head) {
-    return {
-      status: AlreadyUpToDate,
-      commit_id: Some(head),
-      conflicts: [],
-      conflict_types: Map([]),
-    }
-  }
-  let base = merge_find_base(db, rfs, head, target)
-  let base_files = match base {
-    None => Map([])
-    Some(id) => collect_tree_files_from_commit(db, rfs, id)
-  }
-  let ours = collect_tree_files_from_commit(db, rfs, head)
-  let theirs = collect_tree_files_from_commit(db, rfs, target)
+  git_dir : String,
+  base_files : Map[String, TreeFileEntry],
+  ours : Map[String, TreeFileEntry],
+  theirs : Map[String, TreeFileEntry],
+  ours_label~ : String,
+  theirs_label~ : String,
+) -> MergeThreeWay raise @bit.GitError {
   let file_result = merge_files(base_files, ours, theirs, db, rfs)
   let merged = file_result.merged
   let conflicts = file_result.conflicts
@@ -191,47 +74,116 @@ pub fn merge(
   let rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)] = Map([],
   )
   // Try content-level merge for files modified on both sides
+  let distinct_types : Map[String, (String, Int)] = Map([])
   for candidate in file_result.needs_content_merge {
-    let base_content = match candidate.base_id {
-      Some(id) => merge_get_blob_text(db, rfs, id)
-      None => ""
+    // Distinct types (git merge-ort): a regular file on one side and a
+    // symlink on the other cannot be content-merged. The non-regular entry
+    // keeps the path, the regular file is recorded at `<path>~<label>`.
+    match (ours.get(candidate.path), theirs.get(candidate.path)) {
+      (Some(o), Some(t)) if (o.mode == 0o120000) != (t.mode == 0o120000) &&
+        !is_gitlink_mode_int(o.mode) &&
+        !is_gitlink_mode_int(t.mode) => {
+        let (label, stage) = if o.mode == 0o120000 {
+          (theirs_label, 3)
+        } else {
+          (ours_label, 2)
+        }
+        let renamed = candidate.path + "~" + label.replace_all(old="/", new="_")
+        distinct_types[candidate.path] = (renamed, stage)
+        conflicts.push(candidate.path)
+        all_conflict_types[candidate.path] = "distinct types"
+        continue
+      }
+      _ => ()
     }
-    let ours_content = merge_get_blob_text(db, rfs, candidate.ours_id)
-    let theirs_content = merge_get_blob_text(db, rfs, candidate.theirs_id)
+    // Trivial resolutions first, byte for byte (e.g. one side only
+    // renamed the file): no text round-trip at all.
+    if candidate.ours_id == candidate.theirs_id ||
+      candidate.base_id == Some(candidate.theirs_id) {
+      merged[candidate.path] = { id: candidate.ours_id, mode: candidate.mode }
+      continue
+    }
+    if candidate.base_id == Some(candidate.ours_id) {
+      merged[candidate.path] = { id: candidate.theirs_id, mode: candidate.mode }
+      continue
+    }
+    let base_bytes_raw = match candidate.base_id {
+      Some(id) => merge_get_blob_data(db, rfs, id)
+      None => Bytes::new(0)
+    }
     // Skip binary files
     let ours_data = merge_get_blob_data(db, rfs, candidate.ours_id)
     let theirs_data = merge_get_blob_data(db, rfs, candidate.theirs_id)
+    // Content that is not valid UTF-8 cannot go through the text merge
+    // without being mangled: treat it like binary (a conflict).
+    let base_data = match candidate.base_id {
+      Some(id) => merge_get_blob_data(db, rfs, id)
+      None => Bytes::new(0)
+    }
     if @diff3.is_binary_content(ours_data) ||
       @diff3.is_binary_content(theirs_data) {
+      // Binary: our content stays, but the merged mode is applied (git).
+      let mm = merge_three_way_mode(
+        base_files.get(candidate.path).map(e => e.mode),
+        ours.get(candidate.path).map(e => e.mode),
+        theirs.get(candidate.path).map(e => e.mode),
+        candidate.mode,
+      )
+      let full_path = join_path(root, candidate.path)
+      if mm == 0o100755 {
+        ignore(@bitio.worktree_set_mode(full_path, 0o755))
+      } else if mm == 0o100644 {
+        ignore(@bitio.worktree_set_mode(full_path, 0o644))
+      }
       conflicts.push(candidate.path)
       if !all_conflict_types.contains(candidate.path) {
         all_conflict_types[candidate.path] = "content"
       }
       continue
     }
+    // Text merge of the raw bytes: UTF-8 when all three sides are valid
+    // UTF-8, otherwise byte-for-char (Latin-1) so nothing is mangled (git
+    // merges such content as text too; only NUL bytes make it binary).
+    let utf8 = merge_is_valid_utf8(base_bytes_raw) &&
+      merge_is_valid_utf8(ours_data) &&
+      merge_is_valid_utf8(theirs_data)
     let result = @diff3.content_merge(
-      base_content,
-      ours_content,
-      theirs_content,
+      merge_bytes_to_text(base_bytes_raw, utf8),
+      merge_bytes_to_text(ours_data, utf8),
+      merge_bytes_to_text(theirs_data, utf8),
       @diff3.ContentMergeOptions::default().with_labels(
         ours=ours_label,
         base="",
         theirs=theirs_label,
       ),
     )
+    ignore(base_data)
     if result.has_conflicts {
       // Write conflict markers to worktree
       let full_path = join_path(root, candidate.path)
       let dir = rebase_parent_dir(full_path)
       fs.mkdir_p(dir)
-      fs.write_string(full_path, result.content)
+      fs.write_file(full_path, merge_text_to_bytes(result.content, utf8))
+      // The conflicted file carries the merged mode (git merges the exec
+      // bit separately: a side that changed it wins).
+      let mm = merge_three_way_mode(
+        base_files.get(candidate.path).map(e => e.mode),
+        ours.get(candidate.path).map(e => e.mode),
+        theirs.get(candidate.path).map(e => e.mode),
+        candidate.mode,
+      )
+      if mm == 0o100755 {
+        ignore(@bitio.worktree_set_mode(full_path, 0o755))
+      } else if mm == 0o100644 {
+        ignore(@bitio.worktree_set_mode(full_path, 0o644))
+      }
       conflicts.push(candidate.path)
       if !all_conflict_types.contains(candidate.path) {
         all_conflict_types[candidate.path] = "content"
       }
     } else {
       // Clean merge - create new blob
-      let content_bytes = @utf8.encode(result.content)
+      let content_bytes = merge_text_to_bytes(result.content, utf8)
       let (blob_id, compressed) = @bit.create_blob(content_bytes)
       write_object_bytes(fs, git_dir, blob_id, compressed)
       // If this path has a rename/add conflict, store resolved as stage 2
@@ -267,7 +219,15 @@ pub fn merge(
         fs.mkdir_p(dir)
         fs.write_string(full_path, conflict_result.content)
       } else {
-        merged[candidate.path] = { id: blob_id, mode: candidate.mode }
+        merged[candidate.path] = {
+          id: blob_id,
+          mode: merge_three_way_mode(
+            base_files.get(candidate.path).map(e => e.mode),
+            ours.get(candidate.path).map(e => e.mode),
+            theirs.get(candidate.path).map(e => e.mode),
+            candidate.mode,
+          ),
+        }
       }
     }
   }
@@ -381,38 +341,94 @@ pub fn merge(
       None => ()
     }
   }
-  if conflicts.length() > 0 {
-    write_worktree_from_files(
-      db,
-      fs,
-      rfs,
-      root,
-      git_dir,
-      merged,
-      remove_missing=false,
-    )
-    // Remove worktree files for paths that were renamed away
-    for path in file_result.removed_paths {
-      let full_path = join_path(root, path)
-      if rfs.is_file(full_path) {
-        fs.remove_file(full_path) catch {
-          _ => ()
+  {
+    merged,
+    conflicts,
+    conflict_types: all_conflict_types,
+    rename_conflict_stages,
+    removed_paths: file_result.removed_paths,
+    distinct_types,
+    rename_delete_base: file_result.rename_delete_base,
+  }
+}
+
+///|
+/// Write a conflicted three-way result: merged paths to the worktree (the
+/// conflicting ones already hold markers), renamed-away paths removed, and
+/// stages 1-3 in the index.
+fn merge_write_conflicted(
+  db : ObjectDb,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  base_files : Map[String, TreeFileEntry],
+  ours : Map[String, TreeFileEntry],
+  theirs : Map[String, TreeFileEntry],
+  tw : MergeThreeWay,
+  overwrite? : Map[String, Bool] = Map([]),
+) -> Unit raise @bit.GitError {
+  // Only what the merge changes: unstaged edits elsewhere survive.
+  let changed : Map[String, TreeFileEntry] = Map([])
+  for path, f in tw.merged {
+    match ours.get(path) {
+      Some(o) if o.id == f.id && o.mode == f.mode => ()
+      _ =>
+        // Content conflicts already hold markers on disk; a conflicted
+        // path with nothing on disk (modify/delete: "left in tree") gets
+        // the surviving version written.
+        if !tw.conflicts.contains(path) ||
+          @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is None {
+          changed[path] = f
         }
-      }
     }
-    let entries = merge_conflicted_index_entries_with_renames(
-      db, rfs, base_files, ours, theirs, merged, conflicts, rename_conflict_stages,
-    )
-    write_index_stage_entries(fs, git_dir, entries)
-    fs.write_string(git_dir + "/MERGE_HEAD", target.to_hex() + "\n")
-    fs.write_string(git_dir + "/ORIG_HEAD", head.to_hex() + "\n")
-    fs.write_string(git_dir + "/MERGE_MSG", message + "\n")
-    conflicts.sort()
-    return {
-      status: Conflicted,
-      commit_id: None,
-      conflicts,
-      conflict_types: all_conflict_types,
+  }
+  // distinct types: the symlink side at the path, the regular file at its
+  // renamed path.
+  for path, item in tw.distinct_types {
+    let (renamed, stage) = item
+    match (ours.get(path), theirs.get(path)) {
+      (Some(o), Some(t)) => {
+        let (keeper, regular) = if stage == 2 { (t, o) } else { (o, t) }
+        changed[path] = keeper
+        changed[renamed] = regular
+      }
+      _ => ()
+    }
+  }
+  // modify/delete: the surviving side's version is left in the tree.
+  for path in tw.conflicts {
+    if changed.contains(path) ||
+      (!overwrite.contains(path) &&
+      @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_)) {
+      continue
+    }
+    match (ours.get(path), theirs.get(path)) {
+      (None, Some(t)) => changed[path] = t
+      (Some(o), None) => changed[path] = o
+      _ => ()
+    }
+  }
+  // Sparse: a clean (not conflicted) path outside the cone, or one that
+  // already had the skip-worktree bit, is updated in the index only and
+  // keeps / gets the bit; conflicts are always written (git).
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let sparse = is_sparse_checkout_enabled(rfs, git_dir)
+  let patterns = if sparse { read_sparse_patterns(rfs, git_dir) } else { [] }
+  let index_skip : Map[String, Bool] = Map([])
+  for path, f in tw.merged {
+    if tw.conflicts.contains(path) || is_gitlink_mode_int(f.mode) {
+      continue
+    }
+    if skip.contains(path) {
+      index_skip[path] = true
+      changed.remove(path)
+    } else if sparse &&
+      !matches_sparse_pattern(path, patterns) &&
+      (changed.contains(path) ||
+      @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is None) {
+      index_skip[path] = true
+      changed.remove(path)
     }
   }
   write_worktree_from_files(
@@ -421,11 +437,151 @@ pub fn merge(
     rfs,
     root,
     git_dir,
-    merged,
-    remove_missing=true,
+    changed,
+    remove_missing=false,
   )
+  for path in tw.removed_paths {
+    let full_path = join_path(root, path)
+    if rfs.is_file(full_path) {
+      fs.remove_file(full_path) catch {
+        _ => ()
+      }
+    }
+  }
+  // rename/delete: the base version sits at the new path's stage 1.
+  let index_base = base_files.copy()
+  for path, b in tw.rename_delete_base {
+    index_base[path] = b
+  }
+  let entries = merge_conflicted_index_entries_with_renames(
+    db,
+    rfs,
+    index_base,
+    ours,
+    theirs,
+    tw.merged,
+    tw.conflicts,
+    tw.rename_conflict_stages,
+    distinct_types=tw.distinct_types,
+  )
+  write_index_stage_entries(fs, git_dir, entries, skip=index_skip)
+}
+
+///|
+pub fn merge(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  target : @bit.ObjectId,
+  message : String,
+  author : String,
+  timestamp : Int64,
+  ours_label? : String = "HEAD",
+  theirs_label? : String = "incoming",
+) -> MergeResult raise @bit.GitError {
+  let git_marker = join_path(root, ".git")
+  let git_dir = if rfs.is_file(git_marker) {
+    resolve_gitdir(rfs, git_marker)
+  } else {
+    git_marker
+  }
+  let head = match resolve_head_commit(rfs, git_dir) {
+    None =>
+      match read_head_ref(rfs, git_dir) {
+        Branch(_) => {
+          merge_fast_forward(fs, rfs, root, git_dir, target)
+          return {
+            status: FastForward,
+            commit_id: Some(target),
+            conflicts: [],
+            conflict_types: Map([]),
+          }
+        }
+        Detached(_) => raise @bit.GitError::InvalidObject("HEAD not found")
+      }
+    Some(id) => id
+  }
+  if head == target {
+    return {
+      status: AlreadyUpToDate,
+      commit_id: Some(head),
+      conflicts: [],
+      conflict_types: Map([]),
+    }
+  }
+  let db = ObjectDb::load(rfs, git_dir)
+  if merge_is_ancestor(db, rfs, head, target) {
+    merge_fast_forward(fs, rfs, root, git_dir, target)
+    return {
+      status: FastForward,
+      commit_id: Some(target),
+      conflicts: [],
+      conflict_types: Map([]),
+    }
+  }
+  if merge_is_ancestor(db, rfs, target, head) {
+    return {
+      status: AlreadyUpToDate,
+      commit_id: Some(head),
+      conflicts: [],
+      conflict_types: Map([]),
+    }
+  }
+  let base = merge_find_base(db, rfs, head, target)
+  let base_files = match base {
+    None => Map([])
+    Some(id) => collect_tree_files_from_commit(db, rfs, id)
+  }
+  let ours = collect_tree_files_from_commit(db, rfs, head)
+  let theirs = collect_tree_files_from_commit(db, rfs, target)
+  merge_check_clean_index(rfs, git_dir, ours)
+  ignore(
+  stash_check_local_changes(
+    rfs,
+    root,
+    ours,
+    base_files,
+    theirs,
+    read_skip_worktree_paths(rfs, git_dir),
+    stash_note=false,
+    ),
+  )
+  let tw = merge_three_way(
+    db,
+    fs,
+    rfs,
+    root,
+    git_dir,
+    base_files,
+    ours,
+    theirs,
+    ours_label~,
+    theirs_label~,
+  )
+  let merged = tw.merged
+  let conflicts = tw.conflicts
+  let all_conflict_types = tw.conflict_types
+  if conflicts.length() > 0 {
+    merge_write_conflicted(
+      db, fs, rfs, root, git_dir, base_files, ours, theirs, tw,
+    )
+    fs.write_string(git_dir + "/MERGE_HEAD", target.to_hex() + "\n")
+    fs.write_string(git_dir + "/ORIG_HEAD", head.to_hex() + "\n")
+    fs.write_string(
+      git_dir + "/MERGE_MSG",
+      merge_msg_with_conflicts(rfs, git_dir, message + "\n"),
+    )
+    conflicts.sort()
+    return {
+      status: Conflicted,
+      commit_id: None,
+      conflicts,
+      conflict_types: all_conflict_types,
+    }
+  }
+  merge_write_changed_paths(db, fs, rfs, root, git_dir, ours, merged)
   let entries = tree_files_to_index(db, rfs, merged)
-  write_index_entries(fs, git_dir, entries)
+  merge_write_index_keeping_skip(fs, rfs, root, git_dir, entries)
   let tree_id = write_tree_from_index(fs, rfs, git_dir, entries)
   let commit = @bit.Commit::new(
     tree_id,
@@ -546,6 +702,8 @@ priv struct MergeFilesResult {
   conflict_types : Map[String, String]
   /// Paths that were renamed away and should be removed from worktree
   removed_paths : Array[String]
+  /// rename/delete conflicts: new path -> the base entry (index stage 1)
+  rename_delete_base : Map[String, TreeFileEntry]
 }
 
 ///|
@@ -578,6 +736,7 @@ fn merge_files(
   let merged : Map[String, TreeFileEntry] = Map([])
   let conflicts : Array[String] = []
   let needs_content_merge : Array[ContentMergeCandidate] = []
+  let rename_delete_base : Map[String, TreeFileEntry] = Map([])
   let rename_2to1 : Array[Rename2to1Candidate] = []
   let conflict_types : Map[String, String] = Map([])
   let removed_paths : Array[String] = []
@@ -675,14 +834,27 @@ fn merge_files(
         match (base_entry, ours_entry, theirs_entry) {
           (Some(b), Some(o), Some(t)) =>
             if b.id == t.id {
-              // Theirs didn't modify - just take ours rename
-              merged[new_path] = o
+              // Theirs didn't modify the content - take ours rename, with
+              // a mode change theirs made (the exec bit merges apart).
+              merged[new_path] = {
+                id: o.id,
+                mode: merge_three_way_mode(Some(b.mode), Some(o.mode), Some(t.mode), o.mode),
+              }
             } else if is_add_source &&
               theirs_renames.add_source_paths.contains(old_path) {
               // Both sides replaced old_path with new content; the original
               // was renamed. Handle renamed content at new_path, and the
               // new files at old_path will be merged in Step 4.
               merged[new_path] = o
+            } else if (b.mode == 0o120000) != (t.mode == 0o120000) {
+              // Theirs changed the type (symlink <-> file): git does not
+              // pair that with the path, it is a delete plus an add. So:
+              // rename/delete at new_path, theirs' new file at old_path.
+              merged[new_path] = o
+              conflicts.push(new_path)
+              conflict_types[new_path] = "rename/delete"
+              rename_delete_base[new_path] = b
+              merged[old_path] = t
             } else {
               // Theirs modified at old_path, ours renamed to new_path
               // -> content merge at new_path
@@ -691,7 +863,12 @@ fn merge_files(
                 base_id: Some(b.id),
                 ours_id: o.id,
                 theirs_id: t.id,
-                mode: o.mode,
+                mode: merge_three_way_mode(
+                  Some(b.mode),
+                  Some(o.mode),
+                  Some(t.mode),
+                  o.mode,
+                ),
               })
             }
           (_, Some(o), None) => {
@@ -746,8 +923,12 @@ fn merge_files(
     match (base_entry, ours_entry, theirs_entry) {
       (Some(b), Some(o), Some(t)) =>
         if b.id == o.id {
-          // Ours didn't modify - just take theirs rename
-          merged[new_path] = t
+          // Ours didn't modify the content - take theirs rename, with a
+          // mode change ours made.
+          merged[new_path] = {
+            id: t.id,
+            mode: merge_three_way_mode(Some(b.mode), Some(o.mode), Some(t.mode), t.mode),
+          }
         } else if is_add_source &&
           ours_renames.add_source_paths.contains(old_path) {
           // Both sides replaced; handled in Step 2
@@ -760,7 +941,12 @@ fn merge_files(
             base_id: Some(b.id),
             ours_id: o.id,
             theirs_id: t.id,
-            mode: t.mode,
+            mode: merge_three_way_mode(
+              Some(b.mode),
+              Some(o.mode),
+              Some(t.mode),
+              t.mode,
+            ),
           })
         }
       (_, None, Some(t)) => {
@@ -865,6 +1051,7 @@ fn merge_files(
     rename_2to1,
     conflict_types,
     removed_paths,
+    rename_delete_base,
   }
 }
 
@@ -974,20 +1161,24 @@ fn merge_resolve_rename_content(
         return Some((ours_id, ours_entry.unwrap().mode))
       }
   }
-  // Both modified - content merge
-  let base_content = match base_id {
-    Some(id) => merge_get_blob_text(db, rfs, id)
-    None => ""
+  // Both modified - content merge of the raw bytes (UTF-8, or one char per
+  // byte when any side is not valid UTF-8, so nothing is mangled).
+  let base_bytes = match base_id {
+    Some(id) => merge_get_blob_data(db, rfs, id)
+    None => Bytes::new(0)
   }
-  let ours_content = merge_get_blob_text(db, rfs, ours_id)
-  let theirs_content = merge_get_blob_text(db, rfs, theirs_id)
+  let ours_bytes = merge_get_blob_data(db, rfs, ours_id)
+  let theirs_bytes = merge_get_blob_data(db, rfs, theirs_id)
+  let utf8 = merge_is_valid_utf8(base_bytes) &&
+    merge_is_valid_utf8(ours_bytes) &&
+    merge_is_valid_utf8(theirs_bytes)
   let result = @diff3.content_merge(
-    base_content,
-    ours_content,
-    theirs_content,
+    merge_bytes_to_text(base_bytes, utf8),
+    merge_bytes_to_text(ours_bytes, utf8),
+    merge_bytes_to_text(theirs_bytes, utf8),
     @diff3.ContentMergeOptions::default(),
   )
-  let content_bytes = @utf8.encode(result.content)
+  let content_bytes = merge_text_to_bytes(result.content, utf8)
   let (blob_id, compressed) = @bit.create_blob(content_bytes)
   write_object_bytes(fs, git_dir, blob_id, compressed)
   Some((blob_id, ours_entry.unwrap().mode))
@@ -1004,6 +1195,7 @@ fn merge_conflicted_index_entries_with_renames(
   merged : Map[String, TreeFileEntry],
   conflicts : Array[String],
   rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)],
+  distinct_types? : Map[String, (String, Int)] = Map([]),
 ) -> Array[IndexStageEntry] raise @bit.GitError {
   let out : Array[IndexStageEntry] = []
   let conflict_set : Map[String, Bool] = Map([])
@@ -1017,6 +1209,26 @@ fn merge_conflicted_index_entries_with_renames(
     }
   }
   for path in conflicts {
+    // distinct types: each side at its own path (keeper at `path`).
+    match (distinct_types.get(path), ours.get(path), theirs.get(path)) {
+      (Some((renamed, stage)), Some(o), Some(t)) => {
+        let (keeper, keeper_stage, regular) = if stage == 2 {
+          (t, 3, o)
+        } else {
+          (o, 2, t)
+        }
+        out.push({
+          entry: merge_tree_file_to_index_entry(db, fs, path, keeper),
+          stage: keeper_stage,
+        })
+        out.push({
+          entry: merge_tree_file_to_index_entry(db, fs, renamed, regular),
+          stage,
+        })
+        continue
+      }
+      _ => ()
+    }
     match rename_conflict_stages.get(path) {
       Some(stages) => {
         // rename/rename(2to1): stage 2 = resolved ours, stage 3 = resolved theirs
@@ -1060,4 +1272,226 @@ fn merge_conflicted_index_entries_with_renames(
     }
   }
   out
+}
+
+///|
+/// Write a clean merge result over the worktree like git: only paths whose
+/// content changes from `ours` are written, and paths `merged` drops are
+/// removed (lstat); unstaged edits on untouched paths survive.
+fn merge_write_changed_paths(
+  db : ObjectDb,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  ours : Map[String, TreeFileEntry],
+  merged : Map[String, TreeFileEntry],
+  leave? : Map[String, Bool] = Map([]),
+) -> Unit raise @bit.GitError {
+  // Sparse: skip-worktree and out-of-cone paths (and files `leave` names)
+  // are updated in the index only -- git does not write outside the cone.
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  for p, _ in leave {
+    skip[p] = true
+  }
+  if is_sparse_checkout_enabled(rfs, git_dir) {
+    let patterns = read_sparse_patterns(rfs, git_dir)
+    for path, _ in merged {
+      if !matches_sparse_pattern(path, patterns) {
+        skip[path] = true
+      }
+    }
+    for path, _ in ours {
+      if !matches_sparse_pattern(path, patterns) {
+        skip[path] = true
+      }
+    }
+  }
+  let emptied : Array[String] = []
+  for path, o in ours {
+    if merged.contains(path) ||
+      is_gitlink_mode_int(o.mode) ||
+      skip.contains(path) {
+      continue
+    }
+    let abs = join_path(root, path)
+    if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+      fs.remove_file(abs) catch {
+        _ => ()
+      }
+      emptied.push(parent_dir(abs))
+    }
+  }
+  tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
+  let changed : Map[String, TreeFileEntry] = Map([])
+  for path, f in merged {
+    if skip.contains(path) {
+      continue
+    }
+    match ours.get(path) {
+      Some(o) if o.id == f.id && o.mode == f.mode => ()
+      _ => changed[path] = f
+    }
+  }
+  write_worktree_from_files(db, fs, rfs, root, git_dir, changed)
+}
+
+///|
+/// Write a merge-family result index, keeping the skip-worktree bit of
+/// every entry that is still there (sparse checkouts).
+fn merge_write_index_keeping_skip(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  entries : Array[IndexEntry],
+) -> Unit raise @bit.GitError {
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let sparse = is_sparse_checkout_enabled(rfs, git_dir)
+  if skip.length() == 0 && !sparse {
+    write_index_entries(fs, git_dir, entries)
+    return
+  }
+  let patterns = if sparse { read_sparse_patterns(rfs, git_dir) } else { [] }
+  let keep : Map[String, Bool] = Map([])
+  for e in entries {
+    if skip.contains(e.path) {
+      keep[e.path] = true
+    } else if sparse &&
+      !is_gitlink_mode_int(e.mode) &&
+      !matches_sparse_pattern(e.path, patterns) &&
+      @bitio.worktree_entry_meta_sync(rfs, join_path(root, e.path)) is None {
+      // An out-of-cone entry the merge did not write (a path it brings
+      // back or adds) is skip-worktree, as git's sparse checkout makes it.
+      keep[e.path] = true
+    }
+  }
+  write_index_entries_with_skip_worktree(fs, git_dir, entries, keep)
+}
+
+///|
+/// merge-ort refuses to run when the index differs from HEAD at all.
+fn merge_check_clean_index(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  ours : Map[String, TreeFileEntry],
+) -> Unit raise @bit.GitError {
+  let changed : Map[String, Bool] = Map([])
+  let seen : Map[String, Bool] = Map([])
+  for e in read_index_entries(rfs, git_dir) {
+    seen[e.path] = true
+    match ours.get(e.path) {
+      Some(o) if o.id == e.id && o.mode == e.mode => ()
+      _ => changed[e.path] = true
+    }
+  }
+  for path, _ in ours {
+    if !seen.contains(path) {
+      changed[path] = true
+    }
+  }
+  if changed.length() > 0 {
+    let paths = changed.keys().to_array()
+    paths.sort()
+    raise @bit.GitError::InvalidObject(
+      "Your local changes to the following files would be overwritten by merge:\n  " +
+      paths.join(" ") +
+      "\nMerge with strategy ort failed.",
+    )
+  }
+}
+
+///|
+/// Raise git's merge-ort error when the index differs from `head`'s tree.
+pub fn merge_require_clean_index(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  head : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
+  let db = ObjectDb::load_lazy(rfs, resolve_common_git_dir(rfs, git_dir))
+  merge_check_clean_index(rfs, git_dir, collect_tree_files_from_commit(db, rfs, head))
+}
+
+///|
+/// Whether `data` is valid UTF-8 (so the text merge round-trips it).
+fn merge_is_valid_utf8(data : Bytes) -> Bool {
+  let text = @utf8.decode(data[:]) catch { _ => return false }
+  @utf8.encode(text) == data
+}
+
+///|
+/// Blob bytes as merge text: UTF-8 decoding, or one char per byte.
+fn merge_bytes_to_text(data : Bytes, utf8 : Bool) -> String {
+  if utf8 {
+    return @utf8.decode_lossy(data[:])
+  }
+  let sb = StringBuilder()
+  for b in data {
+    sb.write_char(Int::unsafe_to_char(b.to_int()))
+  }
+  sb.to_string()
+}
+
+///|
+/// Inverse of `merge_bytes_to_text`.
+fn merge_text_to_bytes(text : String, utf8 : Bool) -> Bytes {
+  if utf8 {
+    return @utf8.encode(text)
+  }
+  let out : Array[Byte] = []
+  for c in text {
+    let code = c.to_int()
+    if code < 256 {
+      out.push(code.to_byte())
+    } else {
+      // Only marker text / labels can be outside Latin-1: keep them UTF-8.
+      for b in @utf8.encode(c.to_string()) {
+        out.push(b)
+      }
+    }
+  }
+  Bytes::from_array(out)
+}
+
+///|
+/// Three-way merge of a file mode: a side that changed it from the base
+/// wins (ours if both did).
+fn merge_three_way_mode(
+  base : Int?,
+  ours : Int?,
+  theirs : Int?,
+  fallback : Int,
+) -> Int {
+  match (base, ours, theirs) {
+    (Some(b), Some(o), Some(t)) => if o == b { t } else { o }
+    (_, Some(o), _) => o
+    (_, _, Some(t)) => t
+    _ => fallback
+  }
+}
+
+///|
+/// The MERGE_MSG git writes after a conflicted merge / cherry-pick /
+/// revert: the message, then a "# Conflicts:" list of the unmerged paths
+/// in index order (`commit --no-edit` keeps it, an editor strips it).
+fn merge_msg_with_conflicts(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  message : String,
+) -> String {
+  let paths = read_unmerged_paths(rfs, git_dir).keys().collect()
+  if paths.length() == 0 {
+    return message
+  }
+  paths.sort_by(index_path_compare_git_order)
+  let sb = StringBuilder::new()
+  sb.write_string(message)
+  if !message.has_suffix("\n") {
+    sb.write_string("\n")
+  }
+  sb.write_string("\n# Conflicts:\n")
+  for p in paths {
+    sb.write_string("#\t" + p + "\n")
+  }
+  sb.to_string()
 }

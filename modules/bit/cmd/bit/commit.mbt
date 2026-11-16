@@ -93,6 +93,32 @@ fn commit_storage_runtime_delegate_args(
 
 ///|
 async fn handle_commit(args : Array[String]) -> Unit raise Error {
+  // git stages `-a` into a temporary index: a commit that fails (e.g.
+  // nothing to commit) leaves the real index untouched.
+  let stages_all = args.iter().any(a => a == "-a" ||
+    a == "--all" ||
+    (a.has_prefix("-") && !a.has_prefix("--") && a.contains("a") && a.length() <= 4))
+  if !stages_all {
+    return handle_commit_inner(args)
+  }
+  let fs = OsFs::new()
+  let index_path = resolve_git_dir(fs, get_work_root()) + "/index"
+  let saved = if fs.is_file(index_path) {
+    Some(fs.read_file(index_path))
+  } else {
+    None
+  }
+  errdefer {
+    match saved {
+      Some(bytes) => fs.write_file(index_path, bytes) catch { _ => () }
+      None => ()
+    }
+  }
+  handle_commit_inner(args)
+}
+
+///|
+async fn handle_commit_inner(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
@@ -423,10 +449,31 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
     for p in status.unstaged_deleted {
       paths_to_add.push(p)
     }
+    // -a also stages (resolves) conflicted paths, as git does.
+    for p, _ in @bitlib.read_unmerged_paths(fs, git_dir) {
+      if !paths_to_add.contains(p) {
+        paths_to_add.push(p)
+      }
+    }
+    let paths_to_add = @bitlib.filter_paths_in_sparse_checkout(
+      fs, git_dir, paths_to_add,
+    )
     if paths_to_add.length() > 0 {
       @bitlib.add_paths_async(fs, fs, root, paths_to_add)
     }
   }
+  if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+    eprint_line(
+      "error: Committing is not possible because you have unmerged files.",
+    )
+    eprint_line(
+      "hint: Fix them up in the work tree, and then use 'git add/rm <file>'",
+    )
+    eprint_line("hint: as appropriate to mark resolution and make a commit.")
+    eprint_line("fatal: Exiting because of an unresolved conflict.")
+    @sys.exit(128)
+  }
+
   // Handle pathspec-based partial commit (--include / --only / positional args)
   if pathspecs.length() > 0 {
     commit_handle_pathspec_staging(
@@ -856,44 +903,16 @@ async fn commit_signed(
   let parent = @bitlib.resolve_head_commit(rfs, git_dir)
   let entries = @bitlib.read_index_entries(rfs, git_dir)
   let tree_id = if entries.length() == 0 {
-    if !allow_empty {
-      raise @bitcore.GitError::InvalidObject("Empty index")
+    // Empty index = the empty tree (every file deleted).
+    if !allow_empty && parent is None {
+      raise @bitcore.GitError::InvalidObject("nothing to commit")
     }
-    match parent {
-      Some(parent_id) => {
-        let db = @bitlib.ObjectDb::load_lazy(rfs, git_dir)
-        let parent_tree = match db.get(rfs, parent_id) {
-          Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit =>
-            (@bitcore.parse_commit(obj.data).tree |> Some) catch {
-              _ => None
-            }
-          _ => None
-        }
-        match parent_tree {
-          Some(tree) => tree
-          None => {
-            let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
-              algo,
-              [],
-            )
-            @bitlib.write_object_bytes(
-              fs, git_dir, empty_tree_id, empty_tree_compressed,
-            )
-            empty_tree_id
-          }
-        }
-      }
-      None => {
-        let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
-          algo,
-          [],
-        )
-        @bitlib.write_object_bytes(
-          fs, git_dir, empty_tree_id, empty_tree_compressed,
-        )
-        empty_tree_id
-      }
-    }
+    let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
+      algo,
+      [],
+    )
+    @bitlib.write_object_bytes(fs, git_dir, empty_tree_id, empty_tree_compressed)
+    empty_tree_id
   } else {
     @bitlib.write_tree_from_index(
       fs,
@@ -1035,44 +1054,16 @@ async fn commit_with_merge_heads(
   let head_parent = @bitlib.resolve_head_commit(rfs, git_dir)
   let entries = @bitlib.read_index_entries(rfs, git_dir)
   let tree_id = if entries.length() == 0 {
-    if !allow_empty {
-      raise @bitcore.GitError::InvalidObject("Empty index")
+    // Empty index = the empty tree (every file deleted).
+    if !allow_empty && head_parent is None {
+      raise @bitcore.GitError::InvalidObject("nothing to commit")
     }
-    match head_parent {
-      Some(parent_id) => {
-        let db = @bitlib.ObjectDb::load_lazy(rfs, git_dir)
-        let parent_tree = match db.get(rfs, parent_id) {
-          Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit =>
-            (@bitcore.parse_commit(obj.data).tree |> Some) catch {
-              _ => None
-            }
-          _ => None
-        }
-        match parent_tree {
-          Some(tree) => tree
-          None => {
-            let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
-              algo,
-              [],
-            )
-            @bitlib.write_object_bytes(
-              fs, git_dir, empty_tree_id, empty_tree_compressed,
-            )
-            empty_tree_id
-          }
-        }
-      }
-      None => {
-        let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
-          algo,
-          [],
-        )
-        @bitlib.write_object_bytes(
-          fs, git_dir, empty_tree_id, empty_tree_compressed,
-        )
-        empty_tree_id
-      }
-    }
+    let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
+      algo,
+      [],
+    )
+    @bitlib.write_object_bytes(fs, git_dir, empty_tree_id, empty_tree_compressed)
+    empty_tree_id
   } else {
     @bitlib.write_tree_from_index(
       fs,

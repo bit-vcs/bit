@@ -234,6 +234,8 @@ test "merge: fast-forward preserves initialized submodule on removal" {
   )
 
   @bit_lib.switch_branch(fs, fs, "/repo", "main", checkout_files=false)
+  // Back on main: its index (with .gitmodules and the gitlink).
+  @bit_lib.write_index_entries(fs, "/repo/.git", entries)
   let result = @bit_lib.merge(
     fs, fs, "/repo", remove_commit, "merge", "Test <t@example.com>", 1700000104L,
   )

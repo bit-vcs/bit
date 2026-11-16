@@ -218,3 +218,49 @@ pub async fn worktree_entry(
       }
   }
 }
+
+///|
+/// Synchronous worktree mode writers (symlink creation, chmod). Native
+/// installs real ones; elsewhere both report `false` and callers keep the
+/// plain file they wrote.
+pub struct WorktreeWriterProvider {
+  make_symlink : (String, String) -> Bool
+  set_mode : (String, Int) -> Bool
+}
+
+///|
+pub fn WorktreeWriterProvider::new(
+  make_symlink : (String, String) -> Bool,
+  set_mode : (String, Int) -> Bool,
+) -> WorktreeWriterProvider {
+  { make_symlink, set_mode }
+}
+
+///|
+priv struct WorktreeWriterBox {
+  mut value : WorktreeWriterProvider
+}
+
+///|
+let worktree_writer_box : WorktreeWriterBox = {
+  value: { make_symlink: fn(_, _) { false }, set_mode: fn(_, _) { false } },
+}
+
+///|
+pub fn set_worktree_writer(provider : WorktreeWriterProvider) -> Unit {
+  worktree_writer_box.value = provider
+}
+
+///|
+/// Create a symlink at `path` pointing to `target` (`path` must not
+/// exist). Returns false when unsupported or on failure.
+pub fn worktree_make_symlink(target : String, path : String) -> Bool {
+  (worktree_writer_box.value.make_symlink)(target, path)
+}
+
+///|
+/// chmod `path` (never following a symlink). Returns false when
+/// unsupported or on failure.
+pub fn worktree_set_mode(path : String, mode : Int) -> Bool {
+  (worktree_writer_box.value.set_mode)(path, mode)
+}

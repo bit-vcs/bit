@@ -151,6 +151,11 @@ async fn apply_symlink(
   path : String,
   target : String,
 ) -> Unit raise @bit.GitError {
+  // Already the right link (e.g. the tree writer created it): keep it.
+  if @bitio.read_symlink_target_path(path) is Some(existing) &&
+    existing == target {
+    return
+  }
   remove_path_if_exists(path)
   @afs.symlink(target~, path) catch {
     err => raise @bit.GitError::IoError(err.to_string())
@@ -176,7 +181,11 @@ async fn apply_file_mode(path : String, mode : Int) -> Unit raise @bit.GitError 
 
 ///|
 async fn remove_path_if_exists(path : String) -> Unit raise @bit.GitError {
-  let exists = @afs.exists(path) catch {
+  // lstat-based: a dangling symlink exists too and must be removed.
+  let exists = try {
+    ignore(@afs.kind(path, follow_symlink=false))
+    true
+  } catch {
     _ => false
   }
   if !exists {
@@ -227,4 +236,75 @@ fn worktree_modes_join_path(root : String, path : String) -> String {
   } else {
     root + "/" + path
   }
+}
+
+///|
+/// Like `apply_worktree_modes_from_commit`, restricted to `paths` (the ones
+/// a checkout actually wrote): files it left alone keep their local mode,
+/// and a symlink the user deleted is not recreated.
+pub async fn apply_worktree_modes_for_paths(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  commit_id : @bit.ObjectId,
+  paths : Array[String],
+) -> Unit raise @bit.GitError {
+  if paths.length() == 0 {
+    return
+  }
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let all = @bitlib.collect_tree_files_from_commit(db, rfs, commit_id)
+  let files : Map[String, @bitlib.TreeFileEntry] = Map([])
+  for p in paths {
+    match all.get(p) {
+      Some(e) => files[p] = e
+      None => ()
+    }
+  }
+  apply_worktree_modes_from_files(db, rfs, fs, root, git_dir, files)
+}
+
+///|
+/// Apply modes and symlinks for exactly `files` (path -> blob and mode),
+/// e.g. the entries `restore_paths` just wrote from the index.
+pub async fn apply_worktree_modes_for_files(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  files : Map[String, @bitlib.TreeFileEntry],
+) -> Unit raise @bit.GitError {
+  if files.length() == 0 {
+    return
+  }
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  apply_worktree_modes_from_files(db, rfs, fs, root, git_dir, files)
+}
+
+///|
+/// Apply modes and symlinks for `paths` as the index records them.
+pub async fn apply_worktree_modes_for_index_paths(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  paths : Array[String],
+) -> Unit raise @bit.GitError {
+  if paths.length() == 0 {
+    return
+  }
+  let wanted : Map[String, Bool] = Map([])
+  for p in paths {
+    wanted[p] = true
+  }
+  let index_files = @bitlib.read_index_tree_files(rfs, git_dir)
+  let files : Map[String, @bitlib.TreeFileEntry] = Map([])
+  for path, entry in index_files {
+    if wanted.contains(path) {
+      files[path] = entry
+    }
+  }
+  let common = @bitlib.resolve_common_git_dir(rfs, git_dir)
+  apply_worktree_modes_for_files(fs, rfs, root, common, files)
 }

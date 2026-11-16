@@ -26,7 +26,7 @@ pub async fn diff_worktree(
 ) -> Array[DiffFile] raise @bit.GitError {
   let profile = profile_enabled()
   let mut t0 = profile_start(profile)
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_root_git_dir(fs, root)
   let autocrlf = read_autocrlf_setting(fs, git_dir)
   let index_entries = read_index_entries(fs, git_dir)
   let skip_worktree_paths = read_skip_worktree_paths(fs, git_dir)
@@ -207,7 +207,7 @@ pub fn diff_index(
   root : String,
   db? : ObjectDb,
 ) -> Array[DiffFile] raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_root_git_dir(fs, root)
   let index_entries = read_index_entries(fs, git_dir)
   let index_map : Map[String, IndexEntry] = Map([])
   for e in index_entries {

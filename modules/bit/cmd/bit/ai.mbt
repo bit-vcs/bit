@@ -938,7 +938,7 @@ async fn handle_ai_cherry_pick(args : Array[String]) -> Unit raise Error {
     handle_cherry_pick(cherry_pick_args)
     return
   }
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   let context = collect_ai_context(rfs, root, user_instructions)
   let commit_oid = @bitrepo.rev_parse(rfs, git_dir, commit_ref.unwrap()) catch {
     _ => None
@@ -967,6 +967,8 @@ async fn handle_ai_cherry_pick(args : Array[String]) -> Unit raise Error {
         }
         None => print_line("Cherry-pick successful")
       }
+    @bitlib.CherryPickStatus::Empty =>
+      print_line("Cherry-pick is empty: \{commit_ref.unwrap()} is already applied")
     @bitlib.CherryPickStatus::Conflict =>
       resolve_cherry_pick_conflict_and_commit(
         fs,

@@ -64,6 +64,10 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     }
     @sys.exit(1)
   }
+  // Removing a conflicted (unmerged) path resolves it: git does not run
+  // the staged/unstaged content checks for those.
+  let unmerged_now = @bitlib.read_unmerged_paths(fs, actual_git_dir)
+  let check_paths = removed_paths.filter(p => !unmerged_now.contains(p))
   if opts.cached && !opts.force && head_exists {
     let st = @bitlib.status(fs, root)
     let staged_but_not_head : Map[String, Bool] = Map([])
@@ -83,7 +87,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     for path in st.unstaged_modified {
       unstaged_modified[path] = true
     }
-    for path in removed_paths {
+    for path in check_paths {
       if intent_to_add_paths.contains(path) {
         continue
       }
@@ -97,14 +101,16 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
   if !opts.cached && !opts.force {
     let st = @bitlib.status(fs, root)
     let missing_worktree_paths : Map[String, Bool] = Map([])
-    for path in removed_paths {
+    for path in check_paths {
       let abs_path = root + "/" + path
-      if !fs.is_file(abs_path) && !fs.is_dir(abs_path) {
+      // lstat: a symlink (dangling or not) is present.
+      if @bitio.worktree_entry_meta_sync(fs, abs_path) is None &&
+        !fs.is_dir(abs_path) {
         missing_worktree_paths[path] = true
       }
     }
     let (both_dirty, staged_only, local_only) = rm_collect_conflict_paths(
-      st, removed_paths, missing_worktree_paths, head_exists,
+      st, check_paths, missing_worktree_paths, head_exists,
     )
     if both_dirty.length() > 0 ||
       staged_only.length() > 0 ||
@@ -654,6 +660,11 @@ fn rm_collect_conflict_paths(
   for path in removed_paths {
     let has_stage_add = staged_added.contains(path)
     let worktree_missing = missing_worktree_paths.contains(path)
+    // git skips the local-modification checks when the worktree file is
+    // gone: removing the entry loses nothing that is not in the index.
+    if worktree_missing {
+      continue
+    }
     let has_staged_change = staged_modified.contains(path) ||
       (has_stage_add && !worktree_missing)
     let has_unstaged_change = unstaged_modified.contains(path)

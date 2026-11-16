@@ -522,7 +522,14 @@ pub fn content_merge(
   let base_lines = split_lines(base_text)
   let ours_lines = split_lines(ours_text)
   let theirs_lines = split_lines(theirs_text)
-  let sections = diff3_merge(base_lines, ours_lines, theirs_lines)
+  let raw_sections = diff3_merge(base_lines, ours_lines, theirs_lines)
+  // git's default merge level (XDL_MERGE_ZEALOUS) refines conflicts for the
+  // plain "merge" style: lines both sides share move out of the markers,
+  // and conflicts separated by at most 3 unchanged lines are joined again.
+  let sections = match options.conflict_style {
+    ConflictStyle::Merge => zealous_refine(raw_sections)
+    ConflictStyle::Diff3 => raw_sections
+  }
   let sb = StringBuilder()
   let mut conflict_count = 0
   for section in sections {
@@ -554,24 +561,18 @@ pub fn content_merge(
             sb.write_string(
               render_marker('<', options.marker_size, options.ours_label),
             )
-            for line in ours {
-              sb.write_string(line)
-            }
+            write_conflict_section(sb, ours)
             match options.conflict_style {
               ConflictStyle::Diff3 => {
                 sb.write_string(
                   render_marker('|', options.marker_size, options.base_label),
                 )
-                for line in base {
-                  sb.write_string(line)
-                }
+                write_conflict_section(sb, base)
               }
               ConflictStyle::Merge => ()
             }
             sb.write_string(render_marker('=', options.marker_size, ""))
-            for line in theirs {
-              sb.write_string(line)
-            }
+            write_conflict_section(sb, theirs)
             sb.write_string(
               render_marker('>', options.marker_size, options.theirs_label),
             )
@@ -591,4 +592,101 @@ pub fn is_binary_content(data : Bytes) -> Bool {
     }
   }
   false
+}
+
+///|
+/// Write one side of a conflict: a last line without a newline gets one, so
+/// the following marker starts its own line (as git does).
+fn write_conflict_section(sb : StringBuilder, lines : Array[String]) -> Unit {
+  for line in lines {
+    sb.write_string(line)
+  }
+  if lines.length() > 0 && !lines[lines.length() - 1].has_suffix("\n") {
+    sb.write_string("\n")
+  }
+}
+
+///|
+/// Refine and re-join conflict sections like git's xdl_refine_conflicts +
+/// xdl_simplify_non_conflicts at XDL_MERGE_ZEALOUS.
+fn zealous_refine(sections : Array[Diff3Section]) -> Array[Diff3Section] {
+  // 1. Split each conflict along the ours/theirs diff.
+  let refined : Array[Diff3Section] = []
+  for section in sections {
+    match section {
+      Diff3Section::Clean(_) => refined.push(section)
+      Diff3Section::Conflict(ours~, base~, theirs~) => {
+        let changes = extract_changes(myers_diff(ours, theirs))
+        if changes.length() == 0 {
+          refined.push(Diff3Section::Clean(ours))
+          continue
+        }
+        ignore(base)
+        let mut po = 0
+        for c in changes {
+          if po < c.base_start {
+            refined.push(Diff3Section::Clean(slice_lines(ours, po, c.base_start)))
+          }
+          refined.push(
+            Diff3Section::Conflict(
+              ours=slice_lines(ours, c.base_start, c.base_end),
+              base=[],
+              theirs=slice_lines(theirs, c.new_start, c.new_end),
+            ),
+          )
+          po = c.base_end
+        }
+        if po < ours.length() {
+          refined.push(Diff3Section::Clean(slice_lines(ours, po, ours.length())))
+        }
+      }
+    }
+  }
+  // 2. Merge consecutive clean sections, then join conflicts whose gap is
+  //    at most 3 lines.
+  let flat : Array[Diff3Section] = []
+  for section in refined {
+    match (section, flat.last()) {
+      (Diff3Section::Clean(a), Some(Diff3Section::Clean(prev))) => {
+        ignore(flat.pop())
+        let joined = prev.copy()
+        joined.append(a)
+        flat.push(Diff3Section::Clean(joined))
+      }
+      _ => flat.push(section)
+    }
+  }
+  let out : Array[Diff3Section] = []
+  let mut i = 0
+  while i < flat.length() {
+    match flat[i] {
+      Diff3Section::Conflict(ours~, base~, theirs~) => {
+        let o = ours.copy()
+        let t = theirs.copy()
+        let b = base.copy()
+        let mut j = i + 1
+        while j + 1 < flat.length() {
+          match (flat[j], flat[j + 1]) {
+            (Diff3Section::Clean(gap), Diff3Section::Conflict(ours=o2, base=b2, theirs=t2)) if gap.length() <=
+              3 => {
+              o.append(gap)
+              o.append(o2)
+              t.append(gap)
+              t.append(t2)
+              b.append(b2)
+              j = j + 2
+            }
+            _ => break
+          }
+        }
+        out.push(Diff3Section::Conflict(ours=o, base=b, theirs=t))
+        i = j
+      }
+      section => {
+        out.push(section)
+        i = i + 1
+      }
+    }
+  }
+  out
 }

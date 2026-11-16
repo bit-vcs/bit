@@ -465,7 +465,7 @@ pub fn tree_files_to_index(
       }
     }
   }
-  entries.sort_by((a, b) => String::compare(a.path, b.path))
+  entries.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
   entries
 }
 
@@ -485,7 +485,8 @@ fn tree_ops_remove_missing_paths(
       continue
     }
     let path = join_path(root, entry.path)
-    if rfs.is_file(path) {
+    // lstat: a symlink (even dangling or self-referencing) is removed.
+    if worktree_path_is_symlink(path) || rfs.is_file(path) {
       fs.remove_file(path)
       emptied_candidates.push(parent_dir(path))
     } else if is_gitlink_mode_int(entry.mode) && rfs.is_dir(path) {
@@ -733,6 +734,7 @@ pub fn write_worktree_from_files(
         }
         let output = smudge_for_checkout(data, attrs, autocrlf, core_eol~)
         fs.write_file(full_path, output)
+        tree_ops_apply_entry_mode(fs, full_path, info.mode, o.data)
       }
     }
   }
@@ -839,6 +841,7 @@ pub fn write_worktree_and_build_index(
           }
           let output = smudge_for_checkout(data, attrs, autocrlf, core_eol~)
           fs.write_file(full_path, output)
+        tree_ops_apply_entry_mode(fs, full_path, info.mode, o.data)
         }
         // Get actual mtime from the file we just wrote
         let (mtime_sec, mtime_nsec) = match
@@ -902,5 +905,36 @@ fn collect_tree_files_inner(
         }
       }
     }
+  }
+}
+
+///|
+/// After writing a blob: make a symlink entry a real symlink and give a
+/// regular file its 644/755 mode, where the platform supports it (native);
+/// otherwise the plain file just written stays.
+fn tree_ops_apply_entry_mode(
+  fs : &@bit.FileSystem,
+  full_path : String,
+  mode : Int,
+  data : Bytes,
+) -> Unit {
+  if mode == 0o120000 {
+    let target = @utf8.decode_lossy(data[:])
+    let removed = try {
+      fs.remove_file(full_path)
+      true
+    } catch {
+      _ => false
+    }
+    if removed && !@bitio.worktree_make_symlink(target, full_path) {
+      // Unsupported: put the plain file back.
+      fs.write_file(full_path, data) catch {
+        _ => ()
+      }
+    }
+  } else if mode == 0o100755 {
+    ignore(@bitio.worktree_set_mode(full_path, 0o755))
+  } else if mode == 0o100644 {
+    ignore(@bitio.worktree_set_mode(full_path, 0o644))
   }
 }

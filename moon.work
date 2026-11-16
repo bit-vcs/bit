@@ -36,6 +36,7 @@ members = [
   "./modules/bit_worktree",
   "./modules/bitx_bitconfig",
   "./modules/bitx_doc",
+  "./modules/bitx_home",
   "./modules/bitx_hq",
   "./modules/bitx_hub",
   "./modules/bitx_openpgp",

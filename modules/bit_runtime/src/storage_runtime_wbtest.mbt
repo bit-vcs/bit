@@ -966,3 +966,58 @@ test "storage runtime: commit -a stages tracked only" {
     "BIT_STORAGE_RUNTIME_QUIET", prev_quiet,
   )
 }
+
+///|
+test "storage runtime: status porcelain ignores skip-worktree entries" {
+  let fs = @bit.TestFs::new()
+  let root = "/repo-storage-runtime-status-skip-worktree"
+  let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
+  let (
+    prev_author_name,
+    prev_author_email,
+    prev_committer_name,
+    prev_committer_email,
+  ) = setup_identity_for_storage_runtime_wbtest()
+  run_storage_command(fs, fs, root, storage_runtime_wbtest_init_command()) catch {
+    err => fail("init failed: \{err}")
+  }
+  fs.write_string(root + "/kept.txt", "kept\n")
+  fs.write_string(root + "/sparse.txt", "outside the sparse cone\n")
+  fs.write_string(root + "/edited.txt", "base\n")
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    storage_runtime_wbtest_add_command(["kept.txt", "sparse.txt", "edited.txt"]),
+  ) catch {
+    err => fail("add failed: \{err}")
+  }
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    storage_runtime_wbtest_commit_command("base"),
+  ) catch {
+    err => fail("commit failed: \{err}")
+  }
+  // A sparse checkout marks sparse.txt / edited.txt skip-worktree: one is
+  // absent from the worktree, the other differs from the index. Neither is
+  // a change, as in git.
+  fs.write_string(root + "/.git/bit-skip-worktree", "sparse.txt\nedited.txt\n")
+  fs.remove_file(root + "/sparse.txt")
+  fs.write_string(root + "/edited.txt", "stale copy\n")
+  fs.write_string(root + "/kept.txt", "changed\n")
+  let lines = storage_status_porcelain_lines(fs, root, false) catch {
+    err => {
+      fail("status lines failed: \{err}")
+      []
+    }
+  }
+  assert_eq(lines, [" M kept.txt"])
+  restore_identity_for_storage_runtime_wbtest(
+    prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
+  )
+  restore_env_var_for_storage_runtime_wbtest(
+    "BIT_STORAGE_RUNTIME_QUIET", prev_quiet,
+  )
+}

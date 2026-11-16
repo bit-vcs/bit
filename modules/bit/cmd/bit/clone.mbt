@@ -671,6 +671,26 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
             @bitlibnative.apply_worktree_modes_from_commit(
               fs, fs, clone_root, clone_git_dir, checked_id,
             )
+          } else if @bitlib.resolve_ref(
+              fs,
+              clone_git_dir,
+              "refs/remotes/" + remote_name + "/" + refname,
+            )
+            is Some(remote_id) {
+            // `--branch <b>` names a remote branch: create the local branch
+            // with upstream tracking and check it out, as git does (instead
+            // of a detached HEAD at its commit).
+            write_ref_file(fs, clone_git_dir, local_branch_ref, remote_id)
+            setup_clone_branch_tracking(fs, clone_git_dir, refname, remote_name)
+            let checked_id = run_checkout_with_sensitive_hooks(
+              fs, fs, clone_root, refname,
+            )
+            warn_case_insensitive_collisions_from_commit(
+              fs, clone_git_dir, checked_id,
+            )
+            @bitlibnative.apply_worktree_modes_from_commit(
+              fs, fs, clone_root, clone_git_dir, checked_id,
+            )
           } else {
             match
               resolve_local_clone_checkout_target(
@@ -802,6 +822,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
                     ()
                   }
                 }
+                setup_clone_branch_tracking(fs, clone_git_dir, name, remote_name)
                 let checked_id = run_checkout_with_sensitive_hooks(
                   fs, fs, clone_root, name,
                 )

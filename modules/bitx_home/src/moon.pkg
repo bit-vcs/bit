@@ -1,0 +1,11 @@
+import {
+  "moonbit-community/toml",
+  "moonbitlang/core/string",
+}
+
+warnings = "-29"
+
+import {
+  "moonbitlang/core/test",
+  "mizchi/bitx_home" @home,
+} for "test"

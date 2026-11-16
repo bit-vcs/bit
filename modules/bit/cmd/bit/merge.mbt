@@ -78,9 +78,9 @@ fn merge_write_pending_state(
 ///|
 async fn handle_merge(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
+  let git_dir = resolve_git_dir(fs, root)
   check_and_exit_unsupported_attrs(root)
   let wfs : &@bitcore.FileSystem = fs
   let mut message : String? = None
@@ -126,6 +126,8 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
+      // Merges are never interactive here: --no-edit / --edit are moot.
+      "--no-edit" | "--edit" | "-e" => ()
       "--no-ff" => {
         no_ff = true
         i += 1
@@ -288,7 +290,8 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       let orig_hex = rfs.read_file(orig_head_path)
         |> decode_bytes
         |> trim_string
-      ignore(@bitlib.reset(wfs, rfs, root, orig_hex, @bitlib.ResetMode::Hard))
+      // git: `reset --merge ORIG_HEAD`, keeping unrelated local edits.
+      @bitlib.reset_merge(wfs, rfs, root, @bitcore.ObjectId::from_hex(orig_hex))
       wfs.remove_file(orig_head_path) catch {
         _ => ()
       }
@@ -321,7 +324,8 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     }
     // Commit the merge
     let msg = if rfs.is_file(merge_msg_path) {
-      rfs.read_file(merge_msg_path) |> decode_bytes |> trim_string
+      // Like the editor path, comment lines (# Conflicts:) are stripped.
+      rfs.read_file(merge_msg_path) |> decode_bytes |> commit_strip_message
     } else {
       "Merge commit"
     }
@@ -381,6 +385,17 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("No commit to merge specified")
   }
   validate_current_branch_mergeoptions(rfs, git_dir)
+  if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+    eprint_line("error: Merging is not possible because you have unmerged files.")
+    eprint_line(
+      "hint: Fix them up in the work tree, and then use 'git add/rm <file>'",
+    )
+    eprint_line(
+      "hint: as appropriate to mark resolution and make a commit.",
+    )
+    eprint_line("fatal: Exiting because of an unresolved conflict.")
+    @sys.exit(128)
+  }
   // Check if subdir-clone and handle specially
   match get_subdir_info(fs, git_dir) {
     Some((_, subdir_path, _)) => {
@@ -397,7 +412,10 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   ignore(rfs) // merge commit targets handled natively
   let author = get_author_string()
   let timestamp = get_commit_timestamp()
-  let msg = message.unwrap_or("Merge \{refspec}")
+  let msg = match message {
+    Some(m) => m
+    None => merge_default_message(rfs, git_dir, refspec)
+  }
   // Handle -s ours: keep our tree, create merge commit
   if strategy is Some(s) && s == "ours" {
     let head_id = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
@@ -505,6 +523,18 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     @stdio.stderr.write(@utf8.encode("fatal: Not possible to fast-forward, aborting."))
     @sys.exit(128)
   }
+  // Merging something HEAD already contains is a no-op, even with
+  // --no-ff (git: "Already up to date.").
+  let already_merged = match head {
+    Some(h) => is_ancestor(rfs, git_dir, tid, h)
+    None => false
+  }
+  if already_merged {
+    if !quiet {
+      print_line("Already up to date.")
+    }
+    return
+  }
   // Handle --no-ff: force merge commit even if fast-forward possible
   if no_ff && is_ff {
     // Create merge commit even though ff is possible
@@ -512,6 +542,12 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     let head_id = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
     guard head_id is Some(hid) else {
       raise @bitcore.GitError::InvalidObject("Cannot resolve HEAD")
+    }
+    @bitlib.merge_require_clean_index(rfs, git_dir, hid) catch {
+      err => {
+        eprint_line("error: " + format_error_message(err))
+        @sys.exit(2)
+      }
     }
     // Use target's tree
     let target_obj = db.get(rfs, tid)
@@ -536,17 +572,31 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     let commit_id = merge_write_commit_object(
       fs, root, git_dir, commit, commit_algo, should_sign, signing_key,
     )
-    @bitlib.update_head_ref(wfs, rfs, git_dir, commit_id)
-    // Checkout the new tree
+    // Refresh the worktree to the merged tree first (from the old HEAD),
+    // then advance the current branch -- checking out the commit id would
+    // detach HEAD.
+    let checkout_target = match @bitlib.read_head_ref(rfs, git_dir) {
+      @bitlib.HeadRef::Branch(name) => Some(name)
+      @bitlib.HeadRef::Detached(_) => None
+    }
     ignore(
       run_checkout_with_sensitive_hooks(
         wfs,
         rfs,
         root,
-        commit_id.to_hex(),
-        detach=false,
+        tid.to_hex(),
+        detach=true,
+        // Two-tree checkout: local changes (even deleted files) survive.
+        keep_local_changes=true,
       ),
     )
+    match checkout_target {
+      Some(name) => {
+        write_ref_file(fs, git_dir, "refs/heads/" + name, commit_id)
+        wfs.write_string(git_dir + "/HEAD", "ref: refs/heads/" + name + "\n")
+      }
+      None => wfs.write_string(git_dir + "/HEAD", commit_id.to_hex() + "\n")
+    }
     let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
     if !quiet {
       print_line("Merge made by the 'ort' strategy (--no-ff). [\{short}]")
@@ -956,3 +1006,35 @@ fn is_ancestor(
 }
 
 ///|
+
+///|
+/// git's default merge message (fmt-merge-msg) for `git merge <refspec>`:
+/// "Merge branch 'x'", "Merge remote-tracking branch 'origin/x'",
+/// "Merge tag 'v1'" or "Merge commit 'abc'", followed by " into <branch>"
+/// unless the current branch is main or master.
+fn merge_default_message(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  refspec : String,
+) -> String raise Error {
+  let kind = if @bitlib.resolve_ref(rfs, git_dir, "refs/heads/" + refspec)
+    is Some(_) {
+    "branch"
+  } else if @bitlib.resolve_ref(rfs, git_dir, "refs/remotes/" + refspec)
+    is Some(_) {
+    "remote-tracking branch"
+  } else if @bitlib.resolve_ref(rfs, git_dir, "refs/tags/" + refspec)
+    is Some(_) {
+    "tag"
+  } else {
+    "commit"
+  }
+  let base = "Merge \{kind} '\{refspec}'"
+  match @bitlib.read_head_ref(rfs, git_dir) {
+    @bitlib.HeadRef::Branch(name) if name != "main" && name != "master" =>
+      base + " into " + name
+    @bitlib.HeadRef::Branch(_) => base
+    // git (fmt-merge-msg) names a detached HEAD too.
+    @bitlib.HeadRef::Detached(_) => base + " into HEAD"
+  }
+}

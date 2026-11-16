@@ -55,6 +55,7 @@ modules/
   bit_worktree/
   bitx_bitconfig/          ← extension modules (non-Git features)
   bitx_doc/
+  bitx_home/
   bitx_hq/
   bitx_hub/
   bitx_kv/
@@ -160,6 +161,7 @@ depend on another extension module — shared logic should be promoted into
 |------------------------------|---------------------------------|---------------------------------|
 | `mizchi/bitx_bitconfig`      | `modules/bitx_bitconfig/src`    | bit-specific config             |
 | `mizchi/bitx_doc`            | `modules/bitx_doc/src`          | Repo-stored markdown docs       |
+| `mizchi/bitx_home`           | `modules/bitx_home/src`         | Home Repo pattern (`bit home`)  |
 | `mizchi/bitx_hq`             | `modules/bitx_hq/src`           | `ghq`-compatible repo manager   |
 | `mizchi/bitx_hub`            | `modules/bitx_hub/src`          | Local PR / Issue metadata       |
 | `mizchi/bitx_hub/crypto`     | `modules/bitx_hub/src/crypto`   | Hub signing primitives          |

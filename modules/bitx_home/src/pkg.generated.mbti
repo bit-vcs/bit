@@ -1,0 +1,99 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bitx_home"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub let agents_block_begin : String
+
+pub let agents_block_end : String
+
+pub fn agents_md_template(HomeManifest) -> String
+
+pub let claude_md_pointer : String
+
+pub fn describe_status(RepoStatus) -> String
+
+pub fn is_valid_feature_name(String) -> Bool
+
+pub fn is_valid_repo_name(String) -> Bool
+
+pub let manifest_file_name : String
+
+pub let manifest_template : String
+
+pub fn normalize_subdir(String) -> String raise HomeError
+
+pub fn parse_manifest(String) -> HomeManifest raise HomeError
+
+pub fn parse_porcelain_status(String) -> RepoStatus
+
+pub fn path_basename(String) -> String
+
+pub fn render_agents_block(HomeManifest) -> String
+
+pub fn repo_toml_block(HomeRepo) -> String
+
+pub fn resolve_repo_path(String, home~ : String, home_repo_root~ : String) -> String
+
+pub fn sparse_pattern(String) -> String
+
+pub fn toml_quote(String) -> String
+
+pub fn update_agents_md(String, String) -> String
+
+pub fn upstream_from_config(String, String) -> (String, String)?
+
+pub fn worktree_path(String, String) -> String
+
+pub let worktrees_dir_name : String
+
+// Errors
+#derive(@debug.Debug)
+pub suberror HomeError {
+  HomeError(String)
+}
+pub fn HomeError::message(Self) -> String
+pub fn HomeError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+#derive(Eq, @debug.Debug)
+pub(all) struct HomeManifest {
+  repos : Array[HomeRepo]
+}
+pub fn HomeManifest::equal(Self, Self) -> Bool
+pub fn HomeManifest::find(Self, String) -> HomeRepo?
+pub fn HomeManifest::not_equal(Self, Self) -> Bool
+pub fn HomeManifest::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub(all) struct HomeRepo {
+  name : String
+  path : String
+  url : String?
+  description : String?
+  branch : String?
+  subdir : String?
+  notes : String?
+}
+pub fn HomeRepo::equal(Self, Self) -> Bool
+pub fn HomeRepo::not_equal(Self, Self) -> Bool
+pub fn HomeRepo::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub(all) struct RepoStatus {
+  branch : String?
+  upstream : String?
+  ahead : Int32
+  behind : Int32
+  changes : Int32
+}
+pub fn RepoStatus::equal(Self, Self) -> Bool
+pub fn RepoStatus::not_equal(Self, Self) -> Bool
+pub fn RepoStatus::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

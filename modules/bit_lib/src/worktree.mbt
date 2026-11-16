@@ -166,9 +166,52 @@ pub fn add_paths(
   for e in entries {
     map[e.path] = e
   }
+  let core_filemode = read_core_filemode_setting(rfs, common_git_dir)
   let all_paths = expand_paths(rfs, root, paths)
+  all_paths.append(
+    expand_tracked_missing(
+      entries,
+      read_skip_worktree_paths(rfs, actual_git_dir),
+      paths,
+      all_paths,
+    ),
+  )
   for path in all_paths {
     let abs = join_path(root, path)
+    // lstat, never following a symlink: a symlink is staged as itself
+    // (mode 120000, blob = link target), like git, not as its target's
+    // content -- and a dangling or directory symlink is not "missing".
+    let meta = @bitio.worktree_entry_meta_sync(rfs, abs)
+    if meta is Some(info) && info.kind is @bitio.WorktreeKindMeta::Symlink {
+      match @bitio.read_symlink_target_path(abs) {
+        Some(target) => {
+          let bytes = @utf8.encode(target)
+          let id = write_loose_object(
+            fs,
+            common_git_dir,
+            @bit.ObjectType::Blob,
+            bytes,
+            algo=effective_algo,
+          )
+          compat_record_blob_mapping(fs, rfs, common_git_dir, id, bytes)
+          map[path] = {
+            path,
+            id,
+            mode: 0o120000,
+            size: bytes.length(),
+            mtime_sec: info.mtime_sec.unwrap_or(0),
+            mtime_nsec: info.mtime_nsec.unwrap_or(0),
+            intent_to_add: false,
+            dev: info.dev.unwrap_or(0),
+            ino: info.ino.unwrap_or(0),
+            uid: info.uid.unwrap_or(0),
+            gid: info.gid.unwrap_or(0),
+          }
+        }
+        None => map.remove(path)
+      }
+      continue
+    }
     if rfs.is_file(abs) {
       let content = rfs.read_file(abs)
       let attrs = resolve_eol_attrs(rfs, root, path)
@@ -186,8 +229,7 @@ pub fn add_paths(
       )
       compat_record_blob_mapping(fs, rfs, common_git_dir, id, normalized)
       let size = content.length()
-      let (mtime_sec, mtime_nsec, dev, ino, uid, gid) = match
-        @bitio.worktree_entry_meta_sync(rfs, abs) {
+      let (mtime_sec, mtime_nsec, dev, ino, uid, gid) = match meta {
         Some(info) =>
           (
             info.mtime_sec.unwrap_or(0),
@@ -199,10 +241,19 @@ pub fn add_paths(
           )
         None => (0, 0, 0, 0, 0, 0)
       }
+      // The executable bit comes from the worktree (core.filemode); with
+      // core.filemode=false keep what the index already records.
+      let mode = match (meta, map.get(path)) {
+        (Some(info), _) if core_filemode &&
+          (info.mode == 0o100755 || info.mode == 0o100644) => info.mode
+        (_, Some(existing)) if existing.mode == 0o100755 ||
+          existing.mode == 0o100644 => existing.mode
+        _ => default_file_mode()
+      }
       map[path] = {
         path,
         id,
-        mode: default_file_mode(),
+        mode,
         size,
         mtime_sec,
         mtime_nsec,
@@ -217,7 +268,7 @@ pub fn add_paths(
     }
   }
   let out = map.values().to_array()
-  write_index_entries_preserving_cache_tree(fs, rfs, actual_git_dir, out)
+  add_write_index_keeping_conflicts(fs, rfs, actual_git_dir, out, all_paths)
 }
 
 ///|
@@ -246,6 +297,14 @@ pub async fn add_paths_async(
     map[e.path] = e
   }
   let all_paths = expand_paths_async(rfs, root, paths)
+  all_paths.append(
+    expand_tracked_missing(
+      entries,
+      read_skip_worktree_paths(rfs, actual_git_dir),
+      paths,
+      all_paths,
+    ),
+  )
   for path in all_paths {
     let abs = join_path(root, path)
     let meta = @bitio.worktree_entry_meta(rfs, abs)
@@ -383,7 +442,7 @@ pub async fn add_paths_async(
     }
   }
   let out = map.values().to_array()
-  write_index_entries_preserving_cache_tree(fs, rfs, actual_git_dir, out)
+  add_write_index_keeping_conflicts(fs, rfs, actual_git_dir, out, all_paths)
 }
 
 ///|
@@ -416,11 +475,39 @@ pub fn commit(
     _ => algo
   }
   let parent = resolve_head_commit(rfs, actual_git_dir)
+  // git refuses to commit an index with conflict stages (they would be
+  // collapsed into the commit).
+  if read_unmerged_paths(rfs, actual_git_dir).length() > 0 {
+    raise @bit.GitError::InvalidObject(
+      "Committing is not possible because you have unmerged files.",
+    )
+  }
   let entries = read_index_entries(rfs, actual_git_dir)
+  // An empty index records the empty tree (e.g. every file deleted);
+  // whether that is "nothing to commit" is decided below, as in git.
   let tree_id = if entries.length() == 0 {
-    if !allow_empty {
-      raise @bit.GitError::InvalidObject("Empty index")
+    if !allow_empty && parent is None {
+      raise @bit.GitError::InvalidObject("nothing to commit")
     }
+    let (empty_tree_id, empty_tree_compressed) = @object.create_tree_with_algo(
+      effective_algo,
+      [],
+    )
+    write_object_bytes(fs, common_git_dir, empty_tree_id, empty_tree_compressed)
+    empty_tree_id
+  } else {
+    write_tree_from_index(
+      fs,
+      rfs,
+      common_git_dir,
+      entries,
+      missing_ok=true,
+      algo=effective_algo,
+    )
+  }
+  // Like git: without --allow-empty, a commit whose tree equals its
+  // parent's records nothing and is refused.
+  if !allow_empty {
     match parent {
       Some(parent_id) => {
         let db = ObjectDb::load_lazy(rfs, common_git_dir)
@@ -431,40 +518,14 @@ pub fn commit(
             }
           _ => None
         }
-        match parent_tree {
-          Some(tree) => tree
-          None => {
-            let (empty_tree_id, empty_tree_compressed) = @object.create_tree_with_algo(
-              effective_algo,
-              [],
-            )
-            write_object_bytes(
-              fs, common_git_dir, empty_tree_id, empty_tree_compressed,
-            )
-            empty_tree_id
-          }
+        if parent_tree == Some(tree_id) {
+          raise @bit.GitError::InvalidObject(
+            "nothing to commit, working tree clean",
+          )
         }
       }
-      None => {
-        let (empty_tree_id, empty_tree_compressed) = @object.create_tree_with_algo(
-          effective_algo,
-          [],
-        )
-        write_object_bytes(
-          fs, common_git_dir, empty_tree_id, empty_tree_compressed,
-        )
-        empty_tree_id
-      }
+      None => ()
     }
-  } else {
-    write_tree_from_index(
-      fs,
-      rfs,
-      common_git_dir,
-      entries,
-      missing_ok=true,
-      algo=effective_algo,
-    )
   }
   let parents = match parent {
     Some(p) => [p]
@@ -512,6 +573,46 @@ pub fn commit(
 }
 
 ///|
+/// Tracked paths (from `entries`) that a pathspec in `paths` covers but
+/// that `expanded` (built from the worktree) lacks: files deleted from the
+/// worktree, including whole deleted directories. `add <pathspec>` must
+/// stage their removal, like git. Skip-worktree entries (outside a sparse
+/// checkout) are absent on purpose and are not included.
+fn expand_tracked_missing(
+  entries : Array[IndexEntry],
+  skip_worktree : Map[String, Bool],
+  paths : Array[String],
+  expanded : Array[String],
+) -> Array[String] raise @bit.GitError {
+  let have : Map[String, Bool] = Map([])
+  for p in expanded {
+    have[p] = true
+  }
+  let specs : Array[String] = []
+  for p in paths {
+    specs.push(normalize_rel_path(p))
+  }
+  let out : Array[String] = []
+  for e in entries {
+    // Gitlinks (submodules) are directories, never in `expanded`.
+    if have.contains(e.path) ||
+      skip_worktree.contains(e.path) ||
+      e.mode == 0o160000 {
+      continue
+    }
+    for spec in specs {
+      let prefix = if spec.has_suffix("/") { spec } else { spec + "/" }
+      if spec == "." || e.path == spec || e.path.has_prefix(prefix) {
+        out.push(e.path)
+        have[e.path] = true
+        break
+      }
+    }
+  }
+  out
+}
+
+///|
 fn expand_paths(
   fs : &@bit.RepoFileSystem,
   root : String,
@@ -529,7 +630,9 @@ fn expand_paths(
       continue
     }
     let abs = join_path(root, path)
-    if fs.is_dir(abs) {
+    // A symlink to a directory is a path of its own (mode 120000), never
+    // expanded into its target's contents.
+    if fs.is_dir(abs) && !worktree_path_is_symlink(abs) {
       let prefix = if path.has_suffix("/") { path } else { path + "/" }
       for f in all {
         if f.has_prefix(prefix) {
@@ -561,7 +664,9 @@ async fn expand_paths_async(
       continue
     }
     let abs = join_path(root, path)
-    if fs.is_dir(abs) {
+    // A symlink to a directory is a path of its own (mode 120000), never
+    // expanded into its target's contents.
+    if fs.is_dir(abs) && !worktree_path_is_symlink(abs) {
       let prefix = if path.has_suffix("/") { path } else { path + "/" }
       for f in all {
         if f.has_prefix(prefix) {
@@ -1075,12 +1180,37 @@ pub fn write_loose_object(
 }
 
 ///|
+/// Objects live in the common git dir. A linked worktree's own git dir is
+/// `<common>/worktrees/<name>` (git's layout, commondir "../.."), so an
+/// object written "into" it goes to `<common>` instead -- never into a
+/// per-worktree `objects/` that nothing reads.
+fn object_write_git_dir(git_dir : String) -> String {
+  let trimmed = if git_dir.has_suffix("/") {
+    String::unsafe_substring(git_dir, start=0, end=git_dir.length() - 1)
+  } else {
+    git_dir
+  }
+  match trimmed.rev_find("/") {
+    Some(i) => {
+      let parent = String::unsafe_substring(trimmed, start=0, end=i)
+      if parent.has_suffix("/worktrees") {
+        String::unsafe_substring(parent, start=0, end=parent.length() - 10)
+      } else {
+        git_dir
+      }
+    }
+    None => git_dir
+  }
+}
+
+///|
 pub fn write_object_bytes(
   fs : &@bit.FileSystem,
   git_dir : String,
   id : @bit.ObjectId,
   compressed : Bytes,
 ) -> Unit raise @bit.GitError {
+  let git_dir = object_write_git_dir(git_dir)
   let hex = id.to_hex()
   let path = join_path(
     git_dir,
@@ -1849,7 +1979,10 @@ pub fn rm_paths(
     // Remove from working tree unless --cached
     if !cached {
       let abs = join_path(root, norm_path)
-      if rfs.is_file(abs) {
+      // lstat: a symlink (even dangling or to a directory) is removed itself.
+      let is_link = @bitio.worktree_entry_meta_sync(rfs, abs) is Some(info) &&
+        info.kind is @bitio.WorktreeKindMeta::Symlink
+      if is_link || rfs.is_file(abs) {
         fs.remove_file(abs)
         rm_prune_empty_parent_dirs(fs, rfs, root, norm_path)
       } else if tracked_entry is Some(entry) &&
@@ -1871,9 +2004,18 @@ pub fn rm_paths(
     }
   }
   write_skip_worktree_paths(fs, actual_git_dir, remaining_skip_paths)
-  write_index_entries_with_skip_worktree(
-    fs, actual_git_dir, out, remaining_skip_worktree_paths,
-  )
+  if read_unmerged_paths(rfs, actual_git_dir).length() > 0 {
+    // Conflicts in the index: drop every stage of the removed paths (that
+    // resolves them) and keep all other entries -- including other paths'
+    // conflict stages -- exactly as they are.
+    let stage_entries = read_index_stage_entries(rfs, actual_git_dir)
+    let kept = stage_entries.filter(item => map.contains(item.entry.path))
+    write_index_stage_entries(fs, actual_git_dir, kept)
+  } else {
+    write_index_entries_with_skip_worktree(
+      fs, actual_git_dir, out, remaining_skip_worktree_paths,
+    )
+  }
   if !cached {
     rm_update_gitmodules_after_submodule_removal(
       fs, rfs, root, removed_submodule_paths,
@@ -2252,4 +2394,40 @@ pub fn smudge_worktree_content(content : Bytes, autocrlf : AutoCrlf) -> Bytes {
         convert_lf_to_crlf(content)
       }
   }
+}
+
+///|
+/// Write the index after `add`: the added paths are resolved (stage 0, or
+/// gone), every other path keeps its entries -- including the conflict
+/// stages of paths the add did not touch (the collapsed per-path view
+/// `read_index_entries` gives would otherwise resolve them silently).
+fn add_write_index_keeping_conflicts(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  out : Array[IndexEntry],
+  touched : Array[String],
+) -> Unit raise @bit.GitError {
+  let unmerged = read_unmerged_paths(rfs, git_dir)
+  if unmerged.length() == 0 {
+    write_index_entries_preserving_cache_tree(fs, rfs, git_dir, out)
+    return
+  }
+  let touched_set : Map[String, Bool] = Map([])
+  for p in touched {
+    touched_set[p] = true
+  }
+  let result : Array[IndexStageEntry] = []
+  for item in read_index_stage_entries(rfs, git_dir) {
+    if unmerged.contains(item.entry.path) && !touched_set.contains(item.entry.path) {
+      result.push(item)
+    }
+  }
+  for e in out {
+    if unmerged.contains(e.path) && !touched_set.contains(e.path) {
+      continue
+    }
+    result.push({ entry: e, stage: 0 })
+  }
+  write_index_stage_entries(fs, git_dir, result)
 }

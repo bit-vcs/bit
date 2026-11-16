@@ -9,6 +9,12 @@ import {
 }
 
 // Values
+pub async fn apply_worktree_modes_for_files(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Map[String, @bit_lib.TreeFileEntry]) -> Unit raise @bit_object.GitError
+
+pub async fn apply_worktree_modes_for_index_paths(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Array[String]) -> Unit raise @bit_object.GitError
+
+pub async fn apply_worktree_modes_for_paths(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, @bit_object.ObjectId, Array[String]) -> Unit raise @bit_object.GitError
+
 pub async fn apply_worktree_modes_from_commit(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, @bit_object.ObjectId) -> Unit raise @bit_object.GitError
 
 pub async fn clone_http(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Bool) -> @bit_object.ObjectId? raise @bit_object.GitError

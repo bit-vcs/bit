@@ -77,9 +77,8 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       None => ()
     }
     if @bitlib.resolve_ref(fs, git_dir, "refs/heads/" + branch_name) is Some(_) {
-      raise @bitcore.GitError::InvalidObject(
-        "branch '\{branch_name}' already exists",
-      )
+      eprint_line("fatal: a branch named '\{branch_name}' already exists")
+      @sys.exit(128)
     }
     fs.write_string(git_dir + "/HEAD", "ref: refs/heads/" + branch_name + "\n")
     save_previous_checkout_location(fs, git_dir, previous_location)
@@ -94,7 +93,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       Some(path) => checkout_raise_branch_in_use(branch_name, path)
       None => ()
     }
-    // Check if branch already exists
+    // An existing branch is refused first (128), then an unmerged index.
     let branch_exists = @bitlib.resolve_ref(
         fs,
         git_dir,
@@ -102,9 +101,12 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       )
       is Some(_)
     if branch_exists && !force_create {
-      raise @bitcore.GitError::InvalidObject(
-        "branch '\{branch_name}' already exists",
-      )
+      eprint_line("fatal: a branch named '\{branch_name}' already exists")
+      @sys.exit(128)
+    }
+    if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+      eprint_line("error: you need to resolve your current index first")
+      @sys.exit(1)
     }
     // For start point, first checkout to that commit, then create branch
     match start_point {
@@ -117,15 +119,23 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
         }
         // Checkout the start point first (detached)
         let _ = checkout_with_promisor_retry(fs, root, ref_name, detach=true)
-        // Then create and switch to new branch
-        @bitlib.switch_branch(fs, fs, root, branch_name, create=true)
+        // Then create the branch there and point HEAD at it; the
+        // worktree (with any carried-over local changes) is already right.
+        @bitlib.switch_branch(
+          fs,
+          fs,
+          root,
+          branch_name,
+          create=true,
+          checkout_files=false,
+        )
         if track_branch {
           checkout_apply_tracking_config(
             fs, rfs, git_dir, branch_name, ref_name,
           )
         }
       }
-      None =>
+      None => {
         // Same commit, just create branch ref and update HEAD
         @bitlib.switch_branch(
           fs,
@@ -135,6 +145,11 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
           create=true,
           checkout_files=false,
         )
+        // A switch re-applies the sparse patterns, as git's does.
+        if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+          @bitlib.sparse_checkout_reapply(fs, fs, root)
+        }
+      }
     }
     save_previous_checkout_location(fs, git_dir, previous_location)
     return ()
@@ -145,7 +160,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       raise @bitcore.GitError::InvalidObject("No paths specified for checkout")
     }
     if targets.length() == 0 {
-      @bitlib.restore_paths(fs, fs, root, post_separator_targets)
+      checkout_restore_index_paths(fs, root, post_separator_targets)
     } else if targets.length() == 1 {
       checkout_restore_paths_from_spec(
         fs,
@@ -200,6 +215,11 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       _ => false
     }
     if is_branch && current_branch_matches {
+      // Even a no-op switch refuses an unmerged index (git).
+      if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+        eprint_line("error: you need to resolve your current index first")
+        @sys.exit(1)
+      }
       return ()
     }
     let previous_location = current_checkout_location(rfs, git_dir)
@@ -226,7 +246,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       switched_head = true
     } else if is_path {
       // Restore single file
-      @bitlib.restore_paths(fs, fs, root, [target])
+      checkout_restore_index_paths(fs, root, [target])
     } else {
       // Try as branch/commit
       match checkout_branch_in_use_path(rfs, root, target) {
@@ -271,7 +291,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       )
     } else {
       // Multiple targets: treat as file paths
-      @bitlib.restore_paths(fs, fs, root, targets)
+      checkout_restore_index_paths(fs, root, targets)
     }
   }
 }
@@ -636,12 +656,17 @@ async fn checkout_with_promisor_retry(
   }
   let mut attempts = 0
   while attempts < 16 {
+    // The user-facing checkout/switch keeps local changes (two-tree
+    // checkout) and only re-applies modes to the paths it wrote.
+    let updated : Array[String] = []
     let id = run_checkout_with_sensitive_hooks(
       fs,
       fs,
       root,
       checkout_spec,
       detach=checkout_detach,
+      keep_local_changes=true,
+      updated_paths=updated,
     ) catch {
       err => {
         match parse_checkout_missing_object_id(err) {
@@ -675,7 +700,9 @@ async fn checkout_with_promisor_retry(
     if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
       @bitlib.sparse_checkout_reapply(fs, fs, root)
     }
-    @bitlibnative.apply_worktree_modes_from_commit(fs, fs, root, git_dir, id) catch {
+    @bitlibnative.apply_worktree_modes_for_paths(
+      fs, fs, root, git_dir, id, updated,
+    ) catch {
       _ => ()
     }
     return id
@@ -846,3 +873,19 @@ fn parse_checkout_missing_object_id(err : Error) -> @bitcore.ObjectId? {
 }
 
 ///|
+
+///|
+/// `git checkout -- <paths>` / `git restore <paths>` from the index, then
+/// the entries' modes and symlinks (native only).
+async fn checkout_restore_index_paths(
+  fs : OsFs,
+  root : String,
+  paths : Array[String],
+) -> Unit raise Error {
+  let restored : Map[String, @bitlib.TreeFileEntry] = Map([])
+  @bitlib.restore_paths(fs, fs, root, paths, restored~)
+  let common_dir = @bitlib.resolve_common_git_dir(fs, resolve_git_dir(fs, root))
+  @bitlibnative.apply_worktree_modes_for_files(
+    fs, fs, root, common_dir, restored,
+  )
+}

@@ -162,6 +162,9 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   // so only loose objects are packed (existing packs are kept).
   po_args.push("--all")
   po_args.push("--reflog")
+  // Like git's repack: objects the index refers to (staged blobs, the
+  // cache-tree's trees) are kept too, or the index points at nothing.
+  po_args.push("--indexed-objects")
   if !all {
     po_args.push("--unpacked")
     po_args.push("--incremental")
@@ -302,6 +305,8 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
       fs.remove_file(pack_dir + "/" + stem + ".bitmap") catch {
         _ => ()
       }
+      // Objects may be gone: a commit-graph naming them is stale.
+      @bitlib.invalidate_commit_graph(fs, fs, git_dir)
     }
   }
   // Update server info (objects/info/packs) unless -n
@@ -444,7 +449,10 @@ async fn repack_fallback(
         )
       }
       if all && delete_redundant {
-        let git_dir = root + "/.git"
+        let git_dir = @bitlib.resolve_common_git_dir(
+    OsFs::new(),
+    resolve_git_dir(OsFs::new(), root),
+  )
         let pack_dir = git_dir + "/objects/pack"
         let new_pack_name = "pack-" + info.pack_id.to_hex() + ".pack"
         let entries = fs.readdir(pack_dir) catch { _ => [] }
@@ -463,6 +471,7 @@ async fn repack_fallback(
             fs.remove_file(pack_dir + "/" + stem + ".bitmap") catch {
               _ => ()
             }
+            @bitlib.invalidate_commit_graph(fs, fs, git_dir)
           }
         }
       }

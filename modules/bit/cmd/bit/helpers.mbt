@@ -1006,6 +1006,8 @@ async fn run_checkout_with_sensitive_hooks(
   detach? : Bool = false,
   update_worktree? : Bool = true,
   update_index? : Bool = true,
+  keep_local_changes? : Bool = false,
+  updated_paths? : Array[String],
 ) -> @bitcore.ObjectId raise Error {
   hooks_ensure_sensitive_hook_approval(fs, rfs, root, "post-checkout")
   @bitlib.checkout(
@@ -1016,6 +1018,8 @@ async fn run_checkout_with_sensitive_hooks(
     detach~,
     update_worktree~,
     update_index~,
+    keep_local_changes~,
+    updated_paths?,
   )
 }
 

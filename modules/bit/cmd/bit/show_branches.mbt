@@ -1,7 +1,7 @@
 ///|
 async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_git_dir(OsFs::new(), root)
   let fs = OsFs::new()
   // Parse arguments
   let mut show_all = false

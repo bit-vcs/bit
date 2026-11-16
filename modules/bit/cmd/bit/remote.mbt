@@ -1595,12 +1595,27 @@ fn write_ref_file(
       raise @bitcore.GitError::InvalidObject("invalid refname: " + refname)
     }
   }
-  let path = git_dir + "/" + normalized
+  let path = ref_storage_git_dir(fs, git_dir, normalized) + "/" + normalized
   let dir = parent_dir(path)
   if dir.length() > 0 {
     ensure_dir(dir)
   }
   fs.write_string(path, id.to_hex() + "\n")
+}
+
+///|
+/// Where a ref is stored: shared refs live in the common git dir, also
+/// when written from a linked worktree; HEAD and git's per-worktree refs
+/// (refs/bisect, refs/worktree, refs/rewritten) stay in `git_dir`.
+fn ref_storage_git_dir(fs : OsFs, git_dir : String, refname : String) -> String {
+  if !refname.has_prefix("refs/") ||
+    refname.has_prefix("refs/bisect/") ||
+    refname.has_prefix("refs/worktree/") ||
+    refname.has_prefix("refs/rewritten/") {
+    git_dir
+  } else {
+    @bitlib.resolve_common_git_dir(fs, git_dir)
+  }
 }
 
 ///|
@@ -1635,7 +1650,9 @@ fn write_symref_file(
       raise @bitcore.GitError::InvalidObject("invalid ref target: " + target)
     }
   }
-  let path = git_dir + "/" + normalized_refname
+  let path = ref_storage_git_dir(fs, git_dir, normalized_refname) +
+    "/" +
+    normalized_refname
   let dir = parent_dir(path)
   if dir.length() > 0 {
     ensure_dir(dir)

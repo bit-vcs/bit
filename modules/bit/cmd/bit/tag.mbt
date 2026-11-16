@@ -582,7 +582,10 @@ async fn tag_create_signed_annotated_tag(
     signed_payload,
   )
   @bitlib.write_object_bytes(fs, git_dir, tag_id, compressed)
-  let ref_path = git_dir + "/refs/tags/" + name
+  // Refs are shared: write into the common dir, also from a linked worktree.
+  let ref_path = @bitlib.resolve_common_git_dir(fs, git_dir) +
+    "/refs/tags/" +
+    name
   fs.mkdir_p(parent_dir(ref_path))
   fs.write_string(ref_path, tag_id.to_hex() + "\n")
 }

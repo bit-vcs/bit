@@ -713,7 +713,12 @@ fn index_append_cache_tree_node(
   target : Array[Byte],
   tree : IndexCacheTree,
 ) -> Unit {
-  index_append_ascii_bytes(target, tree.name)
+  // Directory names are UTF-8 bytes (one byte per char mangled non-ASCII
+  // names, so the cache-tree no longer matched its paths and was never
+  // invalidated -- a stale tree, and objects gc then dropped).
+  for b in @utf8.encode(tree.name) {
+    target.push(b)
+  }
   target.push(b'\x00')
   index_append_ascii_bytes(target, tree.entry_count.to_string())
   target.push(b' ')
@@ -875,6 +880,7 @@ fn index_preserve_cache_tree(
 fn index_build_cache_tree_from_entries(
   entries : Array[IndexEntry],
   name? : String = "",
+  trees? : Array[(@bit.ObjectId, Bytes)],
 ) -> IndexCacheTree {
   let file_entries : Array[@bit.TreeEntry] = []
   let dir_map : Map[String, Array[IndexEntry]] = Map([])
@@ -931,7 +937,11 @@ fn index_build_cache_tree_from_entries(
     }
   }
   for dir_name, list in dir_map {
-    let subtree = index_build_cache_tree_from_entries(list, name=dir_name)
+    let subtree = index_build_cache_tree_from_entries(
+      list,
+      name=dir_name,
+      trees?,
+    )
     file_entries.push(
       @bit.TreeEntry::new("40000", dir_name, subtree.oid.unwrap()),
     )
@@ -944,19 +954,56 @@ fn index_build_cache_tree_from_entries(
     compare_strings_lexicographic(a_key, b_key)
   })
   subtrees.sort_by(fn(a, b) { compare_strings_lexicographic(a.name, b.name) })
-  let (tree_id, _) = @bit.create_tree(file_entries)
+  let (tree_id, tree_compressed) = @bit.create_tree(file_entries)
+  if trees is Some(out) {
+    out.push((tree_id, tree_compressed))
+  }
   { name, entry_count, oid: Some(tree_id), subtrees }
 }
 
 ///|
 fn index_prepare_cache_tree(
+  wfs : &@bit.FileSystem,
   fs : &@bit.RepoFileSystem,
   git_dir : String,
   sorted : Array[IndexEntry],
-) -> IndexCacheTree {
+) -> IndexCacheTree raise @bit.GitError {
   match index_preserve_cache_tree(fs, git_dir, sorted) {
     Some(tree) => tree
-    None => index_build_cache_tree_from_entries(sorted)
+    None => {
+      // A valid cache-tree entry promises that its tree object exists
+      // (git fsck checks it). A freshly built one names trees nobody has
+      // written yet, so write them now.
+      let trees : Array[(@bit.ObjectId, Bytes)] = []
+      let tree = index_build_cache_tree_from_entries(sorted, trees~)
+      index_store_missing_trees(wfs, fs, git_dir, trees)
+      tree
+    }
+  }
+}
+
+///|
+fn index_store_missing_trees(
+  wfs : &@bit.FileSystem,
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+  trees : Array[(@bit.ObjectId, Bytes)],
+) -> Unit raise @bit.GitError {
+  if trees.length() == 0 {
+    return
+  }
+  // A linked worktree's git dir holds only its index; objects live in the
+  // common git dir.
+  let objects_git_dir = resolve_common_git_dir(fs, git_dir)
+  let db = ObjectDb::load_lazy(fs, objects_git_dir)
+  for item in trees {
+    let (id, data) = item
+    let present = (db.get(fs, id) catch { _ => None }) is Some(_)
+    if present {
+      continue
+    }
+    // `data` is the compressed object `create_tree` produced for `id`.
+    write_object_bytes(wfs, objects_git_dir, id, data)
   }
 }
 
@@ -1356,7 +1403,7 @@ pub fn write_index_entries_preserving_cache_tree(
   let hash_size = index_repo_hash_size(rfs, git_dir)
   let sorted = entries.copy()
   sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
-  let cache_tree = index_prepare_cache_tree(rfs, git_dir, sorted)
+  let cache_tree = index_prepare_cache_tree(fs, rfs, git_dir, sorted)
   let (skip_worktree_paths, assume_unchanged_paths) = index_preserved_flag_paths(
     rfs,
     git_dir,
@@ -1385,11 +1432,13 @@ pub fn write_index_entries_with_tree(
   let hash_size = index_repo_hash_size(rfs, git_dir)
   let sorted = entries.copy()
   sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
-  let cache_tree = index_build_cache_tree_from_entries(sorted)
+  let trees : Array[(@bit.ObjectId, Bytes)] = []
+  let cache_tree = index_build_cache_tree_from_entries(sorted, trees~)
   match cache_tree.oid {
     Some(id) if id == tree_id => ()
     _ => ()
   }
+  index_store_missing_trees(fs, rfs, git_dir, trees)
   let (skip_worktree_paths, assume_unchanged_paths) = index_preserved_flag_paths(
     rfs,
     git_dir,
@@ -1473,11 +1522,18 @@ pub fn write_index_entries_with_flags(
 fn write_index_stage_buf(
   entries : Array[IndexStageEntry],
   hash_size? : Int = 20,
+  skip? : Map[String, Bool] = Map([]),
 ) -> FixedArray[Byte] {
   let mut total_size = 12
   let mut version = 2
+  let is_skip = fn(item : IndexStageEntry) {
+    item.stage == 0 && skip.contains(item.entry.path)
+  }
   for item in entries {
-    let has_extended = index_extended_flags(item.entry.intent_to_add, false) !=
+    let has_extended = index_extended_flags(
+        item.entry.intent_to_add,
+        is_skip(item),
+      ) !=
       0
     if has_extended {
       version = 3
@@ -1503,7 +1559,7 @@ fn write_index_stage_buf(
       pos,
       item.entry,
       item.stage,
-      false,
+      is_skip(item),
       false,
       hash_size~,
     )
@@ -1522,6 +1578,7 @@ pub fn write_index_stage_entries(
   git_dir : String,
   entries : Array[IndexStageEntry],
   hash_size? : Int = 20,
+  skip? : Map[String, Bool] = Map([]),
 ) -> Unit raise @bit.GitError {
   let sorted = entries.copy()
   sorted.sort_by(fn(a, b) {
@@ -1533,7 +1590,7 @@ pub fn write_index_stage_entries(
     }
   })
   let effective_hash_size = index_hash_size_for_stage_entries(sorted, hash_size)
-  let buf = write_index_stage_buf(sorted, hash_size=effective_hash_size)
+  let buf = write_index_stage_buf(sorted, hash_size=effective_hash_size, skip~)
   let index_path = join_path(git_dir, "index")
   fs.write_file(index_path, Bytes::from_array(buf[:]))
 }
@@ -1620,4 +1677,17 @@ fn index_stage_priority(stage : Int) -> Int {
   } else {
     1
   }
+}
+
+///|
+/// The index's stage-0 entries as path -> (blob, mode).
+pub fn read_index_tree_files(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Map[String, TreeFileEntry] raise @bit.GitError {
+  let out : Map[String, TreeFileEntry] = Map([])
+  for e in read_index_entries(rfs, git_dir) {
+    out[e.path] = { id: e.id, mode: e.mode }
+  }
+  out
 }

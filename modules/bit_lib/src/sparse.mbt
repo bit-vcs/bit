@@ -281,8 +281,8 @@ fn sparse_canonicalize_cone_patterns(patterns : Array[String]) -> Array[String] 
             sparse_cone_is_descendant(normalized, existing) {
             covered = true
           }
-          if existing != normalized &&
-            !sparse_cone_is_descendant(existing, normalized) {
+          // A duplicate stays (once): only descendants are dropped.
+          if !sparse_cone_is_descendant(existing, normalized) {
             kept.push(existing)
           }
         }
@@ -480,8 +480,9 @@ pub fn sparse_checkout_init(
   rfs : &@bit.RepoFileSystem,
   root : String,
   cone? : Bool = false,
+  update_worktree? : Bool = true,
 ) -> Unit raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_root_git_dir(rfs, root)
   let config_path = join_path(git_dir, "config")
   let config = sparse_read_or_default_config(rfs, config_path)
   let updated = sparse_upsert_section_bool(
@@ -496,7 +497,9 @@ pub fn sparse_checkout_init(
   if !rfs.is_file(sparse_path) {
     write_sparse_patterns(fs, rfs, git_dir, sparse_default_patterns())
   }
-  sparse_update_worktree(fs, rfs, root)
+  if update_worktree {
+    sparse_update_worktree(fs, rfs, root)
+  }
 }
 
 ///|
@@ -507,10 +510,11 @@ pub fn sparse_checkout_set(
   root : String,
   patterns : Array[String],
 ) -> Unit raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
-  // Ensure sparse checkout is initialized
+  let git_dir = resolve_root_git_dir(rfs, root)
+  // Ensure sparse checkout is initialized -- without applying the default
+  // patterns first: git goes straight to the new ones.
   if !is_sparse_checkout_enabled(rfs, git_dir) {
-    sparse_checkout_init(fs, rfs, root)
+    sparse_checkout_init(fs, rfs, root, update_worktree=false)
   }
   sparse_enable_worktree_config(fs, rfs, git_dir)
   let stored_patterns = if is_sparse_checkout_cone_enabled(rfs, git_dir) {
@@ -531,7 +535,7 @@ pub fn sparse_checkout_add(
   root : String,
   new_patterns : Array[String],
 ) -> Unit raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_root_git_dir(rfs, root)
   // Ensure sparse checkout is initialized
   if !is_sparse_checkout_enabled(rfs, git_dir) {
     sparse_checkout_init(fs, rfs, root)
@@ -572,7 +576,7 @@ pub fn sparse_checkout_disable(
   rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> Unit raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_root_git_dir(rfs, root)
   // Update config to disable
   let config_path = join_path(git_dir, "config")
   if rfs.is_file(config_path) {
@@ -599,19 +603,32 @@ pub fn sparse_checkout_disable(
       ),
     )
   }
-  // Checkout all files
-  let head = resolve_head_commit(rfs, git_dir)
-  match head {
-    None => ()
-    Some(commit_id) => {
-      let db = ObjectDb::load(rfs, git_dir)
-      let files = collect_tree_files_from_commit(db, rfs, commit_id)
-      write_worktree_from_files(db, fs, rfs, root, git_dir, files)
-      let entries = tree_files_to_index(db, rfs, files)
-      write_skip_worktree_paths(fs, git_dir, [])
-      write_index_entries(fs, git_dir, entries)
+  // Materialize the skipped entries that are missing, keep the index
+  // (staged changes) and every existing file, and clear the bits.
+  if !rfs.is_file(join_path(git_dir, "index")) ||
+    read_unmerged_paths(rfs, git_dir).length() > 0 {
+    return
+  }
+  let db = ObjectDb::load(rfs, git_dir)
+  let raw_entries = read_index_entries(rfs, git_dir)
+  let entries = expand_sparse_index_entries(rfs, git_dir, raw_entries)
+  let skip = expand_sparse_skip_worktree_paths(
+    rfs,
+    git_dir,
+    raw_entries,
+    read_skip_worktree_paths(rfs, git_dir),
+  )
+  let to_write : Map[String, TreeFileEntry] = Map([])
+  for e in entries {
+    if skip.contains(e.path) &&
+      !is_gitlink_mode_int(e.mode) &&
+      @bitio.worktree_entry_meta_sync(rfs, join_path(root, e.path)) is None {
+      to_write[e.path] = { id: e.id, mode: e.mode }
     }
   }
+  write_worktree_from_files(db, fs, rfs, root, git_dir, to_write)
+  write_skip_worktree_paths(fs, git_dir, [])
+  write_index_entries_with_skip_worktree(fs, git_dir, entries, Map([]))
 }
 
 ///|
@@ -620,7 +637,7 @@ pub fn sparse_checkout_reapply(
   rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> Unit raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_root_git_dir(rfs, root)
   if !is_sparse_checkout_enabled(rfs, git_dir) {
     sparse_checkout_init(fs, rfs, root)
   }
@@ -968,11 +985,16 @@ fn sparse_update_worktree(
   root : String,
   preserve_index? : Bool = false,
 ) -> Unit raise @bit.GitError {
-  let git_dir = join_path(root, ".git")
+  let git_dir = resolve_root_git_dir(rfs, root)
   if !rfs.is_file(join_path(git_dir, "index")) {
     return
   }
   let patterns = read_sparse_patterns(rfs, git_dir)
+  // Never rewrite an index with unmerged entries: that would drop the
+  // conflict stages (git leaves them, and warns about the paths).
+  if read_unmerged_paths(rfs, git_dir).length() > 0 {
+    return
+  }
   let head = resolve_head_commit(rfs, git_dir)
   match head {
     None => ()
@@ -980,62 +1002,59 @@ fn sparse_update_worktree(
       let db = ObjectDb::load(rfs, git_dir)
       let autocrlf = read_autocrlf_setting(rfs, git_dir)
       let current_raw_entries = read_index_entries(rfs, git_dir)
+      // Like git, the index is kept as is (staged changes survive); only
+      // the skip-worktree bits and the worktree files change.
       let current_entries = expand_sparse_index_entries(
         rfs, git_dir, current_raw_entries,
       )
-      let protected_skip_paths : Map[String, Bool] = Map([])
+      let prev_skip = expand_sparse_skip_worktree_paths(
+        rfs,
+        git_dir,
+        current_raw_entries,
+        read_skip_worktree_paths(rfs, git_dir),
+      )
+      let all_files : Map[String, TreeFileEntry] = Map([])
+      let to_write : Map[String, TreeFileEntry] = Map([])
+      let skip_paths : Array[String] = []
       for entry in current_entries {
+        all_files[entry.path] = { id: entry.id, mode: entry.mode }
+        let abs = join_path(root, entry.path)
+        let present = @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_)
         if matches_sparse_pattern(entry.path, patterns) {
+          // Newly in the cone: materialize what was skipped (an existing
+          // file is left alone).
+          if prev_skip.contains(entry.path) &&
+            !present &&
+            !is_gitlink_mode_int(entry.mode) {
+            to_write[entry.path] = { id: entry.id, mode: entry.mode }
+          }
           continue
         }
-        // Reapply should still prune root-level skipped files back to the
-        // current sparse patterns, while preserving dirty paths inside skipped
-        // directories that may coexist with user files.
-        if preserve_index && !entry.path.contains("/") {
+        if !present {
+          skip_paths.push(entry.path)
           continue
         }
-        if sparse_worktree_matches_index_entry(
+        // Reapply prunes root-level skipped files back to the patterns,
+        // while dirty paths inside skipped directories are preserved.
+        let clean = (preserve_index && !entry.path.contains("/")) ||
+          sparse_worktree_matches_index_entry(
             rfs,
             root,
             entry.path,
             entry,
             autocrlf,
-          ) {
-          continue
+          )
+        if clean {
+          if is_gitlink_mode_int(entry.mode) {
+            skip_paths.push(entry.path)
+            continue
+          }
+          fs.remove_file(abs)
+          skip_paths.push(entry.path)
         }
-        protected_skip_paths[entry.path] = true
+        // A dirty file stays, and stays tracked normally (git warns).
       }
-      let all_files : Map[String, TreeFileEntry] = if preserve_index {
-        let files : Map[String, TreeFileEntry] = Map([])
-        for entry in current_entries {
-          files[entry.path] = { id: entry.id, mode: entry.mode }
-        }
-        files
-      } else {
-        collect_tree_files_from_commit(db, rfs, commit_id)
-      }
-      // Filter files based on sparse patterns
-      let sparse_files : Map[String, TreeFileEntry] = Map([])
-      let skip_paths : Array[String] = []
-      for path, entry in all_files {
-        if matches_sparse_pattern(path, patterns) {
-          sparse_files[path] = entry
-        } else {
-          skip_paths.push(path)
-        }
-      }
-      // Remove files not in sparse set
-      for path in skip_paths {
-        if protected_skip_paths.contains(path) {
-          continue
-        }
-        let file_path = join_path(root, path)
-        if rfs.is_file(file_path) {
-          fs.remove_file(file_path)
-        }
-      }
-      // Write sparse files
-      write_worktree_from_files(db, fs, rfs, root, git_dir, sparse_files)
+      write_worktree_from_files(db, fs, rfs, root, git_dir, to_write)
       ignore(sparse_prune_empty_dirs(fs, rfs, root, root))
       write_skip_worktree_paths(fs, git_dir, skip_paths)
       let use_sparse_index = sparse_is_index_sparse_enabled(rfs, git_dir) &&
@@ -1046,14 +1065,12 @@ fn sparse_update_worktree(
         )
         write_index_entries_with_flags(fs, git_dir, entries, skip_set, Map([]))
       } else {
-        // Update index with sparse skip-worktree entries.
         let skip_set : Map[String, Bool] = Map([])
         for path in skip_paths {
           skip_set[path] = true
         }
-        let all_entries = tree_files_to_index(db, rfs, all_files)
         write_index_entries_with_skip_worktree(
-          fs, git_dir, all_entries, skip_set,
+          fs, git_dir, current_entries, skip_set,
         )
       }
     }
@@ -1138,4 +1155,20 @@ fn sparse_prune_empty_dirs(
 ///|
 fn sparse_trim(s : String) -> String {
   @string_utils.trim_string(s)
+}
+
+///|
+/// Keep only `paths` inside the sparse-checkout patterns (all of them when
+/// sparse checkout is off): git's `commit -a` / `add -u` leave tracked
+/// paths outside the cone alone even when they are dirty.
+pub fn filter_paths_in_sparse_checkout(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  paths : Array[String],
+) -> Array[String] {
+  if !is_sparse_checkout_enabled(rfs, git_dir) {
+    return paths
+  }
+  let patterns = read_sparse_patterns(rfs, git_dir) catch { _ => return paths }
+  paths.filter(p => matches_sparse_pattern(p, patterns))
 }

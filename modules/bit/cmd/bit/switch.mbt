@@ -100,6 +100,11 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       raise @bitcore.GitError::InvalidObject("No branch specified")
     }
     let branch_name = normalize_switch_branch_ref(name)
+    // git refuses to switch with an unmerged index, also for -c.
+    if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+      eprint_line("error: you need to resolve your current index first")
+      @sys.exit(1)
+    }
     if !ignore_other_worktrees {
       match switch_branch_in_use_path(rfs, root, branch_name) {
         Some(_) => {
@@ -155,9 +160,8 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
     }
     let refname = branch_name
     if @bitlib.resolve_ref(rfs, git_dir, refname) is Some(_) && !force_create {
-      raise @bitcore.GitError::InvalidObject(
-        "branch '\{branch_name}' already exists",
-      )
+      eprint_line("fatal: a branch named '\{branch_name}' already exists")
+      @sys.exit(128)
     }
     let target_id = match start_point {
       Some(spec) =>
@@ -175,7 +179,18 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
         switch_apply_tracking_config(
           fs, rfs, git_dir, branch_name, start_point, track_mode,
         )
-        @bitlib.switch_branch(fs, rfs, root, branch_name)
+        // Two-tree switch like git: local changes are carried over (and
+        // block the switch only where the start point differs).
+        let short_name = if branch_name.has_prefix("refs/heads/") {
+          String::unsafe_substring(
+            branch_name,
+            start=11,
+            end=branch_name.length(),
+          )
+        } else {
+          branch_name
+        }
+        ignore(checkout_with_promisor_retry(fs, root, short_name))
       }
       None => {
         @bitlib.create_branch(fs, rfs, root, branch_name, start_point~)

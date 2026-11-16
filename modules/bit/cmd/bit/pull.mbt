@@ -30,6 +30,8 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   let mut autostash : Bool? = None
   let mut verify_signatures : Bool? = None
   let mut quiet = false
+  // `--ff-only` / `--ff` / `--no-ff` (last one wins); None = pull.ff config.
+  let mut cli_ff_only : Bool? = None
   let mut arg_remote : String? = None
   let arg_refspecs : Array[String] = []
   let mut pull_adhoc_remote = false
@@ -98,11 +100,16 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         )
         i += 1
       }
-      "--ff"
-      | "-f"
+      "--ff-only" => {
+        cli_ff_only = Some(true)
+        i += 1
+      }
+      "--ff" | "--no-ff" => {
+        cli_ff_only = Some(false)
+        i += 1
+      }
+      "-f"
       | "--force"
-      | "--no-ff"
-      | "--ff-only"
       | "--squash"
       | "--no-squash"
       | "--no-commit"
@@ -553,6 +560,30 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       @bitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
     }
     return
+  }
+  // `--ff-only` (or pull.ff=only): refuse to merge or rebase divergent
+  // history, as git does. It takes precedence over pull.rebase.
+  let ff_only = match cli_ff_only {
+    Some(v) => v
+    None => {
+      let values = read_config_values(fs, git_dir, "pull", "ff")
+      values.length() > 0 &&
+      values[values.length() - 1].trim(chars=" \t").to_owned().to_lower() ==
+      "only"
+    }
+  }
+  if ff_only {
+    match pre_fetch_head {
+      Some(head_id) =>
+        if !@bitlib.is_ancestor_of(fs, git_dir, head_id, tid) {
+          eprint_line("fatal: Not possible to fast-forward, aborting.")
+          if pull_adhoc_remote {
+            @bitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
+          }
+          @sys.exit(128)
+        }
+      None => ()
+    }
   }
   let author = get_author_string()
   let timestamp = get_commit_timestamp()

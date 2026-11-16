@@ -45,7 +45,7 @@ pub fn check_shorthand_ambiguity(String, (String) -> Bool) -> String?
 
 pub fn check_unsupported_gitattributes(&@bit_types.RepoFileSystem, String) -> String?
 
-pub fn checkout(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, detach? : Bool, update_worktree? : Bool, update_index? : Bool) -> @bit_object.ObjectId raise @bit_object.GitError
+pub fn checkout(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, detach? : Bool, update_worktree? : Bool, update_index? : Bool, keep_local_changes? : Bool, updated_paths? : Array[String]) -> @bit_object.ObjectId raise @bit_object.GitError
 
 pub fn cherry_pick(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, String, Int64, allow_empty? : Bool, no_commit? : Bool, message_suffix? : String, signoff_committer? : String) -> CherryPickResult raise @bit_object.GitError
 
@@ -155,6 +155,8 @@ pub fn expand_sparse_skip_worktree_paths(&@bit_types.RepoFileSystem, String, Arr
 
 pub async fn fast_forward_to(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, run_filter_cmd? : FilterCmd) -> Unit raise @bit_object.GitError
 
+pub fn filter_paths_in_sparse_checkout(&@bit_types.RepoFileSystem, String, Array[String]) -> Array[String]
+
 pub fn find_tree_entry(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String) -> @bit_object.TreeEntry? raise @bit_object.GitError
 
 pub fn format_remove_warning(Array[String]) -> String
@@ -208,6 +210,8 @@ pub async fn interactive_rebase_continue_impl(&@bit_types.FileSystem, &@bit_type
 pub async fn interactive_rebase_skip_impl(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, async (String) -> String?, exec_runner? : (async (String) -> Int32)?) -> InteractiveRebaseResult raise @bit_object.GitError
 
 pub async fn interactive_rebase_start(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId, async (String) -> String?, async (String) -> String?, autosquash? : Bool, exec_runner? : (async (String) -> Int32)?, exec_cmds? : Array[String], update_refs? : Bool, root_mode? : Bool, rebase_merges? : Bool) -> InteractiveRebaseResult raise @bit_object.GitError
+
+pub fn invalidate_commit_graph(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit
 
 pub fn is_absolute_path(String) -> Bool
 
@@ -319,6 +323,8 @@ pub fn merge_base_independent(ObjectDb, &@bit_types.RepoFileSystem, Array[@bit_o
 
 pub fn merge_base_is_ancestor(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, @bit_object.ObjectId) -> Bool raise @bit_object.GitError
 
+pub fn merge_require_clean_index(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId) -> Unit raise @bit_object.GitError
+
 pub fn move_directory(&@bit_types.RepoFileSystem, &@bit_types.FileSystem, String, String) -> Unit
 
 pub fn move_tree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit raise @bit_object.GitError
@@ -429,6 +435,8 @@ pub fn read_index_entries(&@bit_types.RepoFileSystem, String) -> Array[IndexEntr
 
 pub fn read_index_stage_entries(&@bit_types.RepoFileSystem, String) -> Array[IndexStageEntry] raise @bit_object.GitError
 
+pub fn read_index_tree_files(&@bit_types.RepoFileSystem, String) -> Map[String, TreeFileEntry] raise @bit_object.GitError
+
 pub fn read_local_remote_head_state(&@bit_types.RepoFileSystem, String, String) -> RemoteHeadState
 
 pub fn read_promisor_remote(&@bit_types.RepoFileSystem, String) -> String?
@@ -517,6 +525,8 @@ pub fn repo_hash_algorithm(&@bit_types.RepoFileSystem, String) -> @bit_object.Ha
 
 pub fn reset(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, ResetMode, committer? : String, timestamp? : Int64, timezone? : String) -> @bit_object.ObjectId raise @bit_object.GitError
 
+pub fn reset_merge(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId) -> Unit raise @bit_object.GitError
+
 pub fn resolve_checkout_common_git_dir(&@bit_types.RepoFileSystem, String) -> String
 
 pub fn resolve_common_git_dir(&@bit_types.RepoFileSystem, String) -> String
@@ -539,7 +549,7 @@ pub fn resolve_ref(&@bit_types.RepoFileSystem, String, String) -> @bit_object.Ob
 
 pub fn resolve_ref_for_subdir(&@bit_types.RepoFileSystem, String, String) -> @bit_object.ObjectId? raise @bit_object.GitError
 
-pub fn restore_paths(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[String]) -> Unit raise @bit_object.GitError
+pub fn restore_paths(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[String], restored? : Map[String, TreeFileEntry]) -> Unit raise @bit_object.GitError
 
 pub fn rev_list_find_range_dots(String) -> (Int32, Bool)?
 
@@ -572,6 +582,8 @@ pub fn rev_parse_normalize_path(String) -> String
 pub fn rev_parse_parse_config_bool(String) -> Bool?
 
 pub fn rev_parse_parse_parent_suffix(String) -> (String, String)?
+
+pub fn revert(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, String, Int64, mainline? : Int32?, no_commit? : Bool, allow_empty? : Bool) -> CherryPickResult raise @bit_object.GitError
 
 pub fn rewrite_packed_refs(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, (String) -> String?) -> Unit raise @bit_object.GitError
 
@@ -607,7 +619,7 @@ pub fn sparse_checkout_add(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, S
 
 pub fn sparse_checkout_disable(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit raise @bit_object.GitError
 
-pub fn sparse_checkout_init(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, cone? : Bool) -> Unit raise @bit_object.GitError
+pub fn sparse_checkout_init(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, cone? : Bool, update_worktree? : Bool) -> Unit raise @bit_object.GitError
 
 pub fn sparse_checkout_reapply(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit raise @bit_object.GitError
 
@@ -633,7 +645,7 @@ pub fn stash_list(&@bit_types.RepoFileSystem, String) -> Array[StashEntry] raise
 
 pub fn stash_mode_str(Int32) -> String
 
-pub async fn stash_push(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, Int64) -> @bit_object.ObjectId? raise @bit_object.GitError
+pub async fn stash_push(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, Int64, include_untracked? : Bool) -> @bit_object.ObjectId? raise @bit_object.GitError
 
 pub async fn stash_push_patch(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, Int64, async (StashPatchHunk, Int32, Int32) -> Bool) -> @bit_object.ObjectId? raise @bit_object.GitError
 
@@ -683,7 +695,7 @@ pub fn write_index_entries_with_skip_worktree(&@bit_types.FileSystem, String, Ar
 
 pub fn write_index_entries_with_tree(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[IndexEntry], @bit_object.ObjectId) -> Unit raise @bit_object.GitError
 
-pub fn write_index_stage_entries(&@bit_types.FileSystem, String, Array[IndexStageEntry], hash_size? : Int32) -> Unit raise @bit_object.GitError
+pub fn write_index_stage_entries(&@bit_types.FileSystem, String, Array[IndexStageEntry], hash_size? : Int32, skip? : Map[String, Bool]) -> Unit raise @bit_object.GitError
 
 pub fn write_loose_object(&@bit_types.FileSystem, String, @bit_object.ObjectType, Bytes, algo? : @bit_object.HashAlgorithm) -> @bit_object.ObjectId raise @bit_object.GitError
 
@@ -736,6 +748,7 @@ pub struct CherryPickResult {
 pub enum CherryPickStatus {
   Success
   Conflict
+  Empty
 }
 
 pub(all) struct CommitGraphCommitInfo {

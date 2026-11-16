@@ -141,7 +141,22 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
   }
   // Handle --abort
   if do_abort {
-    ignore(@bitlib.reset(wfs, rfs, root, "HEAD", @bitlib.ResetMode::Hard))
+    let pick_head = git_dir + "/CHERRY_PICK_HEAD"
+    if !rfs.is_file(pick_head) {
+      eprint_line("error: no cherry-pick or revert in progress")
+      eprint_line("fatal: cherry-pick failed")
+      @sys.exit(128)
+    }
+    // git: `reset --merge` -- unrelated local edits survive the abort.
+    match @bitlib.resolve_head_commit(rfs, git_dir) {
+      Some(head) => @bitlib.reset_merge(wfs, rfs, root, head)
+      None => ()
+    }
+    for name in ["CHERRY_PICK_HEAD", "MERGE_MSG"] {
+      wfs.remove_file(git_dir + "/" + name) catch {
+        _ => ()
+      }
+    }
     return
   }
   // Check if subdir-clone and handle specially
@@ -263,6 +278,17 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
           }
           None => print_line("Cherry-pick successful")
         }
+      @bitlib.CherryPickStatus::Empty => {
+        eprint_line(
+          "The previous cherry-pick is now empty, possibly due to conflict resolution.",
+        )
+        eprint_line("If you wish to commit it anyway, use:")
+        eprint_line("")
+        eprint_line("    git commit --allow-empty")
+        eprint_line("")
+        eprint_line("Otherwise, please use 'git cherry-pick --skip'")
+        @sys.exit(1)
+      }
       @bitlib.CherryPickStatus::Conflict => {
         print_line("CONFLICT: Merge conflict in cherry-pick:")
         for path in result.conflicts {

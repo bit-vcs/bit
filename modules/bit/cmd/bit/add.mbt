@@ -74,7 +74,9 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
 
-  if add_should_use_storage_runtime(args) {
+  let sparse_enabled = @bitlib.is_sparse_checkout_enabled(rfs, git_dir)
+  let allow_sparse = args.contains("--sparse")
+  if add_should_use_storage_runtime(args) && !sparse_enabled {
     match add_storage_runtime_delegate_args(args) {
       Some(add_args) => {
         @runtime.run_storage_command(
@@ -129,6 +131,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
       }
       "-v" | "--verbose" if !end_of_options => verbose = true
       "--interactive" if !end_of_options => interactive = true
+      "--sparse" if !end_of_options => ()
       "--chmod=+x" if !end_of_options => chmod_mode = Some("+x")
       "--chmod=-x" if !end_of_options => chmod_mode = Some("-x")
       _ if end_of_options || !arg.has_prefix("-") => paths.push(arg)
@@ -186,6 +189,11 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     for p in status.unstaged_deleted {
       all_paths.push(p)
     }
+    let (all_paths, outside_sparse) = if sparse_enabled && !allow_sparse {
+      add_split_outside_sparse(fs, git_dir, all_paths)
+    } else {
+      (all_paths, [])
+    }
     if all_paths.length() > 0 {
       let pre_code = run_add_hook(fs, root, git_dir, "pre-add")
       if pre_code != 0 {
@@ -213,6 +221,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
         raise @bitcore.GitError::InvalidObject("post-add hook failed")
       }
     }
+    add_report_outside_sparse(outside_sparse)
     return
   }
   if paths.length() == 0 && !update_only {
@@ -248,6 +257,17 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     }
   } else {
     requested_stage_paths
+  }
+  let (stage_paths, outside_sparse) = if sparse_enabled && !allow_sparse {
+    add_split_outside_sparse(
+      fs,
+      git_dir,
+      stage_paths,
+      root~,
+      explicit=paths.map(p => (add_normalize_input_path(root, p), p)),
+    )
+  } else {
+    (stage_paths, [])
   }
   let mut had_error = false
   if stage_paths.length() > 0 {
@@ -334,6 +354,12 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   if had_error {
     eprint_line("fatal: adding files failed")
     @sys.exit(1)
+  }
+  if outside_sparse.length() > 0 {
+    if stage_paths.length() > 0 {
+      ignore(run_add_hook(fs, root, git_dir, "post-add"))
+    }
+    add_report_outside_sparse(outside_sparse)
   }
   if stage_paths.length() > 0 {
     let post_code = run_add_hook(fs, root, git_dir, "post-add")
@@ -434,9 +460,20 @@ async fn add_collect_update_requested_paths(
 ) -> Array[String] raise Error {
   let git_dir = resolve_git_dir(fs, root)
   let entries = @bitlib.read_index_entries(fs, git_dir)
+  // Like git, `add -u` leaves skip-worktree (sparse) entries alone.
+  let skip = @bitlib.read_skip_worktree_paths(fs, git_dir)
+  let sparse_patterns = if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+    @bitlib.read_sparse_patterns(fs, git_dir) catch { _ => [] }
+  } else {
+    []
+  }
   let tracked_paths : Array[String] = []
   for entry in entries {
-    tracked_paths.push(entry.path)
+    if !skip.contains(entry.path) &&
+      (sparse_patterns.length() == 0 ||
+      @bitlib.matches_sparse_pattern(entry.path, sparse_patterns)) {
+      tracked_paths.push(entry.path)
+    }
   }
   if raw_paths.length() == 0 {
     return tracked_paths
@@ -602,6 +639,20 @@ async fn add_collect_unmatched_pathspecs(
     let folded = p.to_lower()
     if !visible_folded.contains(folded) {
       visible_folded[folded] = p
+    }
+  }
+  // Tracked paths absent from the worktree (deleted), except skip-worktree
+  // entries, which a sparse checkout leaves out on purpose.
+  let skip_worktree = @bitlib.read_skip_worktree_paths(fs, git_dir)
+  let tracked_missing : Array[String] = []
+  if !force {
+    for entry in tracked_entries {
+      let normalized = normalize_add_path(entry.path)
+      if !visible_map.contains(normalized) &&
+        !skip_worktree.contains(entry.path) &&
+        entry.mode != 0o160000 {
+        tracked_missing.push(normalized)
+      }
     }
   }
   for raw_path in paths {
@@ -948,6 +999,20 @@ async fn expand_add_stage_paths(
       visible_folded[folded] = p
     }
   }
+  // Tracked paths absent from the worktree (deleted), except skip-worktree
+  // entries, which a sparse checkout leaves out on purpose.
+  let skip_worktree = @bitlib.read_skip_worktree_paths(fs, git_dir)
+  let tracked_missing : Array[String] = []
+  if !force {
+    for entry in tracked_entries {
+      let normalized = normalize_add_path(entry.path)
+      if !visible_map.contains(normalized) &&
+        !skip_worktree.contains(entry.path) &&
+        entry.mode != 0o160000 {
+        tracked_missing.push(normalized)
+      }
+    }
+  }
   for raw_path in paths {
     let path = add_normalize_input_path(root, raw_path)
     if path.length() == 0 {
@@ -962,21 +1027,38 @@ async fn expand_add_stage_paths(
         add_push_unique_stage_path(seen, out, p)
       }
       add_collect_embedded_repo_paths(fs, root, "", seen, out)
+      // Tracked files deleted from the worktree: stage their removal.
+      for p in tracked_missing {
+        add_push_unique_stage_path(seen, out, p)
+      }
       continue
     }
     let abs = root + "/" + path
-    if fs.is_dir(abs) {
+    let prefix = path + "/"
+    if add_is_real_dir(fs, abs) {
       if add_is_embedded_repo_dir(fs, root, path) {
         add_push_unique_stage_path(seen, out, path)
         continue
       }
-      let prefix = path + "/"
       for p in visible_paths {
         if p.has_prefix(prefix) {
           add_push_unique_stage_path(seen, out, p)
         }
       }
       add_collect_embedded_repo_paths(fs, root, path, seen, out)
+      for p in tracked_missing {
+        if p.has_prefix(prefix) {
+          add_push_unique_stage_path(seen, out, p)
+        }
+      }
+      continue
+    }
+    // A directory deleted from the worktree that the index still tracks.
+    let tracked_under = tracked_missing.filter(p => p.has_prefix(prefix))
+    if !visible_map.contains(path) && tracked_under.length() > 0 {
+      for p in tracked_under {
+        add_push_unique_stage_path(seen, out, p)
+      }
       continue
     }
     if visible_map.get(path) is Some(_) {
@@ -1085,7 +1167,7 @@ fn expand_force_add_path(
     return
   }
   let abs = root + "/" + path
-  if fs.is_dir(abs) {
+  if add_is_real_dir(fs, abs) {
     if add_is_embedded_repo_dir(fs, root, path) {
       add_push_unique_stage_path(seen, out, path)
       return
@@ -1384,5 +1466,123 @@ fn stage_submodule_gitlinks(
       Some(id) => update_submodule_index_entry(fs, git_dir, rel_path, id)
       None => ()
     }
+  }
+}
+
+///|
+/// git does not add untracked paths outside the sparse-checkout patterns
+/// (without --sparse): split them off so they can be reported.
+fn add_split_outside_sparse(
+  fs : OsFs,
+  git_dir : String,
+  paths : Array[String],
+  root? : String = "",
+  explicit? : Array[(String, String)] = [],
+) -> (Array[String], Array[String]) {
+  ignore(root)
+  let skip = @bitlib.read_skip_worktree_paths(fs, git_dir)
+  let patterns = @bitlib.read_sparse_patterns(fs, git_dir) catch {
+    _ => return (paths, [])
+  }
+  let tracked : Map[String, @bitlib.IndexEntry] = Map([])
+  let entries = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
+  for e in entries {
+    tracked[e.path] = e
+  }
+  let in_cone = fn(p : String) {
+    !skip.contains(p) && @bitlib.matches_sparse_pattern(p, patterns)
+  }
+  let kept : Array[String] = []
+  let outside : Array[String] = []
+  let reported : Map[String, Bool] = Map([])
+  let report = fn(text : String) {
+    if !reported.contains(text) {
+      reported[text] = true
+      outside.push(text)
+    }
+  }
+  for p in paths {
+    if tracked.contains(p) {
+      // A tracked entry outside the cone (or skip-worktree) is never
+      // updated; in-cone entries are added normally.
+      if in_cone(p) {
+        kept.push(p)
+      }
+    } else if @bitlib.matches_sparse_pattern(p, patterns) {
+      kept.push(p)
+    } else {
+      // An untracked file outside the cone is reported by name.
+      report(p)
+    }
+  }
+  // git (builtin/add.c): a pathspec that matched nothing in the index
+  // (skip-worktree entries aside) and no file, but does match sparse
+  // entries, is reported as such.
+  let covers = fn(norm : String, p : String) {
+    norm == "" || norm == "." || norm == p || p.has_prefix(norm + "/")
+  }
+  for item in explicit {
+    let (norm, raw) = item
+    let mut seen = false
+    let mut sparse_match = false
+    for e in entries {
+      if covers(norm, e.path) {
+        if in_cone(e.path) {
+          seen = true
+          break
+        }
+        sparse_match = true
+      }
+    }
+    if !seen {
+      for p in kept {
+        if covers(norm, p) {
+          seen = true
+          break
+        }
+      }
+    }
+    if !seen {
+      for p in outside {
+        if covers(norm, p) {
+          seen = true
+          break
+        }
+      }
+    }
+    if !seen && sparse_match {
+      report(raw)
+    }
+  }
+  (kept, outside)
+}
+
+
+///|
+async fn add_report_outside_sparse(outside : Array[String]) -> Unit {
+  if outside.length() == 0 {
+    return
+  }
+  eprint_line(
+    "The following paths and/or pathspecs matched paths that exist\noutside of your sparse-checkout definition, so will not be\nupdated in the index:",
+  )
+  let sorted = outside.copy()
+  sorted.sort()
+  for p in sorted {
+    eprint_line(p)
+  }
+  eprint_line(
+    "hint: If you intend to update such entries, try one of the following:\nhint: * Use the --sparse option.\nhint: * Disable or modify the sparsity rules.\nhint: Disable this message with \"git config advice.updateSparsePath false\"",
+  )
+  @sys.exit(1)
+}
+
+///|
+/// A directory on disk that is not a symlink: a symlink to a directory is
+/// added as the link itself, never expanded into the target's files (git).
+fn add_is_real_dir(fs : &@bitcore.RepoFileSystem, abs : String) -> Bool {
+  match @bitio.worktree_entry_meta_sync(fs, abs) {
+    Some(m) if m.kind is @bitio.WorktreeKindMeta::Symlink => false
+    _ => fs.is_dir(abs)
   }
 }

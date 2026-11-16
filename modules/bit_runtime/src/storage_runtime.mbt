@@ -674,6 +674,13 @@ fn storage_collect_add_all_paths(
   for p in snapshot.unstaged_deleted {
     paths.push(p)
   }
+  // -a also stages (resolves) conflicted paths, as git does.
+  let git_dir = storage_resolve_git_dir(rfs, root)
+  for p, _ in @bitlib.read_unmerged_paths(rfs, git_dir) {
+    if !paths.contains(p) {
+      paths.push(p)
+    }
+  }
   paths
 }
 
@@ -707,9 +714,19 @@ fn storage_handle_commit(
       "storage runtime commit requires -m/--message",
     )
   }
+  // `-a` stages into what is effectively a temporary index: if the commit
+  // fails, the index is restored (git leaves it untouched).
+  let index_path = git_dir + "/index"
+  let saved_index = if args.all_modified && rfs.is_file(index_path) {
+    Some(rfs.read_file(index_path))
+  } else {
+    None
+  }
   if args.all_modified {
-    let all_modified_paths = storage_collect_commit_all_modified_paths(
-      rfs, root,
+    let all_modified_paths = @bitlib.filter_paths_in_sparse_checkout(
+      rfs,
+      git_dir,
+      storage_collect_commit_all_modified_paths(rfs, root),
     )
     if all_modified_paths.length() > 0 {
       @bitlib.add_paths(fs, rfs, root, all_modified_paths)
@@ -721,6 +738,12 @@ fn storage_handle_commit(
   let timezone = storage_get_commit_timezone()
   let committer = storage_get_committer_string()
   let committer_timestamp = timestamp
+  errdefer {
+    match saved_index {
+      Some(bytes) => fs.write_file(index_path, bytes) catch { _ => () }
+      None => ()
+    }
+  }
   let commit_id = @bitlib.commit(
     fs,
     rfs,
@@ -899,6 +922,9 @@ fn storage_collect_status_snapshot(
   let common_git_dir = storage_resolve_common_git_dir(rfs, git_dir)
   let core_filemode = @bitlib.core_filemode_enabled(rfs, common_git_dir)
   let entries = @bitlib.read_index_entries(rfs, git_dir)
+  // Skip-worktree entries (outside a sparse checkout) are not compared
+  // with the worktree, as in git: they are absent on disk by design.
+  let skip_worktree = @bitlib.read_skip_worktree_paths(rfs, git_dir)
   let index_map : Map[String, @bitlib.IndexEntry] = Map([])
   for entry in entries {
     index_map[entry.path] = entry
@@ -910,6 +936,9 @@ fn storage_collect_status_snapshot(
   let unstaged_modified : Array[String] = []
   for rel_path in files {
     visited[rel_path] = true
+    if skip_worktree.contains(rel_path) {
+      continue
+    }
     match index_map.get(rel_path) {
       Some(index_entry) => {
         let abs_path = root + "/" + rel_path
@@ -956,7 +985,8 @@ fn storage_collect_status_snapshot(
   }
   let unstaged_deleted : Array[String] = []
   for entry in entries {
-    if visited.get(entry.path) is Some(_) {
+    if visited.get(entry.path) is Some(_) ||
+      skip_worktree.contains(entry.path) {
       continue
     }
     let abs_path = root + "/" + entry.path

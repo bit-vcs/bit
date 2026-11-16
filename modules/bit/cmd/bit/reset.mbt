@@ -398,7 +398,14 @@ async fn reset_refresh_index_entries(
     }
     updated.push(out_entry)
   }
-  @bitlib.write_index_entries(fs, git_dir, updated)
+  // Keep the skip-worktree bits (sparse checkouts) of the entries written.
+  let keep : Map[String, Bool] = Map([])
+  for e in updated {
+    if skip.contains(e.path) {
+      keep[e.path] = true
+    }
+  }
+  @bitlib.write_index_entries_with_skip_worktree(fs, git_dir, updated, keep)
   let changed = changed_map.keys().to_array()
   changed.sort_by((a, b) => String::compare(a, b))
   changed
