@@ -120,6 +120,19 @@ fn merge_three_way(
     }
     if @diff3.is_binary_content(ours_data) ||
       @diff3.is_binary_content(theirs_data) {
+      // Binary: our content stays, but the merged mode is applied (git).
+      let mm = merge_three_way_mode(
+        base_files.get(candidate.path).map(e => e.mode),
+        ours.get(candidate.path).map(e => e.mode),
+        theirs.get(candidate.path).map(e => e.mode),
+        candidate.mode,
+      )
+      let full_path = join_path(root, candidate.path)
+      if mm == 0o100755 {
+        ignore(@bitio.worktree_set_mode(full_path, 0o755))
+      } else if mm == 0o100644 {
+        ignore(@bitio.worktree_set_mode(full_path, 0o644))
+      }
       conflicts.push(candidate.path)
       if !all_conflict_types.contains(candidate.path) {
         all_conflict_types[candidate.path] = "content"

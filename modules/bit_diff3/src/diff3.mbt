@@ -554,24 +554,18 @@ pub fn content_merge(
             sb.write_string(
               render_marker('<', options.marker_size, options.ours_label),
             )
-            for line in ours {
-              sb.write_string(line)
-            }
+            write_conflict_section(sb, ours)
             match options.conflict_style {
               ConflictStyle::Diff3 => {
                 sb.write_string(
                   render_marker('|', options.marker_size, options.base_label),
                 )
-                for line in base {
-                  sb.write_string(line)
-                }
+                write_conflict_section(sb, base)
               }
               ConflictStyle::Merge => ()
             }
             sb.write_string(render_marker('=', options.marker_size, ""))
-            for line in theirs {
-              sb.write_string(line)
-            }
+            write_conflict_section(sb, theirs)
             sb.write_string(
               render_marker('>', options.marker_size, options.theirs_label),
             )
@@ -591,4 +585,16 @@ pub fn is_binary_content(data : Bytes) -> Bool {
     }
   }
   false
+}
+
+///|
+/// Write one side of a conflict: a last line without a newline gets one, so
+/// the following marker starts its own line (as git does).
+fn write_conflict_section(sb : StringBuilder, lines : Array[String]) -> Unit {
+  for line in lines {
+    sb.write_string(line)
+  }
+  if lines.length() > 0 && !lines[lines.length() - 1].has_suffix("\n") {
+    sb.write_string("\n")
+  }
 }
