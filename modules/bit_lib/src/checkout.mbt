@@ -18,6 +18,23 @@ pub fn restore_paths(
   let object_git_dir = resolve_checkout_common_git_dir(rfs, actual_git_dir)
   let index_entries = read_index_entries(rfs, actual_git_dir)
   let skip = read_skip_worktree_paths(rfs, actual_git_dir)
+  // git (2.37+) clears the skip-worktree bit of entries whose file is
+  // present on disk when it reads the index of a sparse checkout, so such
+  // a path matches a pathspec and is restored like any tracked file.
+  let cleared : Array[String] = []
+  if is_sparse_checkout_enabled(rfs, actual_git_dir) {
+    for path, _ in skip {
+      if @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+        cleared.push(path)
+      }
+    }
+    for path in cleared {
+      skip.remove(path)
+    }
+  }
+  if cleared.length() > 0 && read_unmerged_paths(rfs, actual_git_dir).length() == 0 {
+    write_index_entries_with_skip_worktree(fs, actual_git_dir, index_entries, skip)
+  }
   let autocrlf = read_autocrlf_setting(rfs, actual_git_dir)
   let core_eol = read_core_eol_setting(rfs, actual_git_dir)
   let db = ObjectDb::load(rfs, object_git_dir)
@@ -332,7 +349,12 @@ fn checkout_two_way(
   for e in entries {
     index[e.path] = e
   }
-  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let skip = effective_skip_worktree_paths(rfs, root, git_dir)
+  let sparse_patterns = if is_sparse_checkout_enabled(rfs, git_dir) {
+    Some(read_sparse_patterns(rfs, git_dir))
+  } else {
+    None
+  }
   let paths : Map[String, Bool] = Map([])
   for p, _ in old_files {
     paths[p] = true
@@ -384,10 +406,17 @@ fn checkout_two_way(
           dirty.push(path)
           continue
         }
-      // git refuses to overwrite any untracked file, even an identical one.
+      // git refuses to overwrite any untracked file, even an identical one
+      // -- except in a sparse checkout, where a new entry's check is only a
+      // warning ("already present and thus not updated despite sparse
+      // patterns"): the file is left as it is, the index takes the entry.
       None =>
         if w is Some(_) {
-          untracked.push(path)
+          if sparse_patterns is Some(_) {
+            index_only.push(path)
+          } else {
+            untracked.push(path)
+          }
           continue
         }
     }

@@ -48,6 +48,8 @@ priv struct MergeThreeWay {
   distinct_types : Map[String, (String, Int)]
   /// rename/delete conflicts: new path -> base entry (index stage 1)
   rename_delete_base : Map[String, TreeFileEntry]
+  /// "file location" conflicts: new path -> (stage, entry)
+  location_stages : Map[String, (Int, TreeFileEntry)]
 }
 
 ///|
@@ -92,6 +94,21 @@ fn merge_three_way(
         distinct_types[candidate.path] = (renamed, stage)
         conflicts.push(candidate.path)
         all_conflict_types[candidate.path] = "distinct types"
+        continue
+      }
+      _ => ()
+    }
+    // Both sides changed the mode, differently (e.g. a symlink that became
+    // a 644 file on one side and a 755 file on the other): a conflict even
+    // when the contents agree, as in git.
+    match (base_files.get(candidate.path), ours.get(candidate.path), theirs.get(candidate.path)) {
+      (Some(b), Some(o), Some(t)) if o.mode != b.mode &&
+        t.mode != b.mode &&
+        o.mode != t.mode => {
+        conflicts.push(candidate.path)
+        if !all_conflict_types.contains(candidate.path) {
+          all_conflict_types[candidate.path] = "content"
+        }
         continue
       }
       _ => ()
@@ -349,6 +366,7 @@ fn merge_three_way(
     removed_paths: file_result.removed_paths,
     distinct_types,
     rename_delete_base: file_result.rename_delete_base,
+    location_stages: file_result.location_stages,
   }
 }
 
@@ -463,6 +481,7 @@ fn merge_write_conflicted(
     tw.conflicts,
     tw.rename_conflict_stages,
     distinct_types=tw.distinct_types,
+    location_stages=tw.location_stages,
   )
   write_index_stage_entries(fs, git_dir, entries, skip=index_skip)
 }
@@ -704,6 +723,9 @@ priv struct MergeFilesResult {
   removed_paths : Array[String]
   /// rename/delete conflicts: new path -> the base entry (index stage 1)
   rename_delete_base : Map[String, TreeFileEntry]
+  /// "file location" conflicts (directory renames): new path -> (stage,
+  /// entry) of the file the other side added to the renamed directory
+  location_stages : Map[String, (Int, TreeFileEntry)]
 }
 
 ///|
@@ -774,6 +796,60 @@ fn merge_files(
       None => ()
     }
   }
+  // Step 1c: directory renames (merge-ort, merge.directoryRenames=conflict).
+  // A file one side added inside a directory the other side renamed away
+  // entirely moves with it, as a "file location" conflict.
+  let location_stages : Map[String, (Int, TreeFileEntry)] = Map([])
+  let apply_dir_renames = fn(
+    renamed_by : Map[String, TreeFileEntry],
+    renames : SideRenames,
+    adder : Map[String, TreeFileEntry],
+    adder_renames : SideRenames,
+    stage : Int,
+  ) {
+    let dir_renames = merge_dir_renames(base, renamed_by, renames)
+    if dir_renames.length() == 0 {
+      return
+    }
+    let adder_targets : Map[String, Bool] = Map([])
+    for _, n in adder_renames.old_to_new {
+      adder_targets[n] = true
+    }
+    for path, entry in adder {
+      if base.contains(path) || adder_targets.contains(path) || handled_paths.contains(path) {
+        continue
+      }
+      // The deepest renamed directory holding the path.
+      let mut best : (String, String)? = None
+      for old_dir, new_dir in dir_renames {
+        if path.has_prefix(old_dir + "/") {
+          match best {
+            Some((d, _)) if d.length() >= old_dir.length() => ()
+            _ => best = Some((old_dir, new_dir))
+          }
+        }
+      }
+      guard best is Some((old_dir, new_dir)) else { continue }
+      let rest = String::unsafe_substring(
+        path,
+        start=old_dir.length() + 1,
+        end=path.length(),
+      )
+      let new_path = if new_dir.length() == 0 { rest } else { new_dir + "/" + rest }
+      if base.contains(new_path) || ours.contains(new_path) || theirs.contains(new_path) {
+        continue
+      }
+      merged[new_path] = entry
+      conflicts.push(new_path)
+      conflict_types[new_path] = "file location"
+      location_stages[new_path] = (stage, entry)
+      handled_paths[path] = true
+      handled_paths[new_path] = true
+      removed_paths.push(path)
+    }
+  }
+  apply_dir_renames(theirs, theirs_renames, ours, ours_renames, 2)
+  apply_dir_renames(ours, ours_renames, theirs, theirs_renames, 3)
   // Step 2: Process renames on ours side (skip already handled by Step 1b)
   for old_path, new_path in ours_renames.old_to_new {
     if handled_paths.contains(old_path) || handled_paths.contains(new_path) {
@@ -871,11 +947,16 @@ fn merge_files(
                 ),
               })
             }
-          (_, Some(o), None) => {
+          (b, Some(o), None) => {
             // Theirs deleted old_path, ours renamed: rename/delete conflict
+            // (the base version sits at the new path's stage 1).
             merged[new_path] = o
             conflicts.push(new_path)
             conflict_types[new_path] = "rename/delete"
+            match b {
+              Some(be) => rename_delete_base[new_path] = be
+              None => ()
+            }
           }
           _ =>
             match ours_entry {
@@ -949,11 +1030,16 @@ fn merge_files(
             ),
           })
         }
-      (_, None, Some(t)) => {
+      (b, None, Some(t)) => {
         // Ours deleted old_path, theirs renamed: rename/delete conflict
+        // (the base version sits at the new path's stage 1).
         merged[new_path] = t
         conflicts.push(new_path)
         conflict_types[new_path] = "rename/delete"
+        match b {
+          Some(be) => rename_delete_base[new_path] = be
+          None => ()
+        }
       }
       _ =>
         match theirs_entry {
@@ -1052,6 +1138,7 @@ fn merge_files(
     conflict_types,
     removed_paths,
     rename_delete_base,
+    location_stages,
   }
 }
 
@@ -1196,6 +1283,7 @@ fn merge_conflicted_index_entries_with_renames(
   conflicts : Array[String],
   rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)],
   distinct_types? : Map[String, (String, Int)] = Map([]),
+  location_stages? : Map[String, (Int, TreeFileEntry)] = Map([]),
 ) -> Array[IndexStageEntry] raise @bit.GitError {
   let out : Array[IndexStageEntry] = []
   let conflict_set : Map[String, Bool] = Map([])
@@ -1209,6 +1297,14 @@ fn merge_conflicted_index_entries_with_renames(
     }
   }
   for path in conflicts {
+    // file location (directory rename): only the adding side's stage.
+    match location_stages.get(path) {
+      Some((stage, f)) => {
+        out.push({ entry: merge_tree_file_to_index_entry(db, fs, path, f), stage })
+        continue
+      }
+      None => ()
+    }
     // distinct types: each side at its own path (keeper at `path`).
     match (distinct_types.get(path), ours.get(path), theirs.get(path)) {
       (Some((renamed, stage)), Some(o), Some(t)) => {
@@ -1319,8 +1415,9 @@ fn merge_write_changed_paths(
       fs.remove_file(abs) catch {
         _ => ()
       }
-      emptied.push(parent_dir(abs))
     }
+    // A file already gone still lets git prune its empty parents.
+    emptied.push(parent_dir(abs))
   }
   tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
   let changed : Map[String, TreeFileEntry] = Map([])

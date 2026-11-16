@@ -15,6 +15,7 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
   let mut skip_errors = false
   let mut dry_run = false
   let mut verbose = false
+  let mut sparse_flag = false
   let paths : Array[String] = []
   let mut after_separator = false
   for arg in args {
@@ -28,6 +29,7 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
       "-k" => skip_errors = true
       "-n" | "--dry-run" => dry_run = true
       "-v" | "--verbose" => verbose = true
+      "--sparse" => sparse_flag = true
       _ if !arg.has_prefix("-") => paths.push(arg)
       _ => warn_unimplemented_arg("mv", arg)
     }
@@ -56,6 +58,15 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
   }
   let moves : Array[MvMove] = []
   let claimed : Map[String, Bool] = Map([])
+  // Sparse: a destination outside the patterns is not moved (without
+  // --sparse); git reports it at the end and exits 1.
+  let sparse_patterns = if !sparse_flag &&
+    @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+    Some(@bitlib.read_sparse_patterns(fs, git_dir))
+  } else {
+    None
+  }
+  let outside_sparse : Array[String] = []
   for i in 0..<(paths.length() - 1) {
     let src_raw = paths[i]
     let src = mv_normalize(src_raw)
@@ -142,6 +153,25 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
         None => ()
       }
     }
+    // git checks the sparse patterns last, for the source and the
+    // destination, so it can point at --sparse.
+    match sparse_patterns {
+      Some(pats) => {
+        let mut skip_sparse = false
+        if !@bitlib.matches_sparse_pattern(src, pats) {
+          outside_sparse.push(src)
+          skip_sparse = true
+        }
+        if !@bitlib.matches_sparse_pattern(dst, pats) {
+          outside_sparse.push(dst)
+          skip_sparse = true
+        }
+        if skip_sparse {
+          continue
+        }
+      }
+      None => ()
+    }
     if claimed.contains(dst) {
       if !skip_errors {
  mv_fatal("multiple sources for the same target, source=\{src}, destination=\{dst}")
@@ -161,6 +191,13 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
     claimed[dst] = true
     moves.push({ src, dst, gitlink })
   }
+  if outside_sparse.length() > 0 {
+    mv_advise_sparse(outside_sparse)
+    // Without -k nothing is moved at all.
+    if !skip_errors {
+      @sys.exit(1)
+    }
+  }
   for mv in moves {
     if verbose || dry_run {
       print_line("Renaming \{mv.src} to \{mv.dst}")
@@ -179,22 +216,26 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
     }
   }
   if plain.length() > 0 {
-    let entries = @bitlib.read_index_entries(fs, git_dir)
-    let out : Array[@bitlib.IndexEntry] = []
+    // Stage by stage, so conflict stages of other paths survive.
+    let entries = @bitlib.read_index_stage_entries(fs, git_dir)
+    let out : Array[@bitlib.IndexStageEntry] = []
     let moved_dst : Map[String, Bool] = Map([])
     for mv in plain {
       moved_dst[mv.dst] = true
     }
-    for e in entries {
+    for item in entries {
+      let e = item.entry
       let mut path = e.path
-      for mv in plain {
-        if path == mv.src {
-          path = mv.dst
-          break
-        } else if path.has_prefix(mv.src + "/") {
-          path = mv.dst +
-            String::unsafe_substring(path, start=mv.src.length(), end=path.length())
-          break
+      if item.stage == 0 {
+        for mv in plain {
+          if path == mv.src {
+            path = mv.dst
+            break
+          } else if path.has_prefix(mv.src + "/") {
+            path = mv.dst +
+              String::unsafe_substring(path, start=mv.src.length(), end=path.length())
+            break
+          }
         }
       }
       if path == e.path && moved_dst.contains(path) {
@@ -202,7 +243,8 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
         continue
       }
       out.push(
-        @bitlib.IndexEntry::new(
+        @bitlib.IndexStageEntry::new(
+          @bitlib.IndexEntry::new(
           path,
           e.id,
           e.mode,
@@ -214,14 +256,30 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
           ino=e.ino,
           uid=e.uid,
           gid=e.gid,
+          ),
+          item.stage,
         ),
       )
     }
-    @bitlib.write_index_entries_with_skip_worktree(fs, git_dir, out, skip)
+    @bitlib.write_index_stage_entries(fs, git_dir, out, skip~)
   }
   for mv in moves.filter(m => m.gitlink) {
     @bitlib.mv_path(fs, fs, root, mv.src, mv.dst, force~)
   }
+}
+
+///|
+/// git's advise_on_updating_sparse_paths, in the order the paths came.
+async fn mv_advise_sparse(paths : Array[String]) -> Unit {
+  eprint_line(
+    "The following paths and/or pathspecs matched paths that exist\noutside of your sparse-checkout definition, so will not be\nupdated in the index:",
+  )
+  for p in paths {
+    eprint_line(p)
+  }
+  eprint_line(
+    "hint: If you intend to update such entries, try one of the following:\nhint: * Use the --sparse option.\nhint: * Disable or modify the sparsity rules.\nhint: Disable this message with \"git config advice.updateSparsePath false\"",
+  )
 }
 
 ///|

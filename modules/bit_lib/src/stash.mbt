@@ -127,7 +127,7 @@ pub async fn stash_push(
     None
   }
   let index_entries = read_index_entries(rfs, git_dir)
-  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let skip = effective_skip_worktree_paths(rfs, root, git_dir)
   let index_tree = write_tree_from_index(fs, rfs, common_dir, index_entries)
   // W: the index with every tracked (non skip-worktree, non gitlink) path
   // re-staged from the worktree, exactly as `git add -u` would.
@@ -194,20 +194,12 @@ pub async fn stash_push(
     timestamp,
     untracked_tree~,
   )
-  stash_reset_hard(fs, rfs, root, git_dir, common_dir, head_id)
+  // git runs `clean --force -d` first, then `reset --hard`: every stashed
+  // untracked file goes (a HEAD path comes back with the reset, or gets the
+  // skip bit outside the cone), as do empty untracked directories.
   if untracked.length() > 0 {
-    // Like `git clean` after the reset: a path HEAD tracks (e.g. one the
-    // index had dropped) was just restored and is not untracked any more.
-    let head_paths = collect_tree_files_from_commit(
-      ObjectDb::load_lazy(rfs, common_dir),
-      rfs,
-      head_id,
-    )
     let emptied : Array[String] = []
     for path in untracked {
-      if head_paths.contains(path) {
-        continue
-      }
       let abs = join_path(root, path)
       if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
         fs.remove_file(abs) catch { _ => () }
@@ -216,7 +208,58 @@ pub async fn stash_push(
     }
     tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
   }
+  if include_untracked {
+    stash_clean_empty_dirs(fs, rfs, root, git_dir)
+  }
+  stash_reset_hard(fs, rfs, root, git_dir, common_dir, head_id)
   Some(stash_id)
+}
+
+///|
+/// Remove every empty directory below `root` that holds no index entry
+/// (skip-worktree ones included), deepest first, like `git clean -d`.
+fn stash_clean_empty_dirs(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+) -> Unit raise @bit.GitError {
+  let tracked_dirs : Map[String, Bool] = Map([])
+  for e in read_index_entries(rfs, git_dir) {
+    let mut p = e.path
+    while p.rev_find("/") is Some(j) {
+      p = String::unsafe_substring(p, start=0, end=j)
+      tracked_dirs[p] = true
+    }
+  }
+  fn walk(rel : String) -> Bool {
+    // Returns whether the directory at `rel` is empty after cleaning.
+    let abs = if rel.length() == 0 { root } else { join_path(root, rel) }
+    let children = rfs.readdir(abs) catch { _ => return false }
+    let mut empty = true
+    for name in children {
+      if rel.length() == 0 && name == ".git" {
+        empty = false
+        continue
+      }
+      let child_rel = if rel.length() == 0 { name } else { rel + "/" + name }
+      let child_abs = join_path(root, child_rel)
+      let is_link = @bitio.worktree_entry_meta_sync(rfs, child_abs) is Some(m) &&
+        m.kind is @bitio.WorktreeKindMeta::Symlink
+      if !is_link && rfs.is_dir(child_abs) && !rfs.is_file(join_path(child_abs, ".git")) &&
+        !rfs.is_dir(join_path(child_abs, ".git")) {
+        if walk(child_rel) && !tracked_dirs.contains(child_rel) {
+          fs.remove_dir(child_abs) catch { _ => empty = false }
+        } else {
+          empty = false
+        }
+      } else {
+        empty = false
+      }
+    }
+    empty
+  }
+  ignore(walk(""))
 }
 
 ///|
@@ -249,26 +292,39 @@ fn stash_reset_hard(
 ) -> Unit raise @bit.GitError {
   let db = ObjectDb::load(rfs, common_dir)
   let head_files = collect_tree_files_from_commit(db, rfs, head_id)
-  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let skip = effective_skip_worktree_paths(rfs, root, git_dir)
   let emptied : Array[String] = []
+  let entries = read_index_entries(rfs, git_dir)
   // reset --hard re-applies the sparse patterns: out-of-cone entries get
-  // the skip bit and are not materialized (their files are discarded).
+  // the skip bit and are not materialized (their files are discarded);
+  // an untracked file at such a path is left alone, as in reset --hard.
+  let leave : Map[String, Bool] = Map([])
   if is_sparse_checkout_enabled(rfs, git_dir) {
     let patterns = read_sparse_patterns(rfs, git_dir)
+    let indexed : Map[String, Bool] = Map([])
+    for e in entries {
+      indexed[e.path] = true
+    }
     for path, f in head_files {
       if !is_gitlink_mode_int(f.mode) &&
         !matches_sparse_pattern(path, patterns) &&
         !skip.contains(path) {
-        skip[path] = true
         let abs = join_path(root, path)
-        if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+        let present = @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_)
+        if !indexed.contains(path) && present {
+          // Left alone, but the entry still gets the skip bit (git).
+          leave[path] = true
+          skip[path] = true
+          continue
+        }
+        skip[path] = true
+        if present {
           fs.remove_file(abs) catch { _ => () }
           emptied.push(parent_dir(abs))
         }
       }
     }
   }
-  let entries = read_index_entries(rfs, git_dir)
   for e in entries {
     if head_files.contains(e.path) || skip.contains(e.path) {
       continue
@@ -279,13 +335,14 @@ fn stash_reset_hard(
     }
     if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
       fs.remove_file(abs) catch { _ => () }
-      emptied.push(parent_dir(abs))
     }
+    // A file already gone still lets git prune its empty parents.
+    emptied.push(parent_dir(abs))
   }
   tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
   let to_write : Map[String, TreeFileEntry] = Map([])
   for path, f in head_files {
-    if !skip.contains(path) {
+    if !skip.contains(path) && !leave.contains(path) {
       to_write[path] = f
     }
   }
@@ -980,7 +1037,7 @@ pub fn stash_apply(
     raise @bit.GitError::InvalidObject("Cannot apply a stash in the middle of a merge")
   }
   let index_entries = read_index_entries(rfs, git_dir)
-  let skip = read_skip_worktree_paths(rfs, git_dir)
+  let skip = effective_skip_worktree_paths(rfs, root, git_dir)
   let ours : Map[String, TreeFileEntry] = Map([])
   let ours_entries : Map[String, IndexEntry] = Map([])
   for e in index_entries {
@@ -1026,6 +1083,7 @@ pub fn stash_apply(
     theirs,
     skip,
     sparse=is_sparse_checkout_enabled(rfs, git_dir),
+    touched=Some(merge_touched_paths(base_files, ours, theirs, db, rfs)),
   ) catch {
     @bit.GitError::InvalidObject(msg) => {
       let u_note = match restore_untracked() {
@@ -1082,8 +1140,9 @@ pub fn stash_apply(
       let abs = join_path(root, path)
       if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
         fs.remove_file(abs) catch { _ => () }
-        emptied.push(parent_dir(abs))
       }
+      // A file already gone still lets git prune its empty parents.
+      emptied.push(parent_dir(abs))
     }
   }
   tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
@@ -1109,7 +1168,18 @@ pub fn stash_apply(
   for e in tree_files_to_index(db, rfs, added) {
     new_index.push(e)
   }
-  write_index_entries_with_skip_worktree(fs, git_dir, new_index, skip)
+  // git re-creates the index entry of every path the merge changed
+  // (unstage_changes_unless_new), so those lose the skip-worktree bit.
+  let kept_skip : Map[String, Bool] = Map([])
+  for path, _ in skip {
+    match (ours.get(path), tw.merged.get(path)) {
+      (Some(o), Some(m)) if o.id == m.id && o.mode == m.mode =>
+        kept_skip[path] = true
+      (None, _) => kept_skip[path] = true
+      _ => ()
+    }
+  }
+  write_index_entries_with_skip_worktree(fs, git_dir, new_index, kept_skip)
   match restore_untracked() {
     Some(msg) => raise @bit.GitError::InvalidObject(msg)
     None => ()
@@ -1132,6 +1202,7 @@ fn stash_check_local_changes(
   skip : Map[String, Bool],
   stash_note? : Bool = true,
   sparse? : Bool = false,
+  touched? : Map[String, Bool]? = None,
 ) -> Map[String, Bool] raise @bit.GitError {
   let note = if stash_note {
     "\nThe stash entry is kept in case you need it again."
@@ -1155,9 +1226,21 @@ fn stash_check_local_changes(
   let dirty : Array[String] = []
   let untracked : Array[String] = []
   for path, _ in changed {
+    // Only paths the merge result actually rewrites can be in the way.
+    match touched {
+      Some(t) if !t.contains(path) => continue
+      _ => ()
+    }
     if skip.contains(path) ||
       same(base_files.get(path), theirs.get(path)) ||
       same(ours.get(path), theirs.get(path)) {
+      continue
+    }
+    // Deleted by the stash but changed here: a modify/delete conflict that
+    // leaves our file as it is, so local edits to it are not in the way.
+    if theirs.get(path) is None &&
+      ours.get(path) is Some(_) &&
+      !same(base_files.get(path), ours.get(path)) {
       continue
     }
     let abs = join_path(root, path)
@@ -1344,4 +1427,53 @@ fn stash_index_differs_from_head(
     }
   }
   false
+}
+
+///|
+/// Paths a three-way merge result rewrites relative to `ours` (renames
+/// included): changed or deleted entries, content merges and conflicts.
+fn merge_touched_paths(
+  base_files : Map[String, TreeFileEntry],
+  ours : Map[String, TreeFileEntry],
+  theirs : Map[String, TreeFileEntry],
+  db : ObjectDb,
+  rfs : &@bit.RepoFileSystem,
+) -> Map[String, Bool] {
+  let fr = merge_files(base_files, ours, theirs, db, rfs)
+  let out : Map[String, Bool] = Map([])
+  for p, f in fr.merged {
+    match ours.get(p) {
+      Some(o) if o.id == f.id && o.mode == f.mode => ()
+      _ => out[p] = true
+    }
+  }
+  for c in fr.needs_content_merge {
+    // A trivial resolution to our own content writes nothing.
+    let ours_kept = c.ours_id == c.theirs_id || c.base_id == Some(c.theirs_id)
+    let ours_mode = ours.get(c.path).map(e => e.mode)
+    if !ours_kept || ours_mode != Some(c.mode) {
+      out[c.path] = true
+    }
+  }
+  for c in fr.rename_2to1 {
+    out[c.path] = true
+  }
+  for p in fr.conflicts {
+    out[p] = true
+  }
+  // Deleted by the merge: neither in the result nor still pending (content
+  // merges and rename/rename(2to1) are resolved later).
+  let pending : Map[String, Bool] = Map([])
+  for c in fr.needs_content_merge {
+    pending[c.path] = true
+  }
+  for c in fr.rename_2to1 {
+    pending[c.path] = true
+  }
+  for p, _ in ours {
+    if !fr.merged.contains(p) && !fr.conflicts.contains(p) && !pending.contains(p) {
+      out[p] = true
+    }
+  }
+  out
 }

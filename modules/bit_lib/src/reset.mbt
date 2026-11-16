@@ -51,7 +51,7 @@ pub fn reset(
       let tree_id = reset_resolve_target_tree_id(db, rfs, target)
       let files = collect_tree_files_from_commit(db, rfs, target)
       let entries = tree_files_to_index(db, rfs, files)
-      let skip = read_skip_worktree_paths(rfs, actual_git_dir)
+      let skip = effective_skip_worktree_paths(rfs, root, actual_git_dir)
       let sparse = is_sparse_checkout_enabled(rfs, actual_git_dir)
       if skip.length() > 0 || sparse {
         // Sparse: entries that stay keep their skip-worktree bit, and an
@@ -85,9 +85,9 @@ pub fn reset(
       // Sparse: skip-worktree paths that stay tracked keep their bit and
       // are not materialized, and git re-applies the patterns: every
       // out-of-cone entry gets the bit (its file is discarded, --hard).
-      let skip = read_skip_worktree_paths(rfs, actual_git_dir)
+      let skip = effective_skip_worktree_paths(rfs, root, actual_git_dir)
       // Out-of-cone untracked files the reset brings back into the index
-      // stay as they are on disk (not written over, no skip bit).
+      // stay as they are on disk (not written over), with the skip bit.
       let leave : Map[String, Bool] = Map([])
       let sparse_on = is_sparse_checkout_enabled(rfs, actual_git_dir)
       if sparse_on {
@@ -98,21 +98,24 @@ pub fn reset(
           indexed[e.path] = true
         }
         for path, f in files {
-          // Only entries the index already had: an untracked file at a
-          // path the reset brings back is left alone (git).
-          if !is_gitlink_mode_int(f.mode) &&
-            !matches_sparse_pattern(path, patterns) &&
-            !skip.contains(path) &&
-            !indexed.contains(path) &&
-            @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+          if is_gitlink_mode_int(f.mode) ||
+            matches_sparse_pattern(path, patterns) ||
+            skip.contains(path) {
+            continue
+          }
+          let abs = join_path(root, path)
+          let present = @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_)
+          if !indexed.contains(path) && present {
+            // An untracked file at a path the reset brings back is left
+            // alone, but the entry still gets the skip bit (git; a present
+            // file hides the bit from git's own reads).
             leave[path] = true
-          } else if !is_gitlink_mode_int(f.mode) &&
-            !matches_sparse_pattern(path, patterns) &&
-            !skip.contains(path) &&
-            indexed.contains(path) {
             skip[path] = true
-            let abs = join_path(root, path)
-            if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+          } else {
+            // Every other out-of-cone entry gets the bit; a file the index
+            // tracked is discarded (--hard), a missing one is not written.
+            skip[path] = true
+            if present {
               fs.remove_file(abs) catch {
                 _ => ()
               }
@@ -262,8 +265,9 @@ pub fn reset_merge(
           fs.remove_file(abs) catch {
             _ => ()
           }
-          emptied.push(parent_dir(abs))
         }
+        // A file already gone still lets git prune its empty parents.
+        emptied.push(parent_dir(abs))
       }
     }
   }

@@ -1691,3 +1691,28 @@ pub fn read_index_tree_files(
   }
   out
 }
+
+///|
+/// The skip-worktree paths as git (2.37+) sees them after reading the index
+/// of a sparse checkout: an entry whose file is present on disk loses the
+/// bit (clear_skip_worktree_from_present_files).
+pub fn effective_skip_worktree_paths(
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+) -> Map[String, Bool] {
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  if skip.length() == 0 || !is_sparse_checkout_enabled(rfs, git_dir) {
+    return skip
+  }
+  let present : Array[String] = []
+  for path, _ in skip {
+    if @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+      present.push(path)
+    }
+  }
+  for path in present {
+    skip.remove(path)
+  }
+  skip
+}

@@ -25,24 +25,23 @@ fn merge_detect_renames(
   // Potential rename sources: paths whose base content disappeared from that path
   let sources : Array[(String, TreeFileEntry)] = []
   let replaced_paths : Map[String, Bool] = Map([])
+  // merge-ort turns rename_empty off: an empty blob is never a rename
+  // source or destination.
+  let empty = @bit.hash_blob(Bytes::new(0))
   for path, entry in base {
+    if entry.id == empty {
+      continue
+    }
+    // merge-ort does no break detection (break_opt = -1): only a path the
+    // side deleted can be a rename source, never one it only modified.
     if !side.contains(path) {
       sources.push((path, entry))
-    } else {
-      match side.get(path) {
-        Some(side_entry) =>
-          if side_entry.id != entry.id {
-            sources.push((path, entry))
-            replaced_paths[path] = true
-          }
-        None => ()
-      }
     }
   }
   // Added paths: in side but not in base
   let added : Array[(String, TreeFileEntry)] = []
   for path, entry in side {
-    if !base.contains(path) {
+    if !base.contains(path) && entry.id != empty {
       added.push((path, entry))
     }
   }
@@ -194,4 +193,71 @@ fn rename_similarity_score(a : String, b : String) -> Int {
   }
   let max_total = if total_a > total_b { total_a } else { total_b }
   100 * common / max_total
+}
+
+///|
+/// Directory renames of one side, like merge-ort's: for each rename the
+/// directory portion that changed (common trailing components stripped);
+/// a base directory counts only when the side removed it entirely, and it
+/// maps to the target most of its renames went to (a tie is no rename).
+fn merge_dir_renames(
+  base : Map[String, TreeFileEntry],
+  side : Map[String, TreeFileEntry],
+  renames : SideRenames,
+) -> Map[String, String] {
+  let counts : Map[String, Map[String, Int]] = Map([])
+  for old_path, new_path in renames.old_to_new {
+    let od = merge_dirname_parts(old_path)
+    let nd = merge_dirname_parts(new_path)
+    while od.length() > 0 && nd.length() > 0 && od[od.length() - 1] == nd[nd.length() - 1] {
+      ignore(od.pop())
+      ignore(nd.pop())
+    }
+    if od.length() == 0 {
+      continue
+    }
+    let o = od.join("/")
+    let n = nd.join("/")
+    let m = match counts.get(o) {
+      Some(m) => m
+      None => {
+        let m : Map[String, Int] = Map([])
+        counts[o] = m
+        m
+      }
+    }
+    m[n] = m.get(n).unwrap_or(0) + 1
+  }
+  let out : Map[String, String] = Map([])
+  for old_dir, targets in counts {
+    let prefix = old_dir + "/"
+    // The side must have removed the directory entirely.
+    if side.keys().any(p => p.has_prefix(prefix)) ||
+      !base.keys().any(p => p.has_prefix(prefix)) {
+      continue
+    }
+    let mut best = ""
+    let mut best_n = 0
+    let mut tie = false
+    for t, n in targets {
+      if n > best_n {
+        best = t
+        best_n = n
+        tie = false
+      } else if n == best_n {
+        tie = true
+      }
+    }
+    if !tie && best_n > 0 {
+      out[old_dir] = best
+    }
+  }
+  out
+}
+
+///|
+fn merge_dirname_parts(path : String) -> Array[String] {
+  let parts = path.split("/").map(v => v.to_string()).collect()
+  ignore(parts.pop())
+  parts
 }

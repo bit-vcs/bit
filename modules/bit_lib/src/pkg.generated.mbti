@@ -147,6 +147,8 @@ pub fn diff_trees(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId?, @bi
 
 pub async fn diff_worktree(&@bit_types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> Array[DiffFile] raise @bit_object.GitError
 
+pub fn effective_skip_worktree_paths(&@bit_types.RepoFileSystem, String, String) -> Map[String, Bool]
+
 pub async fn execute_interactive_todo(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, InteractiveRebaseState, async (String) -> String?, exec_runner? : (async (String) -> Int32)?) -> InteractiveRebaseResult raise @bit_object.GitError
 
 pub fn expand_sparse_index_entries(&@bit_types.RepoFileSystem, String, Array[IndexEntry]) -> Array[IndexEntry] raise @bit_object.GitError
