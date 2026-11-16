@@ -475,6 +475,13 @@ pub fn commit(
     _ => algo
   }
   let parent = resolve_head_commit(rfs, actual_git_dir)
+  // git refuses to commit an index with conflict stages (they would be
+  // collapsed into the commit).
+  if read_unmerged_paths(rfs, actual_git_dir).length() > 0 {
+    raise @bit.GitError::InvalidObject(
+      "Committing is not possible because you have unmerged files.",
+    )
+  }
   let entries = read_index_entries(rfs, actual_git_dir)
   // An empty index records the empty tree (e.g. every file deleted);
   // whether that is "nothing to commit" is decided below, as in git.
