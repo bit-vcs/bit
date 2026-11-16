@@ -1997,9 +1997,18 @@ pub fn rm_paths(
     }
   }
   write_skip_worktree_paths(fs, actual_git_dir, remaining_skip_paths)
-  write_index_entries_with_skip_worktree(
-    fs, actual_git_dir, out, remaining_skip_worktree_paths,
-  )
+  if read_unmerged_paths(rfs, actual_git_dir).length() > 0 {
+    // Conflicts in the index: drop every stage of the removed paths (that
+    // resolves them) and keep all other entries -- including other paths'
+    // conflict stages -- exactly as they are.
+    let stage_entries = read_index_stage_entries(rfs, actual_git_dir)
+    let kept = stage_entries.filter(item => map.contains(item.entry.path))
+    write_index_stage_entries(fs, actual_git_dir, kept)
+  } else {
+    write_index_entries_with_skip_worktree(
+      fs, actual_git_dir, out, remaining_skip_worktree_paths,
+    )
+  }
   if !cached {
     rm_update_gitmodules_after_submodule_removal(
       fs, rfs, root, removed_submodule_paths,

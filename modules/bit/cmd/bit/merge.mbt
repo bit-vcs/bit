@@ -384,6 +384,17 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("No commit to merge specified")
   }
   validate_current_branch_mergeoptions(rfs, git_dir)
+  if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+    eprint_line("error: Merging is not possible because you have unmerged files.")
+    eprint_line(
+      "hint: Fix them up in the work tree, and then use 'git add/rm <file>'",
+    )
+    eprint_line(
+      "hint: as appropriate to mark resolution and make a commit.",
+    )
+    eprint_line("fatal: Exiting because of an unresolved conflict.")
+    @sys.exit(128)
+  }
   // Check if subdir-clone and handle specially
   match get_subdir_info(fs, git_dir) {
     Some((_, subdir_path, _)) => {

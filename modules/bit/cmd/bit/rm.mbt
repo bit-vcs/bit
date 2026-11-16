@@ -64,6 +64,10 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     }
     @sys.exit(1)
   }
+  // Removing a conflicted (unmerged) path resolves it: git does not run
+  // the staged/unstaged content checks for those.
+  let unmerged_now = @bitlib.read_unmerged_paths(fs, actual_git_dir)
+  let check_paths = removed_paths.filter(p => !unmerged_now.contains(p))
   if opts.cached && !opts.force && head_exists {
     let st = @bitlib.status(fs, root)
     let staged_but_not_head : Map[String, Bool] = Map([])
@@ -83,7 +87,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     for path in st.unstaged_modified {
       unstaged_modified[path] = true
     }
-    for path in removed_paths {
+    for path in check_paths {
       if intent_to_add_paths.contains(path) {
         continue
       }
@@ -97,7 +101,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
   if !opts.cached && !opts.force {
     let st = @bitlib.status(fs, root)
     let missing_worktree_paths : Map[String, Bool] = Map([])
-    for path in removed_paths {
+    for path in check_paths {
       let abs_path = root + "/" + path
       // lstat: a symlink (dangling or not) is present.
       if @bitio.worktree_entry_meta_sync(fs, abs_path) is None &&
@@ -106,7 +110,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
       }
     }
     let (both_dirty, staged_only, local_only) = rm_collect_conflict_paths(
-      st, removed_paths, missing_worktree_paths, head_exists,
+      st, check_paths, missing_worktree_paths, head_exists,
     )
     if both_dirty.length() > 0 ||
       staged_only.length() > 0 ||
