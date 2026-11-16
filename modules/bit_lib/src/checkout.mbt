@@ -333,6 +333,11 @@ fn checkout_two_way(
     index[e.path] = e
   }
   let skip = read_skip_worktree_paths(rfs, git_dir)
+  let sparse_patterns = if is_sparse_checkout_enabled(rfs, git_dir) {
+    Some(read_sparse_patterns(rfs, git_dir))
+  } else {
+    None
+  }
   let paths : Map[String, Bool] = Map([])
   for p, _ in old_files {
     paths[p] = true
@@ -384,10 +389,16 @@ fn checkout_two_way(
           dirty.push(path)
           continue
         }
-      // git refuses to overwrite any untracked file, even an identical one.
+      // git refuses to overwrite any untracked file, even an identical one
+      // -- except outside the sparse cone, where the file is left as it is
+      // and only the index takes the new entry.
       None =>
         if w is Some(_) {
-          untracked.push(path)
+          match sparse_patterns {
+            Some(pats) if !matches_sparse_pattern(path, pats) =>
+              index_only.push(path)
+            _ => untracked.push(path)
+          }
           continue
         }
     }

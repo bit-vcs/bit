@@ -1319,8 +1319,9 @@ fn merge_write_changed_paths(
       fs.remove_file(abs) catch {
         _ => ()
       }
-      emptied.push(parent_dir(abs))
     }
+    // A file already gone still lets git prune its empty parents.
+    emptied.push(parent_dir(abs))
   }
   tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
   let changed : Map[String, TreeFileEntry] = Map([])

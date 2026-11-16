@@ -98,21 +98,22 @@ pub fn reset(
           indexed[e.path] = true
         }
         for path, f in files {
-          // Only entries the index already had: an untracked file at a
-          // path the reset brings back is left alone (git).
-          if !is_gitlink_mode_int(f.mode) &&
-            !matches_sparse_pattern(path, patterns) &&
-            !skip.contains(path) &&
-            !indexed.contains(path) &&
-            @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+          if is_gitlink_mode_int(f.mode) ||
+            matches_sparse_pattern(path, patterns) ||
+            skip.contains(path) {
+            continue
+          }
+          let abs = join_path(root, path)
+          let present = @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_)
+          if !indexed.contains(path) && present {
+            // An untracked file at a path the reset brings back is left
+            // alone (git).
             leave[path] = true
-          } else if !is_gitlink_mode_int(f.mode) &&
-            !matches_sparse_pattern(path, patterns) &&
-            !skip.contains(path) &&
-            indexed.contains(path) {
+          } else {
+            // Every other out-of-cone entry gets the bit; a file the index
+            // tracked is discarded (--hard), a missing one is not written.
             skip[path] = true
-            let abs = join_path(root, path)
-            if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+            if present {
               fs.remove_file(abs) catch {
                 _ => ()
               }
@@ -262,8 +263,9 @@ pub fn reset_merge(
           fs.remove_file(abs) catch {
             _ => ()
           }
-          emptied.push(parent_dir(abs))
         }
+        // A file already gone still lets git prune its empty parents.
+        emptied.push(parent_dir(abs))
       }
     }
   }

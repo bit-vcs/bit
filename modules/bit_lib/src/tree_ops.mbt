@@ -489,6 +489,9 @@ fn tree_ops_remove_missing_paths(
     if worktree_path_is_symlink(path) || rfs.is_file(path) {
       fs.remove_file(path)
       emptied_candidates.push(parent_dir(path))
+    } else if !rfs.is_dir(path) {
+      // Already gone: git still prunes the directories it leaves empty.
+      emptied_candidates.push(parent_dir(path))
     } else if is_gitlink_mode_int(entry.mode) && rfs.is_dir(path) {
       let bit_marker = join_path(path, ".git")
       if preserve_removed_gitlinks &&

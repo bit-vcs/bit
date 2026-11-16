@@ -279,8 +279,9 @@ fn stash_reset_hard(
     }
     if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
       fs.remove_file(abs) catch { _ => () }
-      emptied.push(parent_dir(abs))
     }
+    // A file already gone still lets git prune its empty parents.
+    emptied.push(parent_dir(abs))
   }
   tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
   let to_write : Map[String, TreeFileEntry] = Map([])
@@ -1082,8 +1083,9 @@ pub fn stash_apply(
       let abs = join_path(root, path)
       if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
         fs.remove_file(abs) catch { _ => () }
-        emptied.push(parent_dir(abs))
       }
+      // A file already gone still lets git prune its empty parents.
+      emptied.push(parent_dir(abs))
     }
   }
   tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
