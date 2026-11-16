@@ -1029,7 +1029,16 @@ pub fn stash_apply(
   )
   if tw.conflicts.length() > 0 {
     merge_write_conflicted(
-      db, fs, rfs, root, git_dir, base_files, ours, theirs, tw,
+      db,
+      fs,
+      rfs,
+      root,
+      git_dir,
+      base_files,
+      ours,
+      theirs,
+      tw,
+      overwrite=already_present,
     )
     let conflicts = tw.conflicts.copy()
     conflicts.sort()
@@ -1054,9 +1063,6 @@ pub fn stash_apply(
   tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
   let to_write : Map[String, TreeFileEntry] = Map([])
   for path, f in tw.merged {
-    if already_present.contains(path) {
-      continue
-    }
     match ours.get(path) {
       Some(o) if o.id == f.id && o.mode == f.mode => ()
       _ => to_write[path] = f
@@ -1156,8 +1162,7 @@ fn stash_check_local_changes(
     )
   }
   if untracked.length() > 0 {
-    // Sparse checkout: git leaves such files alone ("already present and
-    // thus not updated despite sparse patterns") instead of refusing.
+    // Sparse checkout: git does not refuse; the file is written over.
     if sparse {
       let present : Map[String, Bool] = Map([])
       for p in untracked {

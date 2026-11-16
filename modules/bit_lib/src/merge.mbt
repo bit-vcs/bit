@@ -327,6 +327,7 @@ fn merge_write_conflicted(
   ours : Map[String, TreeFileEntry],
   theirs : Map[String, TreeFileEntry],
   tw : MergeThreeWay,
+  overwrite? : Map[String, Bool] = Map([]),
 ) -> Unit raise @bit.GitError {
   // Only what the merge changes: unstaged edits elsewhere survive.
   let changed : Map[String, TreeFileEntry] = Map([])
@@ -359,7 +360,8 @@ fn merge_write_conflicted(
   // modify/delete: the surviving side's version is left in the tree.
   for path in tw.conflicts {
     if changed.contains(path) ||
-      @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+      (!overwrite.contains(path) &&
+      @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_)) {
       continue
     }
     match (ours.get(path), theirs.get(path)) {

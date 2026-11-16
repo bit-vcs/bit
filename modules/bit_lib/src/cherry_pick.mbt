@@ -99,7 +99,16 @@ pub fn cherry_pick(
   )
   if tw.conflicts.length() > 0 {
     merge_write_conflicted(
-      db, fs, rfs, root, git_dir, base_files, ours, theirs, tw,
+      db,
+      fs,
+      rfs,
+      root,
+      git_dir,
+      base_files,
+      ours,
+      theirs,
+      tw,
+      overwrite=already_present,
     )
     if !no_commit {
       fs.write_string(
@@ -120,7 +129,6 @@ pub fn cherry_pick(
     git_dir,
     ours,
     tw.merged,
-    leave=already_present,
   )
   let entries = tree_files_to_index(db, rfs, tw.merged)
   merge_write_index_keeping_skip(fs, rfs, git_dir, entries)
@@ -310,9 +318,8 @@ fn sequencer_check_local_changes(
     )
   }
   if untracked.length() > 0 {
-    // In a sparse checkout git leaves such files alone instead: the index
-    // takes the new version, the file stays ("already present and thus
-    // not updated despite sparse patterns").
+    // In a sparse checkout git does not refuse: the file is written over
+    // (observed with git 2.43, despite its "already present" warning).
     if is_sparse_checkout_enabled(rfs, git_dir) {
       let present : Map[String, Bool] = Map([])
       for p in untracked {
@@ -415,7 +422,16 @@ pub fn revert(
   )
   if tw.conflicts.length() > 0 {
     merge_write_conflicted(
-      db, fs, rfs, root, git_dir, base_files, ours, theirs, tw,
+      db,
+      fs,
+      rfs,
+      root,
+      git_dir,
+      base_files,
+      ours,
+      theirs,
+      tw,
+      overwrite=already_present,
     )
     if !no_commit {
       fs.write_string(join_path(git_dir, "REVERT_HEAD"), commit_id.to_hex() + "\n")
@@ -433,7 +449,6 @@ pub fn revert(
     git_dir,
     ours,
     tw.merged,
-    leave=already_present,
   )
   let entries = tree_files_to_index(db, rfs, tw.merged)
   merge_write_index_keeping_skip(fs, rfs, git_dir, entries)
