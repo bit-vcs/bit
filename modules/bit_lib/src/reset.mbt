@@ -87,7 +87,7 @@ pub fn reset(
       // out-of-cone entry gets the bit (its file is discarded, --hard).
       let skip = read_skip_worktree_paths(rfs, actual_git_dir)
       // Out-of-cone untracked files the reset brings back into the index
-      // stay as they are on disk (not written over, no skip bit).
+      // stay as they are on disk (not written over), with the skip bit.
       let leave : Map[String, Bool] = Map([])
       let sparse_on = is_sparse_checkout_enabled(rfs, actual_git_dir)
       if sparse_on {
@@ -107,8 +107,10 @@ pub fn reset(
           let present = @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_)
           if !indexed.contains(path) && present {
             // An untracked file at a path the reset brings back is left
-            // alone (git).
+            // alone, but the entry still gets the skip bit (git; a present
+            // file hides the bit from git's own reads).
             leave[path] = true
+            skip[path] = true
           } else {
             // Every other out-of-cone entry gets the bit; a file the index
             // tracked is discarded (--hard), a missing one is not written.

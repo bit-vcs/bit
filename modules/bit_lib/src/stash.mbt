@@ -194,20 +194,12 @@ pub async fn stash_push(
     timestamp,
     untracked_tree~,
   )
-  stash_reset_hard(fs, rfs, root, git_dir, common_dir, head_id)
+  // git runs `clean --force -d` first, then `reset --hard`: every stashed
+  // untracked file goes (a HEAD path comes back with the reset, or gets the
+  // skip bit outside the cone), as do empty untracked directories.
   if untracked.length() > 0 {
-    // Like `git clean` after the reset: a path HEAD tracks (e.g. one the
-    // index had dropped) was just restored and is not untracked any more.
-    let head_paths = collect_tree_files_from_commit(
-      ObjectDb::load_lazy(rfs, common_dir),
-      rfs,
-      head_id,
-    )
     let emptied : Array[String] = []
     for path in untracked {
-      if head_paths.contains(path) {
-        continue
-      }
       let abs = join_path(root, path)
       if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
         fs.remove_file(abs) catch { _ => () }
@@ -217,9 +209,9 @@ pub async fn stash_push(
     tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
   }
   if include_untracked {
-    // git's `clean --force -d` also removes empty untracked directories.
     stash_clean_empty_dirs(fs, rfs, root, git_dir)
   }
+  stash_reset_hard(fs, rfs, root, git_dir, common_dir, head_id)
   Some(stash_id)
 }
 
@@ -320,7 +312,9 @@ fn stash_reset_hard(
         let abs = join_path(root, path)
         let present = @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_)
         if !indexed.contains(path) && present {
+          // Left alone, but the entry still gets the skip bit (git).
           leave[path] = true
+          skip[path] = true
           continue
         }
         skip[path] = true
@@ -1467,8 +1461,17 @@ fn merge_touched_paths(
   for p in fr.conflicts {
     out[p] = true
   }
+  // Deleted by the merge: neither in the result nor still pending (content
+  // merges and rename/rename(2to1) are resolved later).
+  let pending : Map[String, Bool] = Map([])
+  for c in fr.needs_content_merge {
+    pending[c.path] = true
+  }
+  for c in fr.rename_2to1 {
+    pending[c.path] = true
+  }
   for p, _ in ours {
-    if !fr.merged.contains(p) && !fr.conflicts.contains(p) {
+    if !fr.merged.contains(p) && !fr.conflicts.contains(p) && !pending.contains(p) {
       out[p] = true
     }
   }
