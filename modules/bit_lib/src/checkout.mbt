@@ -18,6 +18,23 @@ pub fn restore_paths(
   let object_git_dir = resolve_checkout_common_git_dir(rfs, actual_git_dir)
   let index_entries = read_index_entries(rfs, actual_git_dir)
   let skip = read_skip_worktree_paths(rfs, actual_git_dir)
+  // git (2.37+) clears the skip-worktree bit of entries whose file is
+  // present on disk when it reads the index of a sparse checkout, so such
+  // a path matches a pathspec and is restored like any tracked file.
+  let cleared : Array[String] = []
+  if is_sparse_checkout_enabled(rfs, actual_git_dir) {
+    for path, _ in skip {
+      if @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+        cleared.push(path)
+      }
+    }
+    for path in cleared {
+      skip.remove(path)
+    }
+  }
+  if cleared.length() > 0 && read_unmerged_paths(rfs, actual_git_dir).length() == 0 {
+    write_index_entries_with_skip_worktree(fs, actual_git_dir, index_entries, skip)
+  }
   let autocrlf = read_autocrlf_setting(rfs, actual_git_dir)
   let core_eol = read_core_eol_setting(rfs, actual_git_dir)
   let db = ObjectDb::load(rfs, object_git_dir)
