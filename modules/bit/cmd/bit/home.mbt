@@ -445,6 +445,32 @@ async fn home_apply_sparse(abs : String, subdir : String) -> Bool {
 }
 
 ///|
+/// Number of tracked (staged or unstaged) changes, untracked files aside.
+async fn home_tracked_changes(abs : String) -> Int? {
+  let (code, out) = home_capture_bit([
+    "-C", abs, "status", "--porcelain", "--untracked-files=no",
+  ])
+  if code != 0 {
+    return None
+  }
+  let mut n = 0
+  for line in out.split("\n") {
+    if line.length() > 0 {
+      n += 1
+    }
+  }
+  Some(n)
+}
+
+///|
+/// Whether `abs` currently is a sparse checkout.
+async fn home_is_sparse(abs : String) -> Bool {
+  // `sparse-checkout list` fails with "this worktree is not sparse".
+  let (code, _) = home_capture_bit(["-C", abs, "sparse-checkout", "list"])
+  code == 0
+}
+
+///|
 /// Clone or fast-forward one repository. Returns false on failure.
 async fn home_sync_one(
   fs : OsFs,
@@ -489,11 +515,36 @@ async fn home_sync_one(
     eprint_line("\{name}: \{contract_path_hq(abs)} exists but is not a git repository")
     return false
   }
-  if subdir is Some(dir) {
-    if !home_apply_sparse(abs, dir) {
-      eprint_line("\{name}: sparse checkout of \{dir}/ failed")
+  // Only tracked changes block a sync (untracked files are left alone and
+  // never in the way of a fast-forward's checks). A dirty repository is not
+  // touched at all -- not even its sparse checkout.
+  match home_tracked_changes(abs) {
+    Some(n) if n > 0 => {
+      print_line(
+        "\{name}: \{n} local change(s); not updating (commit or stash first)",
+      )
+      return true
+    }
+    Some(_) => ()
+    None => {
+      eprint_line("\{name}: could not read status")
       return false
     }
+  }
+  // The checkout follows the manifest: a cone for `subdir`, a full
+  // checkout without one (disabling an earlier sparse checkout).
+  match subdir {
+    Some(dir) =>
+      if !home_apply_sparse(abs, dir) {
+        eprint_line("\{name}: sparse checkout of \{dir}/ failed")
+        return false
+      }
+    None =>
+      if home_is_sparse(abs) &&
+        home_run_bit(["-C", abs, "sparse-checkout", "disable"]) != 0 {
+        eprint_line("\{name}: disabling the sparse checkout failed")
+        return false
+      }
   }
   match home_repo_status(abs) {
     None => {
@@ -501,12 +552,7 @@ async fn home_sync_one(
       false
     }
     Some(status) =>
-      if status.changes > 0 {
-        print_line(
-          "\{name}: \{status.changes} local change(s); not updating (commit or stash first)",
-        )
-        true
-      } else if status.upstream is None {
+      if status.upstream is None {
         if home_capture_trimmed(["-C", abs, "remote"]) is None {
           print_line("\{name}: no remote; nothing to sync")
           true

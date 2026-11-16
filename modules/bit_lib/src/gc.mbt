@@ -596,6 +596,7 @@ fn prune_loose_objects(
   keep : Map[String, Bool],
   remove_reachable : Bool,
 ) -> Unit raise @bit.GitError {
+  let mut removed_any = false
   let objects_dir = join_path(git_dir, "objects")
   if !rfs.is_dir(objects_dir) {
     return
@@ -626,7 +627,11 @@ fn prune_loose_objects(
         continue
       }
       fs.remove_file(path)
+      removed_any = true
     }
+  }
+  if removed_any {
+    gc_invalidate_commit_graph(fs, rfs, git_dir)
   }
 }
 
@@ -682,12 +687,47 @@ fn prune_packfiles(
   let keep_pack = base + ".pack"
   let keep_idx = base + ".idx"
   let entries = rfs.readdir(pack_dir)
+  let mut removed = false
   for entry in entries {
     if entry == keep_pack || entry == keep_idx {
       continue
     }
     if entry.has_suffix(".pack") || entry.has_suffix(".idx") {
       fs.remove_file(join_path(pack_dir, entry))
+      removed = true
+    }
+  }
+  if removed {
+    gc_invalidate_commit_graph(fs, rfs, git_dir)
+  }
+}
+
+///|
+/// Objects were deleted: a commit-graph may now name commits that are
+/// gone (git fsck: "Could not read ..."). It is only a cache, so drop it;
+/// `gc` writes a fresh one afterwards.
+fn gc_invalidate_commit_graph(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Unit {
+  let info_dir = join_path(git_dir, "objects/info")
+  let single = join_path(info_dir, "commit-graph")
+  if rfs.is_file(single) {
+    fs.remove_file(single) catch {
+      _ => ()
+    }
+  }
+  let chain_dir = join_path(info_dir, "commit-graphs")
+  if rfs.is_dir(chain_dir) {
+    let names = rfs.readdir(chain_dir) catch { _ => [] }
+    for name in names {
+      fs.remove_file(join_path(chain_dir, name)) catch {
+        _ => ()
+      }
+    }
+    fs.remove_dir(chain_dir) catch {
+      _ => ()
     }
   }
 }
