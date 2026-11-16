@@ -25,7 +25,13 @@ fn merge_detect_renames(
   // Potential rename sources: paths whose base content disappeared from that path
   let sources : Array[(String, TreeFileEntry)] = []
   let replaced_paths : Map[String, Bool] = Map([])
+  // merge-ort turns rename_empty off: an empty blob is never a rename
+  // source or destination.
+  let empty = @bit.hash_blob(Bytes::new(0))
   for path, entry in base {
+    if entry.id == empty {
+      continue
+    }
     if !side.contains(path) {
       sources.push((path, entry))
     } else {
@@ -42,7 +48,7 @@ fn merge_detect_renames(
   // Added paths: in side but not in base
   let added : Array[(String, TreeFileEntry)] = []
   for path, entry in side {
-    if !base.contains(path) {
+    if !base.contains(path) && entry.id != empty {
       added.push((path, entry))
     }
   }
