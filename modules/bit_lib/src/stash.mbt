@@ -1016,6 +1016,8 @@ pub fn stash_apply(
       "\ncould not restore untracked files from stash",
     )
   }
+  // A refused merge (local changes in the way) still restores the
+  // untracked files: git jumps to restore_untracked on any merge failure.
   let already_present = stash_check_local_changes(
     rfs,
     root,
@@ -1024,7 +1026,16 @@ pub fn stash_apply(
     theirs,
     skip,
     sparse=is_sparse_checkout_enabled(rfs, git_dir),
-  )
+  ) catch {
+    @bit.GitError::InvalidObject(msg) => {
+      let u_note = match restore_untracked() {
+        Some(u) => "\n" + u
+        None => ""
+      }
+      raise @bit.GitError::InvalidObject(msg + u_note)
+    }
+    e => raise e
+  }
   let tw = merge_three_way(
     db,
     fs,
