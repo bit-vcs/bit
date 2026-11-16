@@ -3,7 +3,7 @@
 // Opt-in (not run in CI): it can take minutes.
 //
 //   node tools/difffuzz/run.mjs [--scenario core|worktree|sparse|home|all]
-//        [--seeds N | --seed S] [--steps M] [--bit PATH] [--crash P]
+//        [--seeds N [--seed-start S0] | --seed S] [--steps M] [--bit PATH] [--crash P]
 //        [--keep] [--out DIR]
 //
 // Each failure prints the scenario, seed and step plus the operation log,
@@ -26,6 +26,7 @@ function parseArgs(argv) {
     scenario: "all",
     seeds: 10,
     seed: null,
+    seedStart: 1000,
     steps: 40,
     bit: path.join(repoRoot, "_build/native/release/build/mizchi/bit/bit.exe"),
     crash: 0,
@@ -38,6 +39,7 @@ function parseArgs(argv) {
     if (a === "--scenario") o.scenario = v();
     else if (a === "--seeds") o.seeds = Number(v());
     else if (a === "--seed") o.seed = Number(v());
+    else if (a === "--seed-start") o.seedStart = Number(v());
     else if (a === "--steps") o.steps = Number(v());
     else if (a === "--bit") o.bit = path.resolve(v());
     else if (a === "--crash") o.crash = Number(v());
@@ -74,7 +76,7 @@ function main() {
       process.exit(2);
     }
   }
-  const seeds = o.seed !== null ? [o.seed] : Array.from({ length: o.seeds }, (_, i) => 1000 + i);
+  const seeds = o.seed !== null ? [o.seed] : Array.from({ length: o.seeds }, (_, i) => o.seedStart + i);
   fs.mkdirSync(o.out, { recursive: true });
   const gitVersion = run("git", ["--version"], {}).stdout.trim();
   console.log(`bit: ${o.bit}\n${gitVersion}\nout: ${o.out}\n`);
