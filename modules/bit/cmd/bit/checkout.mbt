@@ -104,7 +104,10 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       eprint_line("fatal: a branch named '\{branch_name}' already exists")
       @sys.exit(128)
     }
-    if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+    // Only a start point merges the tree, and so refuses an unmerged
+    // index; without one git skips the merge entirely (do_merge = 0).
+    if start_point is Some(_) &&
+      @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
       eprint_line("error: you need to resolve your current index first")
       @sys.exit(1)
     }

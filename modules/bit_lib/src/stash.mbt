@@ -1213,6 +1213,13 @@ fn stash_check_local_changes(
       same(ours.get(path), theirs.get(path)) {
       continue
     }
+    // Deleted by the stash but changed here: a modify/delete conflict that
+    // leaves our file as it is, so local edits to it are not in the way.
+    if theirs.get(path) is None &&
+      ours.get(path) is Some(_) &&
+      !same(base_files.get(path), ours.get(path)) {
+      continue
+    }
     let abs = join_path(root, path)
     let on_disk : @bit.ObjectId? = match
       @bitio.worktree_entry_meta_sync(rfs, abs) {

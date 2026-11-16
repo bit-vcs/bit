@@ -190,7 +190,16 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
         } else {
           branch_name
         }
-        ignore(checkout_with_promisor_retry(fs, root, short_name))
+        if start_point is None {
+          // No start point: git skips the tree merge (do_merge = 0), so an
+          // unmerged index does not block it; only HEAD moves.
+          switch_write_head_ref(fs, git_dir, branch_name)
+          if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+            @bitlib.sparse_checkout_reapply(fs, fs, root)
+          }
+        } else {
+          ignore(checkout_with_promisor_retry(fs, root, short_name))
+        }
       }
       None => {
         @bitlib.create_branch(fs, rfs, root, branch_name, start_point~)
