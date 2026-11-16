@@ -988,7 +988,9 @@ pub fn stash_apply(
   }
   let base_files = collect_tree_files_from_commit(db, rfs, stash.parents[0])
   let theirs = collect_tree_files(db, rfs, stash.tree)
-  // Untracked files come back first; an existing file blocks that.
+  // Untracked files come back first; existing ones fail the apply at the
+  // end (after the merge), as in git.
+  let mut untracked_error : String? = None
   if stash.parents.length() >= 3 {
     let u_files = collect_tree_files_from_commit(db, rfs, stash.parents[2])
     let existing : Array[String] = []
@@ -997,14 +999,23 @@ pub fn stash_apply(
         existing.push(path)
       }
     }
+    // Like git: every untracked file that does not exist yet is restored;
+    // existing ones are reported, the merge still runs, and the apply
+    // fails at the end (the entry is kept).
+    let to_restore : Map[String, TreeFileEntry] = Map([])
+    for path, f in u_files {
+      if !existing.contains(path) {
+        to_restore[path] = f
+      }
+    }
+    write_worktree_from_files(db, fs, rfs, root, git_dir, to_restore)
     if existing.length() > 0 {
       existing.sort()
-      raise @bit.GitError::InvalidObject(
+      untracked_error = Some(
         existing.map(p => "\{p} already exists, no checkout").join("\n") +
         "\ncould not restore untracked files from stash",
       )
     }
-    write_worktree_from_files(db, fs, rfs, root, git_dir, u_files)
   }
   let already_present = stash_check_local_changes(
     rfs,
@@ -1084,6 +1095,10 @@ pub fn stash_apply(
     new_index.push(e)
   }
   write_index_entries_with_skip_worktree(fs, git_dir, new_index, skip)
+  match untracked_error {
+    Some(msg) => raise @bit.GitError::InvalidObject(msg)
+    None => ()
+  }
   if drop {
     stash_drop_at(fs, rfs, common_dir, index)
   }
@@ -1144,8 +1159,22 @@ fn stash_check_local_changes(
         }
       None => None
     }
+    // A mode change (exec bit, file <-> symlink) is a local change too.
+    let disk_mode = match @bitio.worktree_entry_meta_sync(rfs, abs) {
+      Some(info) =>
+        match info.kind {
+          @bitio.WorktreeKindMeta::Symlink => 0o120000
+          @bitio.WorktreeKindMeta::Regular => info.mode
+        }
+      None => 0
+    }
     match (ours.get(path), on_disk) {
-      (Some(o), Some(id)) => if o.id != id { dirty.push(path) }
+      (Some(o), Some(id)) =>
+        if o.id != id ||
+          (o.mode != disk_mode &&
+          (disk_mode == 0o100644 || disk_mode == 0o100755 || disk_mode == 0o120000)) {
+          dirty.push(path)
+        }
       // A missing file loses nothing when rewritten or deleted (git).
       (Some(_), None) => ()
       (None, Some(_)) => untracked.push(path)

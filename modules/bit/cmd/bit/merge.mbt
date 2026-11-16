@@ -585,6 +585,8 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         root,
         tid.to_hex(),
         detach=true,
+        // Two-tree checkout: local changes (even deleted files) survive.
+        keep_local_changes=true,
       ),
     )
     match checkout_target {

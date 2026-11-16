@@ -1194,11 +1194,24 @@ fn merge_write_changed_paths(
   merged : Map[String, TreeFileEntry],
   leave? : Map[String, Bool] = Map([]),
 ) -> Unit raise @bit.GitError {
-  // Sparse: skip-worktree paths (and files `leave` names) are updated in
-  // the index only.
+  // Sparse: skip-worktree and out-of-cone paths (and files `leave` names)
+  // are updated in the index only -- git does not write outside the cone.
   let skip = read_skip_worktree_paths(rfs, git_dir)
   for p, _ in leave {
     skip[p] = true
+  }
+  if is_sparse_checkout_enabled(rfs, git_dir) {
+    let patterns = read_sparse_patterns(rfs, git_dir)
+    for path, _ in merged {
+      if !matches_sparse_pattern(path, patterns) {
+        skip[path] = true
+      }
+    }
+    for path, _ in ours {
+      if !matches_sparse_pattern(path, patterns) {
+        skip[path] = true
+      }
+    }
   }
   let emptied : Array[String] = []
   for path, o in ours {

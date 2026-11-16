@@ -263,7 +263,8 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
       fs,
       git_dir,
       stage_paths,
-      explicit=paths.map(p => add_normalize_input_path(root, p)),
+      root~,
+      explicit=paths.map(p => (add_normalize_input_path(root, p), p)),
     )
   } else {
     (stage_paths, [])
@@ -1475,34 +1476,76 @@ fn add_split_outside_sparse(
   fs : OsFs,
   git_dir : String,
   paths : Array[String],
-  explicit? : Array[String] = [],
+  root? : String = "",
+  explicit? : Array[(String, String)] = [],
 ) -> (Array[String], Array[String]) {
   let skip = @bitlib.read_skip_worktree_paths(fs, git_dir)
   let patterns = @bitlib.read_sparse_patterns(fs, git_dir) catch {
     _ => return (paths, [])
   }
-  let tracked : Map[String, Bool] = Map([])
+  let tracked : Map[String, @bitlib.IndexEntry] = Map([])
   let entries = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
   for e in entries {
-    tracked[e.path] = true
+    tracked[e.path] = e
   }
   let kept : Array[String] = []
   let outside : Array[String] = []
+  let reported : Map[String, Bool] = Map([])
+  let report = fn(text : String) {
+    if !reported.contains(text) {
+      reported[text] = true
+      outside.push(text)
+    }
+  }
   for p in paths {
-    if !tracked.contains(p) && !@bitlib.matches_sparse_pattern(p, patterns) {
-      outside.push(p)
-    } else if skip.contains(p) ||
-      (tracked.contains(p) && !@bitlib.matches_sparse_pattern(p, patterns)) {
-      // A skip-worktree or out-of-cone entry is never updated; naming it
-      // explicitly is an error (git's path_in_sparse_checkout).
-      if explicit.contains(p) {
-        outside.push(p)
-      }
-    } else {
-      kept.push(p)
+    match tracked.get(p) {
+      None =>
+        if @bitlib.matches_sparse_pattern(p, patterns) {
+          kept.push(p)
+        } else {
+          // An untracked file outside the cone is reported by name.
+          report(p)
+        }
+      Some(e) =>
+        if skip.contains(p) || !@bitlib.matches_sparse_pattern(p, patterns) {
+          // A tracked entry outside the cone is never updated. When it
+          // would have been (its file changed), git reports the pathspec
+          // that matched it; without pathspecs (-A / -u) it stays quiet.
+          if root != "" && add_worktree_differs(fs, root + "/" + p, e) {
+            for item in explicit {
+              let (norm, raw) = item
+              if norm == "" || norm == "." || norm == p || p.has_prefix(norm + "/") {
+                report(raw)
+              }
+            }
+          }
+        } else {
+          kept.push(p)
+        }
     }
   }
   (kept, outside)
+}
+
+///|
+/// Whether the worktree file differs from its index entry (missing counts
+/// as unchanged here: there is nothing to add).
+fn add_worktree_differs(fs : OsFs, abs : String, e : @bitlib.IndexEntry) -> Bool {
+  match @bitio.worktree_entry_meta_sync(fs, abs) {
+    None => false
+    Some(info) =>
+      match info.kind {
+        @bitio.WorktreeKindMeta::Symlink =>
+          match @bitio.read_symlink_target_path(abs) {
+            Some(t) => @bitcore.hash_blob(@utf8.encode(t)) != e.id
+            None => false
+          }
+        @bitio.WorktreeKindMeta::Regular => {
+          let data = fs.read_file(abs) catch { _ => return false }
+          @bitcore.hash_blob(data) != e.id
+        }
+      }
+  }
 }
 
 ///|

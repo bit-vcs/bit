@@ -713,7 +713,12 @@ fn index_append_cache_tree_node(
   target : Array[Byte],
   tree : IndexCacheTree,
 ) -> Unit {
-  index_append_ascii_bytes(target, tree.name)
+  // Directory names are UTF-8 bytes (one byte per char mangled non-ASCII
+  // names, so the cache-tree no longer matched its paths and was never
+  // invalidated -- a stale tree, and objects gc then dropped).
+  for b in @utf8.encode(tree.name) {
+    target.push(b)
+  }
   target.push(b'\x00')
   index_append_ascii_bytes(target, tree.entry_count.to_string())
   target.push(b' ')

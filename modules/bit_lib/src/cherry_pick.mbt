@@ -301,8 +301,22 @@ fn sequencer_check_local_changes(
         }
       None => None
     }
+    // A mode change (exec bit, file <-> symlink) is a local change too.
+    let disk_mode = match meta {
+      Some(info) =>
+        match info.kind {
+          @bitio.WorktreeKindMeta::Symlink => 0o120000
+          @bitio.WorktreeKindMeta::Regular => info.mode
+        }
+      None => 0
+    }
     match (ours.get(path), on_disk) {
-      (Some(o), Some((id, _))) => if o.id != id { dirty.push(path) }
+      (Some(o), Some((id, _))) =>
+        if o.id != id ||
+          (o.mode != disk_mode &&
+          (disk_mode == 0o100644 || disk_mode == 0o100755 || disk_mode == 0o120000)) {
+          dirty.push(path)
+        }
       // A missing file loses nothing when rewritten or deleted (git).
       (Some(_), None) => ()
       // git refuses to overwrite any untracked file, even an identical one.

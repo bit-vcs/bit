@@ -162,6 +162,9 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   // so only loose objects are packed (existing packs are kept).
   po_args.push("--all")
   po_args.push("--reflog")
+  // Like git's repack: objects the index refers to (staged blobs, the
+  // cache-tree's trees) are kept too, or the index points at nothing.
+  po_args.push("--indexed-objects")
   if !all {
     po_args.push("--unpacked")
     po_args.push("--incremental")

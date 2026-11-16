@@ -410,11 +410,8 @@ pub fn subdir_remove_dir(
 
 ///|
 fn string_to_bytes(s : String) -> Bytes {
-  let bytes : Array[Byte] = []
-  for c in s {
-    bytes.push(c.to_int().to_byte())
-  }
-  Bytes::from_array(bytes)
+  // UTF-8 (one byte per char mangled non-ASCII paths and names).
+  @utf8.encode(s)
 }
 
 ///|

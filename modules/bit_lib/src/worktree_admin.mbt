@@ -1951,7 +1951,11 @@ fn worktree_has_untracked_files(
           ) {
           return true
         }
-      } else {
+      } else if worktree_has_untracked_files(
+          fs, worktree_path, child_rel, tracked_paths, gitlink_paths,
+        ) {
+        // Only files count: an empty (untracked) directory is not
+        // "untracked files" for git.
         return true
       }
     } else if (is_symlink || fs.is_file(child_abs)) &&
