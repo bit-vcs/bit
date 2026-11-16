@@ -96,11 +96,11 @@ cmd/bit (native-only)
 - Add **trait/record definitions** to `src/lib` (`ObjectStore`, `RefStore`, `Transport`, `Clock`, `Random`).
 - Add `EnvProvider` to make environment variable / current directory retrieval **injectable**.
 - Remove native imports from `src/lib/moon.pkg`:
-  - `moonbitlang/async/process`
+  - `moonbitlang/core/async/process`
   - `moonbitlang/x/sys`
   - `moonbitlang/core/env`
-  - `moonbitlang/async/http`
-  - `moonbitlang/async/fs` to be removed after abstracting `worktree` / `gitignore`
+  - `moonbitlang/core/async/http`
+  - `moonbitlang/core/async/fs` to be removed after abstracting `worktree` / `gitignore`
 - Move native-specific implementations to `src/lib/native`.
 
 ### Step 2: Make `x-hub` pure
