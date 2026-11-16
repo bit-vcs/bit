@@ -268,7 +268,7 @@ pub fn add_paths(
     }
   }
   let out = map.values().to_array()
-  write_index_entries_preserving_cache_tree(fs, rfs, actual_git_dir, out)
+  add_write_index_keeping_conflicts(fs, rfs, actual_git_dir, out, all_paths)
 }
 
 ///|
@@ -442,7 +442,7 @@ pub async fn add_paths_async(
     }
   }
   let out = map.values().to_array()
-  write_index_entries_preserving_cache_tree(fs, rfs, actual_git_dir, out)
+  add_write_index_keeping_conflicts(fs, rfs, actual_git_dir, out, all_paths)
 }
 
 ///|
@@ -2387,4 +2387,40 @@ pub fn smudge_worktree_content(content : Bytes, autocrlf : AutoCrlf) -> Bytes {
         convert_lf_to_crlf(content)
       }
   }
+}
+
+///|
+/// Write the index after `add`: the added paths are resolved (stage 0, or
+/// gone), every other path keeps its entries -- including the conflict
+/// stages of paths the add did not touch (the collapsed per-path view
+/// `read_index_entries` gives would otherwise resolve them silently).
+fn add_write_index_keeping_conflicts(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  out : Array[IndexEntry],
+  touched : Array[String],
+) -> Unit raise @bit.GitError {
+  let unmerged = read_unmerged_paths(rfs, git_dir)
+  if unmerged.length() == 0 {
+    write_index_entries_preserving_cache_tree(fs, rfs, git_dir, out)
+    return
+  }
+  let touched_set : Map[String, Bool] = Map([])
+  for p in touched {
+    touched_set[p] = true
+  }
+  let result : Array[IndexStageEntry] = []
+  for item in read_index_stage_entries(rfs, git_dir) {
+    if unmerged.contains(item.entry.path) && !touched_set.contains(item.entry.path) {
+      result.push(item)
+    }
+  }
+  for e in out {
+    if unmerged.contains(e.path) && !touched_set.contains(e.path) {
+      continue
+    }
+    result.push({ entry: e, stage: 0 })
+  }
+  write_index_stage_entries(fs, git_dir, result)
 }
