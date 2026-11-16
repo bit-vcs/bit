@@ -1006,7 +1006,15 @@ pub fn stash_apply(
     }
     write_worktree_from_files(db, fs, rfs, root, git_dir, u_files)
   }
-  stash_check_local_changes(rfs, root, ours, base_files, theirs, skip)
+  let already_present = stash_check_local_changes(
+    rfs,
+    root,
+    ours,
+    base_files,
+    theirs,
+    skip,
+    sparse=is_sparse_checkout_enabled(rfs, git_dir),
+  )
   let tw = merge_three_way(
     db,
     fs,
@@ -1046,6 +1054,9 @@ pub fn stash_apply(
   tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
   let to_write : Map[String, TreeFileEntry] = Map([])
   for path, f in tw.merged {
+    if already_present.contains(path) {
+      continue
+    }
     match ours.get(path) {
       Some(o) if o.id == f.id && o.mode == f.mode => ()
       _ => to_write[path] = f
@@ -1084,7 +1095,8 @@ fn stash_check_local_changes(
   theirs : Map[String, TreeFileEntry],
   skip : Map[String, Bool],
   stash_note? : Bool = true,
-) -> Unit raise @bit.GitError {
+  sparse? : Bool = false,
+) -> Map[String, Bool] raise @bit.GitError {
   let note = if stash_note {
     "\nThe stash entry is kept in case you need it again."
   } else {
@@ -1144,6 +1156,15 @@ fn stash_check_local_changes(
     )
   }
   if untracked.length() > 0 {
+    // Sparse checkout: git leaves such files alone ("already present and
+    // thus not updated despite sparse patterns") instead of refusing.
+    if sparse {
+      let present : Map[String, Bool] = Map([])
+      for p in untracked {
+        present[p] = true
+      }
+      return present
+    }
     untracked.sort()
     raise @bit.GitError::InvalidObject(
       "The following untracked working tree files would be overwritten by merge:\n\t" +
@@ -1152,6 +1173,7 @@ fn stash_check_local_changes(
       note,
     )
   }
+  Map([])
 }
 
 ///|

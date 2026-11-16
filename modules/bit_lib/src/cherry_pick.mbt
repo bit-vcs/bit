@@ -81,7 +81,7 @@ pub fn cherry_pick(
     None => Map([])
   }
   let theirs = collect_tree_files(db, rfs, commit_info.tree)
-  sequencer_check_local_changes(
+  let already_present = sequencer_check_local_changes(
     rfs, root, git_dir, ours, base_files, theirs, "cherry-pick",
   )
   let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
@@ -112,7 +112,16 @@ pub fn cherry_pick(
     conflicts.sort()
     return { status: CherryPickStatus::Conflict, commit_id: None, conflicts }
   }
-  merge_write_changed_paths(db, fs, rfs, root, git_dir, ours, tw.merged)
+  merge_write_changed_paths(
+    db,
+    fs,
+    rfs,
+    root,
+    git_dir,
+    ours,
+    tw.merged,
+    leave=already_present,
+  )
   let entries = tree_files_to_index(db, rfs, tw.merged)
   merge_write_index_keeping_skip(fs, rfs, git_dir, entries)
   if no_commit {
@@ -212,7 +221,7 @@ fn sequencer_check_local_changes(
   base_files : Map[String, TreeFileEntry],
   theirs : Map[String, TreeFileEntry],
   op : String,
-) -> Unit raise @bit.GitError {
+) -> Map[String, Bool] raise @bit.GitError {
   let entries = read_index_entries(rfs, git_dir)
   let skip = read_skip_worktree_paths(rfs, git_dir)
   // On an unborn branch (no HEAD tree) an index already matching the
@@ -301,12 +310,23 @@ fn sequencer_check_local_changes(
     )
   }
   if untracked.length() > 0 {
+    // In a sparse checkout git leaves such files alone instead: the index
+    // takes the new version, the file stays ("already present and thus
+    // not updated despite sparse patterns").
+    if is_sparse_checkout_enabled(rfs, git_dir) {
+      let present : Map[String, Bool] = Map([])
+      for p in untracked {
+        present[p] = true
+      }
+      return present
+    }
     untracked.sort()
     raise @bit.GitError::InvalidObject(
       "The following untracked working tree files would be overwritten by \{op}:\n\t" +
       untracked.join("\n\t"),
     )
   }
+  Map([])
 }
 
 ///|
@@ -367,7 +387,7 @@ pub fn revert(
     Some(p) => collect_tree_files_from_commit(db, rfs, p)
     None => Map([])
   }
-  sequencer_check_local_changes(
+  let already_present = sequencer_check_local_changes(
     rfs, root, git_dir, ours, base_files, theirs, "revert",
   )
   let subject = cherry_pick_subject(commit.message)
@@ -405,7 +425,16 @@ pub fn revert(
     conflicts.sort()
     return { status: CherryPickStatus::Conflict, commit_id: None, conflicts }
   }
-  merge_write_changed_paths(db, fs, rfs, root, git_dir, ours, tw.merged)
+  merge_write_changed_paths(
+    db,
+    fs,
+    rfs,
+    root,
+    git_dir,
+    ours,
+    tw.merged,
+    leave=already_present,
+  )
   let entries = tree_files_to_index(db, rfs, tw.merged)
   merge_write_index_keeping_skip(fs, rfs, git_dir, entries)
   if no_commit {

@@ -43,6 +43,9 @@ priv struct MergeThreeWay {
   conflict_types : Map[String, String]
   rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)]
   removed_paths : Array[String]
+  /// "distinct types" conflicts (a regular file on one side, a symlink on
+  /// the other): path -> (path the regular file is recorded at, its stage)
+  distinct_types : Map[String, (String, Int)]
 }
 
 ///|
@@ -69,7 +72,28 @@ fn merge_three_way(
   let rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)] = Map([],
   )
   // Try content-level merge for files modified on both sides
+  let distinct_types : Map[String, (String, Int)] = Map([])
   for candidate in file_result.needs_content_merge {
+    // Distinct types (git merge-ort): a regular file on one side and a
+    // symlink on the other cannot be content-merged. The non-regular entry
+    // keeps the path, the regular file is recorded at `<path>~<label>`.
+    match (ours.get(candidate.path), theirs.get(candidate.path)) {
+      (Some(o), Some(t)) if (o.mode == 0o120000) != (t.mode == 0o120000) &&
+        !is_gitlink_mode_int(o.mode) &&
+        !is_gitlink_mode_int(t.mode) => {
+        let (label, stage) = if o.mode == 0o120000 {
+          (theirs_label, 3)
+        } else {
+          (ours_label, 2)
+        }
+        let renamed = candidate.path + "~" + label.replace_all(old="/", new="_")
+        distinct_types[candidate.path] = (renamed, stage)
+        conflicts.push(candidate.path)
+        all_conflict_types[candidate.path] = "distinct types"
+        continue
+      }
+      _ => ()
+    }
     // Trivial resolutions first, byte for byte (e.g. one side only
     // renamed the file): no text round-trip at all.
     if candidate.ours_id == candidate.theirs_id ||
@@ -285,6 +309,7 @@ fn merge_three_way(
     conflict_types: all_conflict_types,
     rename_conflict_stages,
     removed_paths: file_result.removed_paths,
+    distinct_types,
   }
 }
 
@@ -316,6 +341,19 @@ fn merge_write_conflicted(
           @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is None {
           changed[path] = f
         }
+    }
+  }
+  // distinct types: the symlink side at the path, the regular file at its
+  // renamed path.
+  for path, item in tw.distinct_types {
+    let (renamed, stage) = item
+    match (ours.get(path), theirs.get(path)) {
+      (Some(o), Some(t)) => {
+        let (keeper, regular) = if stage == 2 { (t, o) } else { (o, t) }
+        changed[path] = keeper
+        changed[renamed] = regular
+      }
+      _ => ()
     }
   }
   // modify/delete: the surviving side's version is left in the tree.
@@ -356,6 +394,7 @@ fn merge_write_conflicted(
     tw.merged,
     tw.conflicts,
     tw.rename_conflict_stages,
+    distinct_types=tw.distinct_types,
   )
   write_index_stage_entries(fs, git_dir, entries)
 }
@@ -428,6 +467,7 @@ pub fn merge(
   let ours = collect_tree_files_from_commit(db, rfs, head)
   let theirs = collect_tree_files_from_commit(db, rfs, target)
   merge_check_clean_index(rfs, git_dir, ours)
+  ignore(
   stash_check_local_changes(
     rfs,
     root,
@@ -436,6 +476,7 @@ pub fn merge(
     theirs,
     read_skip_worktree_paths(rfs, git_dir),
     stash_note=false,
+    ),
   )
   let tw = merge_three_way(
     db,
@@ -1058,6 +1099,7 @@ fn merge_conflicted_index_entries_with_renames(
   merged : Map[String, TreeFileEntry],
   conflicts : Array[String],
   rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)],
+  distinct_types? : Map[String, (String, Int)] = Map([]),
 ) -> Array[IndexStageEntry] raise @bit.GitError {
   let out : Array[IndexStageEntry] = []
   let conflict_set : Map[String, Bool] = Map([])
@@ -1071,6 +1113,26 @@ fn merge_conflicted_index_entries_with_renames(
     }
   }
   for path in conflicts {
+    // distinct types: each side at its own path (keeper at `path`).
+    match (distinct_types.get(path), ours.get(path), theirs.get(path)) {
+      (Some((renamed, stage)), Some(o), Some(t)) => {
+        let (keeper, keeper_stage, regular) = if stage == 2 {
+          (t, 3, o)
+        } else {
+          (o, 2, t)
+        }
+        out.push({
+          entry: merge_tree_file_to_index_entry(db, fs, path, keeper),
+          stage: keeper_stage,
+        })
+        out.push({
+          entry: merge_tree_file_to_index_entry(db, fs, renamed, regular),
+          stage,
+        })
+        continue
+      }
+      _ => ()
+    }
     match rename_conflict_stages.get(path) {
       Some(stages) => {
         // rename/rename(2to1): stage 2 = resolved ours, stage 3 = resolved theirs
@@ -1128,9 +1190,14 @@ fn merge_write_changed_paths(
   git_dir : String,
   ours : Map[String, TreeFileEntry],
   merged : Map[String, TreeFileEntry],
+  leave? : Map[String, Bool] = Map([]),
 ) -> Unit raise @bit.GitError {
-  // Sparse: skip-worktree paths are updated in the index only.
+  // Sparse: skip-worktree paths (and files `leave` names) are updated in
+  // the index only.
   let skip = read_skip_worktree_paths(rfs, git_dir)
+  for p, _ in leave {
+    skip[p] = true
+  }
   let emptied : Array[String] = []
   for path, o in ours {
     if merged.contains(path) ||
