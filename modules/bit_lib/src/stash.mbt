@@ -216,7 +216,58 @@ pub async fn stash_push(
     }
     tree_ops_prune_empty_dirs(fs, rfs, root, emptied)
   }
+  if include_untracked {
+    // git's `clean --force -d` also removes empty untracked directories.
+    stash_clean_empty_dirs(fs, rfs, root, git_dir)
+  }
   Some(stash_id)
+}
+
+///|
+/// Remove every empty directory below `root` that holds no index entry
+/// (skip-worktree ones included), deepest first, like `git clean -d`.
+fn stash_clean_empty_dirs(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+) -> Unit raise @bit.GitError {
+  let tracked_dirs : Map[String, Bool] = Map([])
+  for e in read_index_entries(rfs, git_dir) {
+    let mut p = e.path
+    while p.rev_find("/") is Some(j) {
+      p = String::unsafe_substring(p, start=0, end=j)
+      tracked_dirs[p] = true
+    }
+  }
+  fn walk(rel : String) -> Bool {
+    // Returns whether the directory at `rel` is empty after cleaning.
+    let abs = if rel.length() == 0 { root } else { join_path(root, rel) }
+    let children = rfs.readdir(abs) catch { _ => return false }
+    let mut empty = true
+    for name in children {
+      if rel.length() == 0 && name == ".git" {
+        empty = false
+        continue
+      }
+      let child_rel = if rel.length() == 0 { name } else { rel + "/" + name }
+      let child_abs = join_path(root, child_rel)
+      let is_link = @bitio.worktree_entry_meta_sync(rfs, child_abs) is Some(m) &&
+        m.kind is @bitio.WorktreeKindMeta::Symlink
+      if !is_link && rfs.is_dir(child_abs) && !rfs.is_file(join_path(child_abs, ".git")) &&
+        !rfs.is_dir(join_path(child_abs, ".git")) {
+        if walk(child_rel) && !tracked_dirs.contains(child_rel) {
+          fs.remove_dir(child_abs) catch { _ => empty = false }
+        } else {
+          empty = false
+        }
+      } else {
+        empty = false
+      }
+    }
+    empty
+  }
+  ignore(walk(""))
 }
 
 ///|
