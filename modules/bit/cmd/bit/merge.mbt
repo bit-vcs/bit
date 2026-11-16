@@ -1030,6 +1030,8 @@ fn merge_default_message(
   match @bitlib.read_head_ref(rfs, git_dir) {
     @bitlib.HeadRef::Branch(name) if name != "main" && name != "master" =>
       base + " into " + name
-    _ => base
+    @bitlib.HeadRef::Branch(_) => base
+    // git (fmt-merge-msg) names a detached HEAD too.
+    @bitlib.HeadRef::Detached(_) => base + " into HEAD"
   }
 }

@@ -799,3 +799,14 @@ fn collect_index_referenced_objects(
     }
   }
 }
+
+///|
+/// Public form of the commit-graph invalidation, for callers that delete
+/// packs or loose objects themselves (cmd repack).
+pub fn invalidate_commit_graph(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Unit {
+  gc_invalidate_commit_graph(fs, rfs, git_dir)
+}

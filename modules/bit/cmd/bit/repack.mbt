@@ -302,6 +302,8 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
       fs.remove_file(pack_dir + "/" + stem + ".bitmap") catch {
         _ => ()
       }
+      // Objects may be gone: a commit-graph naming them is stale.
+      @bitlib.invalidate_commit_graph(fs, fs, git_dir)
     }
   }
   // Update server info (objects/info/packs) unless -n
@@ -466,6 +468,7 @@ async fn repack_fallback(
             fs.remove_file(pack_dir + "/" + stem + ".bitmap") catch {
               _ => ()
             }
+            @bitlib.invalidate_commit_graph(fs, fs, git_dir)
           }
         }
       }

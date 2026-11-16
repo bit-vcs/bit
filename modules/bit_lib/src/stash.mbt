@@ -249,8 +249,25 @@ fn stash_reset_hard(
   let db = ObjectDb::load(rfs, common_dir)
   let head_files = collect_tree_files_from_commit(db, rfs, head_id)
   let skip = read_skip_worktree_paths(rfs, git_dir)
-  let entries = read_index_entries(rfs, git_dir)
   let emptied : Array[String] = []
+  // reset --hard re-applies the sparse patterns: out-of-cone entries get
+  // the skip bit and are not materialized (their files are discarded).
+  if is_sparse_checkout_enabled(rfs, git_dir) {
+    let patterns = read_sparse_patterns(rfs, git_dir)
+    for path, f in head_files {
+      if !is_gitlink_mode_int(f.mode) &&
+        !matches_sparse_pattern(path, patterns) &&
+        !skip.contains(path) {
+        skip[path] = true
+        let abs = join_path(root, path)
+        if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+          fs.remove_file(abs) catch { _ => () }
+          emptied.push(parent_dir(abs))
+        }
+      }
+    }
+  }
+  let entries = read_index_entries(rfs, git_dir)
   for e in entries {
     if head_files.contains(e.path) || skip.contains(e.path) {
       continue

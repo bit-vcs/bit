@@ -660,6 +660,11 @@ fn rm_collect_conflict_paths(
   for path in removed_paths {
     let has_stage_add = staged_added.contains(path)
     let worktree_missing = missing_worktree_paths.contains(path)
+    // git skips the local-modification checks when the worktree file is
+    // gone: removing the entry loses nothing that is not in the index.
+    if worktree_missing {
+      continue
+    }
     let has_staged_change = staged_modified.contains(path) ||
       (has_stage_add && !worktree_missing)
     let has_unstaged_change = unstaged_modified.contains(path)
