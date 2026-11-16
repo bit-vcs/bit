@@ -160,9 +160,8 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
     }
     let refname = branch_name
     if @bitlib.resolve_ref(rfs, git_dir, refname) is Some(_) && !force_create {
-      raise @bitcore.GitError::InvalidObject(
-        "branch '\{branch_name}' already exists",
-      )
+      eprint_line("fatal: a branch named '\{branch_name}' already exists")
+      @sys.exit(128)
     }
     let target_id = match start_point {
       Some(spec) =>

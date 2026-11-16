@@ -116,7 +116,10 @@ pub fn cherry_pick(
         commit_id.to_hex() + "\n",
       )
     }
-    fs.write_string(join_path(git_dir, "MERGE_MSG"), message)
+    fs.write_string(
+      join_path(git_dir, "MERGE_MSG"),
+      merge_msg_with_conflicts(rfs, git_dir, message),
+    )
     let conflicts = tw.conflicts.copy()
     conflicts.sort()
     return { status: CherryPickStatus::Conflict, commit_id: None, conflicts }
@@ -450,7 +453,10 @@ pub fn revert(
     if !no_commit {
       fs.write_string(join_path(git_dir, "REVERT_HEAD"), commit_id.to_hex() + "\n")
     }
-    fs.write_string(join_path(git_dir, "MERGE_MSG"), message)
+    fs.write_string(
+      join_path(git_dir, "MERGE_MSG"),
+      merge_msg_with_conflicts(rfs, git_dir, message),
+    )
     let conflicts = tw.conflicts.copy()
     conflicts.sort()
     return { status: CherryPickStatus::Conflict, commit_id: None, conflicts }

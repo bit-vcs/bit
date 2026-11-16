@@ -1035,7 +1035,7 @@ async fn expand_add_stage_paths(
     }
     let abs = root + "/" + path
     let prefix = path + "/"
-    if fs.is_dir(abs) {
+    if add_is_real_dir(fs, abs) {
       if add_is_embedded_repo_dir(fs, root, path) {
         add_push_unique_stage_path(seen, out, path)
         continue
@@ -1167,7 +1167,7 @@ fn expand_force_add_path(
     return
   }
   let abs = root + "/" + path
-  if fs.is_dir(abs) {
+  if add_is_real_dir(fs, abs) {
     if add_is_embedded_repo_dir(fs, root, path) {
       add_push_unique_stage_path(seen, out, path)
       return
@@ -1575,4 +1575,14 @@ async fn add_report_outside_sparse(outside : Array[String]) -> Unit {
     "hint: If you intend to update such entries, try one of the following:\nhint: * Use the --sparse option.\nhint: * Disable or modify the sparsity rules.\nhint: Disable this message with \"git config advice.updateSparsePath false\"",
   )
   @sys.exit(1)
+}
+
+///|
+/// A directory on disk that is not a symlink: a symlink to a directory is
+/// added as the link itself, never expanded into the target's files (git).
+fn add_is_real_dir(fs : &@bitcore.RepoFileSystem, abs : String) -> Bool {
+  match @bitio.worktree_entry_meta_sync(fs, abs) {
+    Some(m) => !(m.kind is @bitio.WorktreeKindMeta::Symlink) && fs.is_dir(abs)
+    None => false
+  }
 }

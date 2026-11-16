@@ -545,7 +545,10 @@ pub fn merge(
     )
     fs.write_string(git_dir + "/MERGE_HEAD", target.to_hex() + "\n")
     fs.write_string(git_dir + "/ORIG_HEAD", head.to_hex() + "\n")
-    fs.write_string(git_dir + "/MERGE_MSG", message + "\n")
+    fs.write_string(
+      git_dir + "/MERGE_MSG",
+      merge_msg_with_conflicts(rfs, git_dir, message + "\n"),
+    )
     conflicts.sort()
     return {
       status: Conflicted,
@@ -1415,4 +1418,30 @@ fn merge_three_way_mode(
     (_, _, Some(t)) => t
     _ => fallback
   }
+}
+
+///|
+/// The MERGE_MSG git writes after a conflicted merge / cherry-pick /
+/// revert: the message, then a "# Conflicts:" list of the unmerged paths
+/// in index order (`commit --no-edit` keeps it, an editor strips it).
+fn merge_msg_with_conflicts(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  message : String,
+) -> String {
+  let paths = read_unmerged_paths(rfs, git_dir).keys().collect()
+  if paths.length() == 0 {
+    return message
+  }
+  paths.sort_by(index_path_compare_git_order)
+  let sb = StringBuilder::new()
+  sb.write_string(message)
+  if !message.has_suffix("\n") {
+    sb.write_string("\n")
+  }
+  sb.write_string("\n# Conflicts:\n")
+  for p in paths {
+    sb.write_string("#\t" + p + "\n")
+  }
+  sb.to_string()
 }

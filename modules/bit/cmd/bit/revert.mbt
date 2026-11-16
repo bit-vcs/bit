@@ -95,8 +95,9 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
       @sys.exit(1)
     }
     // Read the commit message from MERGE_MSG
+    // Comment lines (# Conflicts:) are stripped, as git's editor does.
     let msg = if rfs.is_file(merge_msg_path) {
-      decode_bytes(rfs.read_file(merge_msg_path))
+      commit_strip_message(decode_bytes(rfs.read_file(merge_msg_path))) + "\n"
     } else {
       "Revert commit\n"
     }

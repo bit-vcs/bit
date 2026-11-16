@@ -324,7 +324,8 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     }
     // Commit the merge
     let msg = if rfs.is_file(merge_msg_path) {
-      rfs.read_file(merge_msg_path) |> decode_bytes |> trim_string
+      // Like the editor path, comment lines (# Conflicts:) are stripped.
+      rfs.read_file(merge_msg_path) |> decode_bytes |> commit_strip_message
     } else {
       "Merge commit"
     }

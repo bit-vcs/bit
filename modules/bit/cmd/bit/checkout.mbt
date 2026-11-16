@@ -77,9 +77,8 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       None => ()
     }
     if @bitlib.resolve_ref(fs, git_dir, "refs/heads/" + branch_name) is Some(_) {
-      raise @bitcore.GitError::InvalidObject(
-        "branch '\{branch_name}' already exists",
-      )
+      eprint_line("fatal: a branch named '\{branch_name}' already exists")
+      @sys.exit(128)
     }
     fs.write_string(git_dir + "/HEAD", "ref: refs/heads/" + branch_name + "\n")
     save_previous_checkout_location(fs, git_dir, previous_location)
@@ -94,12 +93,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       Some(path) => checkout_raise_branch_in_use(branch_name, path)
       None => ()
     }
-    // Check if branch already exists
-    // git refuses to switch with an unmerged index, also for -b.
-    if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
-      eprint_line("error: you need to resolve your current index first")
-      @sys.exit(1)
-    }
+    // An existing branch is refused first (128), then an unmerged index.
     let branch_exists = @bitlib.resolve_ref(
         fs,
         git_dir,
@@ -107,9 +101,12 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       )
       is Some(_)
     if branch_exists && !force_create {
-      raise @bitcore.GitError::InvalidObject(
-        "branch '\{branch_name}' already exists",
-      )
+      eprint_line("fatal: a branch named '\{branch_name}' already exists")
+      @sys.exit(128)
+    }
+    if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+      eprint_line("error: you need to resolve your current index first")
+      @sys.exit(1)
     }
     // For start point, first checkout to that commit, then create branch
     match start_point {
