@@ -224,6 +224,10 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
         eprint_line("error: you need to resolve your current index first")
         @sys.exit(1)
       }
+      // The (no-op) tree merge still re-applies the sparse patterns.
+      if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+        @bitlib.sparse_checkout_reapply(fs, fs, root)
+      }
       return ()
     }
     let previous_location = current_checkout_location(rfs, git_dir)

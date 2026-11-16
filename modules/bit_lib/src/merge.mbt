@@ -98,6 +98,21 @@ fn merge_three_way(
       }
       _ => ()
     }
+    // Both sides changed the mode, differently (e.g. a symlink that became
+    // a 644 file on one side and a 755 file on the other): a conflict even
+    // when the contents agree, as in git.
+    match (base_files.get(candidate.path), ours.get(candidate.path), theirs.get(candidate.path)) {
+      (Some(b), Some(o), Some(t)) if o.mode != b.mode &&
+        t.mode != b.mode &&
+        o.mode != t.mode => {
+        conflicts.push(candidate.path)
+        if !all_conflict_types.contains(candidate.path) {
+          all_conflict_types[candidate.path] = "content"
+        }
+        continue
+      }
+      _ => ()
+    }
     // Trivial resolutions first, byte for byte (e.g. one side only
     // renamed the file): no text round-trip at all.
     if candidate.ours_id == candidate.theirs_id ||
