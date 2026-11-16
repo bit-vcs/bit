@@ -1582,7 +1582,7 @@ async fn add_report_outside_sparse(outside : Array[String]) -> Unit {
 /// added as the link itself, never expanded into the target's files (git).
 fn add_is_real_dir(fs : &@bitcore.RepoFileSystem, abs : String) -> Bool {
   match @bitio.worktree_entry_meta_sync(fs, abs) {
-    Some(m) => !(m.kind is @bitio.WorktreeKindMeta::Symlink) && fs.is_dir(abs)
-    None => false
+    Some(m) if m.kind is @bitio.WorktreeKindMeta::Symlink => false
+    _ => fs.is_dir(abs)
   }
 }
