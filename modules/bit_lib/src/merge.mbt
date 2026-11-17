@@ -82,6 +82,19 @@ priv struct MergeThreeWay {
   rename_delete_base : Map[String, TreeFileEntry]
   /// "file location" conflicts: new path -> (stage, entry)
   location_stages : Map[String, (Int, TreeFileEntry)]
+  /// content merges at a rename destination: the three sides
+  rename_sides : Map[String, RenameMergeSides]
+}
+
+///|
+/// The sides of a content merge at a rename destination: each side's
+/// entry and the path it had there (conflict labels and index stages).
+priv struct RenameMergeSides {
+  base : TreeFileEntry?
+  ours_path : String
+  ours : TreeFileEntry
+  theirs_path : String
+  theirs : TreeFileEntry
 }
 
 ///|
@@ -157,12 +170,7 @@ fn merge_three_way(
     // Trivial resolutions first, byte for byte (e.g. one side only
     // renamed the file): no text round-trip at all.
     // The exec bit merges separately: a side that changed it wins.
-    let trivial_mode = merge_three_way_mode(
-      base_files.get(candidate.path).map(e => e.mode),
-      ours.get(candidate.path).map(e => e.mode),
-      theirs.get(candidate.path).map(e => e.mode),
-      candidate.mode,
-    )
+    let trivial_mode = candidate.mode
     if candidate.ours_id == candidate.theirs_id ||
       candidate.base_id == Some(candidate.theirs_id) {
       merged[candidate.path] = { id: candidate.ours_id, mode: trivial_mode }
@@ -188,12 +196,7 @@ fn merge_three_way(
     if @diff3.is_binary_content(ours_data) ||
       @diff3.is_binary_content(theirs_data) {
       // Binary: our content stays, but the merged mode is applied (git).
-      let mm = merge_three_way_mode(
-        base_files.get(candidate.path).map(e => e.mode),
-        ours.get(candidate.path).map(e => e.mode),
-        theirs.get(candidate.path).map(e => e.mode),
-        candidate.mode,
-      )
+      let mm = candidate.mode
       let full_path = join_path(root, candidate.path)
       if mm == 0o100755 {
         ignore(@bitio.worktree_set_mode(full_path, 0o755))
@@ -212,14 +215,24 @@ fn merge_three_way(
     let utf8 = merge_is_valid_utf8(base_bytes_raw) &&
       merge_is_valid_utf8(ours_data) &&
       merge_is_valid_utf8(theirs_data)
+    // A rename on one side: git labels each side with its path.
+    let (cm_ours_label, cm_theirs_label) = match
+      file_result.rename_sides.get(candidate.path) {
+      Some(sides) if sides.ours_path != sides.theirs_path =>
+        (
+          ours_label + ":" + sides.ours_path,
+          theirs_label + ":" + sides.theirs_path,
+        )
+      _ => (ours_label, theirs_label)
+    }
     let result = @diff3.content_merge(
       merge_bytes_to_text(base_bytes_raw, utf8),
       merge_bytes_to_text(ours_data, utf8),
       merge_bytes_to_text(theirs_data, utf8),
       @diff3.ContentMergeOptions::default().with_labels(
-        ours=ours_label,
+        ours=cm_ours_label,
         base="",
-        theirs=theirs_label,
+        theirs=cm_theirs_label,
       ),
     )
     ignore(base_data)
@@ -231,12 +244,7 @@ fn merge_three_way(
       fs.write_file(full_path, merge_text_to_bytes(result.content, utf8))
       // The conflicted file carries the merged mode (git merges the exec
       // bit separately: a side that changed it wins).
-      let mm = merge_three_way_mode(
-        base_files.get(candidate.path).map(e => e.mode),
-        ours.get(candidate.path).map(e => e.mode),
-        theirs.get(candidate.path).map(e => e.mode),
-        candidate.mode,
-      )
+      let mm = candidate.mode
       if mm == 0o100755 {
         ignore(@bitio.worktree_set_mode(full_path, 0o755))
       } else if mm == 0o100644 {
@@ -286,12 +294,7 @@ fn merge_three_way(
       } else {
         merged[candidate.path] = {
           id: blob_id,
-          mode: merge_three_way_mode(
-            base_files.get(candidate.path).map(e => e.mode),
-            ours.get(candidate.path).map(e => e.mode),
-            theirs.get(candidate.path).map(e => e.mode),
-            candidate.mode,
-          ),
+          mode: candidate.mode,
         }
       }
     }
@@ -415,6 +418,7 @@ fn merge_three_way(
     distinct_types,
     rename_delete_base: file_result.rename_delete_base,
     location_stages: file_result.location_stages,
+    rename_sides: file_result.rename_sides,
   }
 }
 
@@ -522,6 +526,10 @@ fn merge_write_conflicted(
     remove_missing=false,
   )
   for path in tw.removed_paths {
+    // A path not in our tree (our own rename source) is untracked there.
+    if !ours.contains(path) {
+      continue
+    }
     let full_path = join_path(root, path)
     if rfs.is_file(full_path) {
       fs.remove_file(full_path) catch {
@@ -545,6 +553,7 @@ fn merge_write_conflicted(
     tw.rename_conflict_stages,
     distinct_types=tw.distinct_types,
     location_stages=tw.location_stages,
+    rename_sides=tw.rename_sides,
   )
   write_index_stage_entries(fs, git_dir, entries, skip=index_skip)
 }
@@ -790,6 +799,8 @@ priv struct MergeFilesResult {
   /// "file location" conflicts (directory renames): new path -> (stage,
   /// entry) of the file the other side added to the renamed directory
   location_stages : Map[String, (Int, TreeFileEntry)]
+  /// content merges at a rename destination: the three sides
+  rename_sides : Map[String, RenameMergeSides]
 }
 
 ///|
@@ -826,6 +837,7 @@ fn merge_files(
   let rename_2to1 : Array[Rename2to1Candidate] = []
   let conflict_types : Map[String, String] = Map([])
   let removed_paths : Array[String] = []
+  let rename_sides : Map[String, RenameMergeSides] = Map([])
   // Step 1: Detect renames on each side
   let ours_renames = merge_detect_renames(base, ours, db, rfs)
   let theirs_renames = merge_detect_renames(base, theirs, db, rfs)
@@ -936,14 +948,27 @@ fn merge_files(
           } else {
             // Same target path, possibly different content - content merge
             match (ours_entry, theirs_entry) {
-              (Some(o), Some(t)) =>
+              (Some(o), Some(t)) => {
+                rename_sides[new_path] = {
+                  base: base_entry,
+                  ours_path: new_path,
+                  ours: o,
+                  theirs_path: new_path,
+                  theirs: t,
+                }
                 needs_content_merge.push({
                   path: new_path,
                   base_id: base_entry.map(fn(e) { e.id }),
                   ours_id: o.id,
                   theirs_id: t.id,
-                  mode: o.mode,
+                  mode: merge_three_way_mode(
+                    base_entry.map(e => e.mode),
+                    Some(o.mode),
+                    Some(t.mode),
+                    o.mode,
+                  ),
                 })
+              }
               _ => ()
             }
           }
@@ -1010,6 +1035,13 @@ fn merge_files(
             } else {
               // Theirs modified at old_path, ours renamed to new_path
               // -> content merge at new_path
+              rename_sides[new_path] = {
+                base: Some(b),
+                ours_path: new_path,
+                ours: o,
+                theirs_path: old_path,
+                theirs: t,
+              }
               needs_content_merge.push({
                 path: new_path,
                 base_id: Some(b.id),
@@ -1093,6 +1125,13 @@ fn merge_files(
         } else {
           // Ours modified at old_path, theirs renamed to new_path
           // -> content merge at new_path
+          rename_sides[new_path] = {
+            base: Some(b),
+            ours_path: old_path,
+            ours: o,
+            theirs_path: new_path,
+            theirs: t,
+          }
           needs_content_merge.push({
             path: new_path,
             base_id: Some(b.id),
@@ -1195,7 +1234,12 @@ fn merge_files(
             base_id,
             ours_id: ours_entry.id,
             theirs_id: theirs_entry.id,
-            mode: ours_entry.mode,
+            mode: merge_three_way_mode(
+              b.map(e => e.mode),
+              Some(ours_entry.mode),
+              Some(theirs_entry.mode),
+              ours_entry.mode,
+            ),
           })
         }
         _ => {
@@ -1215,6 +1259,7 @@ fn merge_files(
     removed_paths,
     rename_delete_base,
     location_stages,
+    rename_sides,
   }
 }
 
@@ -1360,6 +1405,7 @@ fn merge_conflicted_index_entries_with_renames(
   rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)],
   distinct_types? : Map[String, (String, Int)] = Map([]),
   location_stages? : Map[String, (Int, TreeFileEntry)] = Map([]),
+  rename_sides? : Map[String, RenameMergeSides] = Map([]),
 ) -> Array[IndexStageEntry] raise @bit.GitError {
   let out : Array[IndexStageEntry] = []
   let conflict_set : Map[String, Bool] = Map([])
@@ -1396,6 +1442,29 @@ fn merge_conflicted_index_entries_with_renames(
         out.push({
           entry: merge_tree_file_to_index_entry(db, fs, renamed, regular),
           stage,
+        })
+        continue
+      }
+      _ => ()
+    }
+    // content conflict at a rename destination: the three sides' entries.
+    match rename_sides.get(path) {
+      Some(sides) if !rename_conflict_stages.contains(path) => {
+        match sides.base {
+          Some(b) =>
+            out.push({
+              entry: merge_tree_file_to_index_entry(db, fs, path, b),
+              stage: 1,
+            })
+          None => ()
+        }
+        out.push({
+          entry: merge_tree_file_to_index_entry(db, fs, path, sides.ours),
+          stage: 2,
+        })
+        out.push({
+          entry: merge_tree_file_to_index_entry(db, fs, path, sides.theirs),
+          stage: 3,
         })
         continue
       }

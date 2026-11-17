@@ -1224,6 +1224,19 @@ fn stash_check_local_changes(
   for path, _ in base_files {
     changed[path] = true
   }
+  // Rename destinations the merge rewrites (theirs changed the content
+  // at the old path) are in neither tree under that name.
+  let renamed_dest : Map[String, Bool] = Map([])
+  match touched {
+    Some(t) =>
+      for path, _ in t {
+        if !changed.contains(path) && ours.contains(path) {
+          changed[path] = true
+          renamed_dest[path] = true
+        }
+      }
+    None => ()
+  }
   let dirty : Array[String] = []
   let untracked : Array[String] = []
   for path, _ in changed {
@@ -1232,14 +1245,18 @@ fn stash_check_local_changes(
       Some(t) if !t.contains(path) => continue
       _ => ()
     }
-    if skip.contains(path) ||
-      same(base_files.get(path), theirs.get(path)) ||
-      same(ours.get(path), theirs.get(path)) {
+    if skip.contains(path) {
+      continue
+    }
+    if !renamed_dest.contains(path) &&
+      (same(base_files.get(path), theirs.get(path)) ||
+      same(ours.get(path), theirs.get(path))) {
       continue
     }
     // Deleted by the stash but changed here: a modify/delete conflict that
     // leaves our file as it is, so local edits to it are not in the way.
-    if theirs.get(path) is None &&
+    if !renamed_dest.contains(path) &&
+      theirs.get(path) is None &&
       ours.get(path) is Some(_) &&
       !same(base_files.get(path), ours.get(path)) {
       continue
@@ -1457,21 +1474,9 @@ fn merge_touched_paths(
       c.base_id == Some(c.theirs_id) ||
       (c.base_id != Some(c.ours_id) &&
       (@diff3.is_binary_content(merge_get_blob_data(db, rfs, c.ours_id)) ||
-      @diff3.is_binary_content(merge_get_blob_data(db, rfs, c.theirs_id))) &&
-      merge_three_way_mode(
-        base_files.get(c.path).map(e => e.mode),
-        ours_mode,
-        theirs.get(c.path).map(e => e.mode),
-        c.mode,
-      ) ==
-      c.mode)
-    let merged_mode = merge_three_way_mode(
-      base_files.get(c.path).map(e => e.mode),
-      ours_mode,
-      theirs.get(c.path).map(e => e.mode),
-      c.mode,
-    )
-    if !ours_kept || ours_mode != Some(merged_mode) {
+      @diff3.is_binary_content(merge_get_blob_data(db, rfs, c.theirs_id))))
+    // The candidate carries the three-way merged mode (renames included).
+    if !ours_kept || ours_mode != Some(c.mode) {
       out[c.path] = true
     }
   }
