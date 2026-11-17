@@ -662,6 +662,15 @@ async fn checkout_with_promisor_retry(
       }
     None => ()
   }
+  // Paths tracked before the switch: a new entry the checkout only added
+  // to the index (its file was already there) is not removed by the
+  // sparse update, as in git.
+  let before : Map[String, Bool] = Map([])
+  if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+    for e in @bitlib.read_index_entries(fs, git_dir) {
+      before[e.path] = true
+    }
+  }
   let mut attempts = 0
   while attempts < 16 {
     // The user-facing checkout/switch keeps local changes (two-tree
@@ -706,7 +715,17 @@ async fn checkout_with_promisor_retry(
       }
     }
     if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
-      @bitlib.sparse_checkout_reapply(fs, fs, root)
+      let written : Map[String, Bool] = Map([])
+      for p in updated {
+        written[p] = true
+      }
+      let leave : Map[String, Bool] = Map([])
+      for e in @bitlib.read_index_entries(fs, git_dir) {
+        if !before.contains(e.path) && !written.contains(e.path) {
+          leave[e.path] = true
+        }
+      }
+      @bitlib.sparse_checkout_reapply(fs, fs, root, leave~)
     }
     @bitlibnative.apply_worktree_modes_for_paths(
       fs, fs, root, git_dir, id, updated,

@@ -1449,8 +1449,21 @@ fn merge_touched_paths(
   }
   for c in fr.needs_content_merge {
     // A trivial resolution to our own content writes nothing.
-    let ours_kept = c.ours_id == c.theirs_id || c.base_id == Some(c.theirs_id)
     let ours_mode = ours.get(c.path).map(e => e.mode)
+    // A binary conflict keeps our content as it is (git's result tree has
+    // our blob there), so only a mode change rewrites the file.
+    let ours_kept = c.ours_id == c.theirs_id ||
+      c.base_id == Some(c.theirs_id) ||
+      (c.base_id != Some(c.ours_id) &&
+      (@diff3.is_binary_content(merge_get_blob_data(db, rfs, c.ours_id)) ||
+      @diff3.is_binary_content(merge_get_blob_data(db, rfs, c.theirs_id))) &&
+      merge_three_way_mode(
+        base_files.get(c.path).map(e => e.mode),
+        ours_mode,
+        theirs.get(c.path).map(e => e.mode),
+        c.mode,
+      ) ==
+      c.mode)
     if !ours_kept || ours_mode != Some(c.mode) {
       out[c.path] = true
     }
