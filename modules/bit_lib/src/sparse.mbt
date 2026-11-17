@@ -996,9 +996,13 @@ fn sparse_update_worktree(
     return
   }
   let patterns = read_sparse_patterns(rfs, git_dir)
-  // Never rewrite an index with unmerged entries: that would drop the
-  // conflict stages (git leaves them, and warns about the paths).
-  if read_unmerged_paths(rfs, git_dir).length() > 0 {
+  // Unmerged entries are left as they are (git warns about them); the
+  // other entries still get their skip-worktree bits updated, and the
+  // conflict stages are written back unchanged.
+  let unmerged = read_unmerged_paths(rfs, git_dir)
+  if unmerged.length() > 0 &&
+    sparse_is_index_sparse_enabled(rfs, git_dir) &&
+    is_sparse_checkout_cone_enabled(rfs, git_dir) {
     return
   }
   let head = resolve_head_commit(rfs, git_dir)
@@ -1007,7 +1011,9 @@ fn sparse_update_worktree(
     Some(commit_id) => {
       let db = ObjectDb::load(rfs, git_dir)
       let autocrlf = read_autocrlf_setting(rfs, git_dir)
-      let current_raw_entries = read_index_entries(rfs, git_dir)
+      let current_raw_entries = read_index_entries(rfs, git_dir).filter(e => !unmerged.contains(
+        e.path,
+      ))
       // Like git, the index is kept as is (staged changes survive); only
       // the skip-worktree bits and the worktree files change.
       let current_entries = expand_sparse_index_entries(
@@ -1068,7 +1074,18 @@ fn sparse_update_worktree(
       write_skip_worktree_paths(fs, git_dir, skip_paths)
       let use_sparse_index = sparse_is_index_sparse_enabled(rfs, git_dir) &&
         is_sparse_checkout_cone_enabled(rfs, git_dir)
-      if use_sparse_index {
+      if unmerged.length() > 0 {
+        let skip_set : Map[String, Bool] = Map([])
+        for path in skip_paths {
+          skip_set[path] = true
+        }
+        write_index_stage_entries(
+          fs,
+          git_dir,
+          read_index_stage_entries(rfs, git_dir),
+          skip=skip_set,
+        )
+      } else if use_sparse_index {
         let (entries, skip_set) = sparse_build_sparse_index_entries(
           db, rfs, commit_id, all_files, skip_paths,
         )

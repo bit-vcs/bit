@@ -244,6 +244,11 @@ fn merge_three_way(
       // Binary: our content stays, but the merged mode is applied (git).
       let mm = candidate.mode
       let full_path = join_path(root, candidate.path)
+      // Not on disk (e.g. skip-worktree): git writes our version there.
+      if @bitio.worktree_entry_meta_sync(rfs, full_path) is None {
+        fs.mkdir_p(rebase_parent_dir(full_path))
+        fs.write_file(full_path, ours_data)
+      }
       if mm == 0o100755 {
         ignore(@bitio.worktree_set_mode(full_path, 0o755))
       } else if mm == 0o100644 {
