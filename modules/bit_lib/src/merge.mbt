@@ -174,12 +174,13 @@ fn merge_three_way(
       } else {
         let ours_data = merge_get_blob_data(db, rfs, candidate.ours_id)
         let theirs_data = merge_get_blob_data(db, rfs, candidate.theirs_id)
-        if !(@diff3.is_binary_content(ours_data) ||
+        let base_raw = match candidate.base_id {
+          Some(id) => merge_get_blob_data(db, rfs, id)
+          None => Bytes::new(0)
+        }
+        if !(@diff3.is_binary_content(base_raw) ||
+          @diff3.is_binary_content(ours_data) ||
           @diff3.is_binary_content(theirs_data)) {
-          let base_raw = match candidate.base_id {
-            Some(id) => merge_get_blob_data(db, rfs, id)
-            None => Bytes::new(0)
-          }
           let utf8 = merge_is_valid_utf8(base_raw) &&
             merge_is_valid_utf8(ours_data) &&
             merge_is_valid_utf8(theirs_data)
@@ -235,7 +236,10 @@ fn merge_three_way(
       Some(id) => merge_get_blob_data(db, rfs, id)
       None => Bytes::new(0)
     }
-    if @diff3.is_binary_content(ours_data) ||
+    // git (ll_merge) treats the merge as binary when any of the three
+    // sides is binary, the base included.
+    if @diff3.is_binary_content(base_data) ||
+      @diff3.is_binary_content(ours_data) ||
       @diff3.is_binary_content(theirs_data) {
       // Binary: our content stays, but the merged mode is applied (git).
       let mm = candidate.mode

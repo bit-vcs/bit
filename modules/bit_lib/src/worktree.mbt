@@ -1992,6 +1992,11 @@ pub fn rm_paths(
         rfs.is_dir(abs) {
         remove_worktree_path_recursive(fs, rfs, abs)
         rm_prune_empty_parent_dirs(fs, rfs, root, norm_path)
+      } else if tracked_entry is Some(_) &&
+        @bitio.worktree_entry_meta_sync(rfs, abs) is None {
+        // Already gone from disk: git still removes the empty leading
+        // directories (remove_path ignores the missing file).
+        rm_prune_empty_parent_dirs(fs, rfs, root, norm_path)
       }
     }
   }

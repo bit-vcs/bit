@@ -1473,8 +1473,12 @@ fn merge_touched_paths(
     let ours_kept = c.ours_id == c.theirs_id ||
       c.base_id == Some(c.theirs_id) ||
       (c.base_id != Some(c.ours_id) &&
-      (@diff3.is_binary_content(merge_get_blob_data(db, rfs, c.ours_id)) ||
-      @diff3.is_binary_content(merge_get_blob_data(db, rfs, c.theirs_id))))
+      (
+        (c.base_id is Some(b) &&
+        @diff3.is_binary_content(merge_get_blob_data(db, rfs, b))) ||
+        @diff3.is_binary_content(merge_get_blob_data(db, rfs, c.ours_id)) ||
+        @diff3.is_binary_content(merge_get_blob_data(db, rfs, c.theirs_id))
+      ))
     // The candidate carries the three-way merged mode (renames included).
     if !ours_kept || ours_mode != Some(c.mode) {
       out[c.path] = true
