@@ -144,28 +144,70 @@ fn merge_three_way(
       _ => ()
     }
     // Both sides changed the mode, differently (e.g. a symlink that became
-    // a 644 file on one side and a 755 file on the other): a conflict even
-    // when the contents agree, as in git.
-    match (base_files.get(candidate.path), ours.get(candidate.path), theirs.get(candidate.path)) {
+    // a 644 file on one side and a 755 file on the other), or a file added
+    // on both sides with different modes (add/add): a conflict even when
+    // the contents merge cleanly -- git still writes the merged content.
+    let mode_conflict = match
+      (
+        base_files.get(candidate.path),
+        ours.get(candidate.path),
+        theirs.get(candidate.path),
+      ) {
       (Some(b), Some(o), Some(t)) if o.mode != b.mode &&
         t.mode != b.mode &&
-        o.mode != t.mode => {
-        conflicts.push(candidate.path)
-        if !all_conflict_types.contains(candidate.path) {
-          all_conflict_types[candidate.path] = "content"
-        }
-        continue
+        o.mode != t.mode => Some("content")
+      (None, Some(o), Some(t)) if o.mode != t.mode => Some("add/add")
+      _ => None
+    }
+    if mode_conflict is Some(kind) {
+      conflicts.push(candidate.path)
+      if !all_conflict_types.contains(candidate.path) {
+        all_conflict_types[candidate.path] = kind
       }
-      // Added on both sides with different modes: add/add (AA) even when
-      // the contents agree.
-      (None, Some(o), Some(t)) if o.mode != t.mode => {
-        conflicts.push(candidate.path)
-        if !all_conflict_types.contains(candidate.path) {
-          all_conflict_types[candidate.path] = "add/add"
+      // Our content stays when it is what the merge gives.
+      let resolved : @bit.ObjectId? = if candidate.ours_id ==
+        candidate.theirs_id ||
+        candidate.base_id == Some(candidate.theirs_id) {
+        None
+      } else if candidate.base_id == Some(candidate.ours_id) {
+        Some(candidate.theirs_id)
+      } else {
+        let ours_data = merge_get_blob_data(db, rfs, candidate.ours_id)
+        let theirs_data = merge_get_blob_data(db, rfs, candidate.theirs_id)
+        if !(@diff3.is_binary_content(ours_data) ||
+          @diff3.is_binary_content(theirs_data)) {
+          let base_raw = match candidate.base_id {
+            Some(id) => merge_get_blob_data(db, rfs, id)
+            None => Bytes::new(0)
+          }
+          let utf8 = merge_is_valid_utf8(base_raw) &&
+            merge_is_valid_utf8(ours_data) &&
+            merge_is_valid_utf8(theirs_data)
+          let r = @diff3.content_merge(
+            merge_bytes_to_text(base_raw, utf8),
+            merge_bytes_to_text(ours_data, utf8),
+            merge_bytes_to_text(theirs_data, utf8),
+            @diff3.ContentMergeOptions::default().with_labels(
+              ours=ours_label,
+              base="",
+              theirs=theirs_label,
+            ),
+          )
+          let full_path = join_path(root, candidate.path)
+          fs.mkdir_p(rebase_parent_dir(full_path))
+          fs.write_file(full_path, merge_text_to_bytes(r.content, utf8))
         }
-        continue
+        None
       }
-      _ => ()
+      match resolved {
+        Some(id) => {
+          let full_path = join_path(root, candidate.path)
+          fs.mkdir_p(rebase_parent_dir(full_path))
+          fs.write_file(full_path, merge_get_blob_data(db, rfs, id))
+        }
+        None => ()
+      }
+      continue
     }
     // Trivial resolutions first, byte for byte (e.g. one side only
     // renamed the file): no text round-trip at all.
@@ -525,6 +567,25 @@ fn merge_write_conflicted(
     changed,
     remove_missing=false,
   )
+  // Paths the merge deletes cleanly go from the worktree too (git), also
+  // when other paths conflict.
+  let deleted_dirs : Array[String] = []
+  for path, o in ours {
+    if tw.merged.contains(path) ||
+      tw.conflicts.contains(path) ||
+      skip.contains(path) ||
+      is_gitlink_mode_int(o.mode) {
+      continue
+    }
+    let abs = join_path(root, path)
+    if @bitio.worktree_entry_meta_sync(rfs, abs) is Some(_) {
+      fs.remove_file(abs) catch {
+        _ => ()
+      }
+    }
+    deleted_dirs.push(parent_dir(abs))
+  }
+  tree_ops_prune_empty_dirs(fs, rfs, root, deleted_dirs)
   for path in tw.removed_paths {
     // A path not in our tree (our own rename source) is untracked there.
     if !ours.contains(path) {
