@@ -1180,6 +1180,7 @@ pub fn stash_apply(
     }
   }
   write_index_entries_with_skip_worktree(fs, git_dir, new_index, kept_skip)
+  sync_skip_worktree_sidecar(fs, rfs, git_dir, kept_skip)
   match restore_untracked() {
     Some(msg) => raise @bit.GitError::InvalidObject(msg)
     None => ()
@@ -1464,7 +1465,13 @@ fn merge_touched_paths(
         c.mode,
       ) ==
       c.mode)
-    if !ours_kept || ours_mode != Some(c.mode) {
+    let merged_mode = merge_three_way_mode(
+      base_files.get(c.path).map(e => e.mode),
+      ours_mode,
+      theirs.get(c.path).map(e => e.mode),
+      c.mode,
+    )
+    if !ours_kept || ours_mode != Some(merged_mode) {
       out[c.path] = true
     }
   }
@@ -1472,6 +1479,14 @@ fn merge_touched_paths(
     out[c.path] = true
   }
   for p in fr.conflicts {
+    // modify/delete with our side modified: our version is left in the
+    // tree as it is, so local changes there are not in the way (git).
+    if base_files.get(p) is Some(_) &&
+      theirs.get(p) is None &&
+      ours.get(p) is Some(o) &&
+      !(fr.merged.get(p) is Some(f) && (f.id != o.id || f.mode != o.mode)) {
+      continue
+    }
     out[p] = true
   }
   // Deleted by the merge: neither in the result nor still pending (content

@@ -156,13 +156,20 @@ fn merge_three_way(
     }
     // Trivial resolutions first, byte for byte (e.g. one side only
     // renamed the file): no text round-trip at all.
+    // The exec bit merges separately: a side that changed it wins.
+    let trivial_mode = merge_three_way_mode(
+      base_files.get(candidate.path).map(e => e.mode),
+      ours.get(candidate.path).map(e => e.mode),
+      theirs.get(candidate.path).map(e => e.mode),
+      candidate.mode,
+    )
     if candidate.ours_id == candidate.theirs_id ||
       candidate.base_id == Some(candidate.theirs_id) {
-      merged[candidate.path] = { id: candidate.ours_id, mode: candidate.mode }
+      merged[candidate.path] = { id: candidate.ours_id, mode: trivial_mode }
       continue
     }
     if candidate.base_id == Some(candidate.ours_id) {
-      merged[candidate.path] = { id: candidate.theirs_id, mode: candidate.mode }
+      merged[candidate.path] = { id: candidate.theirs_id, mode: trivial_mode }
       continue
     }
     let base_bytes_raw = match candidate.base_id {
@@ -609,7 +616,7 @@ pub fn merge(
   }
   let ours = collect_tree_files_from_commit(db, rfs, head)
   let theirs = collect_tree_files_from_commit(db, rfs, target)
-  merge_check_clean_index(rfs, git_dir, ours)
+  merge_check_clean_index(rfs, git_dir, ours, restore=(db, fs, root))
   ignore(
   stash_check_local_changes(
     rfs,
@@ -1541,6 +1548,7 @@ fn merge_check_clean_index(
   rfs : &@bit.RepoFileSystem,
   git_dir : String,
   ours : Map[String, TreeFileEntry],
+  restore? : (ObjectDb, &@bit.FileSystem, String),
 ) -> Unit raise @bit.GitError {
   let changed : Map[String, Bool] = Map([])
   let seen : Map[String, Bool] = Map([])
@@ -1557,6 +1565,25 @@ fn merge_check_clean_index(
     }
   }
   if changed.length() > 0 {
+    // git still writes out staged files HEAD does not have that are missing
+    // from the worktree, even though it refuses the merge.
+    if restore is Some((db, fs, root)) {
+      let skip = read_skip_worktree_paths(rfs, git_dir)
+      let missing : Map[String, TreeFileEntry] = Map([])
+      for e in read_index_entries(rfs, git_dir) {
+        if !ours.contains(e.path) &&
+          !skip.contains(e.path) &&
+          !is_gitlink_mode_int(e.mode) &&
+          @bitio.worktree_entry_meta_sync(rfs, join_path(root, e.path)) is None {
+          missing[e.path] = { id: e.id, mode: e.mode }
+        }
+      }
+      if missing.length() > 0 {
+        write_worktree_from_files(db, fs, rfs, root, git_dir, missing) catch {
+          _ => ()
+        }
+      }
+    }
     let paths = changed.keys().to_array()
     paths.sort()
     raise @bit.GitError::InvalidObject(
@@ -1573,9 +1600,20 @@ pub fn merge_require_clean_index(
   rfs : &@bit.RepoFileSystem,
   git_dir : String,
   head : @bit.ObjectId,
+  fs? : &@bit.FileSystem,
+  root? : String,
 ) -> Unit raise @bit.GitError {
   let db = ObjectDb::load_lazy(rfs, resolve_common_git_dir(rfs, git_dir))
-  merge_check_clean_index(rfs, git_dir, collect_tree_files_from_commit(db, rfs, head))
+  let restore = match (fs, root) {
+    (Some(f), Some(r)) => Some((db, f, r))
+    _ => None
+  }
+  merge_check_clean_index(
+    rfs,
+    git_dir,
+    collect_tree_files_from_commit(db, rfs, head),
+    restore?,
+  )
 }
 
 ///|

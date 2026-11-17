@@ -1218,6 +1218,42 @@ pub fn write_skip_worktree_paths(
 }
 
 ///|
+/// Drop entries from the bit-skip-worktree sidecar that the index no
+/// longer marks: a writer that clears a skip bit on purpose (e.g. stash
+/// apply re-creating an entry) must not have the stale sidecar bring the
+/// bit back.
+pub fn sync_skip_worktree_sidecar(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  keep : Map[String, Bool],
+) -> Unit raise @bit.GitError {
+  let state_path = join_path(git_dir, "bit-skip-worktree")
+  if !rfs.is_file(state_path) {
+    return
+  }
+  let text = @utf8.decode_lossy(
+    (rfs.read_file(state_path) catch { _ => return })[:],
+  )
+  let kept : Array[String] = []
+  let mut dropped = false
+  for line_view in text.split("\n") {
+    let line = line_view.to_owned()
+    if line.length() == 0 {
+      continue
+    }
+    if keep.contains(line) {
+      kept.push(line)
+    } else {
+      dropped = true
+    }
+  }
+  if dropped {
+    write_skip_worktree_paths(fs, git_dir, kept)
+  }
+}
+
+///|
 fn index_entry_buf_size(
   path_len : Int,
   has_extended : Bool,
