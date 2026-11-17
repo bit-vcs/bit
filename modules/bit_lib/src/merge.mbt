@@ -31,8 +31,40 @@ fn merge_fast_forward(
   // A fast-forward is a two-tree checkout like git's: local changes are
   // carried over and block it only where the target differs.
   let object_git_dir = resolve_common_git_dir(rfs, git_dir)
-  checkout_two_way(fs, rfs, root, git_dir, object_git_dir, target)
+  let sparse = is_sparse_checkout_enabled(rfs, git_dir)
+  let before : Map[String, Bool] = Map([])
+  if sparse {
+    for e in read_index_entries(rfs, git_dir) {
+      before[e.path] = true
+    }
+  }
+  let updated : Array[String] = []
+  checkout_two_way(
+    fs,
+    rfs,
+    root,
+    git_dir,
+    object_git_dir,
+    target,
+    updated_paths=updated,
+  )
   update_head_ref(fs, rfs, git_dir, target)
+  // Sparse: what the switch wrote outside the cone is removed again and
+  // gets the skip-worktree bit; a new entry whose file was already there
+  // is left alone (git).
+  if sparse {
+    let written : Map[String, Bool] = Map([])
+    for p in updated {
+      written[p] = true
+    }
+    let leave : Map[String, Bool] = Map([])
+    for e in read_index_entries(rfs, git_dir) {
+      if !before.contains(e.path) && !written.contains(e.path) {
+        leave[e.path] = true
+      }
+    }
+    sparse_checkout_reapply(fs, rfs, root, leave~)
+  }
 }
 
 ///|
@@ -922,8 +954,20 @@ fn merge_files(
             Some(v) => merged[theirs_new_path] = v
             None => ()
           }
+          // git: stage 2 at ours' path, stage 3 at theirs', stage 1 at
+          // the original path ("both deleted").
           conflicts.push(new_path)
           conflict_types[new_path] = "rename/rename"
+          if theirs.contains(theirs_new_path) {
+            conflicts.push(theirs_new_path)
+            conflict_types[theirs_new_path] = "rename/rename"
+          }
+          if base_entry is Some(_) &&
+            !ours.contains(old_path) &&
+            !theirs.contains(old_path) {
+            conflicts.push(old_path)
+            conflict_types[old_path] = "rename/rename"
+          }
           handled_paths[old_path] = true
           handled_paths[new_path] = true
           handled_paths[theirs_new_path] = true
