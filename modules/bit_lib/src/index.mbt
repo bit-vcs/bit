@@ -1446,6 +1446,26 @@ pub fn write_index_entries_preserving_cache_tree(
     sorted,
     hash_size~,
   )
+  // git (2.37+) clears the skip-worktree bit of entries whose file is
+  // present on disk whenever it reads the index of a sparse checkout, so
+  // every index it writes back has those bits cleared.
+  if skip_worktree_paths.length() > 0 &&
+    git_dir.has_suffix("/.git") &&
+    is_sparse_checkout_enabled(rfs, git_dir) {
+    let root = git_dir.unsafe_substring(start=0, end=git_dir.length() - 5)
+    let present : Array[String] = []
+    for path, _ in skip_worktree_paths {
+      if @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+        present.push(path)
+      }
+    }
+    for path in present {
+      skip_worktree_paths.remove(path)
+    }
+    if present.length() > 0 {
+      sync_skip_worktree_sidecar(fs, rfs, git_dir, skip_worktree_paths)
+    }
+  }
   let buf = write_index_buf(
     sorted,
     Some(skip_worktree_paths),
