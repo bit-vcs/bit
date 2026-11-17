@@ -1479,8 +1479,14 @@ fn merge_touched_paths(
         @diff3.is_binary_content(merge_get_blob_data(db, rfs, c.ours_id)) ||
         @diff3.is_binary_content(merge_get_blob_data(db, rfs, c.theirs_id))
       ))
+    // A regular file on one side and a symlink on the other ("distinct
+    // types") is always rewritten: ours moves to <path>~<label>.
+    let distinct = match (ours.get(c.path), theirs.get(c.path)) {
+      (Some(o), Some(t)) => (o.mode == 0o120000) != (t.mode == 0o120000)
+      _ => false
+    }
     // The candidate carries the three-way merged mode (renames included).
-    if !ours_kept || ours_mode != Some(c.mode) {
+    if distinct || !ours_kept || ours_mode != Some(c.mode) {
       out[c.path] = true
     }
   }
