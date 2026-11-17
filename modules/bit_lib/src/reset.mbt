@@ -61,10 +61,20 @@ pub fn reset(
         } else {
           []
         }
+        // An entry the reset leaves as it is keeps its flags as well.
+        let current : Map[String, IndexEntry] = Map([])
+        for e in read_index_entries(rfs, actual_git_dir) {
+          current[e.path] = e
+        }
         let keep : Map[String, Bool] = Map([])
         for e in entries {
+          let unchanged = current.get(e.path) is Some(c) &&
+            c.id == e.id &&
+            c.mode == e.mode
           if skip.contains(e.path) {
             keep[e.path] = true
+          } else if unchanged {
+            ()
           } else if sparse &&
             !matches_sparse_pattern(e.path, patterns) &&
             @bitio.worktree_entry_meta_sync(rfs, join_path(root, e.path))
