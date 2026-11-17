@@ -623,7 +623,7 @@ pub fn sparse_checkout_disable(&@bit_types.FileSystem, &@bit_types.RepoFileSyste
 
 pub fn sparse_checkout_init(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, cone? : Bool, update_worktree? : Bool) -> Unit raise @bit_object.GitError
 
-pub fn sparse_checkout_reapply(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit raise @bit_object.GitError
+pub fn sparse_checkout_reapply(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, leave? : Map[String, Bool]) -> Unit raise @bit_object.GitError
 
 pub fn sparse_checkout_set(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[String]) -> Unit raise @bit_object.GitError
 

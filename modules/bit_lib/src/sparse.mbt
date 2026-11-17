@@ -632,17 +632,22 @@ pub fn sparse_checkout_disable(
 }
 
 ///|
+///
+/// `leave` lists paths whose file stays on disk even when it is clean (a
+/// checkout's new entries that it did not write: git marks them
+/// skip-worktree without removing what is already there).
 pub fn sparse_checkout_reapply(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
+  leave? : Map[String, Bool] = Map([]),
 ) -> Unit raise @bit.GitError {
   let git_dir = resolve_root_git_dir(rfs, root)
   if !is_sparse_checkout_enabled(rfs, git_dir) {
     sparse_checkout_init(fs, rfs, root)
   }
   sparse_enable_worktree_config(fs, rfs, git_dir)
-  sparse_update_worktree(fs, rfs, root, preserve_index=true)
+  sparse_update_worktree(fs, rfs, root, preserve_index=true, leave~)
 }
 
 ///|
@@ -984,6 +989,7 @@ fn sparse_update_worktree(
   rfs : &@bit.RepoFileSystem,
   root : String,
   preserve_index? : Bool = false,
+  leave? : Map[String, Bool] = Map([]),
 ) -> Unit raise @bit.GitError {
   let git_dir = resolve_root_git_dir(rfs, root)
   if !rfs.is_file(join_path(git_dir, "index")) {
@@ -1031,7 +1037,7 @@ fn sparse_update_worktree(
           }
           continue
         }
-        if !present {
+        if !present || leave.contains(entry.path) {
           skip_paths.push(entry.path)
           continue
         }

@@ -111,6 +111,15 @@ fn merge_three_way(
         }
         continue
       }
+      // Added on both sides with different modes: add/add (AA) even when
+      // the contents agree.
+      (None, Some(o), Some(t)) if o.mode != t.mode => {
+        conflicts.push(candidate.path)
+        if !all_conflict_types.contains(candidate.path) {
+          all_conflict_types[candidate.path] = "add/add"
+        }
+        continue
+      }
       _ => ()
     }
     // Trivial resolutions first, byte for byte (e.g. one side only
@@ -414,7 +423,17 @@ fn merge_write_conflicted(
       _ => ()
     }
   }
-  // modify/delete: the surviving side's version is left in the tree.
+  // modify/delete: the surviving side's version is left in the tree. Our
+  // own version is only written for a skip-worktree (sparse) entry; a
+  // tracked file deleted locally stays deleted (git writes nothing that
+  // matches our tree).
+  let md_skip = read_skip_worktree_paths(rfs, git_dir)
+  let md_sparse = is_sparse_checkout_enabled(rfs, git_dir)
+  let md_patterns = if md_sparse {
+    read_sparse_patterns(rfs, git_dir)
+  } else {
+    []
+  }
   for path in tw.conflicts {
     if changed.contains(path) ||
       (!overwrite.contains(path) &&
@@ -423,7 +442,12 @@ fn merge_write_conflicted(
     }
     match (ours.get(path), theirs.get(path)) {
       (None, Some(t)) => changed[path] = t
-      (Some(o), None) => changed[path] = o
+      (Some(o), None) =>
+        if overwrite.contains(path) ||
+          md_skip.contains(path) ||
+          (md_sparse && !matches_sparse_pattern(path, md_patterns)) {
+          changed[path] = o
+        }
       _ => ()
     }
   }
@@ -563,6 +587,7 @@ pub fn merge(
     theirs,
     read_skip_worktree_paths(rfs, git_dir),
     stash_note=false,
+    touched=Some(merge_touched_paths(base_files, ours, theirs, db, rfs)),
     ),
   )
   let tw = merge_three_way(
