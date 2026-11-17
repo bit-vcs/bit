@@ -714,6 +714,13 @@ async fn checkout_with_promisor_retry(
         continue
       }
     }
+    // Modes first: a symlink is only a symlink once its mode is applied,
+    // and the sparse update compares the worktree against the index.
+    @bitlibnative.apply_worktree_modes_for_paths(
+      fs, fs, root, git_dir, id, updated,
+    ) catch {
+      _ => ()
+    }
     if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
       let written : Map[String, Bool] = Map([])
       for p in updated {
@@ -726,11 +733,6 @@ async fn checkout_with_promisor_retry(
         }
       }
       @bitlib.sparse_checkout_reapply(fs, fs, root, leave~)
-    }
-    @bitlibnative.apply_worktree_modes_for_paths(
-      fs, fs, root, git_dir, id, updated,
-    ) catch {
-      _ => ()
     }
     return id
   }

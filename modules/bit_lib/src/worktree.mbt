@@ -2431,5 +2431,10 @@ fn add_write_index_keeping_conflicts(
     }
     result.push({ entry: e, stage: 0 })
   }
-  write_index_stage_entries(fs, git_dir, result)
+  // Keep the skip-worktree bits of the entries the add left alone.
+  let skip = read_skip_worktree_paths(rfs, git_dir)
+  for p in touched {
+    skip.remove(p)
+  }
+  write_index_stage_entries(fs, git_dir, result, skip~)
 }
