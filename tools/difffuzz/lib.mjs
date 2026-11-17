@@ -150,6 +150,11 @@ function readGitPathFile(worktree, env, name) {
   return fs.existsSync(abs) ? fs.readFileSync(abs, "utf8").trim() : null;
 }
 
+// `git stash` moves an untracked file in its way to `<path>.stash.XXXXXX`
+// with a random suffix; compare those names without it.
+const STASH_TEMP_NAME = /\.stash\.[A-Za-z0-9]{6}(?=["\s]|$)/gm;
+const maskStashTempNames = (text) => text.replace(STASH_TEMP_NAME, ".stash.XXXXXX");
+
 /** State of one worktree, read with real git. */
 export function snapshot(worktree, env) {
   const head =
@@ -162,11 +167,13 @@ export function snapshot(worktree, env) {
     refs: gitOut(worktree, ["for-each-ref", "--format=%(refname) %(objectname)"], env) ?? "(error)",
     index: gitOut(worktree, ["ls-files", "--stage"], env) ?? "(error)",
     indexFlags: gitOut(worktree, ["ls-files", "-v"], env) ?? "(error)",
-    status: gitOut(worktree, ["status", "--porcelain=v1", "-uall", "--ignored=no"], env) ?? "(error)",
+    status: maskStashTempNames(
+      gitOut(worktree, ["status", "--porcelain=v1", "-uall", "--ignored=no"], env) ?? "(error)",
+    ),
     merge: ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"]
       .map((n) => `${n}=${readGitPathFile(worktree, env, n) ?? "-"}`)
       .join(" "),
-    files: walkWorktree(worktree).join("\n"),
+    files: maskStashTempNames(walkWorktree(worktree).join("\n")),
   };
 }
 

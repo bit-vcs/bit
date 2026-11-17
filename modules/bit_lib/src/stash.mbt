@@ -1094,6 +1094,19 @@ pub fn stash_apply(
     }
     e => raise e
   }
+  // An untracked file in the way of a path outside the sparse cone is
+  // moved aside to <path>.stash.XXXXXX before the stash version is written
+  // (git's unstage_changes_unless_new). Inside the cone git overwrites it.
+  if already_present.length() > 0 && is_sparse_checkout_enabled(rfs, git_dir) {
+    let patterns = read_sparse_patterns(rfs, git_dir)
+    let paths = already_present.keys().to_array()
+    paths.sort()
+    for p in paths {
+      if !matches_sparse_pattern(p, patterns) {
+        stash_relocate_untracked(fs, rfs, root, p)
+      }
+    }
+  }
   let tw = merge_three_way(
     db,
     fs,
@@ -1188,6 +1201,52 @@ pub fn stash_apply(
   if drop {
     stash_drop_at(fs, rfs, common_dir, index)
   }
+}
+
+///|
+/// Move the untracked file (or symlink) at `path` to `<path>.stash.XXXXXX`,
+/// printing git's warning.
+fn stash_relocate_untracked(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  path : String,
+) -> Unit raise @bit.GitError {
+  let abs = join_path(root, path)
+  guard @bitio.worktree_entry_meta_sync(rfs, abs) is Some(info) else { return }
+  let alnum = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+  let mut attempt = 0
+  let mut target = ""
+  while true {
+    let hex = @bit.hash_blob(@utf8.encode("\{path}\n\{attempt}")).to_hex()
+    let sb = StringBuilder::new()
+    for k in 0..<6 {
+      let n = (hex[k * 2].to_int() * 16 + hex[k * 2 + 1].to_int()) %
+        alnum.length()
+      sb.write_char(alnum[n].to_int().unsafe_to_char())
+    }
+    target = path + ".stash." + sb.to_string()
+    if @bitio.worktree_entry_meta_sync(rfs, join_path(root, target)) is None {
+      break
+    }
+    attempt += 1
+  }
+  let dst = join_path(root, target)
+  match info.kind {
+    @bitio.WorktreeKindMeta::Symlink =>
+      match @bitio.read_symlink_target_path(abs) {
+        Some(link) => ignore(@bitio.worktree_make_symlink(link, dst))
+        None => return
+      }
+    @bitio.WorktreeKindMeta::Regular => {
+      fs.write_file(dst, rfs.read_file(abs))
+      ignore(@bitio.worktree_set_mode(dst, info.mode & 0o777))
+    }
+  }
+  fs.remove_file(abs)
+  println(
+    "WARNING: Untracked file in way of tracked file!  Renaming\n            \{path} -> \{target}\n         to make room.",
+  )
 }
 
 ///|
