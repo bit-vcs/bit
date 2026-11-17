@@ -910,7 +910,35 @@ async fn checkout_restore_index_paths(
   fs : OsFs,
   root : String,
   paths : Array[String],
+  check_unmerged? : Bool = true,
 ) -> Unit raise Error {
+  // git refuses (exit 1, nothing written) when a pathspec matches an
+  // unmerged entry.
+  if check_unmerged {
+    let unmerged = @bitlib.read_unmerged_paths(fs, resolve_git_dir(fs, root))
+    if unmerged.length() > 0 {
+      let hit : Array[String] = []
+      for u, _ in unmerged {
+        if paths.iter().any(p => {
+            let q = if p.has_suffix("/") {
+              p.unsafe_substring(start=0, end=p.length() - 1)
+            } else {
+              p
+            }
+            q == "" || q == "." || u == q || u.has_prefix(q + "/")
+          }) {
+          hit.push(u)
+        }
+      }
+      if hit.length() > 0 {
+        hit.sort()
+        for u in hit {
+          eprint_line("error: path '\{u}' is unmerged")
+        }
+        @sys.exit(1)
+      }
+    }
+  }
   let restored : Map[String, @bitlib.TreeFileEntry] = Map([])
   @bitlib.restore_paths(fs, fs, root, paths, restored~)
   let common_dir = @bitlib.resolve_common_git_dir(fs, resolve_git_dir(fs, root))

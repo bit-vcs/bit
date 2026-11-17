@@ -1218,6 +1218,42 @@ pub fn write_skip_worktree_paths(
 }
 
 ///|
+/// Drop entries from the bit-skip-worktree sidecar that the index no
+/// longer marks: a writer that clears a skip bit on purpose (e.g. stash
+/// apply re-creating an entry) must not have the stale sidecar bring the
+/// bit back.
+pub fn sync_skip_worktree_sidecar(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  keep : Map[String, Bool],
+) -> Unit raise @bit.GitError {
+  let state_path = join_path(git_dir, "bit-skip-worktree")
+  if !rfs.is_file(state_path) {
+    return
+  }
+  let text = @utf8.decode_lossy(
+    (rfs.read_file(state_path) catch { _ => return })[:],
+  )
+  let kept : Array[String] = []
+  let mut dropped = false
+  for line_view in text.split("\n") {
+    let line = line_view.to_owned()
+    if line.length() == 0 {
+      continue
+    }
+    if keep.contains(line) {
+      kept.push(line)
+    } else {
+      dropped = true
+    }
+  }
+  if dropped {
+    write_skip_worktree_paths(fs, git_dir, kept)
+  }
+}
+
+///|
 fn index_entry_buf_size(
   path_len : Int,
   has_extended : Bool,
@@ -1410,6 +1446,26 @@ pub fn write_index_entries_preserving_cache_tree(
     sorted,
     hash_size~,
   )
+  // git (2.37+) clears the skip-worktree bit of entries whose file is
+  // present on disk whenever it reads the index of a sparse checkout, so
+  // every index it writes back has those bits cleared.
+  if skip_worktree_paths.length() > 0 &&
+    git_dir.has_suffix("/.git") &&
+    is_sparse_checkout_enabled(rfs, git_dir) {
+    let root = git_dir.unsafe_substring(start=0, end=git_dir.length() - 5)
+    let present : Array[String] = []
+    for path, _ in skip_worktree_paths {
+      if @bitio.worktree_entry_meta_sync(rfs, join_path(root, path)) is Some(_) {
+        present.push(path)
+      }
+    }
+    for path in present {
+      skip_worktree_paths.remove(path)
+    }
+    if present.length() > 0 {
+      sync_skip_worktree_sidecar(fs, rfs, git_dir, skip_worktree_paths)
+    }
+  }
   let buf = write_index_buf(
     sorted,
     Some(skip_worktree_paths),

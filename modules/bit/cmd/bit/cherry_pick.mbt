@@ -242,6 +242,7 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
   } else {
     commit_ids.push(cid)
   }
+  sequencer_refuse_unmerged(rfs, git_dir, "Cherry-picking", "cherry-pick")
   let author = get_author_string()
   let timestamp = get_commit_timestamp()
   for current_id in commit_ids {

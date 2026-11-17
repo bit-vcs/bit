@@ -325,7 +325,7 @@ pub fn merge_base_independent(ObjectDb, &@bit_types.RepoFileSystem, Array[@bit_o
 
 pub fn merge_base_is_ancestor(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, @bit_object.ObjectId) -> Bool raise @bit_object.GitError
 
-pub fn merge_require_clean_index(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId) -> Unit raise @bit_object.GitError
+pub fn merge_require_clean_index(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId, fs? : &@bit_types.FileSystem, root? : String) -> Unit raise @bit_object.GitError
 
 pub fn move_directory(&@bit_types.RepoFileSystem, &@bit_types.FileSystem, String, String) -> Unit
 
@@ -662,6 +662,8 @@ pub async fn status_text(&@bit_types.RepoFileSystem, String) -> String raise @bi
 pub fn subdir_remove_dir(&@bit_types.RepoFileSystem, &@bit_types.FileSystem, String) -> Unit
 
 pub fn switch_branch(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, create? : Bool, checkout_files? : Bool) -> Unit raise @bit_object.GitError
+
+pub fn sync_skip_worktree_sidecar(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Map[String, Bool]) -> Unit raise @bit_object.GitError
 
 pub fn tree_files_to_index(ObjectDb, &@bit_types.RepoFileSystem, Map[String, TreeFileEntry]) -> Array[IndexEntry] raise @bit_object.GitError
 

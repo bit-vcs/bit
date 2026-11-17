@@ -65,6 +65,11 @@ fn commit_storage_runtime_delegate_args(
   if commit_has_merge_state(fs, git_dir) {
     return None
   }
+  // Conflicts (e.g. from stash pop): `-a` resolves them and a plain commit
+  // refuses; the full path below handles both like git.
+  if @bitlib.read_unmerged_paths(fs, git_dir).length() > 0 {
+    return None
+  }
   if !commit_has_no_verify_flag(args) {
     // Check for hooks in default location and core.hooksPath
     let common_git_dir = resolve_common_git_dir(fs, git_dir)

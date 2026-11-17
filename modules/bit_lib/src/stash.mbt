@@ -1094,6 +1094,19 @@ pub fn stash_apply(
     }
     e => raise e
   }
+  // An untracked file in the way of a path outside the sparse cone is
+  // moved aside to <path>.stash.XXXXXX before the stash version is written
+  // (git's unstage_changes_unless_new). Inside the cone git overwrites it.
+  if already_present.length() > 0 && is_sparse_checkout_enabled(rfs, git_dir) {
+    let patterns = read_sparse_patterns(rfs, git_dir)
+    let paths = already_present.keys().to_array()
+    paths.sort()
+    for p in paths {
+      if !matches_sparse_pattern(p, patterns) {
+        stash_relocate_untracked(fs, rfs, root, p)
+      }
+    }
+  }
   let tw = merge_three_way(
     db,
     fs,
@@ -1180,6 +1193,7 @@ pub fn stash_apply(
     }
   }
   write_index_entries_with_skip_worktree(fs, git_dir, new_index, kept_skip)
+  sync_skip_worktree_sidecar(fs, rfs, git_dir, kept_skip)
   match restore_untracked() {
     Some(msg) => raise @bit.GitError::InvalidObject(msg)
     None => ()
@@ -1187,6 +1201,52 @@ pub fn stash_apply(
   if drop {
     stash_drop_at(fs, rfs, common_dir, index)
   }
+}
+
+///|
+/// Move the untracked file (or symlink) at `path` to `<path>.stash.XXXXXX`,
+/// printing git's warning.
+fn stash_relocate_untracked(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  path : String,
+) -> Unit raise @bit.GitError {
+  let abs = join_path(root, path)
+  guard @bitio.worktree_entry_meta_sync(rfs, abs) is Some(info) else { return }
+  let alnum = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+  let mut attempt = 0
+  let mut target = ""
+  while true {
+    let hex = @bit.hash_blob(@utf8.encode("\{path}\n\{attempt}")).to_hex()
+    let sb = StringBuilder::new()
+    for k in 0..<6 {
+      let n = (hex[k * 2].to_int() * 16 + hex[k * 2 + 1].to_int()) %
+        alnum.length()
+      sb.write_char(alnum[n].to_int().unsafe_to_char())
+    }
+    target = path + ".stash." + sb.to_string()
+    if @bitio.worktree_entry_meta_sync(rfs, join_path(root, target)) is None {
+      break
+    }
+    attempt += 1
+  }
+  let dst = join_path(root, target)
+  match info.kind {
+    @bitio.WorktreeKindMeta::Symlink =>
+      match @bitio.read_symlink_target_path(abs) {
+        Some(link) => ignore(@bitio.worktree_make_symlink(link, dst))
+        None => return
+      }
+    @bitio.WorktreeKindMeta::Regular => {
+      fs.write_file(dst, rfs.read_file(abs))
+      ignore(@bitio.worktree_set_mode(dst, info.mode & 0o777))
+    }
+  }
+  fs.remove_file(abs)
+  println(
+    "WARNING: Untracked file in way of tracked file!  Renaming\n            \{path} -> \{target}\n         to make room.",
+  )
 }
 
 ///|
@@ -1223,6 +1283,19 @@ fn stash_check_local_changes(
   for path, _ in base_files {
     changed[path] = true
   }
+  // Rename destinations the merge rewrites (theirs changed the content
+  // at the old path) are in neither tree under that name.
+  let renamed_dest : Map[String, Bool] = Map([])
+  match touched {
+    Some(t) =>
+      for path, _ in t {
+        if !changed.contains(path) && ours.contains(path) {
+          changed[path] = true
+          renamed_dest[path] = true
+        }
+      }
+    None => ()
+  }
   let dirty : Array[String] = []
   let untracked : Array[String] = []
   for path, _ in changed {
@@ -1231,14 +1304,18 @@ fn stash_check_local_changes(
       Some(t) if !t.contains(path) => continue
       _ => ()
     }
-    if skip.contains(path) ||
-      same(base_files.get(path), theirs.get(path)) ||
-      same(ours.get(path), theirs.get(path)) {
+    if skip.contains(path) {
+      continue
+    }
+    if !renamed_dest.contains(path) &&
+      (same(base_files.get(path), theirs.get(path)) ||
+      same(ours.get(path), theirs.get(path))) {
       continue
     }
     // Deleted by the stash but changed here: a modify/delete conflict that
     // leaves our file as it is, so local edits to it are not in the way.
-    if theirs.get(path) is None &&
+    if !renamed_dest.contains(path) &&
+      theirs.get(path) is None &&
       ours.get(path) is Some(_) &&
       !same(base_files.get(path), ours.get(path)) {
       continue
@@ -1455,16 +1532,20 @@ fn merge_touched_paths(
     let ours_kept = c.ours_id == c.theirs_id ||
       c.base_id == Some(c.theirs_id) ||
       (c.base_id != Some(c.ours_id) &&
-      (@diff3.is_binary_content(merge_get_blob_data(db, rfs, c.ours_id)) ||
-      @diff3.is_binary_content(merge_get_blob_data(db, rfs, c.theirs_id))) &&
-      merge_three_way_mode(
-        base_files.get(c.path).map(e => e.mode),
-        ours_mode,
-        theirs.get(c.path).map(e => e.mode),
-        c.mode,
-      ) ==
-      c.mode)
-    if !ours_kept || ours_mode != Some(c.mode) {
+      (
+        (c.base_id is Some(b) &&
+        @diff3.is_binary_content(merge_get_blob_data(db, rfs, b))) ||
+        @diff3.is_binary_content(merge_get_blob_data(db, rfs, c.ours_id)) ||
+        @diff3.is_binary_content(merge_get_blob_data(db, rfs, c.theirs_id))
+      ))
+    // A regular file on one side and a symlink on the other ("distinct
+    // types") is always rewritten: ours moves to <path>~<label>.
+    let distinct = match (ours.get(c.path), theirs.get(c.path)) {
+      (Some(o), Some(t)) => (o.mode == 0o120000) != (t.mode == 0o120000)
+      _ => false
+    }
+    // The candidate carries the three-way merged mode (renames included).
+    if distinct || !ours_kept || ours_mode != Some(c.mode) {
       out[c.path] = true
     }
   }
@@ -1472,6 +1553,14 @@ fn merge_touched_paths(
     out[c.path] = true
   }
   for p in fr.conflicts {
+    // modify/delete with our side modified: our version is left in the
+    // tree as it is, so local changes there are not in the way (git).
+    if base_files.get(p) is Some(_) &&
+      theirs.get(p) is None &&
+      ours.get(p) is Some(o) &&
+      !(fr.merged.get(p) is Some(f) && (f.id != o.id || f.mode != o.mode)) {
+      continue
+    }
     out[p] = true
   }
   // Deleted by the merge: neither in the result nor still pending (content

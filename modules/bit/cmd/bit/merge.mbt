@@ -543,7 +543,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     guard head_id is Some(hid) else {
       raise @bitcore.GitError::InvalidObject("Cannot resolve HEAD")
     }
-    @bitlib.merge_require_clean_index(rfs, git_dir, hid) catch {
+    @bitlib.merge_require_clean_index(rfs, git_dir, hid, fs=wfs, root~) catch {
       err => {
         eprint_line("error: " + format_error_message(err))
         @sys.exit(2)

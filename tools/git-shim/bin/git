@@ -497,8 +497,10 @@ fi
 
 log "pass $subcmd $*"
 real_bin="$(resolve_real_git "$subcmd" "$@")"
+# exec (not a child process): real git must keep the shim's pid, e.g. for
+# core.lockfilepid (t7900 "--detach holds maintenance lock").
 if [ "$capture_stderr" = "1" ]; then
-  exec_real_git "$real_bin" "$@"
+  exec "$real_bin" "$@" 2>>"$script_dir/../shim-stderr.log"
 else
-  exec_real_git "$real_bin" "$@"
+  exec "$real_bin" "$@"
 fi

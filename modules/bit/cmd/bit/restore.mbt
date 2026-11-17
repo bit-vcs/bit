@@ -152,7 +152,12 @@ async fn handle_restore(args : Array[String]) -> Unit raise Error {
       if filtered_paths.length() == 0 {
         return
       }
-      checkout_restore_index_paths(fs, root, filtered_paths)
+      checkout_restore_index_paths(
+        fs,
+        root,
+        filtered_paths,
+        check_unmerged=false,
+      )
       return
     }
   }
