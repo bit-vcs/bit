@@ -244,8 +244,11 @@ fn merge_three_way(
       // Binary: our content stays, but the merged mode is applied (git).
       let mm = candidate.mode
       let full_path = join_path(root, candidate.path)
-      // Not on disk (e.g. skip-worktree): git writes our version there.
-      if @bitio.worktree_entry_meta_sync(rfs, full_path) is None {
+      // Not on disk because the entry is skip-worktree: git drops the bit
+      // and writes our version there. A tracked file merely deleted from
+      // the worktree stays deleted (difffuzz core-4926).
+      if @bitio.worktree_entry_meta_sync(rfs, full_path) is None &&
+        read_skip_worktree_paths(rfs, git_dir).contains(candidate.path) {
         fs.mkdir_p(rebase_parent_dir(full_path))
         fs.write_file(full_path, ours_data)
       }

@@ -127,6 +127,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   if commits.length() == 0 {
     raise @bitcore.GitError::InvalidObject("usage: git revert <commit>...")
   }
+  sequencer_refuse_unmerged(rfs, git_dir, "Reverting", "revert")
   // Check if revert already in progress
   if rfs.is_file(revert_head_path) {
     @stdio.stderr.write(
@@ -243,5 +244,27 @@ fn revert_subject_of(
       }
     }
     None => ""
+  }
+}
+
+///|
+/// git's sequencer refuses to pick when the index has unmerged entries
+/// (`error_dirty_index`), before anything else is touched.
+async fn sequencer_refuse_unmerged(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  verb : String,
+  action : String,
+) -> Unit raise Error {
+  if @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0 {
+    eprint_line(
+      "error: \{verb} is not possible because you have unmerged files.",
+    )
+    eprint_line(
+      "hint: Fix them up in the work tree, and then use 'git add/rm <file>'",
+    )
+    eprint_line("hint: as appropriate to mark resolution and make a commit.")
+    eprint_line("fatal: \{action} failed")
+    @sys.exit(128)
   }
 }
