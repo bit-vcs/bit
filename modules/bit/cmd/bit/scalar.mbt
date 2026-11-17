@@ -347,8 +347,32 @@ async fn scalar_run_git_in(repo : String, args : Array[String]) -> Int {
 }
 
 ///|
+/// Run `git -C <repo> <args>` with the real git binary when falling back is
+/// allowed: background maintenance (the OS scheduler) and the fsmonitor
+/// daemon are not implemented in bit, only stubbed. With
+/// `--no-git-fallback` the in-process command runs instead.
+async fn scalar_run_real_git_in(repo : String, args : Array[String]) -> Int {
+  if git_fallback_disabled() {
+    return scalar_run_git_in(repo, args)
+  }
+  let argv = ["-C", repo]
+  argv.append(args)
+  let result = @process.run(
+    resolve_real_git_for_dispatch(),
+    argv[:],
+    inherit_env=true,
+    stdin=Stdin,
+    stdout=Stdout,
+    stderr=Stderr,
+  ) catch {
+    _ => return 127
+  }
+  result.exit_code
+}
+
+///|
 async fn scalar_start_fsmonitor(repo : String) -> Unit {
-  ignore(scalar_run_git_in(repo, ["fsmonitor--daemon", "start"]))
+  ignore(scalar_run_real_git_in(repo, ["fsmonitor--daemon", "start"]))
 }
 
 ///|
@@ -365,7 +389,7 @@ async fn scalar_toggle_maintenance(
 ) -> Unit {
   match mode {
     "disable" => {
-      let code = scalar_run_git_in(repo, [
+      let code = scalar_run_real_git_in(repo, [
         "maintenance", "unregister", "--force",
       ])
       scalar_trace_subcommand(fs, [
@@ -377,7 +401,7 @@ async fn scalar_toggle_maintenance(
     }
     "keep" => ()
     _ => {
-      let code = scalar_run_git_in(repo, ["maintenance", "start"])
+      let code = scalar_run_real_git_in(repo, ["maintenance", "start"])
       scalar_trace_subcommand(fs, ["git", "maintenance", "start"])
       if code != 0 && !quiet {
         eprint_line("warning: could not toggle maintenance")
@@ -478,6 +502,8 @@ fn scalar_parse_global_options(args : Array[String]) -> (String, Array[String]) 
 ///|
 struct ScalarCloneOptions {
   full_clone : Bool
+  single_branch : Bool
+  branch : String?
   src : Bool
   tags : Bool
   maintenance : Bool
@@ -488,6 +514,8 @@ struct ScalarCloneOptions {
 ///|
 fn scalar_parse_clone_options(args : Array[String]) -> ScalarCloneOptions {
   let mut full_clone = false
+  let mut single_branch = false
+  let mut branch : String? = None
   let mut src = true
   let mut tags = true
   let mut maintenance = true
@@ -499,6 +527,8 @@ fn scalar_parse_clone_options(args : Array[String]) -> ScalarCloneOptions {
     match arg {
       "--full-clone" => full_clone = true
       "--no-full-clone" => full_clone = false
+      "--single-branch" => single_branch = true
+      "--no-single-branch" => single_branch = false
       "--src" => src = true
       "--no-src" => src = false
       "--tags" => tags = true
@@ -508,18 +538,28 @@ fn scalar_parse_clone_options(args : Array[String]) -> ScalarCloneOptions {
       "-h" | "--help" => clone_opts.push(arg)
       "--branch" | "-b" =>
         if i + 1 < args.length() {
-          clone_opts.push(arg)
-          clone_opts.push(args[i + 1])
+          branch = Some(args[i + 1])
           i += 1
         } else {
           clone_opts.push(arg)
         }
+      _ if arg.has_prefix("--branch=") =>
+        branch = Some(arg.unsafe_substring(start=9, end=arg.length()))
       _ if arg.has_prefix("-") => clone_opts.push(arg)
       _ => positional.push(arg)
     }
     i += 1
   }
-  { full_clone, src, tags, maintenance, clone_opts, positional }
+  {
+    full_clone,
+    single_branch,
+    branch,
+    src,
+    tags,
+    maintenance,
+    clone_opts,
+    positional,
+  }
 }
 
 ///|
@@ -660,6 +700,100 @@ async fn scalar_handle_reconfigure(
 }
 
 ///|
+/// Run this bit binary as a child process with the terminal's stdio (the
+/// in-process runner does not support every command, e.g. `init`).
+async fn scalar_run_bit(args : Array[String]) -> Int {
+  let exe = @env.args()[0]
+  let result = @process.run(
+    exe,
+    args[:],
+    inherit_env=true,
+    stdin=Stdin,
+    stdout=Stdout,
+    stderr=Stderr,
+  ) catch {
+    _ => return 127
+  }
+  result.exit_code
+}
+
+///|
+async fn scalar_run_bit_in(dir : String, args : Array[String]) -> Int {
+  scalar_run_bit(["-C", dir] + args)
+}
+
+///|
+/// Run this bit binary as a child process and capture its stdout.
+async fn scalar_capture_bit(args : Array[String]) -> (Int, String) {
+  let exe = @env.args()[0]
+  let result = @process.run(
+    exe,
+    args[:],
+    inherit_env=true,
+    stdout=Collect,
+    stderr=Discard,
+  ) catch {
+    _ => return (127, "")
+  }
+  (result.exit_code, @utf8.decode_lossy(result.stdout_binary()))
+}
+
+///|
+/// The branch the remote's HEAD points at (`ls-remote --symref <url> HEAD`),
+/// like git's scalar remote_default_branch().
+async fn scalar_remote_default_branch(url : String) -> String? {
+  let (code, out) = scalar_capture_bit(["ls-remote", "--symref", url, "HEAD"])
+  if code == 0 {
+    for line_view in out.split("\n") {
+      let line = line_view.to_owned()
+      guard line.has_prefix("ref: ") && line.has_suffix("\tHEAD") else {
+        continue
+      }
+      let target = line.unsafe_substring(start=5, end=line.length() - 5)
+      if target.has_prefix("refs/heads/") {
+        return Some(target.unsafe_substring(start=11, end=target.length()))
+      }
+      eprint_line("error: remote HEAD is not a branch: '\{target}'")
+      return None
+    }
+  }
+  eprint_line(
+    "warning: failed to get default branch name from remote; using local default",
+  )
+  None
+}
+
+///|
+/// The worktree name `scalar clone <url>` derives from the URL: the last
+/// path component, without trailing slashes and a `.git` suffix.
+fn scalar_enlistment_from_url(url : String) -> String? {
+  let mut u = url
+  while u.length() > 0 && u.has_suffix("/") {
+    u = u.unsafe_substring(start=0, end=u.length() - 1)
+  }
+  if u.has_suffix(".git") {
+    u = u.unsafe_substring(start=0, end=u.length() - 4)
+  }
+  match u.rev_find("/") {
+    Some(i) => Some(u.unsafe_substring(start=i + 1, end=u.length()))
+    None => None
+  }
+}
+
+///|
+/// `git -C <dir> config <key> <value>`; exits on failure.
+async fn scalar_set_config(dir : String, key : String, value : String) -> Unit {
+  let code = scalar_run_bit_in(dir, ["config", key, value])
+  if code != 0 {
+    @sys.exit(code)
+  }
+}
+
+///|
+/// `scalar clone`, following git's scalar: init, configure the remote for a
+/// partial (blob:none) clone, sparse-checkout init, recommended config,
+/// fetch (falling back to a full fetch when the partial one fails), then
+/// check out the branch and register the enlistment.
 async fn scalar_handle_clone(
   fs : OsFs,
   cwd : String,
@@ -672,61 +806,104 @@ async fn scalar_handle_clone(
       @sys.exit(129)
     }
   }
-  if parsed.positional.length() < 2 {
-    print_scalar_usage()
-    @sys.exit(129)
-  }
-  let url = parsed.positional[0]
-  let enlistment = scalar_abs_path(parsed.positional[1], cwd)
-  let repo = if parsed.src { enlistment + "/src" } else { enlistment }
-  if parsed.src {
-    fs.mkdir_p(enlistment) catch {
-      err => {
-        if @async.is_being_cancelled() {
-          raise err
+  let (url, enlistment_arg) = match parsed.positional.length() {
+    2 => (parsed.positional[0], parsed.positional[1])
+    1 =>
+      match scalar_enlistment_from_url(parsed.positional[0]) {
+        Some(name) => (parsed.positional[0], name)
+        None => {
+          scalar_die(
+            128,
+            "cannot deduce worktree name from '\{parsed.positional[0]}'",
+          )
+          return
         }
-        ()
       }
+    _ => {
+      eprint_line("error: You must specify a repository to clone.")
+      print_scalar_usage()
+      @sys.exit(129)
+      return
     }
   }
-  let clone_args : Array[String] = ["clone", "--filter=blob:none"]
+  let enlistment = scalar_abs_path(enlistment_arg, cwd)
+  if fs.is_dir(enlistment) {
+    scalar_die(128, "directory '\{enlistment_arg}' exists already")
+  }
+  let dir = if parsed.src { enlistment + "/src" } else { enlistment }
+  let show_progress = if scalar_clone_has_progress_flag(parsed.clone_opts) {
+    parsed.clone_opts.contains("--progress")
+  } else {
+    scalar_stderr_is_tty()
+  }
+  let progress = if show_progress { "--progress" } else { "--no-progress" }
+  let fail = fn(code : Int) { if code != 0 { @sys.exit(code) } }
+  fail(scalar_run_bit(["init", "--", dir]))
+  let branch = match parsed.branch {
+    Some(b) => Some(b)
+    None => scalar_remote_default_branch(url)
+  }
+  let branch = match branch {
+    Some(b) => {
+      fail(scalar_run_bit_in(dir, ["symbolic-ref", "HEAD", "refs/heads/" + b]))
+      b
+    }
+    None => {
+      let (code, out) = scalar_capture_bit([
+        "-C", dir, "symbolic-ref", "--short", "HEAD",
+      ])
+      let b = out.trim(chars=" \t\r\n").to_owned()
+      if code != 0 || b.length() == 0 {
+        scalar_die(1, "failed to get default branch for '\{url}'")
+      }
+      b
+    }
+  }
+  let refspec_branch = if parsed.single_branch { branch } else { "*" }
+  scalar_set_config(dir, "remote.origin.url", url)
+  scalar_set_config(
+    dir,
+    "remote.origin.fetch",
+    "+refs/heads/\{refspec_branch}:refs/remotes/origin/\{refspec_branch}",
+  )
+  scalar_set_config(dir, "remote.origin.promisor", "true")
+  scalar_set_config(dir, "remote.origin.partialCloneFilter", "blob:none")
   if !parsed.tags {
-    clone_args.push("--no-tags")
-  }
-  if !scalar_clone_has_progress_flag(parsed.clone_opts) {
-    if scalar_stderr_is_tty() {
-      clone_args.push("--progress")
-    } else {
-      clone_args.push("--quiet")
-      clone_args.push("--no-progress")
-    }
-  }
-  for opt in parsed.clone_opts {
-    clone_args.push(opt)
-  }
-  clone_args.push(url)
-  clone_args.push(repo)
-  let code = scalar_run_git(clone_args)
-  if code != 0 {
-    @sys.exit(code)
+    scalar_set_config(dir, "remote.origin.tagOpt", "--no-tags")
   }
   if !parsed.full_clone {
-    ignore(scalar_run_git_in(repo, ["sparse-checkout", "init", "--cone"]))
+    fail(scalar_run_bit_in(dir, ["sparse-checkout", "init", "--cone"]))
   }
+  scalar_rewrite_repo_config(fs, dir)
+  let fetch_args = ["fetch", "--quiet", progress, "origin"]
   if !parsed.tags {
+    fetch_args.push("--no-tags")
+  }
+  // bit's fetch shows no progress meter, so --[no-]progress is left out.
+  let code = scalar_run_bit_in(
+    dir,
+    fetch_args.filter(a => a != "--progress" && a != "--no-progress"),
+  )
+  scalar_trace_subcommand(fs, ["git"] + fetch_args)
+  if code != 0 {
+    eprint_line("warning: partial clone failed; attempting full clone")
+    ignore(scalar_run_bit_in(dir, ["config", "--unset", "remote.origin.promisor"]))
     ignore(
-      scalar_run_git_in(repo, [
-        "fetch", "--quiet", "--no-progress", "origin", "--no-tags",
+      scalar_run_bit_in(dir, [
+        "config", "--unset", "remote.origin.partialCloneFilter",
       ]),
     )
-    scalar_trace_subcommand(fs, [
-      "git", "fetch", "--quiet", "--no-progress", "origin", "--no-tags",
-    ])
+    fail(scalar_run_bit_in(dir, ["fetch", "--quiet", "origin"]))
   }
-  scalar_add_maintenance_repo(fs, repo)
-  scalar_rewrite_repo_config(fs, repo)
+  scalar_set_config(dir, "branch.\{branch}.remote", "origin")
+  scalar_set_config(dir, "branch.\{branch}.merge", "refs/heads/\{branch}")
+  // git: checkout -f -t origin/<branch> (the tracking config is set above).
+  fail(
+    scalar_run_bit_in(dir, ["checkout", "-f", "-B", branch, "origin/" + branch]),
+  )
+  scalar_add_maintenance_repo(fs, dir)
   if parsed.maintenance {
-    scalar_toggle_maintenance(fs, repo, "enable", false)
+    scalar_toggle_maintenance(fs, dir, "enable", false)
   }
 }
 
