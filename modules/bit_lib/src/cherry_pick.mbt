@@ -237,7 +237,8 @@ fn sequencer_check_local_changes(
   let skip = read_skip_worktree_paths(rfs, git_dir)
   // On an unborn branch (no HEAD tree) an index already matching the
   // picked tree is fine, as in git.
-  let unborn = ours.length() == 0
+  // (A commit with an empty tree is not unborn.)
+  let unborn = resolve_head_commit(rfs, git_dir) is None
   let mut staged = !unborn && entries.length() != ours.length()
   if !staged {
     for e in entries {
@@ -271,9 +272,14 @@ fn sequencer_check_local_changes(
   for path, _ in base_files {
     changed[path] = true
   }
+  // A path the merge result leaves as ours (e.g. a binary conflict, or an
+  // add/add of the same content) is not rewritten either.
+  let db = ObjectDb::load_lazy(rfs, resolve_common_git_dir(rfs, git_dir))
+  let touched = merge_touched_paths(base_files, ours, theirs, db, rfs)
   for path in changed.keys().to_array() {
     if same(base_files.get(path), theirs.get(path)) ||
-      same(ours.get(path), theirs.get(path)) {
+      same(ours.get(path), theirs.get(path)) ||
+      !touched.contains(path) {
       changed.remove(path)
     }
   }
