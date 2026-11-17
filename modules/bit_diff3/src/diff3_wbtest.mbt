@@ -248,3 +248,23 @@ test "content_merge: marker size" {
   assert_true(result.content.contains("===\n"))
   assert_true(result.content.contains(">>> incoming"))
 }
+
+///|
+test "conflict keeps lines the other side rewrote, with CRLF markers" {
+  // base: 2 CRLF lines; ours drops the second; theirs replaces both.
+  let r = content_merge(
+    "crlf 08\r\ncrlf 12\r\n",
+    "crlf 08\r\n",
+    "no trailing newline 153",
+    ContentMergeOptions::default().with_labels(
+      ours="Updated upstream",
+      base="",
+      theirs="Stashed changes",
+    ),
+  )
+  assert_true(r.has_conflicts)
+  assert_eq(
+    r.content,
+    "<<<<<<< Updated upstream\r\ncrlf 08\r\n=======\r\nno trailing newline 153\r\n>>>>>>> Stashed changes\r\n",
+  )
+}

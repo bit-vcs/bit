@@ -1109,7 +1109,8 @@ fn sparse_worktree_matches_index_entry(
           @bit.hash_blob(normalized) == entry.id
         }
         @bitio.WorktreeKindMeta::Symlink => {
-          if info.mode != entry.mode {
+          // The meta mode of a symlink is not 120000; the kind is what counts.
+          if entry.mode != 0o120000 {
             return false
           }
           match @bitio.read_symlink_target_path(abs) {

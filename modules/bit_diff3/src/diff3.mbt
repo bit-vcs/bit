@@ -391,20 +391,68 @@ fn diff3_merge(
     match (ours_change, theirs_change) {
       (Some(o), Some(t)) =>
         if ranges_overlap(o, t) {
-          // Emit clean lines before the overlap
-          let overlap_start = if o.base_start < t.base_start {
+          // The conflict spans the union of every change (from either side)
+          // that overlaps it, transitively; each side's text is its version
+          // of that whole base range (unchanged lines it kept included).
+          let mut s0 = if o.base_start < t.base_start {
             o.base_start
           } else {
             t.base_start
           }
+          let mut e0 = if o.base_end > t.base_end { o.base_end } else { t.base_end }
+          let mut o_last = oi
+          let mut t_last = ti
+          let mut grew = true
+          while grew {
+            grew = false
+            let span = { base_start: s0, base_end: e0, new_start: 0, new_end: 0 }
+            if o_last + 1 < changes_ours.length() &&
+              ranges_overlap(changes_ours[o_last + 1], span) {
+              o_last = o_last + 1
+              let c = changes_ours[o_last]
+              if c.base_end > e0 {
+                e0 = c.base_end
+              }
+              if c.base_start < s0 {
+                s0 = c.base_start
+              }
+              grew = true
+            }
+            if t_last + 1 < changes_theirs.length() &&
+              ranges_overlap(changes_theirs[t_last + 1], span) {
+              t_last = t_last + 1
+              let c = changes_theirs[t_last]
+              if c.base_end > e0 {
+                e0 = c.base_end
+              }
+              if c.base_start < s0 {
+                s0 = c.base_start
+              }
+              grew = true
+            }
+          }
+          let overlap_start = s0
+          let overlap_end = e0
           if base_pos < overlap_start {
             sections.push(
               Diff3Section::Clean(slice_lines(base, base_pos, overlap_start)),
             )
           }
+          let of = changes_ours[oi]
+          let ol = changes_ours[o_last]
+          let tf = changes_theirs[ti]
+          let tl = changes_theirs[t_last]
+          let ours_lines = slice_lines(
+            ours,
+            of.new_start - (of.base_start - overlap_start),
+            ol.new_end + (overlap_end - ol.base_end),
+          )
+          let theirs_lines = slice_lines(
+            theirs,
+            tf.new_start - (tf.base_start - overlap_start),
+            tl.new_end + (overlap_end - tl.base_end),
+          )
           // Check if both sides made the same change
-          let ours_lines = slice_lines(ours, o.new_start, o.new_end)
-          let theirs_lines = slice_lines(theirs, t.new_start, t.new_end)
           if lines_equal(
               ours_lines,
               0,
@@ -415,11 +463,6 @@ fn diff3_merge(
             ) {
             sections.push(Diff3Section::Clean(ours_lines))
           } else {
-            let overlap_end = if o.base_end > t.base_end {
-              o.base_end
-            } else {
-              t.base_end
-            }
             let base_lines = slice_lines(base, overlap_start, overlap_end)
             sections.push(
               Diff3Section::Conflict(
@@ -429,14 +472,9 @@ fn diff3_merge(
               ),
             )
           }
-          let new_base_pos = if o.base_end > t.base_end {
-            o.base_end
-          } else {
-            t.base_end
-          }
-          base_pos = new_base_pos
-          oi = oi + 1
-          ti = ti + 1
+          base_pos = overlap_end
+          oi = o_last + 1
+          ti = t_last + 1
         } else if o.base_start <= t.base_start {
           // Ours comes first, no overlap
           if base_pos < o.base_start {
@@ -499,7 +537,12 @@ fn diff3_merge(
 }
 
 ///|
-fn render_marker(ch : Char, size : Int, label : String) -> String {
+fn render_marker(
+  ch : Char,
+  size : Int,
+  label : String,
+  cr? : Bool = false,
+) -> String {
   let sb = StringBuilder()
   for _ in 0..<size {
     sb.write_char(ch)
@@ -508,8 +551,58 @@ fn render_marker(ch : Char, size : Int, label : String) -> String {
     sb.write_char(' ')
     sb.write_string(label)
   }
+  if cr {
+    sb.write_char('\r')
+  }
   sb.write_char('\n')
   sb.to_string()
+}
+
+///|
+/// git's is_eol_crlf: 1 when line `i` ends in CRLF, 0 for LF, -1 when it
+/// cannot tell (an empty file, or a single line without an end of line).
+fn eol_crlf(lines : Array[String], i : Int) -> Int {
+  let n = lines.length()
+  if n == 0 {
+    return -1
+  }
+  let crlf = fn(l : String) { if l.has_suffix("\r\n") { 1 } else { 0 } }
+  if i < n - 1 {
+    return crlf(lines[i])
+  }
+  if lines[i].has_suffix("\n") {
+    return crlf(lines[i])
+  }
+  if i == 0 {
+    return -1
+  }
+  crlf(lines[i - 1])
+}
+
+///|
+/// git's is_cr_needed: conflict markers follow the end-of-line style of the
+/// line before the conflict (or the first line of ours / theirs), then of
+/// the base's first line; LF when nothing decides.
+fn conflict_needs_cr(
+  prev_line : String?,
+  ours : Array[String],
+  theirs : Array[String],
+  base : Array[String],
+) -> Bool {
+  let style = fn(file : Array[String]) {
+    match prev_line {
+      Some(l) => if l.has_suffix("\r\n") { 1 } else { 0 }
+      None => eol_crlf(file, 0)
+    }
+  }
+  let mut needs = style(ours)
+  if needs != 0 {
+    needs = style(theirs)
+  }
+  if needs != 0 {
+    needs = eol_crlf(base, 0)
+  }
+  needs == 1
 }
 
 ///|
@@ -532,11 +625,14 @@ pub fn content_merge(
   }
   let sb = StringBuilder()
   let mut conflict_count = 0
+  // The line written just before a conflict (git's "preceding line").
+  let mut prev_line : String? = None
   for section in sections {
     match section {
       Diff3Section::Clean(lines) =>
         for line in lines {
           sb.write_string(line)
+          prev_line = Some(line)
         }
       Diff3Section::Conflict(ours~, base~, theirs~) =>
         match options.favor {
@@ -558,24 +654,33 @@ pub fn content_merge(
           }
           MergeFavor::NoFavor => {
             conflict_count = conflict_count + 1
-            sb.write_string(
-              render_marker('<', options.marker_size, options.ours_label),
+            let cr = conflict_needs_cr(
+              prev_line, ours_lines, theirs_lines, base_lines,
             )
-            write_conflict_section(sb, ours)
+            sb.write_string(
+              render_marker('<', options.marker_size, options.ours_label, cr~),
+            )
+            write_conflict_section(sb, ours, cr~)
             match options.conflict_style {
               ConflictStyle::Diff3 => {
                 sb.write_string(
-                  render_marker('|', options.marker_size, options.base_label),
+                  render_marker(
+                    '|',
+                    options.marker_size,
+                    options.base_label,
+                    cr~,
+                  ),
                 )
-                write_conflict_section(sb, base)
+                write_conflict_section(sb, base, cr~)
               }
               ConflictStyle::Merge => ()
             }
-            sb.write_string(render_marker('=', options.marker_size, ""))
-            write_conflict_section(sb, theirs)
+            sb.write_string(render_marker('=', options.marker_size, "", cr~))
+            write_conflict_section(sb, theirs, cr~)
             sb.write_string(
-              render_marker('>', options.marker_size, options.theirs_label),
+              render_marker('>', options.marker_size, options.theirs_label, cr~),
             )
+            prev_line = Some("\n")
           }
         }
     }
@@ -597,12 +702,16 @@ pub fn is_binary_content(data : Bytes) -> Bool {
 ///|
 /// Write one side of a conflict: a last line without a newline gets one, so
 /// the following marker starts its own line (as git does).
-fn write_conflict_section(sb : StringBuilder, lines : Array[String]) -> Unit {
+fn write_conflict_section(
+  sb : StringBuilder,
+  lines : Array[String],
+  cr? : Bool = false,
+) -> Unit {
   for line in lines {
     sb.write_string(line)
   }
   if lines.length() > 0 && !lines[lines.length() - 1].has_suffix("\n") {
-    sb.write_string("\n")
+    sb.write_string(if cr { "\r\n" } else { "\n" })
   }
 }
 
