@@ -19,6 +19,23 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+      # Install the toolchain pinned by flake.lock (moonbit-overlay's
+      # versions/toolchains/latest.json at the locked revision), as the
+      # SessionStart hook does, rather than whatever release is latest.
+      - name: Resolve pinned MoonBit version
+        shell: bash
+        run: |
+          rev="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); r=d["nodes"]["root"]["inputs"]["moonbit-overlay"]; print(d["nodes"][r]["locked"]["rev"])' flake.lock)"
+          tmp="$(mktemp -d)"
+          git -C "$tmp" init -q
+          git -C "$tmp" fetch -q --depth 1 --filter=blob:none https://github.com/moonbit-community/moonbit-overlay "$rev"
+          pinned="$(git -C "$tmp" show FETCH_HEAD:versions/toolchains/latest.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+          rm -rf "$tmp"
+          # The installer names releases <moonc version>, e.g. 0.10.20+65efd5b93.
+          release="${pinned#v}"
+          release="${release%+*}"
+          echo "MoonBit pinned by flake.lock: $pinned (installer release $release)"
+          echo "MOONBIT_INSTALL_VERSION=$release" >> "$GITHUB_ENV"
       - name: Install MoonBit on Unix
         if: runner.os != 'Windows'
         shell: bash
