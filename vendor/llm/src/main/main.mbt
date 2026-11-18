@@ -69,10 +69,10 @@ fn test_text_stream() -> Unit raise {
     call_count: 0,
   }
   let events : Array[String] = []
-  let text_buf = StringBuilder::new()
+  let text_buf = StringBuilder::StringBuilder()
   let handler : @llm.StreamHandler = {
     on_event: fn(event) {
-      events.push(event.to_string())
+      events.push("\{event}")
       match event {
         @llm.StreamEvent::TextDelta(s) => text_buf.write_string(s)
         _ => ()
@@ -128,7 +128,7 @@ fn test_tool_call_stream() -> Unit raise {
   let tool_calls : Array[@llm.ToolCall] = []
   let handler : @llm.StreamHandler = {
     on_event: fn(event) {
-      println("  [event] " + event.to_string())
+      println("  [event] \{event}")
       match event {
         @llm.StreamEvent::ToolCallEnd(id~, name~, input~) =>
           tool_calls.push({ id, name, input })
@@ -200,7 +200,7 @@ fn test_agent_loop() -> Unit raise {
     @llm.MaxSteps(5),
     fn(e) {
       let s = match e {
-        @llm.AgentEvent::Stream(evt) => "[stream] " + evt.to_string()
+        @llm.AgentEvent::Stream(evt) => "[stream] \{evt}"
         @llm.AgentEvent::ToolExecute(name~, input~) =>
           "[tool:exec] " + name + " " + input.stringify()
         @llm.AgentEvent::ToolResult(name~, result~, ..) =>

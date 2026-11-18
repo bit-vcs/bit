@@ -1,0 +1,35 @@
+import {
+  "mizchi/x/data",
+  "moonbitlang/core/async/process" @async_process,
+  "moonbitlang/core/async/fs" @async_fs,
+  "moonbitlang/core/async/types",
+  "moonbitlang/core/async/io",
+  "mizchi/x/process",
+}
+
+import {
+  "moonbitlang/core/async",
+  "moonbitlang/core/encoding/utf8",
+} for "test"
+
+warnings = "-0029-0024"
+
+options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async/process",
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/io",
+    "moonbitlang/core/async/fs",
+    "moonbitlang/core/async/types",
+  ],
+  "native-stub": [ "pipe_native.c" ],
+  targets: {
+    "pipe_js.mbt": [ "js" ],
+    "pipe_native.mbt": [ "native" ],
+    "pipe_fd_native.mbt": [ "native" ],
+    "pipe_fd_wasm.mbt": [ "wasm" ],
+    "pipe_native_test.mbt": [ "native" ],
+    "pipe_test.mbt": [ "native", "js" ],
+    "pipe_wasmgc.mbt": [ "wasm", "wasm-gc" ],
+  },
+)

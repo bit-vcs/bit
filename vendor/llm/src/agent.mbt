@@ -35,7 +35,7 @@ pub fn run_agent(
       break
     }
     // Collect events from this step
-    let text_buf = StringBuilder::new()
+    let text_buf = StringBuilder::StringBuilder()
     let pending_tool_calls : Array[ToolCall] = []
     let finish_reason : Ref[FinishReason] = Ref(Stop)
     let handler : StreamHandler = {

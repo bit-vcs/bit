@@ -151,7 +151,7 @@ fn json_message_text(msg : Json) -> String {
   match provider_json_get_json_field(msg, "content") {
     Some(String(s)) => s
     Some(Array(parts)) => {
-      let buf = StringBuilder::new()
+      let buf = StringBuilder::StringBuilder()
       for part in parts {
         match part {
           Object(part_obj) =>

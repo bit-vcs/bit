@@ -46,4 +46,5 @@ members = [
   "./modules/bitx_wal",
   "./modules/bitx_workspace",
   "./vendor/llm",
+  "./vendor/x",
 ]

@@ -1,0 +1,14 @@
+import {
+  "moonbitlang/core/env",
+  "moonbitlang/x/sys" @x_sys,
+}
+
+warnings = "-0029"
+
+options(
+  targets: {
+    "env_default.mbt": [ "native", "js" ],
+    "env_wasm.mbt": [ "wasm" ],
+    "env_wasmgc.mbt": [ "wasm-gc" ],
+  },
+)

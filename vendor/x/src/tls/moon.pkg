@@ -1,0 +1,34 @@
+import {
+  "mizchi/x/data",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/io",
+  "moonbitlang/core/async/js_async",
+  "moonbitlang/core/async/tls" @async_tls,
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/debug",
+  "moonbitlang/x/crypto",
+}
+
+import {
+  "mizchi/x/fs",
+  "mizchi/x/socket",
+  "moonbitlang/core/encoding/utf8",
+} for "test"
+
+warnings = "-0029-0067-0006-0009-0014-0053"
+
+options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/io",
+    "moonbitlang/core/async/js_async",
+    "moonbitlang/core/async/tls",
+  ],
+  "native-stub": [ "tls_native.c" ],
+  targets: {
+    "tls_js.mbt": [ "js" ],
+    "tls_native.mbt": [ "native" ],
+    "tls_stub.mbt": [ "wasm", "wasm-gc" ],
+    "tls_test.mbt": [ "native", "js" ],
+  },
+)

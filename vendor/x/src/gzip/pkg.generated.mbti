@@ -1,0 +1,49 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/x/gzip"
+
+import {
+  "mizchi/x/data",
+  "moonbitlang/core/async/io",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct Decoder[R] {
+  // private fields
+}
+#alias(new, deprecated)
+pub fn[R] Decoder::Decoder(R) -> Self[R]
+pub async fn[R : @io.BinaryReader] Decoder::drop(Self[R], Int32) -> Int32
+pub async fn[R : @io.BinaryReader] Decoder::drop_all(Self[R]) -> Int64 raise @io.ReaderError
+pub async fn[R : @io.BinaryReader] Decoder::drop_exactly(Self[R], Int32) -> Unit raise @io.ReaderError
+pub async fn[R : @io.BinaryReader] Decoder::peek(Self[R]) -> BytesView? raise @io.ReaderError
+pub async fn[R : @io.BinaryReader] Decoder::peek_at_least(Self[R], Int32) -> BytesView raise @io.ReaderError
+pub async fn[R : @io.BinaryReader] Decoder::peek_exactly(Self[R], Int32) -> BytesView raise @io.ReaderError
+pub async fn[R : @io.BinaryReader] Decoder::peek_until(Self[R], BytesView, include_delimiter? : Bool) -> BytesView? raise @io.ReaderError
+pub async fn[R : @io.BinaryReader] Decoder::read(Self[R], FixedArray[Byte], offset? : Int32, max_len? : Int32) -> Int32
+pub async fn[R : @io.BinaryReader] Decoder::read_all(Self[R]) -> &@data.Data
+pub async fn[R : @io.BinaryReader] Decoder::read_at_least(Self[R], Int32) -> Bytes raise @io.ReaderError
+pub async fn[R : @io.BinaryReader] Decoder::read_exactly(Self[R], Int32) -> Bytes raise @io.ReaderError
+pub async fn[R : @io.BinaryReader] Decoder::read_into(Self[R], FixedArray[Byte], offset? : Int32, max_len? : Int32) -> Int32 raise @io.ReaderError
+pub async fn[R : @io.BinaryReader] Decoder::read_some(Self[R], max_len? : Int32) -> Bytes?
+pub async fn[R : @io.BinaryReader] Decoder::read_until(Self[R], StringView) -> String?
+pub impl[R : @io.BinaryReader] @io.BinaryReader for Decoder[R]
+
+pub struct Encoder[W] {
+  // private fields
+}
+#alias(new, deprecated)
+pub fn[W] Encoder::Encoder(W, mtime? : UInt32, extra_flags? : Byte, operating_system? : Byte) -> Self[W]
+pub async fn[W : @io.BinaryWriter] Encoder::end(Self[W]) -> Unit
+pub async fn[W : @io.BinaryWriter] Encoder::flush(Self[W]) -> Unit
+pub async fn[W : @io.BinaryWriter] Encoder::write(Self[W], &@data.Data) -> Unit
+pub async fn[W : @io.BinaryWriter] Encoder::write_once(Self[W], Bytes, offset~ : Int32, len~ : Int32) -> Int32
+pub async fn[W : @io.BinaryWriter] Encoder::write_reader(Self[W], &@io.BinaryReader) -> Unit
+pub impl[W : @io.BinaryWriter] @io.BinaryWriter for Encoder[W]
+
+// Type aliases
+
+// Traits

@@ -1,0 +1,21 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/x/raw_fd"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct RawFd {
+  fd : Int32
+  // private fields
+}
+#alias(new, deprecated)
+pub async fn RawFd::RawFd(Int32) -> Self
+pub fn RawFd::close(Self) -> Unit
+pub async fn RawFd::read(Self, FixedArray[Byte], offset? : Int32, max_len? : Int32) -> Int32
+pub async fn RawFd::write(Self, Bytes, offset? : Int32, len? : Int32) -> Int32
+
+// Type aliases
+
+// Traits

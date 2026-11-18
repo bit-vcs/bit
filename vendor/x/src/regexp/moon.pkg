@@ -1,0 +1,15 @@
+import {
+  "moonbitlang/regexp" @upstream,
+  "moonbitlang/core/bench",
+}
+
+warnings = "-0029-0006"
+
+options(
+  targets: {
+    "regexp_default.mbt": [ "native", "wasm", "wasm-gc" ],
+    "regexp_js.mbt": [ "js" ],
+    "regexp_test.mbt": [ "native", "js" ],
+    "regexp_bench_wbtest.mbt": [ "native", "js" ],
+  },
+)

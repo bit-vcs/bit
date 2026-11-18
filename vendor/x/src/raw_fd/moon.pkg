@@ -1,0 +1,25 @@
+import {
+  "mizchi/x/fs",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/js_async",
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/encoding/utf8",
+}
+
+warnings = "-0029-0009-0067"
+
+options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/js_async",
+  ],
+  "native-stub": [ "raw_fd_native.c" ],
+  targets: {
+    "raw_fd_js.mbt": [ "js" ],
+    "raw_fd_js_test.mbt": [ "js" ],
+    "raw_fd_native.mbt": [ "native" ],
+    "raw_fd_native_test.mbt": [ "native" ],
+    "raw_fd_wasm.mbt": [ "wasm" ],
+    "raw_fd_wasmgc.mbt": [ "wasm-gc" ],
+  },
+)

@@ -1,0 +1,21 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/x/string_view"
+
+// Values
+pub fn compare(StringView, StringView) -> Int32
+
+pub fn find(StringView, StringView) -> Int32?
+
+pub fn find_code_unit(StringView, UInt16) -> Int32?
+
+pub fn rev_find(StringView, StringView) -> Int32?
+
+pub fn rev_find_code_unit(StringView, UInt16) -> Int32?
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

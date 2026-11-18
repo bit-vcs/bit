@@ -1,0 +1,26 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/x/signal"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn set_global_cancellation_signals(ReadOnlyArray[Signal]) -> Unit
+
+// Errors
+
+// Types and methods
+#derive(@debug.Debug)
+pub(all) enum Signal {
+  SIGINT
+  SIGTERM
+  SIGHUP
+  SIGBREAK
+}
+pub fn Signal::to_int(Self) -> Int32
+pub fn Signal::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

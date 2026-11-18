@@ -1,0 +1,20 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/x/cond_var"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct Cond {
+  // private fields
+}
+#alias(new, deprecated)
+pub fn Cond::Cond() -> Self
+pub fn Cond::broadcast(Self) -> Unit
+pub fn Cond::signal(Self) -> Unit
+pub async fn Cond::wait(Self) -> Unit
+
+// Type aliases
+
+// Traits

@@ -843,7 +843,7 @@ async fn run_ssh_upload_pack_info_refs(
   let response = child.stdout.read_all() catch {
     e => {
       cleanup_temp_files([stderr_path])
-      raise @bit.GitError::IoError("SSH stdout read failed: \{e}")
+      raise @bit.GitError::IoError("SSH stdout read failed: \{(e : Error)}")
     }
   }
   child.stdout.close()
@@ -929,7 +929,7 @@ async fn skip_ssh_ref_advertisement(
     }
     let _discard = reader.read_exactly(len - 4) catch {
       err =>
-        raise @bit.GitError::ProtocolError("SSH pkt-line read failed: \{err}")
+        raise @bit.GitError::ProtocolError("SSH pkt-line read failed: \{(err : Error)}")
     }
   }
 }
@@ -1023,7 +1023,7 @@ async fn run_ssh_upload_pack_interactive(
   child.stdin.write(wants_data) catch {
     e => {
       cleanup_temp_files([stderr_path])
-      raise @bit.GitError::IoError("SSH stdin write failed: \{e}")
+      raise @bit.GitError::IoError("SSH stdin write failed: \{(e : Error)}")
     }
   }
   child.stdin.close()
@@ -1031,7 +1031,7 @@ async fn run_ssh_upload_pack_interactive(
   let response = child.stdout.read_all() catch {
     e => {
       cleanup_temp_files([stderr_path])
-      raise @bit.GitError::IoError("SSH stdout read failed: \{e}")
+      raise @bit.GitError::IoError("SSH stdout read failed: \{(e : Error)}")
     }
   }
   child.stdout.close()

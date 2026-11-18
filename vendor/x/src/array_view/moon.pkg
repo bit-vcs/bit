@@ -1,0 +1,15 @@
+import {
+  "moonbitlang/core/debug",
+} for "test"
+
+import {
+  "moonbitlang/core/bench",
+} for "wbtest"
+
+options(
+  targets: {
+    "array_view_default.mbt": [ "native", "wasm", "wasm-gc" ],
+    "array_view_js.mbt": [ "js" ],
+    "array_view_test.mbt": [ "native", "js", "wasm", "wasm-gc" ],
+  },
+)

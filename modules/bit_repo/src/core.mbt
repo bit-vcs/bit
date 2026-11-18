@@ -524,7 +524,7 @@ pub fn set_tree_path_protection(hfs~ : Bool, ntfs~ : Bool) -> Unit {
 
 ///|
 fn tree_name_ascii_fold(name : String) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder::StringBuilder()
   for c in name {
     out.write_char(Int::unsafe_to_char(tree_name_ascii_lower(c.to_int())))
   }
@@ -610,7 +610,7 @@ fn tree_name_is_hfs_ignorable(c : Int) -> Bool {
 /// HFS+ resolves `name` to `.<marker>` once ignorable code points are
 /// dropped and ASCII is folded to lower case.
 fn tree_name_is_hfs_dot(name : String, marker : String) -> Bool {
-  let folded = StringBuilder::new()
+  let folded = StringBuilder::StringBuilder()
   for c in name {
     let cp = c.to_int()
     if tree_name_is_hfs_ignorable(cp) {

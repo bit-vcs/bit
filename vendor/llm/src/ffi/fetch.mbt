@@ -104,7 +104,7 @@ fn build_curl_args(
 /// Split a string by newlines.
 fn split_lines(s : String) -> Array[String] {
   let result : Array[String] = []
-  let buf = StringBuilder::new()
+  let buf = StringBuilder::StringBuilder()
   for ch in s {
     if ch == '\n' {
       result.push(buf.to_string())

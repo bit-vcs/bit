@@ -1,0 +1,26 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/x/data"
+
+import {
+  "moonbitlang/core/json",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+pub(open) trait Data {
+  fn text(Self) -> String raise
+  fn binary(Self) -> Bytes
+  fn json(Self) -> @json.Json raise = _
+}
+pub impl Data for String
+pub impl Data for Bytes
+pub impl Data for @json.Json
+pub impl Data for BytesView
+pub impl Data for StringView

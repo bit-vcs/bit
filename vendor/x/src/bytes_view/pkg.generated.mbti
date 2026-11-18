@@ -1,0 +1,23 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/x/bytes_view"
+
+// Values
+pub fn compare(BytesView, BytesView) -> Int32
+
+pub fn equal(BytesView, BytesView) -> Bool
+
+pub fn find(BytesView, BytesView) -> Int32?
+
+pub fn find_byte(BytesView, Byte) -> Int32?
+
+pub fn find_non_ascii(BytesView) -> Int32?
+
+pub fn rev_find_byte(BytesView, Byte) -> Int32?
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

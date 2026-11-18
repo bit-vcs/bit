@@ -1,0 +1,60 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/x/pipe"
+
+import {
+  "mizchi/x/data",
+  "moonbitlang/core/async/fs",
+  "moonbitlang/core/async/io",
+}
+
+// Values
+pub async fn pipe() -> (PipeRead, PipeWrite)
+
+// Errors
+pub suberror PipeError {
+  PipeError(Int32)
+}
+
+// Types and methods
+pub struct PipeRead {
+  inner : @fs.File
+  // private fields
+}
+pub fn PipeRead::_process_input_native(Self) -> @moonbitlang/core/async/process.ProcessInput
+pub fn PipeRead::_release_input_native(Self) -> Unit
+pub fn PipeRead::close(Self) -> Unit
+pub async fn PipeRead::drop(Self, Int32) -> Int32
+pub async fn PipeRead::drop_all(Self) -> Int64 raise @io.ReaderError
+pub async fn PipeRead::drop_exactly(Self, Int32) -> Unit raise @io.ReaderError
+pub fn PipeRead::fd(Self) -> Int32
+pub async fn PipeRead::peek(Self) -> BytesView? raise @io.ReaderError
+pub async fn PipeRead::peek_at_least(Self, Int32) -> BytesView raise @io.ReaderError
+pub async fn PipeRead::peek_exactly(Self, Int32) -> BytesView raise @io.ReaderError
+pub async fn PipeRead::peek_until(Self, BytesView, include_delimiter? : Bool) -> BytesView? raise @io.ReaderError
+pub async fn PipeRead::read(Self, FixedArray[Byte], offset? : Int32, max_len? : Int32) -> Int32
+pub async fn PipeRead::read_all(Self) -> &@data.Data
+pub async fn PipeRead::read_at_least(Self, Int32) -> Bytes raise @io.ReaderError
+pub async fn PipeRead::read_exactly(Self, Int32) -> Bytes raise @io.ReaderError
+pub async fn PipeRead::read_into(Self, FixedArray[Byte], offset? : Int32, max_len? : Int32) -> Int32 raise @io.ReaderError
+pub async fn PipeRead::read_some(Self, max_len? : Int32) -> Bytes?
+pub async fn PipeRead::read_until(Self, StringView) -> String?
+pub impl @mizchi/x/process.ProcessInput for PipeRead
+pub impl @io.BinaryReader for PipeRead
+
+pub struct PipeWrite {
+  inner : @fs.File
+  // private fields
+}
+pub fn PipeWrite::_process_output_native(Self) -> @moonbitlang/core/async/process.ProcessOutput
+pub fn PipeWrite::_release_output_native(Self) -> Unit
+pub fn PipeWrite::close(Self) -> Unit
+pub fn PipeWrite::fd(Self) -> Int32
+pub async fn PipeWrite::write(Self, &@data.Data) -> Unit
+pub async fn PipeWrite::write_once(Self, Bytes, offset~ : Int32, len~ : Int32) -> Int32
+pub async fn PipeWrite::write_reader(Self, &@io.BinaryReader) -> Unit
+pub impl @mizchi/x/process.ProcessOutput for PipeWrite
+pub impl @io.BinaryWriter for PipeWrite
+
+// Type aliases
+
+// Traits

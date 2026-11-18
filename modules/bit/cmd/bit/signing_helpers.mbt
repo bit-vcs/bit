@@ -545,7 +545,7 @@ async fn signing_collect_output_text_with_payload(
   stdin_writer.write(payload) catch {
     err =>
       raise @bitcore.GitError::InvalidObject(
-        "failed to write verify payload: \{err}",
+        "failed to write verify payload: \{(err : Error)}",
       )
   }
   stdin_writer.close()
@@ -960,7 +960,7 @@ async fn signing_run_stdout_signer(
   stdin_writer.write(payload) catch {
     err =>
       raise @bitcore.GitError::InvalidObject(
-        "failed to write signing payload: \{err}",
+        "failed to write signing payload: \{(err : Error)}",
       )
   }
   stdin_writer.close()

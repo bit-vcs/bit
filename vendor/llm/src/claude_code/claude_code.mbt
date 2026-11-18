@@ -32,7 +32,7 @@ pub fn parse_claude_code_line(line : String) -> @llm.StreamEvent? {
         Some(msg) =>
           match @llm.json_get_array(msg, "content") {
             Some(content) => {
-              let buf = StringBuilder::new()
+              let buf = StringBuilder::StringBuilder()
               for block in content {
                 let block_type = get_str(block, "type", "")
                 if block_type == "text" {
@@ -85,7 +85,7 @@ pub impl @llm.Provider for ClaudeCodeProvider with fn stream(
   handler,
 ) {
   // Build the prompt from messages
-  let prompt = StringBuilder::new()
+  let prompt = StringBuilder::StringBuilder()
   for msg in messages {
     let text = msg.get_text()
     if !text.is_empty() {

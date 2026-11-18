@@ -1,0 +1,54 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/x/regexp"
+
+// Values
+pub fn compile(StringView, flags? : StringView) -> Regexp raise RegexpError
+
+// Errors
+pub suberror RegexpError {
+  RegexpError(err~ : Err, source_fragment~ : StringView)
+}
+pub fn RegexpError::output(Self, &Logger) -> Unit
+pub fn RegexpError::to_string(Self) -> String
+pub impl Show for RegexpError
+
+// Types and methods
+pub enum Err {
+  InternalError
+  InvalidCharClass
+  InvalidEscape
+  InvalidNamedCapture
+  InvalidRepeatOp
+  InvalidRepeatSize
+  MissingBracket
+  MissingParenthesis
+  MissingRepeatArgument
+  TrailingBackslash
+  UnexpectedParenthesis
+}
+pub fn Err::output(Self, &Logger) -> Unit
+pub fn Err::to_string(Self) -> String
+pub impl Show for Err
+
+pub struct MatchResult {
+  // private fields
+}
+pub fn MatchResult::after(Self) -> StringView
+pub fn MatchResult::before(Self) -> StringView
+pub fn MatchResult::get(Self, Int32) -> StringView?
+pub fn MatchResult::groups(Self) -> Map[String, StringView]
+pub fn MatchResult::matched(Self) -> Bool
+pub fn MatchResult::results(Self) -> Array[StringView?]
+
+pub struct Regexp {
+  // private fields
+}
+pub fn Regexp::execute(Self, StringView) -> MatchResult
+pub fn Regexp::group_by_name(Self, String) -> Int32?
+pub fn Regexp::group_count(Self) -> Int32
+pub fn Regexp::group_names(Self) -> Array[String]
+pub fn Regexp::match_(Self, StringView) -> MatchResult?
+
+// Type aliases
+
+// Traits

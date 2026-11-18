@@ -1,0 +1,15 @@
+import {
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/aqueue" @async_aqueue,
+  "moonbitlang/core/bench",
+  "moonbitlang/core/debug",
+}
+
+warnings = "-0029"
+
+options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/aqueue",
+  ],
+)

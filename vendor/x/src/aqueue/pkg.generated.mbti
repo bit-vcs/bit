@@ -1,0 +1,43 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/x/aqueue"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+}
+
+// Values
+
+// Errors
+#derive(@debug.Debug, @json.ToJson)
+pub suberror QueueAlreadyClosed
+pub fn QueueAlreadyClosed::output(Self, &Logger) -> Unit
+pub fn QueueAlreadyClosed::to_json(Self) -> @json.Json
+pub fn QueueAlreadyClosed::to_repr(Self) -> @debug.Repr
+pub fn QueueAlreadyClosed::to_string(Self) -> String
+pub impl Show for QueueAlreadyClosed
+
+// Types and methods
+pub(all) enum Kind {
+  Unbounded
+  Blocking(Int32)
+  DiscardOldest(Int32)
+  DiscardLatest(Int32)
+}
+
+pub struct Queue[X] {
+  kind : Kind
+  // private fields
+}
+#alias(new, deprecated)
+#as_free_fn(new, deprecated)
+pub fn[X] Queue::Queue(kind~ : Kind) -> Self[X]
+pub fn[X] Queue::close(Self[X], error? : Error, clear? : Bool) -> Unit
+pub async fn[X] Queue::get(Self[X]) -> X
+pub async fn[X] Queue::put(Self[X], X) -> Unit
+pub fn[X] Queue::try_get(Self[X]) -> X? raise
+pub fn[X] Queue::try_put(Self[X], X) -> Bool raise
+
+// Type aliases
+
+// Traits

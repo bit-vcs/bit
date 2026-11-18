@@ -1,0 +1,38 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/x/crypto"
+
+// Values
+pub fn[D : @moonbitlang/x/crypto.ByteSource] bytes_to_hex_string(D) -> String
+
+pub fn[H : @moonbitlang/x/crypto.CryptoHasher] hmac(H, BytesView, BytesView) -> FixedArray[Byte]
+
+pub fn[Data : @moonbitlang/x/crypto.ByteSource] md5(Data) -> FixedArray[Byte]
+
+pub fn[Data : @moonbitlang/x/crypto.ByteSource] sha1(Data) -> FixedArray[Byte]
+
+pub fn[Data : @moonbitlang/x/crypto.ByteSource] sha224(Data) -> FixedArray[Byte]
+
+pub fn sha224_from_iter(Iter[Byte]) -> FixedArray[Byte]
+
+pub fn[Data : @moonbitlang/x/crypto.ByteSource] sha256(Data) -> FixedArray[Byte]
+
+pub fn sha256_from_iter(Iter[Byte]) -> FixedArray[Byte]
+
+pub fn[Data : @moonbitlang/x/crypto.ByteSource] sm3(Data) -> FixedArray[Byte]
+
+pub fn sm3_from_iter(Iter[Byte]) -> FixedArray[Byte]
+
+pub fn uints_to_hex_string(Iter[UInt32]) -> String
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+pub using @moonbitlang/x/crypto {type MD5}
+
+pub using @moonbitlang/x/crypto {type SHA256}
+
+pub using @moonbitlang/x/crypto {type SM3}
+
+// Traits

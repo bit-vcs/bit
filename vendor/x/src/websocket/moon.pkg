@@ -1,0 +1,36 @@
+import {
+  "mizchi/x/data",
+  "mizchi/x/http",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/http" @async_http,
+  "moonbitlang/core/async/websocket" @async_ws,
+  "moonbitlang/core/async/io",
+  "moonbitlang/core/async/js_async",
+  "moonbitlang/core/bench",
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonbitlang/core/async/http" @http_server,
+  "moonbitlang/core/async/socket",
+} for "test"
+
+warnings = "-0029-0001"
+
+options(
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/http",
+    "moonbitlang/core/async/io",
+    "moonbitlang/core/async/js_async",
+    "moonbitlang/core/async/socket",
+    "moonbitlang/core/async/websocket",
+  ],
+  targets: {
+    "websocket_js.mbt": [ "js" ],
+    "websocket_native.mbt": [ "native", "wasm" ],
+    "websocket_native_test.mbt": [ "native" ],
+    "websocket_wasm.mbt": [ "not", "native", "js", "wasm", "wasm-gc" ],
+    "websocket_wasmgc.mbt": [ "wasm-gc" ],
+  },
+)
