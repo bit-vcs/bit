@@ -1094,6 +1094,7 @@ pub fn stash_apply(
     }
     e => raise e
   }
+  note_sparse_not_updated(rfs, git_dir, already_present.keys().to_array())
   // An untracked file in the way of a path outside the sparse cone is
   // moved aside to <path>.stash.XXXXXX before the stash version is written
   // (git's unstage_changes_unless_new). Inside the cone git overwrites it.

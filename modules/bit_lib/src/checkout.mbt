@@ -370,6 +370,7 @@ fn checkout_two_way(
   let index_only : Array[String] = []
   let dirty : Array[String] = []
   let untracked : Array[String] = []
+  let sparse_present : Array[String] = []
   let removed_untracked : Array[String] = []
   for path, _ in paths {
     let o = old_files.get(path)
@@ -409,15 +410,23 @@ fn checkout_two_way(
       // git refuses to overwrite any untracked file, even an identical one
       // -- except in a sparse checkout, where a new entry's check is only a
       // warning ("already present and thus not updated despite sparse
-      // patterns"): the file is left as it is, the index takes the entry.
+      // patterns"). Despite its wording, git still writes an entry inside
+      // the cone over the file (unpack-trees keeps CE_UPDATE); one outside
+      // the cone becomes skip-worktree and the file is left as it is.
       None =>
         if w is Some(_) {
-          if sparse_patterns is Some(_) {
-            index_only.push(path)
-          } else {
-            untracked.push(path)
+          match (sparse_patterns, n) {
+            (Some(patterns), Some(_)) if matches_sparse_pattern(path, patterns) =>
+              sparse_present.push(path)
+            (Some(_), _) => {
+              index_only.push(path)
+              continue
+            }
+            (None, _) => {
+              untracked.push(path)
+              continue
+            }
           }
-          continue
         }
     }
     match n {
@@ -449,6 +458,7 @@ fn checkout_two_way(
       "\nPlease move or remove them before you switch branches.\nAborting",
     )
   }
+  note_sparse_not_updated(rfs, git_dir, sparse_present)
   // Apply: deletions first (a file may become a directory), then writes.
   to_delete.sort()
   for path in to_delete {

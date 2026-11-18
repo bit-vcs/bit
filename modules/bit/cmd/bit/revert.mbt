@@ -41,6 +41,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   if do_abort {
     if !rfs.is_file(revert_head_path) {
       @stdio.stderr.write(@utf8.encode("error: no revert in progress"))
+      eprint_sparse_not_updated_warning()
       @sys.exit(1)
     }
     // Restore ORIG_HEAD if exists
@@ -74,6 +75,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   if do_skip {
     if !rfs.is_file(revert_head_path) {
       @stdio.stderr.write(@utf8.encode("error: no revert in progress"))
+      eprint_sparse_not_updated_warning()
       @sys.exit(1)
     }
     // Clean up state files (skip current revert)
@@ -92,6 +94,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   if do_continue {
     if !rfs.is_file(revert_head_path) {
       @stdio.stderr.write(@utf8.encode("error: no revert in progress"))
+      eprint_sparse_not_updated_warning()
       @sys.exit(1)
     }
     // Read the commit message from MERGE_MSG
@@ -133,6 +136,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     @stdio.stderr.write(
       @utf8.encode("error: revert already in progress, use --continue, --abort, or --skip"),
     )
+    eprint_sparse_not_updated_warning()
     @sys.exit(1)
   }
   // Save ORIG_HEAD
@@ -170,6 +174,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
         }
       @bitlib.CherryPickStatus::Empty => {
         print_line("nothing to commit, working tree clean")
+        eprint_sparse_not_updated_warning()
         @sys.exit(1)
       }
       @bitlib.CherryPickStatus::Conflict => {
@@ -183,6 +188,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
         eprint_line(
           "hint: After resolving the conflicts, mark them with\nhint: \"git add/rm <pathspec>\", then run\nhint: \"git revert --continue\".",
         )
+        eprint_sparse_not_updated_warning()
         @sys.exit(1)
       }
     }
@@ -265,6 +271,7 @@ async fn sequencer_refuse_unmerged(
     )
     eprint_line("hint: as appropriate to mark resolution and make a commit.")
     eprint_line("fatal: \{action} failed")
+    eprint_sparse_not_updated_warning()
     @sys.exit(128)
   }
 }

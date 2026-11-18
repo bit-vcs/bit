@@ -1286,9 +1286,29 @@ async fn dispatch_command(
       if @async.is_being_cancelled() {
         raise err
       }
+      eprint_sparse_not_updated_warning()
       exit_with_error(command_error_name(normalized_cmd), err)
     }
   }
+  eprint_sparse_not_updated_warning()
+}
+
+///|
+/// git's unpack-trees warning for untracked files inside the sparse cone
+/// that a checkout/merge-like command wrote over (it says "not updated",
+/// but git does write them; bit follows git, see bit issue 5fabca56).
+/// Handlers that exit early call this before `@sys.exit`.
+async fn eprint_sparse_not_updated_warning() -> Unit {
+  let paths = @bitlib.take_sparse_not_updated_paths()
+  if paths.length() == 0 {
+    return
+  }
+  let listed = paths.map(p => "\t" + p + "\n").join("")
+  eprint_line(
+    "warning: The following paths were already present and thus not updated despite sparse patterns:\n" +
+    listed +
+    "\nAfter fixing the above paths, you may want to run `git sparse-checkout reapply`.",
+  )
 }
 
 ///|

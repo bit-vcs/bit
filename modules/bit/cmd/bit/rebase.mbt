@@ -19,6 +19,7 @@ async fn delegate_rebase_to_real_git(
     stdout=Stdout,
     stderr=Stderr,
   ).exit_code
+  eprint_sparse_not_updated_warning()
   @sys.exit(code)
 }
 
@@ -433,6 +434,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     eprint_line(
       "fatal: interactive/step rebase mode is not supported in standalone mode",
     )
+    eprint_sparse_not_updated_warning()
     @sys.exit(1)
   }
   if rebase_requires_real_git(args, git_dir~) {
@@ -560,6 +562,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
           handle_show([hex])
         } else {
           eprint_line("fatal: No rebase in progress?")
+          eprint_sparse_not_updated_warning()
           @sys.exit(1)
         }
         return
@@ -570,6 +573,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         let todo_path = git_dir + "/rebase-merge/git-rebase-todo"
         if !(rfs as &@bitcore.RepoFileSystem).is_file(todo_path) {
           eprint_line("fatal: No rebase in progress?")
+          eprint_sparse_not_updated_warning()
           @sys.exit(1)
         }
         let content = decode_bytes(
@@ -729,6 +733,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   for cmd in exec_cmds {
     if cmd.trim().to_owned().length() == 0 {
       eprint_line("error: empty exec command")
+      eprint_sparse_not_updated_warning()
       @sys.exit(1)
     }
   }
@@ -754,6 +759,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       rebase_clear_signing_state(wfs, git_dir)
     } else {
       eprint_line("fatal: no rebase in progress")
+      eprint_sparse_not_updated_warning()
       @sys.exit(1)
     }
     return ()
@@ -1412,17 +1418,20 @@ async fn print_interactive_rebase_result(
     @bitlib.IRBConflict => {
       print_line(result.message)
       print_line("Resolve conflicts, then run \"git rebase --continue\".")
+      eprint_sparse_not_updated_warning()
       @sys.exit(1)
     }
     @bitlib.IRBStopped => {
       print_line(result.message)
       if result.exit_code != 0 {
+        eprint_sparse_not_updated_warning()
         @sys.exit(result.exit_code)
       }
     }
     @bitlib.IRBAborted =>
       if result.message.length() > 0 {
         eprint_line(result.message)
+        eprint_sparse_not_updated_warning()
         @sys.exit(1)
       } else {
         print_line("Rebase aborted.")
@@ -2160,6 +2169,7 @@ async fn print_rebase_result_with_commit(
         "To abort and return to the original state, run \"git rebase --abort\".",
       )
       print_line("To skip this commit, run \"git rebase --skip\".")
+      eprint_sparse_not_updated_warning()
       @sys.exit(1)
     }
   }

@@ -158,6 +158,7 @@ async fn handle_stash(args : Array[String]) -> Unit raise Error {
     "branch" => {
       if rest.length() == 0 {
         eprint_line("usage: git stash branch <branchname> [<stash>]")
+        eprint_sparse_not_updated_warning()
         @sys.exit(1)
       }
       let branch_name = rest[0]
