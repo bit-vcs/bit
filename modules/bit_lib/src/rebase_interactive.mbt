@@ -1771,7 +1771,7 @@ fn interactive_cherry_pick(
       let tree_map = rebase_tree_map_from_tree(db, rfs, info.tree)
       rebase_write_worktree(fs, db, rfs, root, git_dir, tree_map)
       let entries = rebase_map_to_index(db, rfs, tree_map)
-      write_index_entries(fs, git_dir, entries)
+      rebase_write_index(fs, rfs, git_dir, entries)
       return {
         status: IRBComplete,
         commit_id: Some(new_id),
@@ -1807,7 +1807,7 @@ fn interactive_cherry_pick(
       fs, db, rfs, root, git_dir, base_map, conflicts,
     )
     let entries = rebase_map_to_index(db, rfs, base_map)
-    write_index_entries(fs, git_dir, entries)
+    rebase_write_index(fs, rfs, git_dir, entries, except=conflicts)
     return {
       status: IRBConflict,
       commit_id: Some(commit_id),
@@ -1834,7 +1834,7 @@ fn interactive_cherry_pick(
   // Update worktree + index
   rebase_write_worktree(fs, db, rfs, root, git_dir, base_map)
   let entries = rebase_map_to_index(db, rfs, base_map)
-  write_index_entries(fs, git_dir, entries)
+  rebase_write_index(fs, rfs, git_dir, entries)
   { status: IRBComplete, commit_id: Some(new_id), message: "", exit_code: 0 }
 }
 
@@ -1912,7 +1912,7 @@ async fn interactive_squash_into_head(
       fs, db, rfs, root, git_dir, base_map, conflicts,
     )
     let entries = rebase_map_to_index(db, rfs, base_map)
-    write_index_entries(fs, git_dir, entries)
+    rebase_write_index(fs, rfs, git_dir, entries, except=conflicts)
     return {
       status: IRBConflict,
       commit_id: Some(commit_id),
@@ -1960,7 +1960,7 @@ async fn interactive_squash_into_head(
   // Update worktree + index
   rebase_write_worktree(fs, db, rfs, root, git_dir, base_map)
   let entries = rebase_map_to_index(db, rfs, base_map)
-  write_index_entries(fs, git_dir, entries)
+  rebase_write_index(fs, rfs, git_dir, entries)
   {
     status: IRBComplete,
     commit_id: Some(new_id),
@@ -2093,7 +2093,7 @@ pub async fn interactive_rebase_skip_impl(
   let tree_map = rebase_tree_map(db, rfs, h)
   rebase_write_worktree(fs, db, rfs, root, git_dir, tree_map)
   let entries = rebase_map_to_index(db, rfs, tree_map)
-  write_index_entries(fs, git_dir, entries)
+  rebase_write_index(fs, rfs, git_dir, entries)
   // Clear amend flag if set
   let new_state : InteractiveRebaseState = { ..s, amend: false }
   save_interactive_rebase_state(fs, git_dir, new_state)
@@ -2138,7 +2138,7 @@ pub fn interactive_rebase_abort_impl(
     _ => ()
   }
   let entries = rebase_map_to_index(db, rfs, tree_map) catch { _ => [] }
-  write_index_entries(fs, git_dir, entries) catch {
+  rebase_write_index(fs, rfs, git_dir, entries) catch {
     _ => ()
   }
   // Clear rebase state
@@ -2166,7 +2166,7 @@ fn interactive_rebase_finish(
   let final_map = rebase_tree_map(db, rfs, final_id)
   rebase_write_worktree(fs, db, rfs, root, git_dir, final_map)
   let entries = rebase_map_to_index(db, rfs, final_map)
-  write_index_entries(fs, git_dir, entries)
+  rebase_write_index(fs, rfs, git_dir, entries)
   // Update refs that pointed to commits in the rebase chain
   if state.update_refs.length() > 0 {
     for ref_path, old_hex in state.update_refs {

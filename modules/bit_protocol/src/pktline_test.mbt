@@ -3,32 +3,60 @@
 test "pktline encode simple" {
   let encoded = @bit_protocol.pktline_encode("hello\n")
   // Length = 6 + 4 = 10 = 0x000a
-  inspect(encoded[0], content="b'\\x30'") // '0'
-  inspect(encoded[1], content="b'\\x30'") // '0'
-  inspect(encoded[2], content="b'\\x30'") // '0'
-  inspect(encoded[3], content="b'\\x61'") // 'a'
-  inspect(encoded[4], content="b'\\x68'") // 'h'
-  inspect(encoded[9], content="b'\\x0A'") // '\n'
+  inspect(encoded[0], content=(
+    #|48
+  )) // '0'
+  inspect(encoded[1], content=(
+    #|48
+  )) // '0'
+  inspect(encoded[2], content=(
+    #|48
+  )) // '0'
+  inspect(encoded[3], content=(
+    #|97
+  )) // 'a'
+  inspect(encoded[4], content=(
+    #|104
+  )) // 'h'
+  inspect(encoded[9], content=(
+    #|10
+  )) // '\n'
 }
 
 ///|
 test "pktline flush" {
   let flush = @bit_protocol.pktline_flush()
   inspect(flush.length(), content="4")
-  inspect(flush[0], content="b'\\x30'")
-  inspect(flush[1], content="b'\\x30'")
-  inspect(flush[2], content="b'\\x30'")
-  inspect(flush[3], content="b'\\x30'")
+  inspect(flush[0], content=(
+    #|48
+  ))
+  inspect(flush[1], content=(
+    #|48
+  ))
+  inspect(flush[2], content=(
+    #|48
+  ))
+  inspect(flush[3], content=(
+    #|48
+  ))
 }
 
 ///|
 test "pktline delim" {
   let delim = @bit_protocol.pktline_delim()
   inspect(delim.length(), content="4")
-  inspect(delim[0], content="b'\\x30'")
-  inspect(delim[1], content="b'\\x30'")
-  inspect(delim[2], content="b'\\x30'")
-  inspect(delim[3], content="b'\\x31'")
+  inspect(delim[0], content=(
+    #|48
+  ))
+  inspect(delim[1], content=(
+    #|48
+  ))
+  inspect(delim[2], content=(
+    #|48
+  ))
+  inspect(delim[3], content=(
+    #|49
+  ))
 }
 
 ///|
@@ -114,11 +142,25 @@ test "pktline encode bytes" {
   let data = Bytes::from_array([b'\x00', b'\x01', b'\x02'])
   let encoded = @bit_protocol.pktline_encode_bytes(data)
   // Length = 3 + 4 = 7 = 0x0007
-  inspect(encoded[0], content="b'\\x30'")
-  inspect(encoded[1], content="b'\\x30'")
-  inspect(encoded[2], content="b'\\x30'")
-  inspect(encoded[3], content="b'\\x37'") // '7'
-  inspect(encoded[4], content="b'\\x00'")
-  inspect(encoded[5], content="b'\\x01'")
-  inspect(encoded[6], content="b'\\x02'")
+  inspect(encoded[0], content=(
+    #|48
+  ))
+  inspect(encoded[1], content=(
+    #|48
+  ))
+  inspect(encoded[2], content=(
+    #|48
+  ))
+  inspect(encoded[3], content=(
+    #|55
+  )) // '7'
+  inspect(encoded[4], content=(
+    #|0
+  ))
+  inspect(encoded[5], content=(
+    #|1
+  ))
+  inspect(encoded[6], content=(
+    #|2
+  ))
 }

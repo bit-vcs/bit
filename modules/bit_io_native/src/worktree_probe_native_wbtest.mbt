@@ -1,7 +1,7 @@
 ///|
 async test "native worktree probes handle UTF-8 paths and missing entries" {
   let root = @afs.tmpdir(prefix="bit-probe-")
-  defer @afs.rmdir(root, recursive=true)
+  defer @afs.remove(root, recursive=true)
   let directory = root + "/目录"
   @afs.mkdir(directory)
   let path = directory + "/文件.txt"
@@ -23,7 +23,7 @@ async test "native worktree probes handle UTF-8 paths and missing entries" {
 ///|
 async test "native worktree probes preserve symbolic link targets" {
   let root = @afs.tmpdir(prefix="bit-probe-link-")
-  defer @afs.rmdir(root, recursive=true)
+  defer @afs.remove(root, recursive=true)
   let path = root + "/链接"
   @afs.symlink(target="缺失.txt", path, force_symlink=true)
   guard native_lstat_meta(path) is Some(meta) else {

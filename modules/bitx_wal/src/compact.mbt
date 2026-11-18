@@ -49,7 +49,7 @@ pub async fn[S : @objstore.ObjectStore] Wal::compact(
       return CommitOutcome::Committed(self.image.snapshot_seq)
     }
     let previous = if self.image.snapshot == "" {
-      Bytes::new(0)
+      Bytes::make(0, b'\x00')
     } else {
       let key = self.snapshot_key(self.image.snapshot)
       let (body, _) = self.store.get(key).unwrap(key)
@@ -111,7 +111,7 @@ pub async fn[S : @objstore.ObjectStore] Wal::read_snapshot(
   self : Wal[S],
 ) -> Bytes raise @bit.GitError {
   if self.image.snapshot == "" {
-    return Bytes::new(0)
+    return Bytes::make(0, b'\x00')
   }
   let key = self.snapshot_key(self.image.snapshot)
   let (body, _) = self.store.get(key).unwrap(key)

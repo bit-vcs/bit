@@ -3,7 +3,7 @@ name = "mizchi/llm"
 version = "0.3.2"
 
 import {
-  "mizchi/x@0.7.0",
+  "mizchi/x@0.8.0",
 }
 
 source = "src"

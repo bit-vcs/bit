@@ -53,7 +53,7 @@ async fn relay_prepare_process_stdin(
     err => raise @bit.GitError::IoError("relay sign: pipe failed: \{err}")
   }
   writer.write(@utf8.encode(text)) catch {
-    err => raise @bit.GitError::IoError("relay sign: pipe write failed: \{err}")
+    err => raise @bit.GitError::IoError("relay sign: pipe write failed: \{(err : Error)}")
   }
   writer.close()
   stdin

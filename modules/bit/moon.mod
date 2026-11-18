@@ -8,7 +8,7 @@ import {
   "mizchi/tempfile@0.1.3",
   "mizchi/llm@0.3.2",
   "mizchi/bitflow@0.4.3",
-  "mizchi/x@0.7.0",
+  "mizchi/x@0.8.0",
   "moonbitlang/regexp@0.3.7",
   "moonbit-community/toml@0.5.1",
   "mizchi/experimental_crypto@0.0.2",

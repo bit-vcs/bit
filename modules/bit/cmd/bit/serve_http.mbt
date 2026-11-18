@@ -347,7 +347,7 @@ fn http_serve_dispatch(
 ///|
 /// Run the listener until interrupted.
 async fn http_serve_run(options : HttpServeOptions) -> Unit raise Error {
-  let addr = @socket.Addr::resolve(options.host, port=options.port)
+  let addr = @socket.Addr::resolve(options.host, port=options.port.to_uint16())
   let server = @http.Server::Server(addr, reuse_addr=true)
   println("bit serve: listening on http://\{options.host}:\{options.port}")
   println("bit serve: serving repositories under \{options.root}")

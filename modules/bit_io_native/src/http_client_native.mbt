@@ -161,11 +161,11 @@ async fn bit_credential_fill(
     err => raise @bit.GitError::IoError("git credential fill failed: \{err}")
   }
   child.stdin.write(@utf8.encode(input)) catch {
-    err => raise @bit.GitError::IoError("git credential write failed: \{err}")
+    err => raise @bit.GitError::IoError("git credential write failed: \{(err : Error)}")
   }
   child.stdin.close()
   let stdout = child.stdout.read_all() catch {
-    err => raise @bit.GitError::IoError("git credential read failed: \{err}")
+    err => raise @bit.GitError::IoError("git credential read failed: \{(err : Error)}")
   }
   let code = child.wait() catch {
     err => raise @bit.GitError::IoError("git credential fill failed: \{err}")
@@ -257,7 +257,7 @@ async fn collect_response(
     let chunk = client.read() catch {
       err =>
         if strict {
-          raise @bit.GitError::IoError("HTTP response body truncated: \{err}")
+          raise @bit.GitError::IoError("HTTP response body truncated: \{(err : Error)}")
         } else {
           break
         }
@@ -322,7 +322,7 @@ pub async fn native_http_get(
   headers : Map[String, String],
 ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
-  let (response, client) = @http.get(
+  let (response, client) = @http.get_stream(
     url,
     headers=to_http_headers(auth_headers),
   ) catch {
@@ -339,11 +339,11 @@ pub async fn native_http_post(
   headers : Map[String, String],
 ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
-  let client = @http.post(url, headers=to_http_headers(auth_headers)) catch {
+  let client = @http.post_stream(url, headers=to_http_headers(auth_headers)) catch {
     e => raise @bit.GitError::IoError("HTTP POST failed: \{e}")
   }
   client.write(body) catch {
-    e => raise @bit.GitError::IoError("HTTP POST write failed: \{e}")
+    e => raise @bit.GitError::IoError("HTTP POST write failed: \{(e : Error)}")
   }
   let response = client.end_request() catch {
     e => raise @bit.GitError::IoError("HTTP POST end_request failed: \{e}")
@@ -381,11 +381,11 @@ pub async fn native_http_put(
   headers : Map[String, String],
 ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
-  let client = @http.put(url, headers=to_http_headers(auth_headers)) catch {
+  let client = @http.put_stream(url, headers=to_http_headers(auth_headers)) catch {
     e => raise @bit.GitError::IoError("HTTP PUT failed: \{e}")
   }
   client.write(body) catch {
-    e => raise @bit.GitError::IoError("HTTP PUT write failed: \{e}")
+    e => raise @bit.GitError::IoError("HTTP PUT write failed: \{(e : Error)}")
   }
   let response = client.end_request() catch {
     e => raise @bit.GitError::IoError("HTTP PUT end_request failed: \{e}")

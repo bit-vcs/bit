@@ -144,8 +144,12 @@ test "git compat: zlib header" {
   let compressed = @zlib.zlib_compress_stored(data)
 
   // Zlib header: 0x78 0x01 (deflate, fastest)
-  inspect(compressed[0], content="b'\\x78'")
-  inspect(compressed[1], content="b'\\x01'")
+  inspect(compressed[0], content=(
+    #|120
+  ))
+  inspect(compressed[1], content=(
+    #|1
+  ))
 }
 
 // =============================================================================
@@ -158,22 +162,46 @@ test "git compat: packfile header" {
   let packfile = @pack.create_blob_packfile(content)
 
   // Magic: "PACK"
-  inspect(packfile[0], content="b'\\x50'") // 'P'
-  inspect(packfile[1], content="b'\\x41'") // 'A'
-  inspect(packfile[2], content="b'\\x43'") // 'C'
-  inspect(packfile[3], content="b'\\x4B'") // 'K'
+  inspect(packfile[0], content=(
+    #|80
+  )) // 'P'
+  inspect(packfile[1], content=(
+    #|65
+  )) // 'A'
+  inspect(packfile[2], content=(
+    #|67
+  )) // 'C'
+  inspect(packfile[3], content=(
+    #|75
+  )) // 'K'
 
   // Version: 2 (big-endian)
-  inspect(packfile[4], content="b'\\x00'")
-  inspect(packfile[5], content="b'\\x00'")
-  inspect(packfile[6], content="b'\\x00'")
-  inspect(packfile[7], content="b'\\x02'")
+  inspect(packfile[4], content=(
+    #|0
+  ))
+  inspect(packfile[5], content=(
+    #|0
+  ))
+  inspect(packfile[6], content=(
+    #|0
+  ))
+  inspect(packfile[7], content=(
+    #|2
+  ))
 
   // Object count: 1 (big-endian)
-  inspect(packfile[8], content="b'\\x00'")
-  inspect(packfile[9], content="b'\\x00'")
-  inspect(packfile[10], content="b'\\x00'")
-  inspect(packfile[11], content="b'\\x01'")
+  inspect(packfile[8], content=(
+    #|0
+  ))
+  inspect(packfile[9], content=(
+    #|0
+  ))
+  inspect(packfile[10], content=(
+    #|0
+  ))
+  inspect(packfile[11], content=(
+    #|1
+  ))
 }
 
 ///|
@@ -195,10 +223,18 @@ test "git compat: packfile with 3 objects" {
   )
 
   // Object count should be 3 (blob, tree, commit)
-  inspect(packfile[8], content="b'\\x00'")
-  inspect(packfile[9], content="b'\\x00'")
-  inspect(packfile[10], content="b'\\x00'")
-  inspect(packfile[11], content="b'\\x03'")
+  inspect(packfile[8], content=(
+    #|0
+  ))
+  inspect(packfile[9], content=(
+    #|0
+  ))
+  inspect(packfile[10], content=(
+    #|0
+  ))
+  inspect(packfile[11], content=(
+    #|3
+  ))
 }
 
 // =============================================================================
@@ -210,11 +246,21 @@ test "git compat: pktline encode" {
   // "hello\n" with 4-byte length prefix
   // Length = 6 + 4 = 10 = 0x000a
   let encoded = @protocol.pktline_encode("hello\n")
-  inspect(encoded[0], content="b'\\x30'") // '0'
-  inspect(encoded[1], content="b'\\x30'") // '0'
-  inspect(encoded[2], content="b'\\x30'") // '0'
-  inspect(encoded[3], content="b'\\x61'") // 'a'
-  inspect(encoded[4], content="b'\\x68'") // 'h'
+  inspect(encoded[0], content=(
+    #|48
+  )) // '0'
+  inspect(encoded[1], content=(
+    #|48
+  )) // '0'
+  inspect(encoded[2], content=(
+    #|48
+  )) // '0'
+  inspect(encoded[3], content=(
+    #|97
+  )) // 'a'
+  inspect(encoded[4], content=(
+    #|104
+  )) // 'h'
 }
 
 ///|
@@ -222,10 +268,18 @@ test "git compat: pktline flush" {
   // Flush packet: 0000
   let flush = @protocol.pktline_flush()
   inspect(flush.length(), content="4")
-  inspect(flush[0], content="b'\\x30'")
-  inspect(flush[1], content="b'\\x30'")
-  inspect(flush[2], content="b'\\x30'")
-  inspect(flush[3], content="b'\\x30'")
+  inspect(flush[0], content=(
+    #|48
+  ))
+  inspect(flush[1], content=(
+    #|48
+  ))
+  inspect(flush[2], content=(
+    #|48
+  ))
+  inspect(flush[3], content=(
+    #|48
+  ))
 }
 
 ///|
@@ -233,10 +287,18 @@ test "git compat: pktline delim" {
   // Delimiter packet: 0001
   let delim = @protocol.pktline_delim()
   inspect(delim.length(), content="4")
-  inspect(delim[0], content="b'\\x30'")
-  inspect(delim[1], content="b'\\x30'")
-  inspect(delim[2], content="b'\\x30'")
-  inspect(delim[3], content="b'\\x31'")
+  inspect(delim[0], content=(
+    #|48
+  ))
+  inspect(delim[1], content=(
+    #|48
+  ))
+  inspect(delim[2], content=(
+    #|48
+  ))
+  inspect(delim[3], content=(
+    #|49
+  ))
 }
 
 // =============================================================================

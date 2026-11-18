@@ -52,7 +52,7 @@ pub fn zlib_compress_stored(data : BytesView) -> Bytes {
 fn zlib_encode(data : BytesView, level : Int) -> Bytes {
   let encoder = @czlib.Encoder(level~)
   let chunk = FixedArray::make(65536, b'\x00')
-  let out = @buffer.Buffer(size_hint=data.length() / 2 + 64)
+  let out = @buffer.Buffer(capacity=data.length() / 2 + 64)
   for consumed = 0 {
     let step = encoder.step(data[consumed:], chunk.mut_view(), action=Finish)
     out.write_bytes(Bytes::from_array(chunk[:step.produced]))
@@ -106,7 +106,7 @@ pub fn zlib_decompress_at(
     raise ZlibError(DictionaryRequired, "zlib: preset dictionary not supported")
   }
   let body = start + 2
-  let decoded = @flate.inflate_prefix(data[body:], max_output=max_size) catch {
+  let decoded = @flate.inflate_prefix(data[body:], max_output_bytes=max_size) catch {
     @flate.InflateError(kind, msg) =>
       raise ZlibError(
         match kind {

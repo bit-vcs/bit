@@ -41,7 +41,7 @@ extern "c" fn bit_chmod(path_buf : Bytes, mode : Int) -> Int = "bit_chmod"
 ///|
 fn native_lstat_meta(abs_path : String) -> @bitio.WorktreeEntryMeta? {
   let path_buf = native_string_to_cstring(abs_path)
-  let buf = Bytes::new(44)
+  let buf = Bytes::make(44, b'\x00')
   let ret = bit_lstat(path_buf, buf)
   if ret < 0 {
     return None
@@ -135,7 +135,7 @@ fn native_try_readlink(path : String) -> String? {
   let path_buf = native_string_to_cstring(path)
   let mut buf_len = 256
   while buf_len <= 131072 {
-    let buf = Bytes::new(buf_len)
+    let buf = Bytes::make(buf_len, b'\x00')
     let read_len = readlink(path_buf, buf, buf.length())
     if read_len < 0 {
       return None
@@ -145,7 +145,7 @@ fn native_try_readlink(path : String) -> String? {
     }
     buf_len *= 2
   }
-  let buf = Bytes::new(131072)
+  let buf = Bytes::make(131072, b'\x00')
   let read_len = readlink(path_buf, buf, buf.length())
   if read_len < 0 {
     None
@@ -178,7 +178,7 @@ extern "c" fn bit_readdir(path_buf : Bytes, buf : Bytes, buf_size : Int) -> Int 
 pub fn native_readdir_typed(path : String) -> Array[(String, Int)]? {
   let path_buf = native_string_to_cstring(path)
   let buf_size = 65536
-  let buf = Bytes::new(buf_size)
+  let buf = Bytes::make(buf_size, b'\x00')
   let ret = bit_readdir(path_buf, buf, buf_size)
   if ret < 0 {
     return None

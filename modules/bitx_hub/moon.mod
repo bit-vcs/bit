@@ -12,7 +12,7 @@ import {
   "mizchi/bit_types@0.49.1",
   "mizchi/bit_pack@0.49.1",
   "mizchi/bit_protocol@0.49.1",
-  "mizchi/x@0.7.0",
+  "mizchi/x@0.8.0",
   "moonbitlang/regexp@0.3.7",
   "moonbitlang/x@0.5.7",
 }

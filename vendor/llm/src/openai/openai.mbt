@@ -216,7 +216,7 @@ fn apply_openai_tool_fragments(
         }
       }
       None => {
-        let input_buf = StringBuilder::new()
+        let input_buf = StringBuilder::StringBuilder()
         if !args_delta.is_empty() {
           input_buf.write_string(args_delta)
         }

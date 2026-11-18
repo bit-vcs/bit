@@ -179,7 +179,7 @@ pub impl @llm.Provider for AnthropicProvider with fn stream(
         Some(event) =>
           match event {
             @llm.StreamEvent::ToolCallStart(id~, name~) => {
-              active_tools[id] = (name, StringBuilder::new())
+              active_tools[id] = (name, StringBuilder::StringBuilder())
               (handler.on_event)(event)
             }
             @llm.StreamEvent::ToolCallDelta(input_delta~, ..) => {

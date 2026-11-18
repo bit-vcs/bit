@@ -77,7 +77,7 @@ pub fn collect_text(
   messages : Array[Message],
   tools? : Array[ToolDef] = [],
 ) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder::StringBuilder()
   let handler : StreamHandler = {
     on_event: fn(event) {
       match event {
@@ -106,7 +106,7 @@ pub fn collect(
   messages : Array[Message],
   tools? : Array[ToolDef] = [],
 ) -> CollectResult {
-  let text_buf = StringBuilder::new()
+  let text_buf = StringBuilder::StringBuilder()
   let tool_calls : Array[ToolCall] = []
   let finish_reason : Ref[FinishReason] = { val: Stop }
   let usage : Ref[Usage?] = { val: None }

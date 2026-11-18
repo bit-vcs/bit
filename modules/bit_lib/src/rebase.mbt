@@ -63,7 +63,7 @@ pub async fn fast_forward_to(
   rebase_update_head(fs, rfs, git_dir, target)
   rebase_write_worktree_filtered(fs, db, rfs, root, git_dir, tree_map, run_filter_cmd?)
   let entries = rebase_map_to_index(db, rfs, tree_map)
-  write_index_entries(fs, git_dir, entries)
+  rebase_write_index(fs, rfs, git_dir, entries)
 }
 
 ///|
@@ -120,7 +120,7 @@ pub async fn rebase_onto(
       rebase_update_head(fs, rfs, git_dir, parent)
       rebase_write_worktree_filtered(fs, db, rfs, root, git_dir, base_map, run_filter_cmd?)
       let entries = rebase_map_to_index(db, rfs, base_map)
-      write_index_entries(fs, git_dir, entries)
+      rebase_write_index(fs, rfs, git_dir, entries)
       parent
     }
   }
@@ -326,20 +326,11 @@ fn rebase_check_untracked_conflicts(
     }
   }
   if is_sparse_checkout_enabled(rfs, git_dir) && conflicts.length() > 0 {
-    // Inside the cone git writes over the file (with a warning). Outside it
-    // git leaves the file alone, but bit's rebase does not yet honour the
-    // sparse patterns when writing the worktree, so keep refusing there
-    // rather than overwrite the file.
-    let patterns = read_sparse_patterns(rfs, git_dir)
-    let outside = conflicts.filter(p => !matches_sparse_pattern(p, patterns))
-    if outside.length() == 0 {
-      note_sparse_not_updated(rfs, git_dir, conflicts)
-      return
-    }
-    conflicts.clear()
-    for p in outside {
-      conflicts.push(p)
-    }
+    // Inside the cone git writes over the file (with a warning); outside
+    // it the entry becomes skip-worktree and the file is left alone, which
+    // `rebase_write_worktree_except` and `rebase_write_index` also do.
+    note_sparse_not_updated(rfs, git_dir, conflicts)
+    return
   }
   if conflicts.length() > 0 {
     conflicts.sort()
@@ -579,6 +570,49 @@ fn rebase_write_tree_recursive(
 }
 
 ///|
+/// The sparse-checkout patterns when sparse checkout is enabled.
+fn rebase_sparse_patterns(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Array[String]? raise @bit.GitError {
+  if is_sparse_checkout_enabled(rfs, git_dir) {
+    Some(read_sparse_patterns(rfs, git_dir))
+  } else {
+    None
+  }
+}
+
+///|
+/// Write the index for a rebase step. In a sparse checkout the entries
+/// outside the patterns get the skip-worktree bit, as git's unpack-trees
+/// does, except the `except` paths (conflicts written to the worktree).
+fn rebase_write_index(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  entries : Array[IndexEntry],
+  except? : Array[String] = [],
+) -> Unit raise @bit.GitError {
+  guard rebase_sparse_patterns(rfs, git_dir) is Some(patterns) else {
+    write_index_entries(fs, git_dir, entries)
+    return
+  }
+  let except_set : Map[String, Bool] = Map([])
+  for path in except {
+    except_set[path] = true
+  }
+  let skip : Map[String, Bool] = Map([])
+  for e in entries {
+    if !except_set.contains(e.path) &&
+      !matches_sparse_pattern(e.path, patterns) {
+      skip[e.path] = true
+    }
+  }
+  write_skip_worktree_paths(fs, git_dir, skip.keys().to_array())
+  write_index_entries_with_skip_worktree(fs, git_dir, entries, skip)
+}
+
+///|
 fn rebase_write_worktree(
   fs : &@bit.FileSystem,
   db : ObjectDb,
@@ -612,9 +646,15 @@ fn rebase_write_worktree_except(
   for path in except {
     except_set[path] = true
   }
+  let sparse = rebase_sparse_patterns(rfs, git_dir)
   for path, info in map {
     if except_set.contains(path) {
       continue // Skip conflicting files
+    }
+    // Sparse checkout: a path outside the patterns is not written (its
+    // index entry gets the skip-worktree bit in `rebase_write_index`).
+    if sparse is Some(patterns) && !matches_sparse_pattern(path, patterns) {
+      continue
     }
     let full = join_path(root, path)
     if is_gitlink_mode_int(info.mode) {
@@ -688,9 +728,15 @@ async fn rebase_write_worktree_except_filtered(
   for path in except {
     except_set[path] = true
   }
+  let sparse = rebase_sparse_patterns(rfs, git_dir)
   for path, info in map {
     if except_set.contains(path) {
       continue // Skip conflicting files
+    }
+    // Sparse checkout: a path outside the patterns is not written (its
+    // index entry gets the skip-worktree bit in `rebase_write_index`).
+    if sparse is Some(patterns) && !matches_sparse_pattern(path, patterns) {
+      continue
     }
     let full = join_path(root, path)
     if is_gitlink_mode_int(info.mode) {
@@ -1323,7 +1369,7 @@ pub async fn rebase_start_with_onto(
       rebase_update_head(fs, rfs, git_dir, onto)
       rebase_write_worktree_filtered(fs, db, rfs, root, git_dir, onto_map, run_filter_cmd?)
       let entries = rebase_map_to_index(db, rfs, onto_map)
-      write_index_entries(fs, git_dir, entries)
+      rebase_write_index(fs, rfs, git_dir, entries)
       // Start applying commits
       rebase_apply_next(fs, rfs, root, state, run_filter_cmd?)
     }
@@ -1430,7 +1476,7 @@ pub async fn rebase_abort(
     _ => ()
   }
   let entries = rebase_map_to_index(db, rfs, tree_map) catch { _ => [] }
-  write_index_entries(fs, git_dir, entries) catch {
+  rebase_write_index(fs, rfs, git_dir, entries) catch {
     _ => ()
   }
   // Clear rebase state
@@ -1481,7 +1527,7 @@ pub async fn rebase_skip(
   let tree_map = rebase_tree_map(db, rfs, h)
   rebase_write_worktree_filtered(fs, db, rfs, root, git_dir, tree_map, run_filter_cmd?)
   let entries = rebase_map_to_index(db, rfs, tree_map)
-  write_index_entries(fs, git_dir, entries)
+  rebase_write_index(fs, rfs, git_dir, entries)
   // Continue with next commits
   rebase_apply_next(fs, rfs, root, new_state, run_filter_cmd?)
 }
@@ -1733,7 +1779,7 @@ async fn rebase_apply_next(
     let final_tree_map = rebase_tree_map(db, rfs, final_id)
     rebase_write_worktree_filtered(fs, db, rfs, root, git_dir, final_tree_map, run_filter_cmd?)
     let final_entries = rebase_map_to_index(db, rfs, final_tree_map)
-    write_index_entries(fs, git_dir, final_entries)
+    rebase_write_index(fs, rfs, git_dir, final_entries)
     clear_rebase_state(fs, rfs, git_dir)
     if state.head_name.length() > 0 {
       let head_path = join_path(git_dir, "HEAD")
@@ -1809,7 +1855,7 @@ async fn rebase_apply_next(
       fs, db, rfs, root, git_dir, base_map, conflicts, run_filter_cmd?,
     )
     let entries = rebase_map_to_index(db, rfs, base_map)
-    write_index_entries(fs, git_dir, entries)
+    rebase_write_index(fs, rfs, git_dir, entries, except=conflicts)
     return {
       status: RebaseStatus::Conflict,
       commit_id: Some(commit_id),

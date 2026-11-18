@@ -23,7 +23,7 @@ pub fn run_agent_cancellable(
       on_event(Done(reason="max_steps"))
       break
     }
-    let text_buf = StringBuilder::new()
+    let text_buf = StringBuilder::StringBuilder()
     let pending_tool_calls : Array[ToolCall] = []
     let finish_reason : Ref[FinishReason] = Ref(Stop)
     let handler : StreamHandler = {

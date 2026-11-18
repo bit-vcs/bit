@@ -80,7 +80,7 @@ pub fn Message::system(text : String) -> Message {
 ///|
 /// Get the text content of a message (concatenated from all Text blocks).
 pub fn Message::get_text(self : Message) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder::StringBuilder()
   for block in self.content {
     match block {
       Text(s) => buf.write_string(s)
