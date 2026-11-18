@@ -1159,3 +1159,40 @@ pub fn filter_paths_in_sparse_checkout(
   let patterns = read_sparse_patterns(rfs, git_dir) catch { _ => return paths }
   paths.filter(p => matches_sparse_pattern(p, patterns))
 }
+
+///|
+/// Paths inside the sparse cone that a merge-like command wrote over an
+/// untracked file. git reports them with its "already present and thus
+/// not updated despite sparse patterns" warning even though, with sparse
+/// checkout, unpack-trees still writes the new entry there (5fabca56).
+/// The command layer drains this with `take_sparse_not_updated_paths`.
+let sparse_not_updated_paths : Array[String] = []
+
+///|
+/// Record the untracked paths a command is about to write over; only those
+/// inside the sparse cone are what git's warning lists.
+pub fn note_sparse_not_updated(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  paths : Array[String],
+) -> Unit {
+  if paths.length() == 0 || !is_sparse_checkout_enabled(rfs, git_dir) {
+    return
+  }
+  let patterns = read_sparse_patterns(rfs, git_dir) catch { _ => return }
+  for p in paths {
+    if matches_sparse_pattern(p, patterns) && !sparse_not_updated_paths.contains(p) {
+      sparse_not_updated_paths.push(p)
+    }
+  }
+}
+
+///|
+/// Return (and clear) the paths recorded by `note_sparse_not_updated`,
+/// sorted.
+pub fn take_sparse_not_updated_paths() -> Array[String] {
+  let out = sparse_not_updated_paths.copy()
+  sparse_not_updated_paths.clear()
+  out.sort()
+  out
+}

@@ -699,8 +699,7 @@ pub fn merge(
   let ours = collect_tree_files_from_commit(db, rfs, head)
   let theirs = collect_tree_files_from_commit(db, rfs, target)
   merge_check_clean_index(rfs, git_dir, ours, restore=(db, fs, root))
-  ignore(
-  stash_check_local_changes(
+  let already_present = stash_check_local_changes(
     rfs,
     root,
     ours,
@@ -708,9 +707,11 @@ pub fn merge(
     theirs,
     read_skip_worktree_paths(rfs, git_dir),
     stash_note=false,
+    // Sparse checkout: git only warns and writes over the file (5fabca56).
+    sparse=is_sparse_checkout_enabled(rfs, git_dir),
     touched=Some(merge_touched_paths(base_files, ours, theirs, db, rfs)),
-    ),
   )
+  note_sparse_not_updated(rfs, git_dir, already_present.keys().to_array())
   let tw = merge_three_way(
     db,
     fs,

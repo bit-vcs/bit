@@ -145,6 +145,7 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
     if !rfs.is_file(pick_head) {
       eprint_line("error: no cherry-pick or revert in progress")
       eprint_line("fatal: cherry-pick failed")
+      eprint_sparse_not_updated_warning()
       @sys.exit(128)
     }
     // git: `reset --merge` -- unrelated local edits survive the abort.
@@ -165,10 +166,12 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
     for arg in unsupported_args {
       @stdio.stderr.write(@utf8.encode("error: cherry-pick: unsupported option '\{arg}'\n"))
     }
+    eprint_sparse_not_updated_warning()
     @sys.exit(1)
   }
   guard commit_spec is Some(spec) else {
     eprint_line("error: cherry-pick requires a commit argument")
+    eprint_sparse_not_updated_warning()
     @sys.exit(1)
   }
   // "-" means previous branch's HEAD — resolve via @{-1}
@@ -288,6 +291,7 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
         eprint_line("    git commit --allow-empty")
         eprint_line("")
         eprint_line("Otherwise, please use 'git cherry-pick --skip'")
+        eprint_sparse_not_updated_warning()
         @sys.exit(1)
       }
       @bitlib.CherryPickStatus::Conflict => {
@@ -299,6 +303,7 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
         print_line(
           "After fixing the conflicts, use \"git commit\" to continue.",
         )
+        eprint_sparse_not_updated_warning()
         @sys.exit(1)
       }
     }

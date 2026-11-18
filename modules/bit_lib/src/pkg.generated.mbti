@@ -349,6 +349,8 @@ pub fn normalize_track_ref(String) -> String
 
 pub fn normalize_worktree_content(Bytes, AutoCrlf) -> Bytes
 
+pub fn note_sparse_not_updated(&@bit_types.RepoFileSystem, String, Array[String]) -> Unit
+
 pub fn parse_at_minus_prefix(String) -> (Int32, String)?
 
 pub fn parse_config_blocks(String) -> Array[ConfigBlock]
@@ -664,6 +666,8 @@ pub fn subdir_remove_dir(&@bit_types.RepoFileSystem, &@bit_types.FileSystem, Str
 pub fn switch_branch(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, create? : Bool, checkout_files? : Bool) -> Unit raise @bit_object.GitError
 
 pub fn sync_skip_worktree_sidecar(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Map[String, Bool]) -> Unit raise @bit_object.GitError
+
+pub fn take_sparse_not_updated_paths() -> Array[String]
 
 pub fn tree_files_to_index(ObjectDb, &@bit_types.RepoFileSystem, Map[String, TreeFileEntry]) -> Array[IndexEntry] raise @bit_object.GitError
 

@@ -273,6 +273,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     Some(s) =>
       if s != "ours" && s != "recursive" && s != "ort" && s != "resolve" {
         @stdio.stderr.write(@utf8.encode("error: merge: unknown strategy '\{s}'\n"))
+        eprint_sparse_not_updated_warning()
         @sys.exit(1)
       }
     None => ()
@@ -308,6 +309,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       @stdio.stderr.write(
         @utf8.encode("fatal: There is no merge to abort (ORIG_HEAD missing)."),
       )
+      eprint_sparse_not_updated_warning()
       @sys.exit(128)
     }
     return
@@ -320,6 +322,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       @stdio.stderr.write(
         @utf8.encode("fatal: There is no merge in progress (MERGE_HEAD missing)."),
       )
+      eprint_sparse_not_updated_warning()
       @sys.exit(128)
     }
     // Commit the merge
@@ -394,6 +397,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       "hint: as appropriate to mark resolution and make a commit.",
     )
     eprint_line("fatal: Exiting because of an unresolved conflict.")
+    eprint_sparse_not_updated_warning()
     @sys.exit(128)
   }
   // Check if subdir-clone and handle specially
@@ -507,6 +511,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
           }
           print_line("Automatic merge failed; fix conflicts and then commit.")
         }
+        eprint_sparse_not_updated_warning()
         @sys.exit(1)
       }
     }
@@ -521,6 +526,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   // Handle --ff-only
   if ff_only && !is_ff {
     @stdio.stderr.write(@utf8.encode("fatal: Not possible to fast-forward, aborting."))
+    eprint_sparse_not_updated_warning()
     @sys.exit(128)
   }
   // Merging something HEAD already contains is a no-op, even with
@@ -546,6 +552,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     @bitlib.merge_require_clean_index(rfs, git_dir, hid, fs=wfs, root~) catch {
       err => {
         eprint_line("error: " + format_error_message(err))
+        eprint_sparse_not_updated_warning()
         @sys.exit(2)
       }
     }
@@ -662,6 +669,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         }
         print_line("Automatic merge failed; fix conflicts and then commit.")
       }
+      eprint_sparse_not_updated_warning()
       @sys.exit(1)
     }
   }
@@ -767,6 +775,7 @@ async fn handle_octopus_merge(
             "Automatic merge failed; fix conflicts and then commit the result.",
           )
         }
+        eprint_sparse_not_updated_warning()
         @sys.exit(1)
       }
     }
@@ -936,6 +945,7 @@ async fn validate_current_branch_mergeoptions(
     Some(value) =>
       if split_cmdline_has_unclosed_quote(value) {
         eprint_line("fatal: bad " + merge_key + " string: unclosed quote")
+        eprint_sparse_not_updated_warning()
         @sys.exit(128)
       }
     None => ()

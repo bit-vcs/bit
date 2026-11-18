@@ -311,6 +311,9 @@ fn rebase_check_untracked_conflicts(
   root : String,
   target_map : Map[String, TreeEntryInfo],
 ) -> Unit raise @bit.GitError {
+  // Sparse checkout: git only warns ("already present and thus not
+  // updated despite sparse patterns") and still writes an entry inside the
+  // cone over the file; one outside the cone is left alone (5fabca56).
   let index_paths : Map[String, Bool] = Map([])
   for entry in read_index_entries(rfs, git_dir) {
     index_paths[entry.path] = true
@@ -320,6 +323,22 @@ fn rebase_check_untracked_conflicts(
     let path = pair.0
     if !index_paths.contains(path) && rfs.is_file(join_path(root, path)) {
       conflicts.push(path)
+    }
+  }
+  if is_sparse_checkout_enabled(rfs, git_dir) && conflicts.length() > 0 {
+    // Inside the cone git writes over the file (with a warning). Outside it
+    // git leaves the file alone, but bit's rebase does not yet honour the
+    // sparse patterns when writing the worktree, so keep refusing there
+    // rather than overwrite the file.
+    let patterns = read_sparse_patterns(rfs, git_dir)
+    let outside = conflicts.filter(p => !matches_sparse_pattern(p, patterns))
+    if outside.length() == 0 {
+      note_sparse_not_updated(rfs, git_dir, conflicts)
+      return
+    }
+    conflicts.clear()
+    for p in outside {
+      conflicts.push(p)
     }
   }
   if conflicts.length() > 0 {

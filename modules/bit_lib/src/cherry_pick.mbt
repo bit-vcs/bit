@@ -348,6 +348,7 @@ fn sequencer_check_local_changes(
       for p in untracked {
         present[p] = true
       }
+      note_sparse_not_updated(rfs, git_dir, untracked)
       return present
     }
     untracked.sort()
