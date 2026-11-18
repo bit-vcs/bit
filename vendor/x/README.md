@@ -32,7 +32,7 @@ Node.js backend compatibility layer for `moonbitlang/core/async` in [MoonBit](ht
 | `mizchi/x/fs` | File system operations (`open`, `create`, `File`, `read_file`, `write_file`, `tmpdir`, `walk`, `Watcher`, `exists`, `mkdir`, `readdir`, `opendir`, `Directory::next`, `rename`, `remove`, `rmdir`) |
 | `mizchi/x/http` | HTTP client/server (`get`, `post`, `put`, `get_stream`, `post_stream`, `put_stream`, `Client`, `Server`, `Cookie`) |
 | `mizchi/x/gzip` | Gzip stream encoder/decoder (`Encoder`, `Decoder`) |
-| `mizchi/x/tls` | TLS client/server streams (`Tls::client`, `Tls::server_from_pair`, peer certificate, channel binding, `rand_bytes`, `sha1`) |
+| `mizchi/x/tls` | TLS client/server streams (`Tls::client`, `Tls::server_from_pair` (server: JS only), peer certificate, channel binding, `rand_bytes`, `sha1`) |
 | `mizchi/x/socket` | TCP/UDP sockets (`Addr`, `Tcp`, `TcpServer`, `UdpClient`, `UdpServer`) |
 | `mizchi/x/signal` | Signal constants and global cancellation signal configuration (`Signal`, `to_int`, `set_global_cancellation_signals`) |
 | `mizchi/x/raw_fd` | Raw file descriptor reads/writes (`RawFd::read`, `RawFd::write`, `RawFd::close`) |
@@ -41,7 +41,7 @@ Node.js backend compatibility layer for `moonbitlang/core/async` in [MoonBit](ht
 | `mizchi/x/semaphore` | Async semaphore (`Semaphore::acquire`, `release`, `try_acquire`) |
 | `mizchi/x/websocket` | WebSocket client/server upgrade (`connect`, `from_http_server`, `Conn::send_text`, `Conn::send_binary`, `Conn::recv`, `Conn::close`) |
 | `mizchi/x/stdio` | Standard I/O (`stdin`, `stdout`, `stderr` with `@io.BinaryReader`/`@io.BinaryWriter`) |
-| `mizchi/x/pipe` | In-memory pipes (`pipe()` → `PipeRead`/`PipeWrite` with `@io.BinaryReader`/`@io.BinaryWriter`; native process redirect support) |
+| `mizchi/x/pipe` | Pipes (`pipe()` → `PipeRead`/`PipeWrite` with `@io.BinaryReader`/`@io.BinaryWriter`): OS pipes on native (`pipe()` is `async`, with process redirect support), in-memory on JS |
 | `mizchi/x/sys` | Environment variables and CLI args (`get_env_var`, `get_cli_args`, `exit`) |
 | `mizchi/x/regexp` | Regular expressions mirroring `moonbitlang/regexp` (`compile`, `Regexp::execute`, `match_`, `group_by_name`, `group_count`, `group_names`, `MatchResult::matched`/`get`/`groups`/`results`/`before`/`after`) |
 | `mizchi/x/json` | JSON mirroring `moonbitlang/core/json` (`parse`, `valid`, `stringify`) over the builtin `Json` value type |
@@ -60,7 +60,7 @@ Node.js backend compatibility layer for `moonbitlang/core/async` in [MoonBit](ht
 | `fs` | Yes | Yes | Yes* | stub |
 | `http` | Yes | Yes | Yes | stub |
 | `gzip` | Yes | Yes | Yes | Yes |
-| `tls` | Yes | Yes | Yes | stub |
+| `tls` | client** | Yes | client** | stub |
 | `socket` | TCP/UDP | TCP/UDP | TCP/UDP | stub |
 | `signal` | Yes | constants/no-op | Yes | constants/no-op |
 | `raw_fd` | Yes | Yes | stub | stub |
@@ -69,7 +69,7 @@ Node.js backend compatibility layer for `moonbitlang/core/async` in [MoonBit](ht
 | `semaphore` | Yes | Yes | Yes | Yes |
 | `websocket` | Yes | Yes | client | stub |
 | `stdio` | Yes | Yes | Yes | stub |
-| `pipe` | Yes | Yes | Yes | stub |
+| `pipe` | Unix | Yes | stub | stub |
 | `sys` | Yes | Yes | Yes | Yes* |
 | `regexp` | Yes | Yes (FFI) | Yes | Yes |
 | `json` | Yes | Yes (FFI) | Yes | Yes |
@@ -79,13 +79,16 @@ Node.js backend compatibility layer for `moonbitlang/core/async` in [MoonBit](ht
 | `string_view` | Yes | Yes (native UTF-16) | Yes | Yes |
 | `array_view` | Yes | Yes (native byte search) | Yes | Yes |
 
+
 - **Yes** — Full upstream-backed implementation.
 - **Yes\*** — Implemented, with explicitly unsupported host-specific APIs.
 - **client** — WebSocket client support; HTTP server upgrades are unavailable on wasm.
+- **client\*\*** — TLS client only: `moonbitlang/core/async/tls` is client-only since MoonBit v0.10.21, so TLS server mode needs the JS target.
 - **stub** — Compiles but aborts at runtime with "not supported" message.
+- **Unix** — Native `pipe()` creates an OS pipe on Unix; on Windows it raises `PipeError(ENOSYS)`.
 - **Yes\*** — Environment variables and arguments use `moonbitlang/core/env`; process exit remains unavailable on wasm-gc.
 
-On `wasm`, filesystem, process, socket, TLS, HTTP, WebSocket client, stdio, and pipe operations delegate to `moonbitlang/core/async`'s WASM host integration and retain the native/JS async signatures. They require capabilities granted by the WASM host (for example, `moonrun --policy` for filesystem, networking, and process spawning). `fs.Watcher`, `raw_fd`, process pipe redirection, and process groups, tree termination, and signal-based process termination are explicitly unsupported. Opaque WASM handles exposed as public `Int32` file descriptors abort if they cannot be represented without truncation.
+On `wasm`, filesystem, process, socket, TLS client, HTTP, WebSocket client, and stdio operations delegate to `moonbitlang/core/async`'s WASM host integration and retain the native/JS async signatures. They require capabilities granted by the WASM host (for example, `moonrun --policy` for filesystem, networking, and process spawning). `fs.Watcher`, `raw_fd`, `pipe`, process pipe redirection, and process groups, tree termination, and signal-based process termination are explicitly unsupported. Opaque WASM handles exposed as public `Int32` file descriptors abort if they cannot be represented without truncation.
 
 ## Upstream Compatibility
 
@@ -157,7 +160,7 @@ here.
 
 `json` parse lands roughly on par rather than faster: `JSON.parse` is fast, but the dominant cost is rebuilding the MoonBit `Json` ADT (which the pure-MoonBit parser also pays), so the host parser's edge is largely consumed by marshalling. `valid` and `stringify` win clearly because they avoid that rebuild.
 
-`mizchi/x/tls` mirrors `moonbitlang/core/async/tls`. Native delegates to the upstream OpenSSL/Schannel implementation. JS maps to Node.js `node:tls` over any `@io.BinaryReader`/`@io.BinaryWriter` pair and supports client/server handshakes, graceful shutdown, peer certificate access, `tls-unique`/`tls-server-end-point` style channel bindings, `rand_bytes`, and `sha1`. WASM delegates to the upstream host-backed implementation; wasm-gc remains a stub.
+`mizchi/x/tls` mirrors `moonbitlang/core/async/tls`. Native delegates to the upstream OpenSSL/Schannel implementation, which is client-only since MoonBit v0.10.21: `Tls::server` / `Tls::server_from_pair` raise `TlsError` on native and wasm (terminate TLS in a proxy, or use the JS target), and `rand_bytes` reads the OS entropy source directly. JS maps to Node.js `node:tls` over any `@io.BinaryReader`/`@io.BinaryWriter` pair and supports client/server handshakes, graceful shutdown, peer certificate access, `tls-unique`/`tls-server-end-point` style channel bindings, `rand_bytes`, and `sha1`. WASM delegates to the upstream host-backed implementation; wasm-gc remains a stub.
 
 `mizchi/x/websocket` mirrors the client API and exposes `from_http_server` for native `mizchi/x/http` server connections. JS and WASM support the client API; HTTP server upgrades are native-only.
 
@@ -205,15 +208,15 @@ Upstream tests: 9 | Covered: 9 | Skipped: 0
 
 | Upstream test | Status | Notes |
 |---|---|---|
-| `one way` | Covered | native and JS |
-| `echo` | Covered | native and JS |
+| `one way` | Covered | JS (needs a TLS server) |
+| `echo` | Covered | JS (needs a TLS server) |
 | `` `connect` accidental close `` | Covered | native and JS |
-| `` `read` already closed `` | Covered | native and JS |
-| `client custom root certificate` | Covered | native and JS |
-| `client custom root certificate rejects different root` | Covered | native and JS |
-| `get_peer_certificate` | Covered | native and JS |
-| `channel binding` | Covered | native and JS |
-| `peer close connection` | Covered | native and JS |
+| `` `read` already closed `` | Covered | JS (needs a TLS server) |
+| `client custom root certificate` | Covered | JS (needs a TLS server) |
+| `client custom root certificate rejects different root` | Covered | JS (needs a TLS server) |
+| `get_peer_certificate` | Covered | JS (needs a TLS server) |
+| `channel binding` | Covered | JS (needs a TLS server) |
+| `peer close connection` | Covered | JS (needs a TLS server) |
 
 ## Quick Start
 

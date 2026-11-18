@@ -3202,8 +3202,12 @@ impl @io.BinaryWriterImpl for Client with fn name(_self) {
 }
 
 ///|
-impl @io.BinaryWriterImpl for Client with fn flush_partial_data(_self) {
-  ()
+impl @io.BinaryWriterImpl for Client with fn flush_partial_data(self) {
+  // After CONNECT the writer goes straight to the tunnel socket; there is no
+  // pending HTTP request to flush.
+  if !self.passthrough_mode {
+    self.flush()
+  }
 }
 
 ///|
@@ -3212,6 +3216,6 @@ impl @io.BinaryWriterImpl for ServerConnection with fn name(_self) {
 }
 
 ///|
-impl @io.BinaryWriterImpl for ServerConnection with fn flush_partial_data(_self) {
-  ()
+impl @io.BinaryWriterImpl for ServerConnection with fn flush_partial_data(self) {
+  self.flush()
 }

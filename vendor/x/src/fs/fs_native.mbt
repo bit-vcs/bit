@@ -226,6 +226,17 @@ pub async fn rename(
 
 ///|
 pub async fn rmdir(path : StringView, recursive? : Bool) -> Unit raise IOError {
+  // Core's `rmdir` is a deprecated alias of `remove`, which also deletes
+  // regular files; keep `rmdir` directory-only like the JS/wasm-gc backends.
+  // The kind check and the removal resolve `path` separately, so a
+  // concurrent replacement of the directory in between is not detected
+  // (core offers no directory-handle-relative removal).
+  let kind = @async_fs.kind(path, follow_symlink=false) catch {
+    err => raise IOError::IOError(err.to_string())
+  }
+  guard kind is Directory else {
+    raise IOError::IOError("rmdir: not a directory: \{path}")
+  }
   @async_fs.remove(path, recursive?) catch {
     err => raise IOError::IOError(err.to_string())
   }

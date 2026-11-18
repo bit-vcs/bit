@@ -24,24 +24,6 @@ fn[T] raise_tls_error(err : Error) -> T raise {
 }
 
 ///|
-#borrow(buf)
-extern "C" fn rand_bytes_ffi(buf : FixedArray[Byte], len : Int32) -> Int32 = "mizchi_x_tls_rand_bytes"
-
-///|
-/// Cryptographically secure random bytes from the OS (core's async/tls no
-/// longer exposes `rand_bytes`).
-pub fn rand_bytes(num : Int32) -> Bytes raise {
-  if num < 0 {
-    raise TlsError("rand_bytes length must be non-negative")
-  }
-  let buf = FixedArray::make(num, b'\x00')
-  if rand_bytes_ffi(buf, num) != 0 {
-    raise TlsError("rand_bytes: the OS random source failed")
-  }
-  Bytes::from_array(buf)
-}
-
-///|
 #label_migration(verify, fill=false, msg="use `trust` instead")
 pub async fn[Inner : @io.BinaryReader + @io.BinaryWriter] Tls::client(
   inner : Inner,
@@ -113,7 +95,7 @@ pub async fn[Inner : @io.BinaryReader + @io.BinaryWriter] Tls::server(
     ),
   )
   raise TlsError(
-    "TLS server mode is not supported on the native target: moonbitlang/core async/tls is client-only",
+    "TLS server mode is not supported on this target: moonbitlang/core async/tls is client-only",
   )
 }
 
@@ -132,7 +114,7 @@ pub async fn[R : @io.BinaryReader, W : @io.BinaryWriter] Tls::server_from_pair(
     ),
   )
   raise TlsError(
-    "TLS server mode is not supported on the native target: moonbitlang/core async/tls is client-only",
+    "TLS server mode is not supported on this target: moonbitlang/core async/tls is client-only",
   )
 }
 
@@ -237,6 +219,8 @@ impl @io.BinaryWriterImpl for Tls with fn name(_self) {
 }
 
 ///|
-impl @io.BinaryWriterImpl for Tls with fn flush_partial_data(_self) {
-  ()
+impl @io.BinaryWriterImpl for Tls with fn flush_partial_data(self) {
+  self.inner.flush_partial_data() catch {
+    err => raise_tls_error(err)
+  }
 }

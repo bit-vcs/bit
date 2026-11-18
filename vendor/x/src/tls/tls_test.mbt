@@ -139,7 +139,7 @@ async fn remove_if_exists(path : String) -> Unit {
 ///|
 // TLS needs buffered duplex transport: the JS in-memory pipe is a rendezvous
 // channel and can deadlock when both peers send handshake records at once.
-#cfg(target="js")
+// Loopback TCP also gives native a raw peer for the client-only tests.
 async fn test_pipe() -> (@socket.Tcp, @socket.Tcp) {
   let listener = @socket.TcpServer(@socket.Addr::parse("127.0.0.1:0"))
   defer listener.close()
@@ -269,7 +269,6 @@ async test "echo" {
 }
 
 ///|
-#cfg(target="js")
 async test "`connect` accidental close" {
   @async.with_timeout(5000, () => {
     @async.with_task_group(root => {

@@ -6,37 +6,37 @@ pub(all) struct PipeWrite {}
 
 ///|
 pub fn pipe() -> (PipeRead, PipeWrite) raise {
-  abort("pipe not supported on wasm-gc target")
+  abort("pipe is not supported on the wasm and wasm-gc targets")
 }
 
 ///|
 pub fn PipeRead::close(self : PipeRead) -> Unit {
   ignore(self)
-  abort("pipe not supported on wasm-gc target")
+  abort("pipe is not supported on the wasm and wasm-gc targets")
 }
 
 ///|
 pub fn PipeWrite::close(self : PipeWrite) -> Unit {
   ignore(self)
-  abort("pipe not supported on wasm-gc target")
+  abort("pipe is not supported on the wasm and wasm-gc targets")
 }
 
 ///|
 pub fn PipeRead::fd(self : PipeRead) -> Int32 {
   ignore(self)
-  abort("pipe not supported on wasm-gc target")
+  abort("pipe is not supported on the wasm and wasm-gc targets")
 }
 
 ///|
 pub fn PipeWrite::fd(self : PipeWrite) -> Int32 {
   ignore(self)
-  abort("pipe not supported on wasm-gc target")
+  abort("pipe is not supported on the wasm and wasm-gc targets")
 }
 
 ///|
 impl @io.BinaryReaderImpl for PipeRead with fn get_controller(self) {
   ignore(self)
-  abort("pipe not supported on wasm-gc target")
+  abort("pipe is not supported on the wasm and wasm-gc targets")
 }
 
 ///|
@@ -47,7 +47,7 @@ impl @io.BinaryReaderImpl for PipeRead with fn raw_read_impl(
   max_len~,
 ) {
   ignore((self, buf, offset, max_len))
-  abort("pipe not supported on wasm-gc target")
+  abort("pipe is not supported on the wasm and wasm-gc targets")
 }
 
 ///|
@@ -58,7 +58,7 @@ impl @io.BinaryWriterImpl for PipeWrite with fn raw_write_impl(
   len~,
 ) {
   ignore((self, buf, offset, len))
-  abort("pipe not supported on wasm-gc target")
+  abort("pipe is not supported on the wasm and wasm-gc targets")
 }
 
 ///|

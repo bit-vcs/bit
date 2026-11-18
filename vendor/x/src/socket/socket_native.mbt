@@ -37,6 +37,9 @@ pub async fn Addr::resolve(
   protocol? : IpProtocolPreference,
 ) -> Addr raise ResolveHostnameError {
   let protocol = to_async_protocol(protocol.unwrap_or(NoPreference))
+  guard port >= 0 && port <= 65535 else {
+    raise ResolveHostnameError::ResolveHostnameError("invalid port \{port}")
+  }
   let addr = @async_socket.Addr::resolve(host, port=port.to_uint16(), protocol~) catch {
     err => raise ResolveHostnameError::ResolveHostnameError(err.to_string())
   }
@@ -87,6 +90,7 @@ pub async fn Tcp::connect_to_host(
   port~ : Int32,
   protocol? : IpProtocolPreference,
 ) -> Tcp {
+  guard port >= 0 && port <= 65535 else { raise InvalidAddr }
   let inner = @async_socket.Tcp::connect_to_host(
     host,
     port=port.to_uint16(),

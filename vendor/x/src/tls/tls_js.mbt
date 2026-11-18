@@ -324,8 +324,7 @@ async fn Tls::flush_encrypted(self : Tls) -> Unit {
     check_js_error(chunk.error)
     if chunk.ok {
       self.writer.write(chunk.data) catch {
-        TransportError(@io.PipeClosed, ..) => raise ConnectionClosed
-        err => raise TlsError((err : Error).to_string())
+        err => raise_transport_error(err)
       }
     } else {
       break
@@ -335,10 +334,7 @@ async fn Tls::flush_encrypted(self : Tls) -> Unit {
 
 ///|
 async fn Tls::read_underlying_once(self : Tls) -> Bool {
-  let data = self.reader.read() catch {
-    TransportError(@io.PipeClosed, ..) => raise ConnectionClosed
-    err => raise TlsError((err : Error).to_string())
-  }
+  let data = self.reader.read() catch { err => raise_transport_error(err) }
   match data {
     Some(data) => {
       check_js_error(js_tls_feed_encrypted(self.id, data))
@@ -621,6 +617,26 @@ impl @io.BinaryWriterImpl for Tls with fn name(_self) {
 }
 
 ///|
-impl @io.BinaryWriterImpl for Tls with fn flush_partial_data(_self) {
-  ()
+impl @io.BinaryWriterImpl for Tls with fn flush_partial_data(self) {
+  self.flush_encrypted()
+  @io.BinaryWriter::flush_partial_data(self.writer) catch {
+    err => raise_transport_error(err)
+  }
+}
+
+///|
+/// Readers and writers layered over a pipe wrap `PipeClosed` in
+/// `TransportError` once per layer; unwrap them so a closed peer is still
+/// reported as `ConnectionClosed`.
+fn[T] raise_transport_error(err : Error) -> T raise {
+  let mut cur = err
+  while true {
+    match cur {
+      @io.PipeClosed => raise ConnectionClosed
+      @io.ReaderError::TransportError(inner, ..) => cur = inner
+      @io.WriterError::TransportError(inner, ..) => cur = inner
+      _ => break
+    }
+  }
+  raise TlsError(err.to_string())
 }

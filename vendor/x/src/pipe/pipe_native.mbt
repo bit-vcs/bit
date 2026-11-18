@@ -36,12 +36,19 @@ pub async fn pipe() -> (PipeRead, PipeWrite) {
     raise PipeError(err)
   }
   // Reopen both ends through /dev/fd so core's async fs drives them (it
-  // handles pipes); the descriptors from pipe(2) are closed right after.
+  // handles pipes; core's fd-based `raw_fd` is native-only, and importing it
+  // would drop the js build of this package). Each raw descriptor from
+  // pipe(2) is closed as soon as its replacement is owned.
+  let mut raw_read_open = true
   defer {
-    ignore(pipe_close_ffi(fds[0]))
+    if raw_read_open {
+      ignore(pipe_close_ffi(fds[0]))
+    }
     ignore(pipe_close_ffi(fds[1]))
   }
   let r = @async_fs.open("/dev/fd/\{fds[0]}", mode=ReadOnly)
+  ignore(pipe_close_ffi(fds[0]))
+  raw_read_open = false
   let mut opened = false
   defer (if !opened { r.close() })
   let w = @async_fs.open("/dev/fd/\{fds[1]}", mode=WriteOnly)

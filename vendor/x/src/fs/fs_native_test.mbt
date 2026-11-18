@@ -31,3 +31,19 @@ async test "mkdir" {
   assert_true(@fs.exists(dir))
   @fs.rmdir(dir)
 }
+
+///|
+async test "rmdir refuses a regular file" {
+  let dir = @fs.tmpdir(prefix="mizchi_x_fs_rmdir_")
+  let path = "\{dir}/file"
+  @fs.write_file(path, "keep")
+  let result = try @fs.rmdir(path) catch {
+    _ => false
+  } noraise {
+    _ => true
+  }
+  let kept = @fs.exists(path)
+  @fs.rmdir(dir, recursive=true)
+  assert_false(result)
+  assert_true(kept)
+}

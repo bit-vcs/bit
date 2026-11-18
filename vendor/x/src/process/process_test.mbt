@@ -97,7 +97,9 @@ async test "collect_output blocked" {
   } noraise {
     value => Ok(value)
   }
-  assert_true(result is Ok(_))
+  if result is Err(err) {
+    fail("collect_output blocked: \{err}")
+  }
 }
 
 ///|
