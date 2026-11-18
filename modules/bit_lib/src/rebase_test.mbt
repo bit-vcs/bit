@@ -138,3 +138,49 @@ async test "rebase: start skips commit whose patch already exists upstream" {
   @test.assert_eq(@bit_lib.resolve_head_commit(fs, "/repo/.git"), Some(upstream_head))
   @test.assert_eq(fs.read_string("/repo/stuff"), upstream_twice)
 }
+
+///|
+async test "rebase: sparse checkout leaves paths outside the patterns skipped" {
+  let fs = setup_repo_rebase()
+  fs.write_string("/repo/a/keep", "a\n")
+  fs.write_string("/repo/c/keep", "c\n")
+  @bit_lib.add_paths(fs, fs, "/repo", ["a/keep", "c/keep"])
+  let base = @bit_lib.commit(
+    fs, fs, "/repo", "base", "Test <t@example.com>", 1700000000L,
+  )
+  @bit_lib.create_branch_at(fs, fs, "/repo", "side", base)
+  @bit_lib.switch_branch(fs, fs, "/repo", "side", checkout_files=true)
+  fs.write_string("/repo/c/s2", "s2\n")
+  fs.write_string("/repo/a/s2", "s2\n")
+  @bit_lib.add_paths(fs, fs, "/repo", ["c/s2", "a/s2"])
+  ignore(
+    @bit_lib.commit(fs, fs, "/repo", "side", "Test <t@example.com>", 1700000001L),
+  )
+  @bit_lib.switch_branch(fs, fs, "/repo", "main", checkout_files=true)
+  fs.write_string("/repo/c/new", "side\n")
+  @bit_lib.add_paths(fs, fs, "/repo", ["c/new"])
+  let main_tip = @bit_lib.commit(
+    fs, fs, "/repo", "m", "Test <t@example.com>", 1700000002L,
+  )
+  @bit_lib.switch_branch(fs, fs, "/repo", "side", checkout_files=true)
+  @bit_lib.sparse_checkout_set(fs, fs, "/repo", ["/a/"])
+  assert_true(!fs.is_file("/repo/c/keep"))
+  // An untracked file outside the patterns where the rebase brings in an
+  // entry: git leaves it alone and marks the entry skip-worktree.
+  fs.write_string("/repo/c/new", "PRECIOUS\n")
+  let result = @bit_lib.rebase_start_with_onto(
+    fs, fs, "/repo", main_tip, base,
+  )
+  guard result.status is @bit_lib.RebaseStatus::Complete else {
+    fail("expected complete rebase")
+  }
+  @test.assert_eq(fs.read_string("/repo/a/s2"), "s2\n")
+  @test.assert_eq(fs.read_string("/repo/c/new"), "PRECIOUS\n")
+  assert_true(!fs.is_file("/repo/c/keep"))
+  assert_true(!fs.is_file("/repo/c/s2"))
+  let skip = @bit_lib.read_skip_worktree_paths(fs, "/repo/.git")
+  assert_true(skip.contains("c/keep"))
+  assert_true(skip.contains("c/s2"))
+  assert_true(skip.contains("c/new"))
+  assert_true(!skip.contains("a/s2"))
+}
