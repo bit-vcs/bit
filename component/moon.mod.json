@@ -6,7 +6,7 @@
       "path": ".."
     },
     "moonbitlang/x": "0.5.7",
-    "mizchi/x": "0.7.0"
+    "mizchi/x": "0.8.0"
   },
   "license": "Apache-2.0",
   "description": "WASM Component for bit-vcs git operations"
