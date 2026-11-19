@@ -3279,6 +3279,16 @@ async fn fetch_transport_configured_refs(
   let (remotes, _) = @bitlib.read_repo_config(fs, git_dir)
   guard remotes.get(remote_name) is Some(rc) else { return false }
   let specs = parse_fetch_refspecs_with_force(rc.fetch)
+  // This path writes refs without git's fast-forward and checked-out-branch
+  // checks, so it only takes forced refspecs into remote-tracking refs (the
+  // default `+refs/heads/*:refs/remotes/<name>/*`); anything else keeps the
+  // caller's default-ref fetch.
+  for e in specs {
+    let (spec, force) = e
+    if !spec.negative && (!force || !spec.dst.has_prefix("refs/remotes/")) {
+      return false
+    }
+  }
   // (remote refname, local ref, id, previous local id)
   let targets : Array[(String, String, @bitcore.ObjectId, @bitcore.ObjectId?)] = []
   let seen_dst : Map[String, Bool] = Map([])
