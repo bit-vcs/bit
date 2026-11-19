@@ -204,6 +204,8 @@ type RestoreConflictRecord
 
 type RestoreConflictStage
 
+type RevListMissing
+
 type RmOptions
 
 type RunGitCommandInvocation
