@@ -575,7 +575,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         config_path_override is None &&
         !global_mode &&
         !system_mode &&
-        !local_mode
+        !local_mode &&
+        !worktree_mode
       let mut found = false
       if need_multi_source {
         let rfs4 : &@bitcore.RepoFileSystem = fs
@@ -676,20 +677,76 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
             found = true
           }
         }
-      } else if fs.is_file(config_path) {
-        found = get_regexp_config(
-          fs,
-          config_path,
-          k,
-          vp,
-          fixed_value_mode,
-          get_bool,
-          get_int,
-          name_only,
-          null_terminator,
-          scope=regexp_scope,
-          origin=regexp_origin,
-        )
+        // Worktree (extensions.worktreeConfig), read after the local file
+        if @env.get_env_var("GIT_CONFIG") is None {
+          match config_worktree_layer_path(rfs4) {
+            Some(wt_path) => {
+              let sc = if show_scope { "worktree" } else { "" }
+              let or_ = if show_origin {
+                "file:" + quote_origin_path(make_relative_to_cwd(wt_path))
+              } else {
+                ""
+              }
+              if get_regexp_config(
+                  fs,
+                  wt_path,
+                  k,
+                  vp,
+                  fixed_value_mode,
+                  get_bool,
+                  get_int,
+                  name_only,
+                  null_terminator,
+                  scope=sc,
+                  origin=or_,
+                ) {
+                found = true
+              }
+            }
+            None => ()
+          }
+        }
+      } else {
+        if fs.is_file(config_path) {
+          found = get_regexp_config(
+            fs,
+            config_path,
+            k,
+            vp,
+            fixed_value_mode,
+            get_bool,
+            get_int,
+            name_only,
+            null_terminator,
+            scope=regexp_scope,
+            origin=regexp_origin,
+          )
+        }
+        // Without an explicit scope or file, the per-worktree layer follows.
+        if config_path_override is None &&
+          !global_mode &&
+          !system_mode &&
+          !local_mode &&
+          !worktree_mode &&
+          @env.get_env_var("GIT_CONFIG") is None {
+          match config_worktree_layer_path(fs) {
+            Some(wt_path) =>
+              if get_regexp_config(
+                  fs,
+                  wt_path,
+                  k,
+                  vp,
+                  fixed_value_mode,
+                  get_bool,
+                  get_int,
+                  name_only,
+                  null_terminator,
+                ) {
+                found = true
+              }
+            None => ()
+          }
+        }
       }
       if !found {
         @sys.exit(1)
@@ -802,6 +859,11 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
       !local_mode &&
       !worktree_mode &&
       @env.get_env_var("GIT_CONFIG") is None
+    let worktree_layer = if default_scope_read {
+      config_worktree_layer_path(fs)
+    } else {
+      None
+    }
     // Compute scope/origin prefix for get value output
     let get_scope_prefix = if show_scope {
       let scope_name = if global_mode {
@@ -844,8 +906,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         (None : String?),
         (None : Int?),
       )
-      let prefixed = get_default_origin_prefix +
-        get_default_scope_prefix +
+      let prefixed = get_default_scope_prefix +
+        get_default_origin_prefix +
         formatted
       if null_terminator {
         print_nul_terminated(prefixed)
@@ -872,6 +934,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
       } else {
         None
       }
+      // Values read from the worktree layer, counted from the end.
+      let mut worktree_values = 0
       let result = if config_path == "-" {
         match stdin_content {
           Some(content) =>
@@ -884,14 +948,15 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         } else {
           []
         }
-        if default_scope_read {
-          match config_worktree_layer_path(fs) {
-            Some(wt_path) =>
-              values.append(
-                get_all_config_values(fs, wt_path, k, vp, fixed_value_mode),
-              )
-            None => ()
+        match worktree_layer {
+          Some(wt_path) => {
+            let wt_values = get_all_config_values(
+              fs, wt_path, k, vp, fixed_value_mode,
+            )
+            worktree_values = wt_values.length()
+            values.append(wt_values)
           }
+          None => ()
         }
         values
       }
@@ -910,8 +975,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
               (None : String?),
               (None : Int?),
             )
-            let prefixed = get_default_origin_prefix +
-              get_default_scope_prefix +
+            let prefixed = get_default_scope_prefix +
+              get_default_origin_prefix +
               formatted
             if null_terminator {
               print_nul_terminated(prefixed)
@@ -922,9 +987,12 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
           None => @sys.exit(1)
         }
       } else {
-        for v in result {
+        for idx, v in result {
+          let from_worktree = idx >= result.length() - worktree_values
           let source_name : String? = if config_path == "-" {
             Some("standard input")
+          } else if from_worktree {
+            worktree_layer
           } else {
             Some(config_path)
           }
@@ -940,7 +1008,13 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
             source_name,
             (None : Int?),
           )
-          let prefixed = get_origin_prefix + get_scope_prefix + formatted
+          let prefixed = if from_worktree {
+            (if show_scope { "worktree\t" } else { "" }) +
+            config_worktree_origin_prefix(worktree_layer, show_origin) +
+            formatted
+          } else {
+            get_scope_prefix + get_origin_prefix + formatted
+          }
           if null_terminator {
             print_nul_terminated(prefixed)
           } else {
@@ -970,7 +1044,7 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
             }
           } else {
             let wt_value = if default_scope_read {
-              match config_worktree_layer_path(fs) {
+              match worktree_layer {
                 Some(wt_path) =>
                   match get_config_value(fs, wt_path, k, vp, fixed_value_mode) {
                     Some(v) => {
@@ -1028,7 +1102,15 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
             value_source,
             line_hint,
           )
-          let prefixed = get_origin_prefix + get_scope_prefix + formatted
+          let from_worktree = worktree_layer is Some(_) &&
+            value_source == worktree_layer
+          let prefixed = if from_worktree {
+            (if show_scope { "worktree\t" } else { "" }) +
+            config_worktree_origin_prefix(worktree_layer, show_origin) +
+            formatted
+          } else {
+            get_scope_prefix + get_origin_prefix + formatted
+          }
           if null_terminator {
             print_nul_terminated(prefixed)
           } else {
@@ -1050,8 +1132,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
                 (None : String?),
                 (None : Int?),
               )
-              let prefixed = get_default_origin_prefix +
-                get_default_scope_prefix +
+              let prefixed = get_default_scope_prefix +
+                get_default_origin_prefix +
                 formatted
               if null_terminator {
                 print_nul_terminated(prefixed)
@@ -1877,6 +1959,19 @@ async fn print_config_list_entry(
     print_nul_terminated(prefix + full_key + "\n" + value)
   } else {
     print_line(prefix + full_key + "=" + value)
+  }
+}
+
+///|
+/// The `--show-origin` prefix for a value read from the worktree layer.
+fn config_worktree_origin_prefix(
+  worktree_layer : String?,
+  show_origin : Bool,
+) -> String {
+  match worktree_layer {
+    Some(path) if show_origin =>
+      "file:" + quote_origin_path(make_relative_to_cwd(path)) + "\t"
+    _ => ""
   }
 }
 
