@@ -205,6 +205,18 @@ pub fn create_worktree(
   let commondir_path = join_path(admin_dir, "commondir")
   fs.write_string(commondir_path, "../..\n")
   copy_worktree_config(fs, rfs, git_dir, admin_dir)
+  // Like git's copy_sparse_checkout(): a worktree added from a sparse one
+  // starts with the same patterns (its config.worktree carries the flag).
+  let sparse_source = join_path(git_dir, "info/sparse-checkout")
+  let inherits_sparse = is_sparse_checkout_enabled(rfs, git_dir) &&
+    rfs.is_file(sparse_source)
+  if inherits_sparse {
+    fs.mkdir_p(join_path(admin_dir, "info"))
+    fs.write_file(
+      join_path(admin_dir, "info/sparse-checkout"),
+      rfs.read_file(sparse_source),
+    )
+  }
   // Create worktree directory
   fs.mkdir_p(abs_wt_path)
   // Create .git file in worktree
@@ -239,8 +251,13 @@ pub fn create_worktree(
   }
   // Checkout files to worktree
   match commit_id {
-    Some(id) if checkout_files =>
+    Some(id) if checkout_files => {
       checkout_to_worktree(fs, rfs, git_dir, abs_wt_path, admin_dir, id)
+      // Trim the fresh checkout to the inherited patterns.
+      if inherits_sparse && is_sparse_checkout_enabled(rfs, admin_dir) {
+        sparse_update_worktree(fs, rfs, abs_wt_path)
+      }
+    }
     _ => ()
   }
 }
