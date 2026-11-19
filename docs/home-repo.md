@@ -167,6 +167,7 @@ clone されていないリポジトリには `missing (run bit home sync <name>
 
 - `<name>` をカンマ区切りで並べると、同じ `<feature>` の worktree を複数のリポジトリにまとめて作ります（複数リポジトリにまたがる機能）。
 - `--all <feature>` は、マニフェストの全リポジトリが対象です。`wt remove --all <feature>` は、その worktree があるリポジトリだけから外します。
+- その worktree がすでにあるリポジトリは、そのままにして成功扱いにします（何度実行しても同じ結果になる）。
 - 一部のリポジトリで失敗しても残りは続け、最後に exit 128 で終わります。
 
 - 場所は `<path>/.worktrees/<feature>`、ブランチ名は `<feature>`。

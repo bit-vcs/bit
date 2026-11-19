@@ -881,9 +881,10 @@ async fn home_wt_add_one(
     return false
   }
   let wt = @home.worktree_path(abs, feature)
+  // Re-running is fine: an existing worktree for the feature is kept.
   if rfs.is_dir(wt) {
-    eprint_line("\{repo.name}: worktree already exists: \{contract_path_hq(wt)}")
-    return false
+    print_line("\{repo.name}: worktree \{contract_path_hq(wt)} already exists")
+    return true
   }
   home_exclude_worktrees_dir(fs, abs)
   let git_dir = @bitlib.resolve_common_git_dir(
