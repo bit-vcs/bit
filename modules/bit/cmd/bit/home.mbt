@@ -27,12 +27,19 @@ async fn print_home_usage() -> Unit {
     #|                        (the Home Repo itself included); --subdir entries
     #|                        are sparse checkouts of that directory
     #|  status [<name>...]    Branch / upstream / changes of every repository
-    #|  wt add <name> <feature> [--base <ref>]
-    #|                        Worktree for a feature inside the repository's clone
+    #|  wt add <name>[,<name>...] <feature> [--base <ref>]
+    #|  wt add --all <feature> [--base <ref>]
+    #|                        Worktree for a feature inside each repository's clone
     #|                        (<path>/.worktrees/<feature>, branch <feature>)
     #|  wt list [<name>...]   List worktrees
-    #|  wt remove <name> <feature> [--force]
-    #|                        Remove a feature worktree
+    #|  wt remove <name>[,<name>...] <feature> [--force]
+    #|  wt remove --all <feature> [--force]
+    #|                        Remove a feature worktree (--all: wherever it exists)
+    #|  exec [<name>...] [--home] [-q] -- <command> [<arg>...]
+    #|  exec [<name>...] [--home] [-q] -c '<shell command>'
+    #|                        Run a command in each cloned repository (cwd = clone;
+    #|                        BIT_HOME_REPO / BIT_HOME_REPO_PATH are set); exit 1
+    #|                        if it fails in any
     #|
     #|The Home Repo is found by walking up from the current directory to the
     #|first bit-home.toml (override with BIT_HOME_ROOT).
@@ -45,6 +52,9 @@ async fn print_home_usage() -> Unit {
     #|  bit home sync
     #|  bit home status
     #|  bit home wt add storefront checkout-redesign
+    #|  bit home wt add storefront,payments-api checkout-redesign
+    #|  bit home exec -- git log -1 --oneline
+    #|  bit home exec storefront payments-api -c 'make test'
   print_line(usage)
 }
 
@@ -63,6 +73,22 @@ fn home_cwd() -> String {
 ///|
 fn home_user_dir() -> String {
   @env.get_env_var("HOME").unwrap_or("/")
+}
+
+///|
+/// `$HOME/x` -> `~/x` (other paths unchanged).
+fn home_contract_user_dir(path : String) -> String {
+  let home = normalize_path(home_user_dir())
+  if home == "/" || home.length() == 0 {
+    return path
+  }
+  if path == home {
+    "~"
+  } else if path.has_prefix(home + "/") {
+    "~/" + path.unsafe_substring(start=home.length() + 1, end=path.length())
+  } else {
+    path
+  }
 }
 
 ///|
@@ -291,6 +317,9 @@ async fn handle_home_add(fs : OsFs, args : Array[String]) -> Unit raise Error {
     @sys.exit(129)
     return
   }
+  // A shell expands an unquoted `~/...`; store such paths as `~/...` again
+  // so the manifest stays shareable across machines and users.
+  let repo_path = home_contract_user_dir(repo_path)
   let repo : @home.HomeRepo = {
     name: name.unwrap_or(@home.path_basename(repo_path)),
     path: repo_path,
@@ -440,8 +469,8 @@ fn home_is_git_worktree(fs : OsFs, abs : String) -> Bool {
 async fn home_apply_sparse(abs : String, subdir : String) -> Bool {
   home_run_bit(["-C", abs, "sparse-checkout", "init", "--cone"]) ==
   0 &&
-  home_run_bit(["-C", abs, "sparse-checkout", "set", @home.sparse_pattern(subdir)]) ==
-  0
+  // Cone mode takes directories, not patterns: git rejects "/dir/".
+  home_run_bit(["-C", abs, "sparse-checkout", "set", "--", subdir]) == 0
 }
 
 ///|
@@ -520,8 +549,12 @@ async fn home_sync_one(
   // touched at all -- not even its sparse checkout.
   match home_tracked_changes(abs) {
     Some(n) if n > 0 => {
+      // Fetch anyway, so `status` reports how far behind it is.
+      let fetched = home_capture_trimmed(["-C", abs, "remote"]) is Some(_) &&
+        home_capture_bit(["-C", abs, "fetch", "-q"]).0 == 0
+      let note = if fetched { "fetched; " } else { "" }
       print_line(
-        "\{name}: \{n} local change(s); not updating (commit or stash first)",
+        "\{name}: \{n} local change(s); \{note}not updating the checkout (commit or stash first)",
       )
       return true
     }
@@ -696,25 +729,18 @@ async fn handle_home_wt(fs : OsFs, args : Array[String]) -> Unit raise Error {
   let rest = collect_args(args, 1)
   let root = require_home_root(fs)
   let manifest = load_home_manifest(fs, root)
-  let lookup = async fn(name : String) -> (@home.HomeRepo, String) raise Error {
-    let repos = home_select_repos(manifest, [name])
-    let repo = repos[0]
-    let abs = home_repo_abs(root, repo)
-    if !home_is_git_worktree(fs, abs) {
-      eprint_line("fatal: '\{name}' is not cloned yet (run `bit home sync \{name}`)")
-      @sys.exit(128)
-    }
-    (repo, abs)
-  }
   match sub {
     "add" => {
       let mut base : String? = None
+      let mut all = false
       let positional : Array[String] = []
       let mut i = 0
       while i < rest.length() {
         if rest[i] == "--base" && i + 1 < rest.length() {
           base = Some(rest[i + 1])
           i += 1
+        } else if rest[i] == "--all" {
+          all = true
         } else if rest[i].has_prefix("-") {
           eprint_line("fatal: unknown option '\{rest[i]}'")
           @sys.exit(129)
@@ -723,54 +749,20 @@ async fn handle_home_wt(fs : OsFs, args : Array[String]) -> Unit raise Error {
         }
         i += 1
       }
-      if positional.length() != 2 {
-        eprint_line("usage: bit home wt add <name> <feature> [--base <ref>]")
-        @sys.exit(129)
+      let (names, feature) = home_wt_targets(positional, all, "add", "[--base <ref>]")
+      let repos = home_select_repos(manifest, names)
+      let mut failed = 0
+      for repo in repos {
+        if !home_wt_add_one(fs, root, repo, feature, base) {
+          failed += 1
+        }
       }
-      let feature = positional[1]
-      if !@home.is_valid_feature_name(feature) {
-        eprint_line("fatal: invalid feature name '\{feature}'")
+      if failed > 0 {
+        if repos.length() > 1 {
+          eprint_line("bit home wt add: \{failed} of \{repos.length()} repositories failed")
+        }
         @sys.exit(128)
       }
-      let (repo, abs) = lookup(positional[0])
-      let wt = @home.worktree_path(abs, feature)
-      if rfs.is_dir(wt) {
-        eprint_line("fatal: worktree already exists: \{contract_path_hq(wt)}")
-        @sys.exit(128)
-      }
-      home_exclude_worktrees_dir(fs, abs)
-      let git_dir = @bitlib.resolve_common_git_dir(
-        rfs,
-        @bitlib.resolve_gitdir(rfs, abs + "/.git"),
-      )
-      let branch_exists = @bitlib.resolve_ref(
-          rfs,
-          git_dir,
-          "refs/heads/" + feature,
-        )
-        is Some(_)
-      let wt_args = ["-C", abs, "worktree", "add"]
-      if !branch_exists {
-        wt_args.push("-b")
-        wt_args.push(feature)
-      }
-      wt_args.push(wt)
-      if branch_exists {
-        wt_args.push(feature)
-      } else if base is Some(b) {
-        wt_args.push(b)
-      }
-      if home_run_bit(wt_args) != 0 {
-        eprint_line("fatal: worktree add failed")
-        @sys.exit(128)
-      }
-      if repo.subdir is Some(dir) {
-        // bit's sparse-checkout does not support linked worktrees yet.
-        eprint_line(
-          "note: the worktree is a full checkout (sparse checkout of \{dir}/ is not supported in linked worktrees yet)",
-        )
-      }
-      print_line("\{repo.name}: worktree \{contract_path_hq(wt)} on branch \{feature}")
     }
     "list" => {
       let names = rest.filter(a => !a.has_prefix("-"))
@@ -793,33 +785,258 @@ async fn handle_home_wt(fs : OsFs, args : Array[String]) -> Unit raise Error {
     }
     "remove" => {
       let force = rest.contains("--force") || rest.contains("-f")
+      let all = rest.contains("--all")
+      for a in rest {
+        if a.has_prefix("-") && a != "--force" && a != "-f" && a != "--all" {
+          eprint_line("fatal: unknown option '\{a}'")
+          @sys.exit(129)
+        }
+      }
       let positional = rest.filter(a => !a.has_prefix("-"))
-      if positional.length() != 2 {
-        eprint_line("usage: bit home wt remove <name> <feature> [--force]")
-        @sys.exit(129)
+      let (names, feature) = home_wt_targets(positional, all, "remove", "[--force]")
+      let repos = home_select_repos(manifest, names)
+      let mut failed = 0
+      let mut removed = 0
+      for repo in repos {
+        let abs = home_repo_abs(root, repo)
+        // With --all, only the repositories that have this worktree.
+        if all && !rfs.is_dir(@home.worktree_path(abs, feature)) {
+          continue
+        }
+        if home_wt_remove_one(fs, root, repo, feature, force) {
+          removed += 1
+        } else {
+          failed += 1
+        }
       }
-      let feature = positional[1]
-      if !@home.is_valid_feature_name(feature) {
-        eprint_line("fatal: invalid feature name '\{feature}'")
+      if all && removed == 0 && failed == 0 {
+        eprint_line("bit home wt remove: no repository has a worktree '\{feature}'")
         @sys.exit(128)
       }
-      let (repo, abs) = lookup(positional[0])
-      let wt = @home.worktree_path(abs, feature)
-      let rm_args = ["-C", abs, "worktree", "remove"]
-      if force {
-        rm_args.push("--force")
-      }
-      rm_args.push(wt)
-      if home_run_bit(rm_args) != 0 {
-        eprint_line("fatal: worktree remove failed")
+      if failed > 0 {
         @sys.exit(128)
       }
-      print_line("\{repo.name}: removed worktree \{feature}")
     }
     _ => {
       eprint_line("bit home wt: unknown subcommand '\{sub}'")
       @sys.exit(129)
     }
+  }
+}
+
+///|
+/// `wt add|remove` targets: `<name>[,<name>...] <feature>`, or
+/// `--all <feature>` for every repository in the manifest.
+async fn home_wt_targets(
+  positional : Array[String],
+  all : Bool,
+  sub : String,
+  options : String,
+) -> (Array[String], String) {
+  let usage = "usage: bit home wt \{sub} <name>[,<name>...] <feature> \{options}\n" +
+    "   or: bit home wt \{sub} --all <feature> \{options}"
+  let (names, feature) = if all {
+    if positional.length() != 1 {
+      eprint_line(usage)
+      @sys.exit(129)
+    }
+    ([], positional[0])
+  } else {
+    if positional.length() != 2 {
+      eprint_line(usage)
+      @sys.exit(129)
+    }
+    let names = positional[0]
+      .split(",")
+      .map(n => n.trim(chars=" ").to_owned())
+      .filter(n => n.length() > 0)
+      .to_array()
+    if names.length() == 0 {
+      eprint_line(usage)
+      @sys.exit(129)
+    }
+    (names, positional[1])
+  }
+  if !@home.is_valid_feature_name(feature) {
+    eprint_line("fatal: invalid feature name '\{feature}'")
+    @sys.exit(128)
+  }
+  (names, feature)
+}
+
+///|
+/// Create the `feature` worktree in one repository. Reports problems as
+/// `<name>: ...` and returns false instead of exiting.
+async fn home_wt_add_one(
+  fs : OsFs,
+  root : String,
+  repo : @home.HomeRepo,
+  feature : String,
+  base : String?,
+) -> Bool raise Error {
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let abs = home_repo_abs(root, repo)
+  if !home_is_git_worktree(fs, abs) {
+    eprint_line("\{repo.name}: not cloned yet (run `bit home sync \{repo.name}`)")
+    return false
+  }
+  let wt = @home.worktree_path(abs, feature)
+  if rfs.is_dir(wt) {
+    eprint_line("\{repo.name}: worktree already exists: \{contract_path_hq(wt)}")
+    return false
+  }
+  home_exclude_worktrees_dir(fs, abs)
+  let git_dir = @bitlib.resolve_common_git_dir(
+    rfs,
+    @bitlib.resolve_gitdir(rfs, abs + "/.git"),
+  )
+  let branch_exists = @bitlib.resolve_ref(rfs, git_dir, "refs/heads/" + feature)
+    is Some(_)
+  let wt_args = ["-C", abs, "worktree", "add"]
+  if !branch_exists {
+    wt_args.push("-b")
+    wt_args.push(feature)
+  }
+  wt_args.push(wt)
+  if branch_exists {
+    wt_args.push(feature)
+  } else if base is Some(b) {
+    wt_args.push(b)
+  }
+  if home_run_bit(wt_args) != 0 {
+    eprint_line("\{repo.name}: worktree add failed")
+    return false
+  }
+  if repo.subdir is Some(dir) {
+    // bit's sparse-checkout does not support linked worktrees yet.
+    eprint_line(
+      "note: the worktree is a full checkout (sparse checkout of \{dir}/ is not supported in linked worktrees yet)",
+    )
+  }
+  print_line("\{repo.name}: worktree \{contract_path_hq(wt)} on branch \{feature}")
+  true
+}
+
+///|
+async fn home_wt_remove_one(
+  fs : OsFs,
+  root : String,
+  repo : @home.HomeRepo,
+  feature : String,
+  force : Bool,
+) -> Bool {
+  let abs = home_repo_abs(root, repo)
+  if !home_is_git_worktree(fs, abs) {
+    eprint_line("\{repo.name}: not cloned")
+    return false
+  }
+  let rm_args = ["-C", abs, "worktree", "remove"]
+  if force {
+    rm_args.push("--force")
+  }
+  rm_args.push(@home.worktree_path(abs, feature))
+  if home_run_bit(rm_args) != 0 {
+    eprint_line("\{repo.name}: worktree remove failed")
+    return false
+  }
+  print_line("\{repo.name}: removed worktree \{feature}")
+  true
+}
+
+///|
+/// `bit home exec [<name>...] [--home] [-q] -- <command> [<arg>...]` and
+/// `bit home exec [<name>...] [--home] [-q] -c '<shell command>'`: run a
+/// command in every cloned repository (cwd = its clone), one after another.
+/// BIT_HOME_REPO / BIT_HOME_REPO_PATH name the current repository. Fails
+/// (exit 1) when the command fails in any of them.
+async fn handle_home_exec(fs : OsFs, args : Array[String]) -> Unit raise Error {
+  let usage = "usage: bit home exec [<name>...] [--home] [-q] -- <command> [<arg>...]\n" +
+    "   or: bit home exec [<name>...] [--home] [-q] -c '<shell command>'"
+  let names : Array[String] = []
+  let mut include_home = false
+  let mut quiet = false
+  let mut shell_command : String? = None
+  let command : Array[String] = []
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "--" => {
+        for j in (i + 1)..<args.length() {
+          command.push(args[j])
+        }
+        break
+      }
+      "-c" if i + 1 < args.length() => {
+        shell_command = Some(args[i + 1])
+        i += 1
+      }
+      "--home" => include_home = true
+      "-q" | "--quiet" => quiet = true
+      _ if arg.has_prefix("-") => {
+        eprint_line("fatal: unknown option '\{arg}'")
+        eprint_line(usage)
+        @sys.exit(129)
+      }
+      _ => names.push(arg)
+    }
+    i += 1
+  }
+  let sh_args = match shell_command {
+    Some(cmd) if command.length() == 0 => ["-c", cmd]
+    None if command.length() > 0 => {
+      let a = ["-c", "exec \"$@\"", "bit-home-exec"]
+      a.append(command)
+      a
+    }
+    _ => {
+      eprint_line(usage)
+      @sys.exit(129)
+      []
+    }
+  }
+  let root = require_home_root(fs)
+  let manifest = load_home_manifest(fs, root)
+  let targets : Array[(String, String)] = []
+  if include_home {
+    targets.push(("(home)", root))
+  }
+  for repo in home_select_repos(manifest, names) {
+    targets.push((repo.name, home_repo_abs(root, repo)))
+  }
+  let failed : Array[String] = []
+  for target in targets {
+    let (name, abs) = target
+    if !home_is_git_worktree(fs, abs) {
+      eprint_line("== \{name}: skipped (not cloned; run `bit home sync \{name}`)")
+      continue
+    }
+    if !quiet {
+      print_line("== \{name} (\{contract_path_hq(abs)})")
+    }
+    let env : Map[String, String] = Map([])
+    env["BIT_HOME_REPO"] = name
+    env["BIT_HOME_REPO_PATH"] = abs
+    let code = @process.run(
+      "/bin/sh",
+      sh_args[:],
+      extra_env=env,
+      inherit_env=true,
+      stdin=Stdin,
+      stdout=Stdout,
+      stderr=Stderr,
+      cwd=abs,
+    ).exit_code catch {
+      _ => 127
+    }
+    if code != 0 {
+      eprint_line("== \{name}: exit \{code}")
+      failed.push(name)
+    }
+  }
+  if failed.length() > 0 {
+    eprint_line("bit home exec: failed in \{failed.join(", ")}")
+    @sys.exit(1)
   }
 }
 
@@ -841,6 +1058,7 @@ async fn handle_home(args : Array[String]) -> Unit raise Error {
     "sync" => handle_home_sync(fs, rest)
     "status" => handle_home_status(fs, rest)
     "wt" | "worktree" => handle_home_wt(fs, rest)
+    "exec" => handle_home_exec(fs, rest)
     other => {
       eprint_line("bit home: unknown subcommand '\{other}'")
       print_home_usage()
