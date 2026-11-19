@@ -142,16 +142,24 @@ fn sparse_enable_worktree_config(
   rfs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Unit raise @bit.GitError {
-  let config_path = join_path(git_dir, "config")
+  // The extension lives in the repository's shared config: for a linked
+  // worktree that is the common dir's, not `.git/worktrees/<id>/config`
+  // (which git never reads). Only the main worktree's sparseCheckout goes
+  // there too; a linked worktree keeps it in its own config.worktree so the
+  // main worktree is not made sparse.
+  let common_dir = resolve_common_git_dir(rfs, git_dir)
+  let linked = normalize_path(common_dir) != normalize_path(git_dir)
+  let config_path = join_path(common_dir, "config")
   let config = sparse_read_or_default_config(rfs, config_path)
+  let with_version = sparse_upsert_section_value(
+    config, "core", "repositoryformatversion", "1",
+  )
   let config_with_extension = sparse_upsert_section_bool(
-    sparse_upsert_core_bool(
-      sparse_upsert_section_value(
-        config, "core", "repositoryformatversion", "1",
-      ),
-      "sparseCheckout",
-      true,
-    ),
+    if linked {
+      with_version
+    } else {
+      sparse_upsert_core_bool(with_version, "sparseCheckout", true)
+    },
     "extensions",
     "worktreeConfig",
     true,
@@ -483,7 +491,8 @@ pub fn sparse_checkout_init(
   update_worktree? : Bool = true,
 ) -> Unit raise @bit.GitError {
   let git_dir = resolve_root_git_dir(rfs, root)
-  let config_path = join_path(git_dir, "config")
+  // extensions.worktreeConfig belongs in the shared (common dir) config.
+  let config_path = join_path(resolve_common_git_dir(rfs, git_dir), "config")
   let config = sparse_read_or_default_config(rfs, config_path)
   let updated = sparse_upsert_section_bool(
     sparse_upsert_section_value(config, "core", "repositoryformatversion", "1"),
