@@ -575,7 +575,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         config_path_override is None &&
         !global_mode &&
         !system_mode &&
-        !local_mode
+        !local_mode &&
+        !worktree_mode
       let mut found = false
       if need_multi_source {
         let rfs4 : &@bitcore.RepoFileSystem = fs
@@ -676,20 +677,76 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
             found = true
           }
         }
-      } else if fs.is_file(config_path) {
-        found = get_regexp_config(
-          fs,
-          config_path,
-          k,
-          vp,
-          fixed_value_mode,
-          get_bool,
-          get_int,
-          name_only,
-          null_terminator,
-          scope=regexp_scope,
-          origin=regexp_origin,
-        )
+        // Worktree (extensions.worktreeConfig), read after the local file
+        if @env.get_env_var("GIT_CONFIG") is None {
+          match config_worktree_layer_path(rfs4) {
+            Some(wt_path) => {
+              let sc = if show_scope { "worktree" } else { "" }
+              let or_ = if show_origin {
+                "file:" + quote_origin_path(make_relative_to_cwd(wt_path))
+              } else {
+                ""
+              }
+              if get_regexp_config(
+                  fs,
+                  wt_path,
+                  k,
+                  vp,
+                  fixed_value_mode,
+                  get_bool,
+                  get_int,
+                  name_only,
+                  null_terminator,
+                  scope=sc,
+                  origin=or_,
+                ) {
+                found = true
+              }
+            }
+            None => ()
+          }
+        }
+      } else {
+        if fs.is_file(config_path) {
+          found = get_regexp_config(
+            fs,
+            config_path,
+            k,
+            vp,
+            fixed_value_mode,
+            get_bool,
+            get_int,
+            name_only,
+            null_terminator,
+            scope=regexp_scope,
+            origin=regexp_origin,
+          )
+        }
+        // Without an explicit scope or file, the per-worktree layer follows.
+        if config_path_override is None &&
+          !global_mode &&
+          !system_mode &&
+          !local_mode &&
+          !worktree_mode &&
+          @env.get_env_var("GIT_CONFIG") is None {
+          match config_worktree_layer_path(fs) {
+            Some(wt_path) =>
+              if get_regexp_config(
+                  fs,
+                  wt_path,
+                  k,
+                  vp,
+                  fixed_value_mode,
+                  get_bool,
+                  get_int,
+                  name_only,
+                  null_terminator,
+                ) {
+                found = true
+              }
+            None => ()
+          }
+        }
       }
       if !found {
         @sys.exit(1)
