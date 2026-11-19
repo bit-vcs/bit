@@ -939,7 +939,20 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
         print_line("Preparing worktree (checking out '\{spec}')")
       _ => print_line("Preparing worktree (HEAD)")
     }
-    print_line("HEAD is now at \{wt_path}")
+    // git: "HEAD is now at <abbrev> <subject>" for the new worktree's HEAD.
+    let new_git_dir = resolve_git_dir(fs, resolved_wt_path)
+    match @bitlib.resolve_head_commit(fs, new_git_dir) {
+      Some(commit_id) => {
+        let short_id = String::unsafe_substring(
+          commit_id.to_hex(),
+          start=0,
+          end=7,
+        )
+        let subject = reset_commit_subject_bytes(fs, common_git_dir, commit_id)
+        reset_print_hard_reset_message(short_id, subject)
+      }
+      None => ()
+    }
   }
 }
 
