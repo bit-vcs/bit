@@ -86,6 +86,8 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   let mut graph = false
   let mut no_walk = false
   let mut maximal_only = false
+  let mut missing_action = ""
+  let mut missing_only = false
   let refs : Array[String] = []
   let excludes : Array[String] = []
   let symmetric_ranges : Array[(String, String)] = []
@@ -107,6 +109,13 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       }
       "--count" => count_only = true
       "--objects" | "--objects-edge" => objects = true
+      "--missing-only" => missing_only = true
+      _ if arg.has_prefix("--missing=") => {
+        let value = arg.unsafe_substring(start=10, end=arg.length())
+        if rev_list_missing_action_valid(value) {
+          missing_action = value
+        }
+      }
       "--indexed-objects" => indexed_objects = true
       "--quiet" | "-q" => quiet = true
       "--reverse" => reverse = true
@@ -526,6 +535,31 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       }
     }
   }
+  if missing_only && missing_action != "print" && missing_action != "print-info" {
+    eprint_line(
+      "fatal: --missing-only requires --missing=print or --missing=print-info",
+    )
+    @sys.exit(128)
+  }
+  if missing_only {
+    let other = if count_only {
+      Some("--count")
+    } else if args.iter().any(a => a == "--disk-usage" ||
+        a.has_prefix("--disk-usage=")) {
+      Some("--disk-usage")
+    } else {
+      None
+    }
+    match other {
+      Some(opt) => {
+        eprint_line(
+          "fatal: options '--missing-only' and '\{opt}' cannot be used together",
+        )
+        @sys.exit(128)
+      }
+      None => ()
+    }
+  }
   // Note: --exclude patterns are applied at the point of ref addition
   // (--all, --branches, --tags, --remotes, --glob) so no post-filter needed
   // If no refs specified and no explicit ref source was given, default to HEAD
@@ -545,37 +579,122 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     rev_list_test_bitmap(fs, git_dir)
     return
   }
-  // Resolve starting commits (deduplicate)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  let missing = RevListMissing::new(missing_action)
+  // Resolve starting points (deduplicate). Tags are peeled; with --objects
+  // the tags and any tree/blob tips are listed as objects too, in command
+  // line order, ahead of the objects reached from commits (as git does).
   let start_ids : Array[@bitcore.ObjectId] = []
   let start_seen : Map[String, Bool] = Map([])
+  let tip_objects : Array[(@bitcore.ObjectId, String)] = []
   for spec in refs {
-    match @bitrepo.rev_parse(fs, git_dir, spec) {
-      Some(id) => {
-        let hex = id.to_hex()
-        if id != @bitcore.ObjectId::zero() && !start_seen.contains(hex) {
-          start_seen[hex] = true
-          start_ids.push(id)
-        }
-      }
+    let resolved = match @bitrepo.rev_parse(fs, git_dir, spec) {
+      Some(id) => Some(id)
       // Peeling (`<rev>^{<type>}`) needs the object itself: like git, a
       // peel that cannot be resolved (e.g. a missing promisor object) is
       // a bad revision rather than an empty walk.
       None if spec.contains("^{") => {
         eprint_line("fatal: bad revision '\{spec}'")
         @sys.exit(128)
+        None
       }
-      None => ()
+      None if missing.active() && looks_like_object_id(spec) => {
+        missing.note_tip(@bitcore.ObjectId::from_hex(spec))
+        None
+      }
+      None => None
+    }
+    guard resolved is Some(tip) && tip != @bitcore.ObjectId::zero() else {
+      continue
+    }
+    let tip_path = match spec.find(":") {
+      Some(colon) => spec.unsafe_substring(start=colon + 1, end=spec.length())
+      None => ""
+    }
+    let mut cur = tip
+    let mut peel_depth = 0
+    while peel_depth < 32 {
+      peel_depth += 1
+      if missing.active() && !rev_list_object_exists(db, fs, cur) {
+        missing.note_tip(cur)
+        break
+      }
+      let obj = db.get(fs, cur) catch { _ => None }
+      match obj {
+        Some(o) if o.obj_type == @bitcore.ObjectType::Tag => {
+          if objects {
+            tip_objects.push((cur, spec))
+          }
+          let target = @bitlib.parse_tag_object(@utf8.decode_lossy(o.data[:])) catch {
+            _ => None
+          }
+          match target {
+            Some(t) => cur = t
+            None => break
+          }
+        }
+        Some(o) if o.obj_type == @bitcore.ObjectType::Tree ||
+          o.obj_type == @bitcore.ObjectType::Blob => {
+          if objects {
+            tip_objects.push((cur, tip_path))
+          }
+          break
+        }
+        _ => {
+          let hex = cur.to_hex()
+          if !start_seen.contains(hex) {
+            start_seen[hex] = true
+            start_ids.push(cur)
+          }
+          break
+        }
+      }
     }
   }
-  // Resolve exclude commits
-  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  match missing.fatal {
+    Some(msg) => {
+      eprint_line("fatal: \{msg}")
+      @sys.exit(128)
+    }
+    None => ()
+  }
+  // Resolve exclusions: commits exclude their history; with --objects an
+  // excluded tree or blob also excludes the objects it reaches.
   let exclude_ids : Map[String, Bool] = Map([])
+  let uninteresting_objects : Map[String, Bool] = Map([])
   for spec in excludes {
-    match @bitrepo.rev_parse(fs, git_dir, spec) {
-      Some(id) =>
+    guard @bitrepo.rev_parse(fs, git_dir, spec) is Some(id) else { continue }
+    let mut cur = id
+    let mut peel_depth = 0
+    while peel_depth < 32 {
+      peel_depth += 1
+      let obj = db.get(fs, cur) catch { _ => None }
+      match obj {
+        Some(o) if o.obj_type == @bitcore.ObjectType::Tag => {
+          let target = @bitlib.parse_tag_object(@utf8.decode_lossy(o.data[:])) catch {
+            _ => None
+          }
+          match target {
+            Some(t) => cur = t
+            None => break
+          }
+        }
+        Some(o) if o.obj_type == @bitcore.ObjectType::Tree => {
+          if objects {
+            rev_list_mark_tree_uninteresting(db, fs, cur, uninteresting_objects)
+          }
+          break
+        }
+        Some(o) if o.obj_type == @bitcore.ObjectType::Blob => {
+          uninteresting_objects[cur.to_hex()] = true
+          break
+        }
         // Walk the exclude commit and all its ancestors
-        walk_commits_to_map(db, fs, id, exclude_ids)
-      None => ()
+        _ => {
+          walk_commits_to_map(db, fs, cur, exclude_ids)
+          break
+        }
+      }
     }
   }
   for pair in symmetric_ranges {
@@ -628,6 +747,10 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       continue
     }
     visited[hex] = true
+    if missing.active() && !rev_list_object_exists(db, fs, id) {
+      missing.note(fs, git_dir, db, id, "", "commit")
+      continue
+    }
     result.push(id)
     // Get commit and add parents
     match rev_list_load_commit_info(db, fs, id) {
@@ -646,6 +769,34 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
           }
         }
       _ => ()
+    }
+  }
+  match missing.fatal {
+    Some(msg) => {
+      eprint_line("fatal: \{msg}")
+      @sys.exit(128)
+    }
+    None => ()
+  }
+  // --objects leaves out what the excluded side already has: the trees of
+  // excluded parents of walked commits (git's mark_edges_uninteresting).
+  if objects && exclude_ids.length() > 0 {
+    for id in result {
+      match rev_list_commit_parents(db, fs, id) {
+        Some(parent_ids) =>
+          for p in parent_ids {
+            if exclude_ids.contains(p.to_hex()) {
+              match rev_list_commit_tree(db, fs, p) {
+                Some(tree) =>
+                  rev_list_mark_tree_uninteresting(
+                    db, fs, tree, uninteresting_objects,
+                  )
+                None => ()
+              }
+            }
+          }
+        None => ()
+      }
     }
   }
   // Negative values mean infinity (no limit)
@@ -779,6 +930,31 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   let indexed_path_ids : Map[String, String] = Map([])
   if objects {
     let object_seen : Map[String, Bool] = Map([])
+    for hex, _ in uninteresting_objects {
+      object_seen[hex] = true
+    }
+    for item in tip_objects {
+      let (id, name) = item
+      let obj = db.get(fs, id) catch { _ => None }
+      match obj {
+        Some(o) if o.obj_type == @bitcore.ObjectType::Tree =>
+          collect_tree_objects(
+            db,
+            fs,
+            id,
+            object_ids,
+            object_seen,
+            parent_path=name,
+            missing~,
+            git_dir~,
+          )
+        _ =>
+          if !object_seen.contains(id.to_hex()) {
+            object_seen[id.to_hex()] = true
+            object_ids.push(item)
+          }
+      }
+    }
     let indexed_visible_objects = if indexed_objects {
       let index_entries = @bitlib.read_index_entries(fs, git_dir) catch {
         _ => []
@@ -802,7 +978,15 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
               db, fs, tree, object_ids, object_seen, indexed_path_ids,
             )
           } else {
-            collect_tree_objects(db, fs, tree, object_ids, object_seen)
+            collect_tree_objects(
+              db,
+              fs,
+              tree,
+              object_ids,
+              object_seen,
+              missing~,
+              git_dir~,
+            )
           }
         None => ()
       }
@@ -817,6 +1001,13 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       }
     }
   }
+  match missing.fatal {
+    Some(msg) => {
+      eprint_line("fatal: \{msg}")
+      @sys.exit(128)
+    }
+    None => ()
+  }
   // Output
   if count_only {
     if objects {
@@ -829,6 +1020,11 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   }
   if quiet {
     return
+  }
+  // --missing-only lists nothing but the missing objects.
+  if missing_only {
+    sliced_result.clear()
+    object_ids.clear()
   }
   // Output commits
   match format {
@@ -953,6 +1149,9 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
         }
       }
     }
+  }
+  if missing.collects() {
+    missing.print(use_nul, missing_only)
   }
   ignore(boundary)
 }
@@ -1345,12 +1544,18 @@ fn collect_tree_objects(
   out : Array[(@bitcore.ObjectId, String)],
   visited : Map[String, Bool],
   parent_path? : String = "",
+  missing? : RevListMissing = RevListMissing::new(""),
+  git_dir? : String = "",
 ) -> Unit {
   let hex = tree_id.to_hex()
   if visited.contains(hex) {
     return ()
   }
   visited[hex] = true
+  if missing.active() && !rev_list_object_exists(db, fs, tree_id) {
+    missing.note(fs, git_dir, db, tree_id, parent_path, "tree")
+    return ()
+  }
   out.push((tree_id, parent_path))
   let obj = db.get(fs, tree_id) catch { _ => return () }
   match obj {
@@ -1373,11 +1578,19 @@ fn collect_tree_objects(
               out,
               visited,
               parent_path=entry_path,
+              missing~,
+              git_dir~,
             )
           } else {
             // File or other
             visited[entry_hex] = true
-            out.push((entry.id, entry_path))
+            if missing.active() &&
+              entry.mode != "160000" &&
+              !rev_list_object_exists(db, fs, entry.id) {
+              missing.note(fs, git_dir, db, entry.id, entry_path, "blob")
+            } else {
+              out.push((entry.id, entry_path))
+            }
           }
         }
       }
