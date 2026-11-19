@@ -617,7 +617,20 @@ async fn checkout_with_promisor_retry(
   }
   let mut promisor_db : @bitlib.PromisorDb? = None
   let mut wrote_trace_round = false
-  match resolved_target {
+  // Like git, fetch every missing blob the checkout needs (within the
+  // sparse cone) in one batch before writing the worktree.
+  let prefetch_blobs_for = match resolved_target {
+    Some(id) => Some(id)
+    None =>
+      if @bitlib.is_partial_clone(fs, git_dir) {
+        @bitrepo.rev_parse(fs, git_dir, checkout_spec) catch {
+          _ => None
+        }
+      } else {
+        None
+      }
+  }
+  match prefetch_blobs_for {
     Some(target_id) => {
       let pdb = @bitlibnative.native_promisor_db(fs, git_dir)
       if pdb.has_promisor() {
@@ -754,8 +767,17 @@ fn collect_missing_checkout_blob_ids(
   }
   let missing : Array[@bitcore.ObjectId] = []
   let seen : Map[String, Bool] = Map([])
-  for entry in files.values() {
+  let sparse_patterns = if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+    Some(@bitlib.read_sparse_patterns(fs, git_dir))
+  } else {
+    None
+  }
+  for path, entry in files {
     if entry.mode == 0o160000 {
+      continue
+    }
+    if sparse_patterns is Some(patterns) &&
+      !@bitlib.matches_sparse_pattern(path, patterns) {
       continue
     }
     let hex = entry.id.to_hex()

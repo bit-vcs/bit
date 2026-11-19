@@ -122,11 +122,37 @@ pub async fn PromisorDb::fetch_missing(
     Ok(objs) => objs
     Err(e) => raise e
   }
-  // Write to local storage
-  for obj in objects {
-    let _ = write_loose_object(write_fs, self.git_dir, obj.obj_type, obj.data)
+  // Store them like git's lazy fetch: one pack marked as a promisor pack.
+  if objects.length() > 0 && !write_promisor_pack(write_fs, self.git_dir, objects) {
+    for obj in objects {
+      let _ = write_loose_object(write_fs, self.git_dir, obj.obj_type, obj.data)
+    }
   }
   objects
+}
+
+///|
+/// Write `objects` as `objects/pack/pack-<id>.{pack,idx,promisor}`.
+/// Returns false when the pack could not be written.
+fn write_promisor_pack(
+  write_fs : &@bit.FileSystem,
+  git_dir : String,
+  objects : Array[@bit.PackObject],
+) -> Bool {
+  try {
+    let pack = @pack.create_packfile(objects)
+    let parsed = @pack.parse_packfile(pack)
+    @pack.write_packfile_with_index(write_fs, git_dir, pack, parsed)
+    let start = pack.length() - 20
+    let pack_id = @bit.ObjectId::new(FixedArray::makei(20, i => pack[start + i]))
+    write_fs.write_file(
+      @bit.join_path(git_dir, "objects/pack/pack-\{pack_id.to_hex()}.promisor"),
+      b"",
+    )
+    true
+  } catch {
+    _ => false
+  }
 }
 
 ///|

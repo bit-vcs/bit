@@ -739,6 +739,21 @@ async fn scalar_capture_bit(args : Array[String]) -> (Int, String) {
 }
 
 ///|
+/// The branch the remote's HEAD points at, without diagnostics.
+async fn scalar_remote_head_branch_quiet(url : String) -> String? {
+  let (code, out) = scalar_capture_bit(["ls-remote", "--symref", url, "HEAD"])
+  guard code == 0 else { return None }
+  for line_view in out.split("\n") {
+    let line = line_view.to_owned()
+    guard line.has_prefix("ref: refs/heads/") && line.has_suffix("\tHEAD") else {
+      continue
+    }
+    return Some(line.unsafe_substring(start=16, end=line.length() - 5))
+  }
+  None
+}
+
+///|
 /// The branch the remote's HEAD points at (`ls-remote --symref <url> HEAD`),
 /// like git's scalar remote_default_branch().
 async fn scalar_remote_default_branch(url : String) -> String? {
@@ -839,9 +854,13 @@ async fn scalar_handle_clone(
   let progress = if show_progress { "--progress" } else { "--no-progress" }
   let fail = fn(code : Int) { if code != 0 { @sys.exit(code) } }
   fail(scalar_run_bit(["init", "--", dir]))
+  let remote_head = match parsed.branch {
+    Some(_) => scalar_remote_head_branch_quiet(url)
+    None => scalar_remote_default_branch(url)
+  }
   let branch = match parsed.branch {
     Some(b) => Some(b)
-    None => scalar_remote_default_branch(url)
+    None => remote_head
   }
   let branch = match branch {
     Some(b) => {
@@ -894,6 +913,28 @@ async fn scalar_handle_clone(
       ]),
     )
     fail(scalar_run_bit_in(dir, ["fetch", "--quiet", "origin"]))
+  }
+  // git's fetch (remote.origin.followRemoteHEAD defaults to "create")
+  // records the remote's HEAD as refs/remotes/origin/HEAD when that branch
+  // was fetched; bit's fetch does not, so do it here.
+  match remote_head {
+    Some(head) => {
+      let target = "refs/remotes/origin/" + head
+      let (has_head, _) = scalar_capture_bit([
+        "-C", dir, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/HEAD",
+      ])
+      let (has_target, _) = scalar_capture_bit([
+        "-C", dir, "rev-parse", "--verify", "--quiet", target,
+      ])
+      if has_head != 0 && has_target == 0 {
+        ignore(
+          scalar_run_bit_in(dir, [
+            "symbolic-ref", "refs/remotes/origin/HEAD", target,
+          ]),
+        )
+      }
+    }
+    None => ()
   }
   scalar_set_config(dir, "branch.\{branch}.remote", "origin")
   scalar_set_config(dir, "branch.\{branch}.merge", "refs/heads/\{branch}")
