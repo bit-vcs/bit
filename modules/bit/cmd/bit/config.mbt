@@ -375,7 +375,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
       config_path_override is None &&
       !global_mode &&
       !system_mode &&
-      !local_mode
+      !local_mode &&
+      !worktree_mode
     if need_multi_source {
       // Multi-source list with scope/origin prefix
       let rfs3 : &@bitcore.RepoFileSystem = fs
@@ -439,6 +440,19 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         }
         list_config(fs, local_path, name_only, null_terminator, scope~, origin~)
       }
+      // Worktree (extensions.worktreeConfig), read after the local file
+      match config_worktree_layer_path(rfs3) {
+        Some(wt_path) => {
+          let scope = if show_scope { "worktree" } else { "" }
+          let origin = if show_origin {
+            "file:" + quote_origin_path(make_relative_to_cwd(wt_path))
+          } else {
+            ""
+          }
+          list_config(fs, wt_path, name_only, null_terminator, scope~, origin~)
+        }
+        None => ()
+      }
       return
     }
     if config_path == "-" {
@@ -476,6 +490,27 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         ""
       }
       list_config(fs, config_path, name_only, null_terminator, scope~, origin~)
+      // Without an explicit scope or file, the per-worktree layer follows.
+      if config_path_override is None &&
+        !global_mode &&
+        !system_mode &&
+        !local_mode &&
+        !worktree_mode &&
+        @env.get_env_var("GIT_CONFIG") is None {
+        match config_worktree_layer_path(fs) {
+          Some(wt_path) => {
+            let wt_scope = if show_scope { "worktree" } else { "" }
+            list_config(
+              fs,
+              wt_path,
+              name_only,
+              null_terminator,
+              scope=wt_scope,
+            )
+          }
+          None => ()
+        }
+      }
     } else if config_path_override is Some(_) {
       @sys.exit(1)
     }
