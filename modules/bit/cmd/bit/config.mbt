@@ -476,8 +476,6 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
           "global"
         } else if system_mode {
           "system"
-        } else if worktree_mode {
-          "worktree"
         } else if local_mode || config_path_override is None {
           "local"
         } else {
