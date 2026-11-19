@@ -90,10 +90,18 @@ jobs:
             sha256sum "$f" > "$f.sha256"
           done
 
+      # docs/releases/<tag>.md, when present, becomes the release body
+      # (GitHub's generated notes are appended after it).
+      - name: Release notes
+        run: |
+          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          if [ -f "$notes" ]; then cp "$notes" release-body.md; else : > release-body.md; fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: release/*
+          body_path: release-body.md
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, '-') }}
