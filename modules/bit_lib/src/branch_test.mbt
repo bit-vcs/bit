@@ -536,3 +536,12 @@ test "branch: create_annotated_tag uses storage hash and records compat mapping"
   assert_true(compat is Some(_))
   assert_true(compat.unwrap().length() == 40)
 }
+
+///|
+test "branch: rename_branch renames the unborn current branch" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/master\n")
+  @bit_lib.rename_branch(fs, fs, "/repo", "master", "base")
+  assert_eq(fs.read_string("/repo/.git/HEAD"), "ref: refs/heads/base\n")
+  assert_true(!fs.is_file("/repo/.git/refs/heads/base"))
+}

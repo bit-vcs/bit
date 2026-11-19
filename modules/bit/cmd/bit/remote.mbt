@@ -3129,11 +3129,26 @@ async fn fetch_from_remote(
     }
   }
   let transport = resolve_upload_pack_transport(remote_url)
-  let (refs, _caps, _version, symrefs) = match transport {
+  let (refs, caps, version, symrefs) = match transport {
     UploadPackTransport::Http =>
       @bitnative.discover_upload_refs_http(remote_url, true)
     UploadPackTransport::Process =>
       @bitnative.discover_upload_refs_process(remote_url, true)
+  }
+  let mut filter = filter
+  if filter.is_partial() && !clone_remote_supports_filter(caps, version) {
+    @stdio.stderr.write(
+      @utf8.encode("warning: filtering not recognized by server, ignoring\n"),
+    )
+    filter = @protocol.FilterSpec::NoFilter
+  }
+  if explicit_refspecs.length() == 0 &&
+    depth == 0 &&
+    !unshallow &&
+    fetch_transport_configured_refs(
+      fs, git_dir, remote_name, remote_url, transport, refs, filter, quiet,
+    ) {
+    return ()
   }
   let default_ref = @protocol.select_default_ref(refs, symrefs)
   match default_ref {
@@ -3245,6 +3260,134 @@ async fn fetch_from_remote(
       }
     }
   }
+}
+
+///|
+/// Fetch every advertised ref the remote's configured fetch refspecs map,
+/// in one pack. Returns false (doing nothing) when no configured refspec
+/// maps an advertised ref, leaving the caller's default-ref fetch.
+async fn fetch_transport_configured_refs(
+  fs : OsFs,
+  git_dir : String,
+  remote_name : String,
+  remote_url : String,
+  transport : UploadPackTransport,
+  refs : Array[(@bitcore.ObjectId, String)],
+  filter : @protocol.FilterSpec,
+  quiet : Bool,
+) -> Bool raise Error {
+  let (remotes, _) = @bitlib.read_repo_config(fs, git_dir)
+  guard remotes.get(remote_name) is Some(rc) else { return false }
+  let specs = parse_fetch_refspecs_with_force(rc.fetch)
+  // (remote refname, local ref, id, previous local id)
+  let targets : Array[(String, String, @bitcore.ObjectId, @bitcore.ObjectId?)] = []
+  let seen_dst : Map[String, Bool] = Map([])
+  for entry in refs {
+    let (id, refname) = entry
+    guard refname.has_prefix("refs/") && !refname.has_suffix("^{}") else {
+      continue
+    }
+    let excluded = specs.iter().any(e => {
+      e.0.negative && @bitlib.refspec_capture(e.0.src, refname) is Some(_)
+    })
+    if excluded {
+      continue
+    }
+    for e in specs {
+      let spec = e.0
+      if spec.negative || spec.dst.length() == 0 {
+        continue
+      }
+      match @bitlib.refspec_map_dst(spec.src, spec.dst, refname) {
+        Some(dst) if dst.has_prefix("refs/") && !seen_dst.contains(dst) => {
+          seen_dst[dst] = true
+          let prev = @bitlib.resolve_ref(fs, git_dir, dst) catch { _ => None }
+          targets.push((refname, dst, id, prev))
+          break
+        }
+        _ => ()
+      }
+    }
+  }
+  if targets.length() == 0 {
+    return false
+  }
+  let db = (@bitlib.ObjectDb::load(fs, git_dir) |> Some) catch { _ => None }
+  let wants : Array[@bitcore.ObjectId] = []
+  let haves : Array[@bitcore.ObjectId] = []
+  let want_seen : Map[String, Bool] = Map([])
+  for t in targets {
+    let (_, _, id, prev) = t
+    match prev {
+      Some(p) => if !haves.contains(p) { haves.push(p) }
+      None => ()
+    }
+    let present = match db {
+      Some(d) => (d.get(fs, id) catch { _ => None }) is Some(_)
+      None => false
+    }
+    if !present && !want_seen.contains(id.to_hex()) {
+      want_seen[id.to_hex()] = true
+      wants.push(id)
+    }
+  }
+  if wants.length() > 0 {
+    let shallow = @repo.read_shallow_boundaries(fs, git_dir)
+    let result = match transport {
+      UploadPackTransport::Http =>
+        @bitnative.fetch_pack_http_result(
+          remote_url,
+          wants,
+          true,
+          filter~,
+          haves~,
+          shallow~,
+        )
+      UploadPackTransport::Process =>
+        @bitnative.fetch_pack_process_result(
+          remote_url,
+          wants,
+          true,
+          filter~,
+          haves~,
+          shallow~,
+        )
+    }
+    let pack = result.pack
+    if pack.length() > 0 {
+      let objects = @pack.parse_packfile(pack)
+      @pack.write_packfile_with_index(fs, git_dir, pack, objects)
+      if filter.is_partial() || rc.promisor {
+        ensure_promisor_remote_file(fs, git_dir, remote_url)
+        let pack_id = read_pack_trailer_id(pack)
+        let (first_ref, _, first_id, _) = targets[0]
+        write_fetch_pack_promisor_marker(
+          fs, git_dir, pack_id, first_ref, first_id,
+        )
+      }
+    }
+  }
+  let mut printed_header = false
+  for t in targets {
+    let (refname, dst, id, prev) = t
+    if prev == Some(id) {
+      continue
+    }
+    write_ref_file(fs, git_dir, dst, id)
+    if quiet {
+      continue
+    }
+    if !printed_header {
+      print_line("From \{remote_url}")
+      printed_header = true
+    }
+    match prev {
+      None => print_line(" * [new branch] \{refname} -> \{dst}")
+      Some(pid) =>
+        print_line("   \{pid.to_hex()}..\{id.to_hex()}  \{refname} -> \{dst}")
+    }
+  }
+  true
 }
 
 ///|

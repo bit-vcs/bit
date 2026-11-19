@@ -925,6 +925,14 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
       }
     }
   }
+  // A full object name missing from a partial clone is fetched lazily
+  // from the promisor remote, as git does (unless GIT_NO_LAZY_FETCH).
+  if resolved_obj_id is None && !exists_check && looks_like_object_id(spec) {
+    let oid = @bitcore.ObjectId::from_hex(spec)
+    if cat_file_lazy_fetch(fs, git_dir, oid) {
+      resolved_obj_id = Some(oid)
+    }
+  }
   let dbs = cat_file_load_object_dbs(fs, git_dir)
   let db = dbs[0]
   if exists_check {
@@ -2929,4 +2937,31 @@ async fn cat_file_usage_fatal(message : String) -> Unit raise Error {
 async fn cat_file_usage_error(message : String) -> Unit raise Error {
   eprint_line("error: \{message}")
   @sys.exit(129)
+}
+
+///|
+/// Fetch `oid` from the promisor remote of a partial clone. Returns true
+/// when the object was fetched.
+async fn cat_file_lazy_fetch(
+  fs : OsFs,
+  git_dir : String,
+  oid : @bitcore.ObjectId,
+) -> Bool {
+  if @env.get_env_var("GIT_NO_LAZY_FETCH") is Some(v) &&
+    v != "0" &&
+    v.to_lower() != "false" {
+    return false
+  }
+  try {
+    if !@bitlib.is_partial_clone(fs, git_dir) {
+      return false
+    }
+    let pdb = @bitlibnative.native_promisor_db(fs, git_dir)
+    if !pdb.has_promisor() {
+      return false
+    }
+    pdb.fetch_missing(fs, [oid]).iter().any(o => o.id == oid)
+  } catch {
+    _ => false
+  }
 }

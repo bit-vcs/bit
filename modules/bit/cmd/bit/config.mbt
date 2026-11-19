@@ -759,6 +759,14 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
     return
   }
   if get_mode || value is None {
+    // A read without an explicit scope or file also sees the per-worktree
+    // config layer (extensions.worktreeConfig), which git reads last.
+    let default_scope_read = config_path_override is None &&
+      !global_mode &&
+      !system_mode &&
+      !local_mode &&
+      !worktree_mode &&
+      @env.get_env_var("GIT_CONFIG") is None
     // Compute scope/origin prefix for get value output
     let get_scope_prefix = if show_scope {
       let scope_name = if global_mode {
@@ -835,10 +843,22 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
             get_all_config_values_from_content(content, k, vp, fixed_value_mode)
           None => []
         }
-      } else if fs.is_file(config_path) {
-        get_all_config_values(fs, config_path, k, vp, fixed_value_mode)
       } else {
-        []
+        let values = if fs.is_file(config_path) {
+          get_all_config_values(fs, config_path, k, vp, fixed_value_mode)
+        } else {
+          []
+        }
+        if default_scope_read {
+          match config_worktree_layer_path(fs) {
+            Some(wt_path) =>
+              values.append(
+                get_all_config_values(fs, wt_path, k, vp, fixed_value_mode),
+              )
+            None => ()
+          }
+        }
+        values
       }
       if result.length() == 0 {
         match default_value {
@@ -913,11 +933,30 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
                 get_config_value_from_content(content, k, vp, fixed_value_mode)
               None => (None : String?)
             }
-          } else if fs.is_file(config_path) {
-            value_source = Some(config_path)
-            get_config_value(fs, config_path, k, vp, fixed_value_mode)
           } else {
-            (None : String?)
+            let wt_value = if default_scope_read {
+              match config_worktree_layer_path(fs) {
+                Some(wt_path) =>
+                  match get_config_value(fs, wt_path, k, vp, fixed_value_mode) {
+                    Some(v) => {
+                      value_source = Some(wt_path)
+                      Some(v)
+                    }
+                    None => None
+                  }
+                None => None
+              }
+            } else {
+              None
+            }
+            if wt_value is Some(_) {
+              wt_value
+            } else if fs.is_file(config_path) {
+              value_source = Some(config_path)
+              get_config_value(fs, config_path, k, vp, fixed_value_mode)
+            } else {
+              (None : String?)
+            }
           }
       }
       match result {
@@ -1803,6 +1842,26 @@ async fn print_config_list_entry(
     print_nul_terminated(prefix + full_key + "\n" + value)
   } else {
     print_line(prefix + full_key + "=" + value)
+  }
+}
+
+///|
+/// `$GIT_DIR/config.worktree` when the repository enables
+/// `extensions.worktreeConfig` and the file exists.
+fn config_worktree_layer_path(fs : &@bitcore.RepoFileSystem) -> String? {
+  let git_dir = resolve_git_dir(fs, get_work_root())
+  let common_config = resolve_common_git_dir(fs, git_dir) + "/config"
+  let enabled = get_config_value(
+    fs, common_config, "extensions.worktreeconfig", None, false,
+  ) catch {
+    _ => None
+  }
+  guard parse_config_bool_string(enabled) else { return None }
+  let path = git_dir + "/config.worktree"
+  if fs.is_file(path) {
+    Some(path)
+  } else {
+    None
   }
 }
 

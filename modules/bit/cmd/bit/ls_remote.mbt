@@ -6,6 +6,7 @@ async fn handle_ls_remote(args : Array[String]) -> Unit raise Error {
   let mut show_tags = false
   let mut show_refs_only = false
   let mut quiet = false
+  let mut show_symref = false
   let positional : Array[String] = []
   let mut i = 0
   while i < args.length() {
@@ -22,7 +23,8 @@ async fn handle_ls_remote(args : Array[String]) -> Unit raise Error {
         )
         return
       }
-      "--symref" | "--get-url" | "--sort" =>
+      "--symref" => show_symref = true
+      "--get-url" | "--sort" =>
         // silently skip unsupported flags that take no arg
         ()
       "--upload-pack" | "-u" | "--server-option" | "-o" => {
@@ -62,7 +64,7 @@ async fn handle_ls_remote(args : Array[String]) -> Unit raise Error {
     patterns.push(positional[j])
   }
   // Discover refs from remote
-  let (refs, _caps, _version, _symrefs) = @bitnative.discover_upload_refs_http(
+  let (refs, _caps, _version, symrefs) = @bitnative.discover_upload_refs_http(
     remote_url, true,
   )
   // Filter and print
@@ -95,6 +97,13 @@ async fn handle_ls_remote(args : Array[String]) -> Unit raise Error {
       }
       if !matched {
         continue
+      }
+    }
+    // --symref: the symbolic ref's target first, like git.
+    if show_symref {
+      match symrefs.get(refname) {
+        Some(target) => print_line("ref: \{target}\t\{refname}")
+        None => ()
       }
     }
     print_line("\{oid.to_hex()}\t\{refname}")
