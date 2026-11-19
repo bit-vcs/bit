@@ -28,14 +28,15 @@ async fn print_home_usage() -> Unit {
     #|                        Clone missing repositories, fast-forward the rest
     #|                        (the Home Repo itself included); --subdir entries
     #|                        are sparse checkouts of that directory
-    #|  status [<name>...] [--json]
+    #|  status [<name>...] [--json] [-j <n>]
     #|                        Branch / upstream / changes / worktrees of every repository
     #|  wt add <name>[,<name>...] <feature> [--base <ref>]
     #|  wt add --all <feature> [--base <ref>]
     #|                        Worktree for a feature inside each repository's clone
     #|                        (<path>/.worktrees/<feature>, branch <feature>)
     #|  wt list [<name>...] [--feature <f>] [--json]
-    #|                        List worktrees (--feature: only those on branch <f>)
+    #|                        List worktrees with their state (--feature: only
+    #|                        those on branch <f>)
     #|  wt remove <name>[,<name>...] <feature> [--force]
     #|  wt remove --all <feature> [--force]
     #|                        Remove a feature worktree (--all: wherever it exists)
@@ -875,6 +876,7 @@ async fn handle_home_sync(fs : OsFs, args : Array[String]) -> Unit raise Error {
 async fn handle_home_status(fs : OsFs, args : Array[String]) -> Unit raise Error {
   let root = require_home_root(fs)
   let manifest = load_home_manifest(fs, root)
+  let (jobs, args) = home_take_jobs(args)
   let json = args.contains("--json")
   for a in args {
     if a.has_prefix("-") && a != "--json" {
@@ -892,67 +894,103 @@ async fn handle_home_status(fs : OsFs, args : Array[String]) -> Unit raise Error
   for repo in repos {
     targets.push((repo.name, home_repo_abs(root, repo), repo.subdir))
   }
-  let rows : Array[(String, String, String)] = []
-  let records : Array[Json] = []
-  for target in targets {
-    let (name, abs, subdir) = target
-    let record : Map[String, Json] = Map([])
-    record["name"] = Json::string(name)
-    record["path"] = Json::string(abs)
-    record["sparse"] = home_json_opt(subdir)
-    let desc = if !fs.is_dir(abs) {
-      record["state"] = Json::string("missing")
-      "missing (run `bit home sync \{name}`)"
-    } else if !home_is_git_worktree(fs, abs) {
-      record["state"] = Json::string("not-a-repository")
-      "not a git repository"
-    } else {
-      match home_repo_status(abs) {
-        Some(st) => {
-          record["state"] = Json::string("ok")
-          record["branch"] = home_json_opt(st.branch)
-          record["upstream"] = home_json_opt(st.upstream)
-          record["ahead"] = Json::number(st.ahead.to_double())
-          record["behind"] = Json::number(st.behind.to_double())
-          record["changes"] = Json::number(st.changes.to_double())
-          let wts = home_worktrees(abs)
-          let linked : Array[Json] = []
-          for idx, wt in wts {
-            if idx == 0 {
-              continue
-            }
-            let w : Map[String, Json] = Map([])
-            w["path"] = Json::string(wt.0)
-            w["branch"] = home_json_opt(wt.1)
-            linked.push(Json::object(w))
-          }
-          record["worktrees"] = Json::array(linked)
-          let parts = [@home.describe_status(st)]
-          match subdir {
-            Some(d) => parts.push("sparse \{d}/")
-            None => ()
-          }
-          if linked.length() > 0 {
-            parts.push(
-              "\{linked.length()} worktree\{if linked.length() == 1 { "" } else { "s" }}",
-            )
-          }
-          parts.join(", ")
-        }
-        None => {
-          record["state"] = Json::string("error")
-          "could not read status"
-        }
-      }
-    }
-    records.push(Json::object(record))
-    rows.push((name, contract_path_hq(abs), desc))
-  }
+  let rows : Array[(String, String, String)] = Array::make(
+    targets.length(),
+    ("", "", ""),
+  )
+  let records : Array[Json] = Array::make(targets.length(), Json::null())
+  home_parallel(jobs, targets.length(), async fn(i) {
+    let (name, abs, subdir) = targets[i]
+    let (desc, record) = home_status_entry(fs, name, abs, subdir)
+    rows[i] = (name, contract_path_hq(abs), desc)
+    records[i] = record
+  })
   if json {
     print_line(Json::array(records).stringify())
     return
   }
   home_print_table(rows)
+}
+
+///|
+/// One `status` row: the description and its JSON record.
+async fn home_status_entry(
+  fs : OsFs,
+  name : String,
+  abs : String,
+  subdir : String?,
+) -> (String, Json) {
+  let record : Map[String, Json] = Map([])
+  record["name"] = Json::string(name)
+  record["path"] = Json::string(abs)
+  record["sparse"] = home_json_opt(subdir)
+  let desc = if !fs.is_dir(abs) {
+    record["state"] = Json::string("missing")
+    "missing (run `bit home sync \{name}`)"
+  } else if !home_is_git_worktree(fs, abs) {
+    record["state"] = Json::string("not-a-repository")
+    "not a git repository"
+  } else {
+    match home_repo_status(abs) {
+      Some(st) => {
+        record["state"] = Json::string("ok")
+        home_status_fields(record, st)
+        let linked : Array[Json] = []
+        for idx, wt in home_worktrees(abs) {
+          if idx == 0 {
+            continue
+          }
+          linked.push(home_worktree_record(name, wt.0, wt.1, false))
+        }
+        record["worktrees"] = Json::array(linked)
+        let parts = [@home.describe_status(st)]
+        match subdir {
+          Some(d) => parts.push("sparse \{d}/")
+          None => ()
+        }
+        if linked.length() > 0 {
+          parts.push(
+            "\{linked.length()} worktree\{if linked.length() == 1 { "" } else { "s" }}",
+          )
+        }
+        parts.join(", ")
+      }
+      None => {
+        record["state"] = Json::string("error")
+        "could not read status"
+      }
+    }
+  }
+  (desc, Json::object(record))
+}
+
+///|
+fn home_status_fields(record : Map[String, Json], st : @home.RepoStatus) -> Unit {
+  record["branch"] = home_json_opt(st.branch)
+  record["upstream"] = home_json_opt(st.upstream)
+  record["ahead"] = Json::number(st.ahead.to_double())
+  record["behind"] = Json::number(st.behind.to_double())
+  record["changes"] = Json::number(st.changes.to_double())
+}
+
+///|
+/// A worktree's JSON record, with its own status (changes, upstream).
+async fn home_worktree_record(
+  repo : String,
+  path : String,
+  branch : String?,
+  main : Bool,
+) -> Json {
+  let w : Map[String, Json] = Map([])
+  w["repo"] = Json::string(repo)
+  w["path"] = Json::string(path)
+  w["branch"] = home_json_opt(branch)
+  w["main"] = Json::boolean(main)
+  match home_repo_status(path) {
+    Some(st) => home_status_fields(w, st)
+    None => ()
+  }
+  Json::object(w)
 }
 
 ///|
@@ -1092,15 +1130,15 @@ async fn handle_home_wt(fs : OsFs, args : Array[String]) -> Unit raise Error {
           if feature is Some(f) && branch != Some(f) {
             continue
           }
-          let w : Map[String, Json] = Map([])
-          w["repo"] = Json::string(repo.name)
-          w["path"] = Json::string(path)
-          w["branch"] = home_json_opt(branch)
-          w["main"] = Json::boolean(idx == 0)
-          records.push(Json::object(w))
-          let label = match branch {
-            Some(b) => "[\{b}]"
-            None => "(detached)"
+          records.push(home_worktree_record(repo.name, path, branch, idx == 0))
+          // Each worktree's own state: changes and ahead / behind.
+          let label = match home_repo_status(path) {
+            Some(st) => @home.describe_status(st)
+            None =>
+              match branch {
+                Some(b) => b
+                None => "(detached)"
+              }
           }
           rows.push((repo.name, contract_path_hq(path), label))
         }
@@ -1236,11 +1274,15 @@ async fn home_wt_add_one(
     eprint_line("\{repo.name}: worktree add failed")
     return false
   }
-  if repo.subdir is Some(dir) {
-    // bit's sparse-checkout does not support linked worktrees yet.
-    eprint_line(
-      "note: the worktree is a full checkout (sparse checkout of \{dir}/ is not supported in linked worktrees yet)",
-    )
+  // A `subdir` entry's worktree gets the same cone as the main checkout
+  // (kept in that worktree's own config.worktree).
+  match repo.subdir {
+    Some(dir) =>
+      if !home_apply_sparse(wt, dir) {
+        eprint_line("\{repo.name}: sparse checkout of \{dir}/ in the worktree failed")
+        return false
+      }
+    None => ()
   }
   print_line("\{repo.name}: worktree \{contract_path_hq(wt)} on branch \{feature}")
   true

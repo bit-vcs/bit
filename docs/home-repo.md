@@ -156,7 +156,7 @@ AGENTS.md の「Other Repos」ブロックを `bit-home.toml` から再生成し
 
 `subdir` を指定したリポジトリには、毎回 sparse checkout の設定を適用します。マニフェストの `subdir` を変えれば、次の `sync` で checkout される範囲も変わります。1 つでも失敗すると、最後に exit 1 で終わります。
 
-### `bit home status [<name>...] [--json]`
+### `bit home status [<name>...] [--json] [-j <n>]`
 
 各リポジトリについて、次を 1 行ずつ表示します。
 
@@ -166,7 +166,7 @@ AGENTS.md の「Other Repos」ブロックを `bit-home.toml` から再生成し
 - sparse checkout の範囲
 - linked worktree の数
 
-`--json` を付けると、同じ情報（`name` `path` `state` `branch` `upstream` `ahead` `behind` `changes` `sparse` `worktrees`）を JSON の配列で出力します。エージェントやスクリプトから読むときに使います。
+`--json` を付けると、同じ情報（`name` `path` `state` `branch` `upstream` `ahead` `behind` `changes` `sparse` `worktrees`）を JSON の配列で出力します。エージェントやスクリプトから読むときに使います。`worktrees` の各要素にも、その worktree 自体の `branch` `upstream` `ahead` `behind` `changes` が入ります。`-j <n>` で最大 n 個のリポジトリを並列に調べます。
 
 clone されていないリポジトリには `missing (run bit home sync <name>)` と表示します。
 
@@ -176,7 +176,8 @@ clone されていないリポジトリには `missing (run bit home sync <name>
 
 - `<name>` をカンマ区切りで並べると、同じ `<feature>` の worktree を複数のリポジトリにまとめて作ります（複数リポジトリにまたがる機能）。
 - `--all <feature>` は、マニフェストの全リポジトリが対象です。`wt remove --all <feature>` は、その worktree があるリポジトリだけから外します。
-- `wt list --feature <f>` は、その機能の worktree があるリポジトリだけを表示します。`--json` で JSON 出力になります。
+- `wt list` は、各 worktree のブランチ・upstream との差・変更数を表示します。`--feature <f>` は、その機能の worktree があるリポジトリだけを表示します（複数リポジトリにまたがる機能の進み具合を一覧できる）。`--json` で JSON 出力になります。
+- `subdir` 付きのリポジトリでは、作った worktree にも同じ sparse checkout（cone）を設定します。
 - その worktree がすでにあるリポジトリは、そのままにして成功扱いにします（何度実行しても同じ結果になる）。
 - 一部のリポジトリで失敗しても残りは続け、最後に exit 128 で終わります。
 
@@ -222,6 +223,5 @@ bit home exec --feature checkout-redesign -- git push -u origin HEAD
 ## 制限事項（v1）
 
 - `subdir` 付きのリポジトリでは、最初の clone で一度すべてを checkout し、その直後に sparse checkout で絞り込みます（clone 時から部分的に checkout するわけではありません）。
-- `subdir` 付きのリポジトリでも、`wt add` で作る worktree は全体を checkout します。bit の sparse-checkout が、linked worktree にまだ対応していないためです。
 - `sync` と `exec` は既定で 1 リポジトリずつ順番に処理します。並列にするには `-j <n>` を付けます。
 - 元記事にある「既存リポジトリの skill や AGENTS.md の棚卸し」は自動化していません。
