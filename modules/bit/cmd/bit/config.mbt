@@ -906,8 +906,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         (None : String?),
         (None : Int?),
       )
-      let prefixed = get_default_origin_prefix +
-        get_default_scope_prefix +
+      let prefixed = get_default_scope_prefix +
+        get_default_origin_prefix +
         formatted
       if null_terminator {
         print_nul_terminated(prefixed)
@@ -975,8 +975,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
               (None : String?),
               (None : Int?),
             )
-            let prefixed = get_default_origin_prefix +
-              get_default_scope_prefix +
+            let prefixed = get_default_scope_prefix +
+              get_default_origin_prefix +
               formatted
             if null_terminator {
               print_nul_terminated(prefixed)
@@ -1009,11 +1009,11 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
             (None : Int?),
           )
           let prefixed = if from_worktree {
-            config_worktree_origin_prefix(worktree_layer, show_origin) +
             (if show_scope { "worktree\t" } else { "" }) +
+            config_worktree_origin_prefix(worktree_layer, show_origin) +
             formatted
           } else {
-            get_origin_prefix + get_scope_prefix + formatted
+            get_scope_prefix + get_origin_prefix + formatted
           }
           if null_terminator {
             print_nul_terminated(prefixed)
@@ -1105,11 +1105,11 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
           let from_worktree = worktree_layer is Some(_) &&
             value_source == worktree_layer
           let prefixed = if from_worktree {
-            config_worktree_origin_prefix(worktree_layer, show_origin) +
             (if show_scope { "worktree\t" } else { "" }) +
+            config_worktree_origin_prefix(worktree_layer, show_origin) +
             formatted
           } else {
-            get_origin_prefix + get_scope_prefix + formatted
+            get_scope_prefix + get_origin_prefix + formatted
           }
           if null_terminator {
             print_nul_terminated(prefixed)
@@ -1132,8 +1132,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
                 (None : String?),
                 (None : Int?),
               )
-              let prefixed = get_default_origin_prefix +
-                get_default_scope_prefix +
+              let prefixed = get_default_scope_prefix +
+                get_default_origin_prefix +
                 formatted
               if null_terminator {
                 print_nul_terminated(prefixed)
