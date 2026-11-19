@@ -622,8 +622,10 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       let obj = db.get(fs, cur) catch { _ => None }
       match obj {
         Some(o) if o.obj_type == @bitcore.ObjectType::Tag => {
+          // Listed under the name in the tag object itself (git's
+          // `add_pending_object(revs, object, tag->tag)`).
           if objects {
-            tip_objects.push((cur, spec))
+            tip_objects.push((cur, rev_list_tag_name(o.data)))
           }
           let target = @bitlib.parse_tag_object(@utf8.decode_lossy(o.data[:])) catch {
             _ => None

@@ -252,3 +252,19 @@ fn rev_list_mark_tree_uninteresting(
     }
   }
 }
+
+///|
+/// The `tag <name>` header of a tag object ("" when absent).
+fn rev_list_tag_name(data : Bytes) -> String {
+  let text = @utf8.decode_lossy(data[:])
+  for line_view in text.split("\n") {
+    let line = line_view.to_owned()
+    if line.length() == 0 {
+      break
+    }
+    if line.has_prefix("tag ") {
+      return line.unsafe_substring(start=4, end=line.length())
+    }
+  }
+  ""
+}
