@@ -1,6 +1,6 @@
 name = "mizchi/bit_trailers"
 
-version = "0.49.1"
+version = "0.50.0"
 
 repository = "https://github.com/mizchi/bit-vcs"
 

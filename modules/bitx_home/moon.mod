@@ -1,6 +1,6 @@
 name = "mizchi/bitx_home"
 
-version = "0.49.1"
+version = "0.50.0"
 
 import {
   "moonbit-community/toml@0.5.0",
