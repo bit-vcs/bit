@@ -859,6 +859,11 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
       !local_mode &&
       !worktree_mode &&
       @env.get_env_var("GIT_CONFIG") is None
+    let worktree_layer = if default_scope_read {
+      config_worktree_layer_path(fs)
+    } else {
+      None
+    }
     // Compute scope/origin prefix for get value output
     let get_scope_prefix = if show_scope {
       let scope_name = if global_mode {
@@ -929,6 +934,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
       } else {
         None
       }
+      // Values read from the worktree layer, counted from the end.
+      let mut worktree_values = 0
       let result = if config_path == "-" {
         match stdin_content {
           Some(content) =>
@@ -941,14 +948,15 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         } else {
           []
         }
-        if default_scope_read {
-          match config_worktree_layer_path(fs) {
-            Some(wt_path) =>
-              values.append(
-                get_all_config_values(fs, wt_path, k, vp, fixed_value_mode),
-              )
-            None => ()
+        match worktree_layer {
+          Some(wt_path) => {
+            let wt_values = get_all_config_values(
+              fs, wt_path, k, vp, fixed_value_mode,
+            )
+            worktree_values = wt_values.length()
+            values.append(wt_values)
           }
+          None => ()
         }
         values
       }
@@ -979,9 +987,12 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
           None => @sys.exit(1)
         }
       } else {
-        for v in result {
+        for idx, v in result {
+          let from_worktree = idx >= result.length() - worktree_values
           let source_name : String? = if config_path == "-" {
             Some("standard input")
+          } else if from_worktree {
+            worktree_layer
           } else {
             Some(config_path)
           }
@@ -997,7 +1008,13 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
             source_name,
             (None : Int?),
           )
-          let prefixed = get_origin_prefix + get_scope_prefix + formatted
+          let prefixed = if from_worktree {
+            config_worktree_origin_prefix(worktree_layer, show_origin) +
+            (if show_scope { "worktree\t" } else { "" }) +
+            formatted
+          } else {
+            get_origin_prefix + get_scope_prefix + formatted
+          }
           if null_terminator {
             print_nul_terminated(prefixed)
           } else {
@@ -1027,7 +1044,7 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
             }
           } else {
             let wt_value = if default_scope_read {
-              match config_worktree_layer_path(fs) {
+              match worktree_layer {
                 Some(wt_path) =>
                   match get_config_value(fs, wt_path, k, vp, fixed_value_mode) {
                     Some(v) => {
@@ -1085,7 +1102,15 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
             value_source,
             line_hint,
           )
-          let prefixed = get_origin_prefix + get_scope_prefix + formatted
+          let from_worktree = worktree_layer is Some(_) &&
+            value_source == worktree_layer
+          let prefixed = if from_worktree {
+            config_worktree_origin_prefix(worktree_layer, show_origin) +
+            (if show_scope { "worktree\t" } else { "" }) +
+            formatted
+          } else {
+            get_origin_prefix + get_scope_prefix + formatted
+          }
           if null_terminator {
             print_nul_terminated(prefixed)
           } else {
@@ -1934,6 +1959,19 @@ async fn print_config_list_entry(
     print_nul_terminated(prefix + full_key + "\n" + value)
   } else {
     print_line(prefix + full_key + "=" + value)
+  }
+}
+
+///|
+/// The `--show-origin` prefix for a value read from the worktree layer.
+fn config_worktree_origin_prefix(
+  worktree_layer : String?,
+  show_origin : Bool,
+) -> String {
+  match worktree_layer {
+    Some(path) if show_origin =>
+      "file:" + quote_origin_path(make_relative_to_cwd(path)) + "\t"
+    _ => ""
   }
 }
 
