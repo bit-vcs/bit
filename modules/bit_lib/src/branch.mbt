@@ -523,7 +523,33 @@ pub fn rename_branch(
   )
   let old_id = match resolve_ref(rfs, git_dir, old_ref) {
     Some(id) => id
-    None => raise @bit.GitError::InvalidObject("branch '\{old_name}' not found")
+    None => {
+      // Renaming the checked-out branch while it is still unborn (e.g.
+      // `git init && git branch -m base`): git only points HEAD at the new
+      // name, since there is no ref or reflog to move yet.
+      let unborn_heads = checked_out_head_paths.copy()
+      let main_head = join_path(git_dir, "HEAD")
+      if !unborn_heads.contains(main_head) &&
+        rfs.is_file(main_head) &&
+        @utf8.decode_lossy(rfs.read_file(main_head)[:]).trim_end(chars="\r\n") ==
+        "ref: \{old_ref}" {
+        unborn_heads.push(main_head)
+      }
+      if unborn_heads.length() > 0 && !rfs.is_file(old_path) {
+        if old_name != new_name &&
+          !force &&
+          resolve_ref(rfs, git_dir, new_ref) is Some(_) {
+          raise @bit.GitError::InvalidObject(
+            "branch '\{new_name}' already exists",
+          )
+        }
+        for head_path in unborn_heads {
+          fs.write_string(head_path, "ref: \{new_ref}\n")
+        }
+        return
+      }
+      raise @bit.GitError::InvalidObject("branch '\{old_name}' not found")
+    }
   }
   let old_log = join_path(git_dir, "logs/" + old_ref)
   let old_log_data = if rfs.is_file(old_log) {
