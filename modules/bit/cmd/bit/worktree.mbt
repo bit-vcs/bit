@@ -908,9 +908,26 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
     let worktree_git_dir = resolve_git_dir(fs, resolved_wt_path)
     match @bitlib.resolve_head_commit(fs, worktree_git_dir) {
       Some(commit_id) =>
-        @bitlibnative.apply_worktree_modes_from_commit(
-          fs, fs, resolved_wt_path, common_git_dir, commit_id,
-        )
+        // A worktree that inherited sparse patterns only has the paths
+        // inside them: apply modes to those (the rest were never written).
+        if @bitlib.is_sparse_checkout_enabled(fs, worktree_git_dir) {
+          let patterns = @bitlib.read_sparse_patterns(fs, worktree_git_dir)
+          let db = @bitlib.ObjectDb::load(fs, common_git_dir)
+          let files = @bitlib.collect_tree_files_from_commit(db, fs, commit_id)
+          let paths : Array[String] = []
+          for path, _ in files {
+            if @bitlib.matches_sparse_pattern(path, patterns) {
+              paths.push(path)
+            }
+          }
+          @bitlibnative.apply_worktree_modes_for_paths(
+            fs, fs, resolved_wt_path, common_git_dir, commit_id, paths,
+          )
+        } else {
+          @bitlibnative.apply_worktree_modes_from_commit(
+            fs, fs, resolved_wt_path, common_git_dir, commit_id,
+          )
+        }
       None => ()
     }
   }
