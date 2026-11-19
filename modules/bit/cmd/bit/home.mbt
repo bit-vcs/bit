@@ -22,24 +22,29 @@ async fn print_home_usage() -> Unit {
     #|  add [<url>] --path <dir> [--name <n>] [--description <d>]
     #|                        [--branch <b>] [--subdir <d>] [--notes <text>]
     #|                        Add a repository pointer and re-render AGENTS.md
+    #|  rm <name>...          Remove repository pointers (the clones stay on disk)
     #|  render [--check]      Regenerate the "Other Repos" section of AGENTS.md
-    #|  sync [<name>...]      Clone missing repositories, fast-forward the rest
+    #|  sync [<name>...] [-j <n>]
+    #|                        Clone missing repositories, fast-forward the rest
     #|                        (the Home Repo itself included); --subdir entries
     #|                        are sparse checkouts of that directory
-    #|  status [<name>...]    Branch / upstream / changes of every repository
+    #|  status [<name>...] [--json]
+    #|                        Branch / upstream / changes / worktrees of every repository
     #|  wt add <name>[,<name>...] <feature> [--base <ref>]
     #|  wt add --all <feature> [--base <ref>]
     #|                        Worktree for a feature inside each repository's clone
     #|                        (<path>/.worktrees/<feature>, branch <feature>)
-    #|  wt list [<name>...]   List worktrees
+    #|  wt list [<name>...] [--feature <f>] [--json]
+    #|                        List worktrees (--feature: only those on branch <f>)
     #|  wt remove <name>[,<name>...] <feature> [--force]
     #|  wt remove --all <feature> [--force]
     #|                        Remove a feature worktree (--all: wherever it exists)
-    #|  exec [<name>...] [--home] [-q] -- <command> [<arg>...]
-    #|  exec [<name>...] [--home] [-q] -c '<shell command>'
+    #|  exec [<name>...] [--home] [-q] [-j <n>] -- <command> [<arg>...]
+    #|  exec [<name>...] [--home] [-q] [-j <n>] -c '<shell command>'
     #|                        Run a command in each cloned repository (cwd = clone;
     #|                        BIT_HOME_REPO / BIT_HOME_REPO_PATH are set); exit 1
-    #|                        if it fails in any
+    #|                        if it fails in any. -j runs <n> at a time, output
+    #|                        replayed per repository
     #|
     #|The Home Repo is found by walking up from the current directory to the
     #|first bit-home.toml (override with BIT_HOME_ROOT).
@@ -191,6 +196,125 @@ async fn home_select_repos(
     }
   }
   manifest.repos.filter(r => names.contains(r.name))
+}
+
+///|
+/// Run `cmd` with captured stdout / stderr (no terminal input).
+async fn home_run_captured(
+  cmd : String,
+  args : Array[String],
+  cwd : String,
+  env : Map[String, String],
+) -> (Int, Bytes, Bytes) {
+  let result = @process.run(
+    cmd,
+    args[:],
+    extra_env=env,
+    inherit_env=true,
+    stdout=Collect,
+    stderr=Collect,
+    cwd~,
+  ) catch {
+    _ => return (127, b"", b"")
+  }
+  (result.exit_code, result.stdout_binary(), result.stderr_binary())
+}
+
+///|
+/// Run `task(0..n)` with at most `jobs` running at once.
+async fn home_parallel(jobs : Int, n : Int, task : async (Int) -> Unit) -> Unit {
+  let width = if jobs < 1 { 1 } else { jobs }
+  let mut start = 0
+  while start < n {
+    let end = if start + width < n { start + width } else { n }
+    let first = start
+    @async.with_task_group(group => {
+      for i in first..<end {
+        let _ = group.spawn(() => task(i))
+      }
+    })
+    start = end
+  }
+}
+
+///|
+/// Split `-j N` / `-jN` / `--jobs N` / `--jobs=N` out of `args`.
+async fn home_take_jobs(args : Array[String]) -> (Int, Array[String]) {
+  let rest : Array[String] = []
+  let mut jobs = 1
+  let parse = async fn(v : String) -> Int {
+    let n = @string.parse_int(v) catch { _ => 0 }
+    if n < 1 {
+      eprint_line("fatal: --jobs expects a positive number, got '\{v}'")
+      @sys.exit(129)
+    }
+    n
+  }
+  let mut i = 0
+  while i < args.length() {
+    let a = args[i]
+    if (a == "-j" || a == "--jobs") && i + 1 < args.length() {
+      jobs = parse(args[i + 1])
+      i += 1
+    } else if a.has_prefix("--jobs=") {
+      jobs = parse(a.unsafe_substring(start=7, end=a.length()))
+    } else if a.has_prefix("-j") && a.length() > 2 {
+      jobs = parse(a.unsafe_substring(start=2, end=a.length()))
+    } else {
+      rest.push(a)
+    }
+    i += 1
+  }
+  (jobs, rest)
+}
+
+///|
+async fn home_write_bytes(out : Bytes, err : Bytes) -> Unit {
+  if out.length() > 0 {
+    @stdio.stdout.write(out)
+  }
+  if err.length() > 0 {
+    @stdio.stderr.write(err)
+  }
+}
+
+///|
+/// Worktrees of a clone from `worktree list --porcelain`, the main one
+/// first: (absolute path, branch or None when detached).
+async fn home_worktrees(abs : String) -> Array[(String, String?)] {
+  let (code, out) = home_capture_bit(["-C", abs, "worktree", "list", "--porcelain"])
+  let result : Array[(String, String?)] = []
+  if code != 0 {
+    return result
+  }
+  let mut path : String? = None
+  let mut branch : String? = None
+  let flush = fn() {
+    match path {
+      Some(p) => result.push((p, branch))
+      None => ()
+    }
+  }
+  for line_view in out.split("\n") {
+    let line = line_view.to_owned()
+    if line.has_prefix("worktree ") {
+      flush()
+      path = Some(line.unsafe_substring(start=9, end=line.length()))
+      branch = None
+    } else if line.has_prefix("branch refs/heads/") {
+      branch = Some(line.unsafe_substring(start=18, end=line.length()))
+    }
+  }
+  flush()
+  result
+}
+
+///|
+fn home_json_opt(v : String?) -> Json {
+  match v {
+    Some(s) => Json::string(s)
+    None => Json::null()
+  }
 }
 
 ///|
@@ -351,6 +475,85 @@ async fn handle_home_add(fs : OsFs, args : Array[String]) -> Unit raise Error {
   ignore(home_render_agents(fs, root, manifest, write=true))
   print_line("added '\{repo.name}' -> \{repo.path}")
   print_line("run `bit home sync \{repo.name}` to clone it")
+}
+
+///|
+/// `bit home rm <name>...`: drop repositories from bit-home.toml (their
+/// `[[repo]]` table and the comment lines right above it) and re-render
+/// AGENTS.md. Clones are left on disk.
+async fn handle_home_rm(fs : OsFs, args : Array[String]) -> Unit raise Error {
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let names = args.filter(a => !a.has_prefix("-"))
+  for a in args {
+    if a.has_prefix("-") {
+      eprint_line("fatal: unknown option '\{a}'")
+      @sys.exit(129)
+    }
+  }
+  if names.length() == 0 {
+    eprint_line("usage: bit home rm <name>...")
+    @sys.exit(129)
+  }
+  let root = require_home_root(fs)
+  let manifest = load_home_manifest(fs, root)
+  let removed = home_select_repos(manifest, names)
+  let manifest_path = root + "/" + @home.manifest_file_name
+  let lines = decode_bytes(rfs.read_file(manifest_path))
+    .split("\n")
+    .map(l => l.to_owned())
+    .to_array()
+  // Split into chunks, each starting at the comment lines above a
+  // `[[repo]]` header (the first chunk is the preamble).
+  let chunks : Array[Array[String]] = [[]]
+  for line in lines {
+    if line.trim(chars=" \t").to_owned() == "[[repo]]" {
+      // Move the trailing comment lines of the previous chunk along.
+      let prev = chunks[chunks.length() - 1]
+      let moved : Array[String] = []
+      while prev.length() > 0 &&
+        prev[prev.length() - 1].trim(chars=" \t").has_prefix("#") {
+        moved.push(prev.unsafe_pop())
+      }
+      moved.rev_in_place()
+      moved.push(line)
+      chunks.push(moved)
+    } else {
+      chunks[chunks.length() - 1].push(line)
+    }
+  }
+  let kept : Array[String] = []
+  for idx, chunk in chunks {
+    let drop = idx > 0 &&
+      (
+        @home.parse_manifest(chunk.join("\n")) catch {
+          _ => { repos: [] }
+        }
+      ).repos
+      .iter()
+      .any(r => removed.iter().any(x => x.name == r.name))
+    if !drop {
+      kept.append(chunk)
+    }
+  }
+  let updated = kept.join("\n")
+  let next = @home.parse_manifest(updated) catch {
+    err => {
+      eprint_line("fatal: \{err.message()}")
+      @sys.exit(128)
+      return
+    }
+  }
+  if next.repos.length() != manifest.repos.length() - removed.length() {
+    eprint_line("fatal: could not remove the entries cleanly; edit \{@home.manifest_file_name} by hand")
+    @sys.exit(128)
+  }
+  fs.write_string(manifest_path, updated)
+  ignore(home_render_agents(fs, root, next, write=true))
+  for repo in removed {
+    print_line(
+      "removed '\{repo.name}' (clone left at \{contract_path_hq(home_repo_abs(root, repo))})",
+    )
+  }
 }
 
 ///|
@@ -608,7 +811,14 @@ async fn home_sync_one(
 async fn handle_home_sync(fs : OsFs, args : Array[String]) -> Unit raise Error {
   let root = require_home_root(fs)
   let manifest = load_home_manifest(fs, root)
-  let names = args.filter(a => !a.has_prefix("-"))
+  let (jobs, args) = home_take_jobs(args)
+  for a in args {
+    if a.has_prefix("-") {
+      eprint_line("fatal: unknown option '\{a}'")
+      @sys.exit(129)
+    }
+  }
+  let names = args
   let repos = home_select_repos(manifest, names)
   let mut failed = 0
   // The Home Repo itself is part of the virtual repository.
@@ -617,11 +827,42 @@ async fn handle_home_sync(fs : OsFs, args : Array[String]) -> Unit raise Error {
       failed += 1
     }
   }
-  for repo in repos {
-    let abs = home_repo_abs(root, repo)
-    if !home_sync_one(fs, repo.name, abs, repo.url, repo.branch, repo.subdir) {
-      failed += 1
+  if jobs > 1 && repos.length() > 1 {
+    // Each repository is synced by a child `bit home sync <name>` whose
+    // output is replayed in manifest order once it finishes.
+    let codes = Array::make(repos.length(), 0)
+    let outs = Array::make(repos.length(), b"")
+    let errs = Array::make(repos.length(), b"")
+    let env : Map[String, String] = Map([])
+    env["BIT_HOME_ROOT"] = root
+    env["BIT_HOME_SYNC_CHILD"] = "1"
+    home_parallel(jobs, repos.length(), async fn(i) {
+      let (code, out, err) = home_run_captured(
+        @env.args()[0],
+        ["home", "sync", repos[i].name],
+        root,
+        env,
+      )
+      codes[i] = code
+      outs[i] = out
+      errs[i] = err
+    })
+    for i, code in codes {
+      home_write_bytes(outs[i], errs[i])
+      if code != 0 {
+        failed += 1
+      }
     }
+  } else {
+    for repo in repos {
+      let abs = home_repo_abs(root, repo)
+      if !home_sync_one(fs, repo.name, abs, repo.url, repo.branch, repo.subdir) {
+        failed += 1
+      }
+    }
+  }
+  if failed > 0 && @env.get_env_var("BIT_HOME_SYNC_CHILD") is Some(_) {
+    @sys.exit(1)
   }
   if failed > 0 {
     eprint_line("bit home sync: \{failed} repositor\{if failed == 1 { "y" } else { "ies" }} failed")
@@ -633,36 +874,89 @@ async fn handle_home_sync(fs : OsFs, args : Array[String]) -> Unit raise Error {
 async fn handle_home_status(fs : OsFs, args : Array[String]) -> Unit raise Error {
   let root = require_home_root(fs)
   let manifest = load_home_manifest(fs, root)
+  let json = args.contains("--json")
+  for a in args {
+    if a.has_prefix("-") && a != "--json" {
+      eprint_line("fatal: unknown option '\{a}'")
+      @sys.exit(129)
+    }
+  }
   let names = args.filter(a => !a.has_prefix("-"))
   let repos = home_select_repos(manifest, names)
-  let rows : Array[(String, String, String)] = []
+  // (name, abs, subdir) of every row, the Home Repo first.
+  let targets : Array[(String, String, String?)] = []
   if names.length() == 0 {
-    let desc = match home_repo_status(root) {
-      Some(s) => @home.describe_status(s)
-      None => "not a git repository"
-    }
-    rows.push(("(home)", contract_path_hq(root), desc))
+    targets.push(("(home)", root, None))
   }
   for repo in repos {
-    let abs = home_repo_abs(root, repo)
+    targets.push((repo.name, home_repo_abs(root, repo), repo.subdir))
+  }
+  let rows : Array[(String, String, String)] = []
+  let records : Array[Json] = []
+  for target in targets {
+    let (name, abs, subdir) = target
+    let record : Map[String, Json] = Map([])
+    record["name"] = Json::string(name)
+    record["path"] = Json::string(abs)
+    record["sparse"] = home_json_opt(subdir)
     let desc = if !fs.is_dir(abs) {
-      "missing (run `bit home sync \{repo.name}`)"
+      record["state"] = Json::string("missing")
+      "missing (run `bit home sync \{name}`)"
     } else if !home_is_git_worktree(fs, abs) {
+      record["state"] = Json::string("not-a-repository")
       "not a git repository"
     } else {
       match home_repo_status(abs) {
-        Some(s) => {
-          let base = @home.describe_status(s)
-          match repo.subdir {
-            Some(d) => base + ", sparse \{d}/"
-            None => base
+        Some(st) => {
+          record["state"] = Json::string("ok")
+          record["branch"] = home_json_opt(st.branch)
+          record["upstream"] = home_json_opt(st.upstream)
+          record["ahead"] = Json::number(st.ahead.to_double())
+          record["behind"] = Json::number(st.behind.to_double())
+          record["changes"] = Json::number(st.changes.to_double())
+          let wts = home_worktrees(abs)
+          let linked : Array[Json] = []
+          for idx, wt in wts {
+            if idx == 0 {
+              continue
+            }
+            let w : Map[String, Json] = Map([])
+            w["path"] = Json::string(wt.0)
+            w["branch"] = home_json_opt(wt.1)
+            linked.push(Json::object(w))
           }
+          record["worktrees"] = Json::array(linked)
+          let parts = [@home.describe_status(st)]
+          match subdir {
+            Some(d) => parts.push("sparse \{d}/")
+            None => ()
+          }
+          if linked.length() > 0 {
+            parts.push(
+              "\{linked.length()} worktree\{if linked.length() == 1 { "" } else { "s" }}",
+            )
+          }
+          parts.join(", ")
         }
-        None => "could not read status"
+        None => {
+          record["state"] = Json::string("error")
+          "could not read status"
+        }
       }
     }
-    rows.push((repo.name, contract_path_hq(abs), desc))
+    records.push(Json::object(record))
+    rows.push((name, contract_path_hq(abs), desc))
   }
+  if json {
+    print_line(Json::array(records).stringify())
+    return
+  }
+  home_print_table(rows)
+}
+
+///|
+/// Print rows as aligned columns (the last one unpadded).
+async fn home_print_table(rows : Array[(String, String, String)]) -> Unit {
   let mut name_w = 0
   let mut path_w = 0
   for row in rows {
@@ -765,22 +1059,55 @@ async fn handle_home_wt(fs : OsFs, args : Array[String]) -> Unit raise Error {
       }
     }
     "list" => {
-      let names = rest.filter(a => !a.has_prefix("-"))
+      let json = rest.contains("--json")
+      let mut feature : String? = None
+      let names : Array[String] = []
+      let mut i = 0
+      while i < rest.length() {
+        let a = rest[i]
+        if a == "--feature" && i + 1 < rest.length() {
+          feature = Some(rest[i + 1])
+          i += 1
+        } else if a == "--json" {
+          ()
+        } else if a.has_prefix("-") {
+          eprint_line("fatal: unknown option '\{a}'")
+          @sys.exit(129)
+        } else {
+          names.push(a)
+        }
+        i += 1
+      }
+      let rows : Array[(String, String, String)] = []
+      let records : Array[Json] = []
       for repo in home_select_repos(manifest, names) {
         let abs = home_repo_abs(root, repo)
         if !home_is_git_worktree(fs, abs) {
           continue
         }
-        let (code, out) = home_capture_bit(["-C", abs, "worktree", "list"])
-        if code != 0 {
-          continue
-        }
-        for line in out.split("\n") {
-          let l = line.to_owned()
-          if l.length() > 0 {
-            print_line("\{repo.name}\t\{l}")
+        for idx, wt in home_worktrees(abs) {
+          let (path, branch) = wt
+          // --feature: the repositories working on that feature only.
+          if feature is Some(f) && branch != Some(f) {
+            continue
           }
+          let w : Map[String, Json] = Map([])
+          w["repo"] = Json::string(repo.name)
+          w["path"] = Json::string(path)
+          w["branch"] = home_json_opt(branch)
+          w["main"] = Json::boolean(idx == 0)
+          records.push(Json::object(w))
+          let label = match branch {
+            Some(b) => "[\{b}]"
+            None => "(detached)"
+          }
+          rows.push((repo.name, contract_path_hq(path), label))
         }
+      }
+      if json {
+        print_line(Json::array(records).stringify())
+      } else {
+        home_print_table(rows)
       }
     }
     "remove" => {
@@ -951,8 +1278,14 @@ async fn home_wt_remove_one(
 /// BIT_HOME_REPO / BIT_HOME_REPO_PATH name the current repository. Fails
 /// (exit 1) when the command fails in any of them.
 async fn handle_home_exec(fs : OsFs, args : Array[String]) -> Unit raise Error {
-  let usage = "usage: bit home exec [<name>...] [--home] [-q] -- <command> [<arg>...]\n" +
-    "   or: bit home exec [<name>...] [--home] [-q] -c '<shell command>'"
+  let usage = "usage: bit home exec [<name>...] [--home] [-q] [-j <n>] -- <command> [<arg>...]\n" +
+    "   or: bit home exec [<name>...] [--home] [-q] [-j <n>] -c '<shell command>'"
+  let dash = match args.search("--") {
+    Some(d) => d
+    None => args.length()
+  }
+  let (jobs, head) = home_take_jobs(args[:dash].to_array())
+  let args = head + args[dash:].to_array()
   let names : Array[String] = []
   let mut include_home = false
   let mut quiet = false
@@ -1005,34 +1338,70 @@ async fn handle_home_exec(fs : OsFs, args : Array[String]) -> Unit raise Error {
   for repo in home_select_repos(manifest, names) {
     targets.push((repo.name, home_repo_abs(root, repo)))
   }
-  let failed : Array[String] = []
+  let runnable = targets.filter(t => home_is_git_worktree(fs, t.1))
   for target in targets {
-    let (name, abs) = target
-    if !home_is_git_worktree(fs, abs) {
-      eprint_line("== \{name}: skipped (not cloned; run `bit home sync \{name}`)")
-      continue
+    if !home_is_git_worktree(fs, target.1) {
+      eprint_line(
+        "== \{target.0}: skipped (not cloned; run `bit home sync \{target.0}`)",
+      )
     }
-    if !quiet {
-      print_line("== \{name} (\{contract_path_hq(abs)})")
-    }
+  }
+  let env_for = fn(name : String, abs : String) -> Map[String, String] {
     let env : Map[String, String] = Map([])
     env["BIT_HOME_REPO"] = name
     env["BIT_HOME_REPO_PATH"] = abs
-    let code = @process.run(
-      "/bin/sh",
-      sh_args[:],
-      extra_env=env,
-      inherit_env=true,
-      stdin=Stdin,
-      stdout=Stdout,
-      stderr=Stderr,
-      cwd=abs,
-    ).exit_code catch {
-      _ => 127
+    env
+  }
+  let failed : Array[String] = []
+  if jobs > 1 && runnable.length() > 1 {
+    // Run in parallel with captured output, replayed in manifest order.
+    let codes = Array::make(runnable.length(), 0)
+    let outs = Array::make(runnable.length(), b"")
+    let errs = Array::make(runnable.length(), b"")
+    home_parallel(jobs, runnable.length(), async fn(i) {
+      let (name, abs) = runnable[i]
+      let (code, out, err) = home_run_captured(
+        "/bin/sh",
+        sh_args,
+        abs,
+        env_for(name, abs),
+      )
+      codes[i] = code
+      outs[i] = out
+      errs[i] = err
+    })
+    for i, target in runnable {
+      if !quiet {
+        print_line("== \{target.0} (\{contract_path_hq(target.1)})")
+      }
+      home_write_bytes(outs[i], errs[i])
+      if codes[i] != 0 {
+        eprint_line("== \{target.0}: exit \{codes[i]}")
+        failed.push(target.0)
+      }
     }
-    if code != 0 {
-      eprint_line("== \{name}: exit \{code}")
-      failed.push(name)
+  } else {
+    for target in runnable {
+      let (name, abs) = target
+      if !quiet {
+        print_line("== \{name} (\{contract_path_hq(abs)})")
+      }
+      let code = @process.run(
+        "/bin/sh",
+        sh_args[:],
+        extra_env=env_for(name, abs),
+        inherit_env=true,
+        stdin=Stdin,
+        stdout=Stdout,
+        stderr=Stderr,
+        cwd=abs,
+      ).exit_code catch {
+        _ => 127
+      }
+      if code != 0 {
+        eprint_line("== \{name}: exit \{code}")
+        failed.push(name)
+      }
     }
   }
   if failed.length() > 0 {
@@ -1055,6 +1424,7 @@ async fn handle_home(args : Array[String]) -> Unit raise Error {
   match args[0] {
     "init" => handle_home_init(fs, rest)
     "add" => handle_home_add(fs, rest)
+    "rm" | "remove" => handle_home_rm(fs, rest)
     "render" => handle_home_render(fs, rest)
     "sync" => handle_home_sync(fs, rest)
     "status" => handle_home_status(fs, rest)
