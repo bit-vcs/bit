@@ -296,6 +296,7 @@ options(
     "restore.mbt": [ "native" ],
     "restore_wbtest.mbt": [ "native" ],
     "rev_list.mbt": [ "native" ],
+    "rev_list_missing.mbt": [ "native" ],
     "rev_list_wbtest.mbt": [ "native" ],
     "rev_parse.mbt": [ "native" ],
     "rev_parse_wbtest.mbt": [ "native" ],
