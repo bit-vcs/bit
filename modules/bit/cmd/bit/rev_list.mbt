@@ -557,6 +557,13 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
           start_ids.push(id)
         }
       }
+      // Peeling (`<rev>^{<type>}`) needs the object itself: like git, a
+      // peel that cannot be resolved (e.g. a missing promisor object) is
+      // a bad revision rather than an empty walk.
+      None if spec.contains("^{") => {
+        eprint_line("fatal: bad revision '\{spec}'")
+        @sys.exit(128)
+      }
       None => ()
     }
   }
