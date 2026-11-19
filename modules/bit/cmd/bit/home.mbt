@@ -39,12 +39,12 @@ async fn print_home_usage() -> Unit {
     #|  wt remove <name>[,<name>...] <feature> [--force]
     #|  wt remove --all <feature> [--force]
     #|                        Remove a feature worktree (--all: wherever it exists)
-    #|  exec [<name>...] [--home] [-q] [-j <n>] -- <command> [<arg>...]
-    #|  exec [<name>...] [--home] [-q] [-j <n>] -c '<shell command>'
-    #|                        Run a command in each cloned repository (cwd = clone;
-    #|                        BIT_HOME_REPO / BIT_HOME_REPO_PATH are set); exit 1
-    #|                        if it fails in any. -j runs <n> at a time, output
-    #|                        replayed per repository
+    #|  exec [<name>...] [--home | --feature <f>] [-q] [-j <n>] -- <command> [<arg>...]
+    #|  exec [<name>...] [--home | --feature <f>] [-q] [-j <n>] -c '<shell command>'
+    #|                        Run a command in each cloned repository (cwd = clone,
+    #|                        or with --feature its .worktrees/<f>; BIT_HOME_REPO /
+    #|                        BIT_HOME_REPO_PATH are set); exit 1 if it fails in
+    #|                        any. -j runs <n> at a time, output replayed per repo
     #|
     #|The Home Repo is found by walking up from the current directory to the
     #|first bit-home.toml (override with BIT_HOME_ROOT).
@@ -60,6 +60,7 @@ async fn print_home_usage() -> Unit {
     #|  bit home wt add storefront,payments-api checkout-redesign
     #|  bit home exec -- git log -1 --oneline
     #|  bit home exec storefront payments-api -c 'make test'
+    #|  bit home exec --feature checkout-redesign -- git push -u origin HEAD
   print_line(usage)
 }
 
@@ -1278,8 +1279,8 @@ async fn home_wt_remove_one(
 /// BIT_HOME_REPO / BIT_HOME_REPO_PATH name the current repository. Fails
 /// (exit 1) when the command fails in any of them.
 async fn handle_home_exec(fs : OsFs, args : Array[String]) -> Unit raise Error {
-  let usage = "usage: bit home exec [<name>...] [--home] [-q] [-j <n>] -- <command> [<arg>...]\n" +
-    "   or: bit home exec [<name>...] [--home] [-q] [-j <n>] -c '<shell command>'"
+  let usage = "usage: bit home exec [<name>...] [--home | --feature <f>] [-q] [-j <n>] -- <command> [<arg>...]\n" +
+    "   or: bit home exec [<name>...] [--home | --feature <f>] [-q] [-j <n>] -c '<shell command>'"
   let dash = match args.search("--") {
     Some(d) => d
     None => args.length()
@@ -1289,6 +1290,7 @@ async fn handle_home_exec(fs : OsFs, args : Array[String]) -> Unit raise Error {
   let names : Array[String] = []
   let mut include_home = false
   let mut quiet = false
+  let mut feature : String? = None
   let mut shell_command : String? = None
   let command : Array[String] = []
   let mut i = 0
@@ -1306,6 +1308,10 @@ async fn handle_home_exec(fs : OsFs, args : Array[String]) -> Unit raise Error {
         i += 1
       }
       "--home" => include_home = true
+      "--feature" if i + 1 < args.length() => {
+        feature = Some(args[i + 1])
+        i += 1
+      }
       "-q" | "--quiet" => quiet = true
       _ if arg.has_prefix("-") => {
         eprint_line("fatal: unknown option '\{arg}'")
@@ -1332,11 +1338,37 @@ async fn handle_home_exec(fs : OsFs, args : Array[String]) -> Unit raise Error {
   let root = require_home_root(fs)
   let manifest = load_home_manifest(fs, root)
   let targets : Array[(String, String)] = []
-  if include_home {
-    targets.push(("(home)", root))
-  }
-  for repo in home_select_repos(manifest, names) {
-    targets.push((repo.name, home_repo_abs(root, repo)))
+  match feature {
+    // --feature: run in each repository's worktree for that feature, in
+    // the repositories that have one.
+    Some(f) => {
+      if !@home.is_valid_feature_name(f) {
+        eprint_line("fatal: invalid feature name '\{f}'")
+        @sys.exit(128)
+      }
+      if include_home {
+        eprint_line("fatal: --home cannot be combined with --feature")
+        @sys.exit(129)
+      }
+      for repo in home_select_repos(manifest, names) {
+        let wt = @home.worktree_path(home_repo_abs(root, repo), f)
+        if fs.is_dir(wt) {
+          targets.push((repo.name, wt))
+        }
+      }
+      if targets.length() == 0 {
+        eprint_line("fatal: no repository has a worktree '\{f}' (see `bit home wt list`)")
+        @sys.exit(128)
+      }
+    }
+    None => {
+      if include_home {
+        targets.push(("(home)", root))
+      }
+      for repo in home_select_repos(manifest, names) {
+        targets.push((repo.name, home_repo_abs(root, repo)))
+      }
+    }
   }
   let runnable = targets.filter(t => home_is_git_worktree(fs, t.1))
   for target in targets {
