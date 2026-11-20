@@ -416,52 +416,11 @@ async test "main: show_command_help supports hub command" {
 }
 
 ///|
-async test "main: show_command_help supports rebase-ai command" {
-  let ok = show_command_help("rebase-ai", silent=true)
-  assert_true(ok)
-}
-
-///|
-async test "main: show_command_help supports ai command" {
-  let ok = show_command_help("ai", silent=true)
-  assert_true(ok)
-}
-
-///|
-test "ai: parse_ai_commit_options strips ai flags and keeps commit args" {
-  let (
-    options,
-    commit_args,
-    generate_message,
-    all_modified,
-    split_commits,
-    user_instructions,
-  ) = parse_ai_commit_options([
-    "--model", "gpt-4", "--agent-loop", "-m", "msg", "--max-ai-rounds=5", "--agent-max-steps",
-    "10", "--all",
-  ])
-  @test.assert_eq(options.model, "gpt-4")
-  assert_true(options.use_agent_loop)
-  @test.assert_eq(options.max_auto_rounds, 5)
-  @test.assert_eq(options.agent_max_steps, 10)
-  @test.assert_eq(commit_args, ["-m", "msg", "--all"])
-  assert_false(generate_message)
-  assert_true(all_modified)
-  assert_false(split_commits)
-  @test.assert_eq(user_instructions, [])
-}
-
-///|
-test "ai: parse_ai_merge_options keeps merge args and user instructions" {
-  let (options, merge_args, user_instructions) = parse_ai_merge_options([
-    "origin/main", "--model", "gpt-4", "--agent-loop", "--", "Prefer ours", "Keep changes grouped by file",
-  ])
-  @test.assert_eq(options.model, "gpt-4")
-  assert_true(options.use_agent_loop)
-  @test.assert_eq(merge_args, ["origin/main"])
-  @test.assert_eq(user_instructions, [
-    "Prefer ours", "Keep changes grouped by file",
-  ])
+async test "main: retired AI commands are absent from help and completion" {
+  for cmd in ["ai", "rebase-ai"] {
+    assert_false(show_command_help(cmd, silent=true))
+    assert_false(all_subcommands().any(fn(entry) { entry.0 == cmd }))
+  }
 }
 
 ///|
@@ -529,7 +488,7 @@ test "main: opt-in help text is loaded from external files" {
 ///|
 async test "main: dispatch-only commands have help route" {
   let dispatch_only = [
-    "diff-files", "show-branches", "rebase-ai", "scalar", "shell", "x/doc", "version",
+    "diff-files", "show-branches", "scalar", "shell", "x/doc", "version",
   ]
   for cmd in dispatch_only {
     let ok = command_handles_builtin_help(cmd) ||

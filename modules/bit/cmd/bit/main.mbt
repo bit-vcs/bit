@@ -35,8 +35,6 @@ async fn show_help() -> Unit {
     #|   merge       Join two or more development histories together
     #|   rebase      Reapply commits on top of another base tip
     #|   restore     Restore working tree files
-    #|   ai           AI helpers (rebase, merge, commit, cherry-pick, revert)
-    #|   rebase-ai    AI-assisted rebase conflict resolution (OpenRouter kimi-k2, alias for ai rebase)
     #|   reset       Reset current HEAD to the specified state
     #|   stash       Stash the changes in a dirty working directory
     #|   switch      Switch branches
@@ -186,9 +184,6 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
     ),
     (
       "rebase", "git rebase [<options>] <upstream> [<branch>]", "Reapply commits on top of another base tip.",
-    ),
-    (
-      "ai", "bit ai <command> [<args>]", "AI helpers (rebase, merge, commit, cherry-pick, revert).",
     ),
     (
       "merge", "git merge [<options>] <commit>...", "Join two or more development histories together.",
@@ -696,24 +691,6 @@ async fn show_command_help(cmd : String, silent? : Bool = false) -> Bool {
       }
       true
     }
-    "rebase-ai" => {
-      if !silent {
-        show_simple_command_help(
-          "git rebase-ai [<options>] <upstream>",
-          summary="Rebase with AI conflict resolution (OpenRouter moonshotai/kimi-k2, supports --agent-loop).",
-        )
-      }
-      true
-    }
-    "ai" => {
-      if !silent {
-        show_simple_command_help(
-          "bit ai <command> [<args>]",
-          summary="AI helpers.\n\nSubcommands:\n  rebase   AI-assisted rebase conflict resolution\n  merge    AI-assisted merge conflict resolution\n  cherry-pick AI-assisted cherry-pick conflict resolution\n  revert   AI-assisted revert conflict resolution\n  commit   AI-assisted commit message workflow",
-        )
-      }
-      true
-    }
     _ => show_command_help_from_specs(cmd, silent)
   }
 }
@@ -1041,8 +1018,6 @@ fn is_bit_only_command(cmd : String) -> Bool {
     | "hq"
     | "home"
     | "subdir-clone"
-    | "ai"
-    | "rebase-ai"
     | "debug" => true
     _ => false
   }
@@ -1406,8 +1381,6 @@ async fn dispatch_known_command(
     "reset" => handle_reset(rest)
     "rebase" => handle_rebase(rest)
     "history" => handle_history(rest)
-    "ai" => handle_ai(rest)
-    "rebase-ai" => handle_rebase_ai(rest)
     "stash" => handle_stash(rest)
     "cherry-pick" => handle_cherry_pick(rest)
     "show-branches" => handle_show_branches(rest)

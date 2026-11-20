@@ -192,7 +192,6 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "modules/bitx_doc/**",
       "modules/bitx_hq/**",
       "modules/bitx_subdir/**",
-      "modules/bitx_rebase_ai/**",
       "modules/bit/cmd/git-bit/**",
       "modules/bit/tests/**",
       "modules/bit/fuzz_tests/**",

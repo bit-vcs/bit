@@ -1,7 +1,0 @@
-import {
-  "mizchi/llm",
-}
-
-pkgtype(kind: "executable")
-
-warnings = "-25-29-79"

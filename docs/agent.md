@@ -10,7 +10,6 @@ If you want agent-adjacent functionality today, the user-facing commands in this
 - `bit pr`
 - `bit issue`
 - `bit relay`
-- `bit ai`
 
 ## Why This Page Changed
 

@@ -79,7 +79,7 @@ select = ["third_party/git/t/t7004-tag.sh", "third_party/git/t/t7030-verify-tag.
 reason = "module:signing"
 
 [[rules]]
-changed = ["modules/bitx_hub/**", "modules/bitx_kv/**", "modules/bitx_workspace/**", "modules/bitx_doc/**", "modules/bitx_hq/**", "modules/bitx_subdir/**", "modules/bitx_rebase_ai/**", "modules/bit/cmd/git-bit/**", "modules/bit/tests/**", "modules/bit/fuzz_tests/**"]
+changed = ["modules/bitx_hub/**", "modules/bitx_kv/**", "modules/bitx_workspace/**", "modules/bitx_doc/**", "modules/bitx_hq/**", "modules/bitx_subdir/**", "modules/bit/cmd/git-bit/**", "modules/bit/tests/**", "modules/bit/fuzz_tests/**"]
 select = []
 reason = "module:bit-only"
 

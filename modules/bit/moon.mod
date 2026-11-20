@@ -1,12 +1,11 @@
 name = "mizchi/bit"
 
-version = "0.50.0"
+version = "0.50.1"
 
 import {
   "moonbitlang/x@0.5.7",
   "mizchi/simd@0.6.1",
   "mizchi/tempfile@0.1.3",
-  "mizchi/llm@0.3.2",
   "mizchi/bitflow@0.4.3",
   "mizchi/x@0.8.0",
   "moonbitlang/regexp@0.3.7",
@@ -51,7 +50,6 @@ import {
   "mizchi/bitx_home@0.50.0",
   "mizchi/bitx_hq@0.50.0",
   "mizchi/bitx_hub@0.50.0",
-  "mizchi/bitx_rebase_ai@0.50.0",
   "mizchi/bitx_subdir@0.50.0",
   "mizchi/bitx_workspace@0.50.0",
 }

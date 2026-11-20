@@ -345,17 +345,10 @@ local testDistributed: Task = new {
   description = "Agent/orchestration focused native checks"
   cmd = #"""
     moon test --target native -p mizchi/bit/x-mcp
-    moon test --target native -p mizchi/bitx_rebase_ai
     moon test --target native -p mizchi/bitx_hub
     moon test --target native -p mizchi/bitx_hub/native
     moon test --target native -p mizchi/bitx_kv
     """#
-}
-
-local testAi: Task = new {
-  name = "test-ai"
-  description = "Prepare an intentional rebase conflict to debug rebase-ai locally"
-  cmd = "bash tools/test-ai.sh"
 }
 
 // -- compatibility helpers ------------------------------------------------
@@ -719,7 +712,6 @@ tasks {
   e2e
   testT
   testDistributed
-  testAi
 
   compatTable
   compatRandomRun

@@ -1,8 +1,0 @@
-import {
-  "moonbitlang/core/debug",
-  "moonbitlang/core/json",
-  "mizchi/llm",
-  "mizchi/llm/ffi",
-}
-
-warnings = "-25-29-79"

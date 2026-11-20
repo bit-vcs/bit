@@ -59,7 +59,6 @@ modules/
   bitx_hq/
   bitx_hub/
   bitx_kv/
-  bitx_rebase_ai/
   bitx_subdir/
   bitx_workspace/
 ```
@@ -68,7 +67,7 @@ Naming conventions:
 - `bit_<name>` (no x) — extracted core plumbing modules, one Git primitive
   each, mirroring gitoxide's `gix-*` crates.
 - `bitx_<name>` (with x) — extensions for non-Git features (PR metadata,
-  KV store, AI rebase, etc.).
+  KV store, etc.).
 
 ## Layers
 
@@ -168,7 +167,6 @@ depend on another extension module — shared logic should be promoted into
 | `mizchi/bitx_hub/native`     | `modules/bitx_hub/src/native`   | Hub native bindings + GitHub    |
 | `mizchi/bitx_kv`             | `modules/bitx_kv/src`           | Git-backed KV store             |
 | `mizchi/bitx_kv/native`      | `modules/bitx_kv/src/native`    | KV native sync                  |
-| `mizchi/bitx_rebase_ai`      | `modules/bitx_rebase_ai/src`    | AI-assisted rebase helpers      |
 | `mizchi/bitx_subdir`         | `modules/bitx_subdir/src`       | Subdirectory clone              |
 | `mizchi/bitx_workspace`      | `modules/bitx_workspace/src`    | Workspace flow                  |
 

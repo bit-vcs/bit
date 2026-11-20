@@ -9,8 +9,8 @@ Older agent/orchestrator notes still exist in `docs/`, but this guide is scoped 
 
 1. Pure logic (fast)
 - Purpose: Detect regressions in pure coordination and serialization logic
-- Target: `modules/bitx_hub/src/*_test.mbt`, `modules/bitx_kv/src/*_test.mbt`, `modules/bitx_rebase_ai/src/*_wbtest.mbt`
-- Examples: Hub record round-trips, issue/PR state transitions, KV merge behavior, rebase-ai parser logic
+- Target: `modules/bitx_hub/src/*_test.mbt`, `modules/bitx_kv/src/*_test.mbt`
+- Examples: Hub record round-trips, issue/PR state transitions, KV merge behavior
 
 2. Coordination/State (medium)
 - Purpose: Verify read/write consistency across relay, native sync, and repo-backed state
@@ -30,7 +30,7 @@ Older agent/orchestrator notes still exist in `docs/`, but this guide is scoped 
 1. Hub records serialize/deserialize without semantic loss
 2. Relay sync must be idempotent and must not corrupt existing metadata
 3. KV merge and gossip state must converge for equivalent histories
-4. Rebase-ai and other coordination helpers must fail predictably on malformed input
+4. Coordination helpers must fail predictably on malformed input
 5. Native wrappers must preserve protocol-level expectations across retries and partial failures
 
 ## 3. Execution Commands
@@ -46,7 +46,6 @@ pkf run check
 
 Current `pkf run test-distributed` runs:
 
-- `mizchi/bitx_rebase_ai`
 - `mizchi/bitx_hub`
 - `mizchi/bitx_hub/native`
 - `mizchi/bitx_kv`
@@ -56,7 +55,6 @@ Current `pkf run test-distributed` runs:
 1. Feed empty/corrupted payloads into hub sync and verify error paths
 2. Replay duplicate relay records and verify idempotent merge behavior
 3. Inject conflicting KV histories and verify merge convergence
-4. Exercise malformed or partial rebase-ai inputs and verify bounded failures
 
 ## 5. Operational Rules
 
