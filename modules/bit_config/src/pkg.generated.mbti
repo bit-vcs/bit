@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mizchi/bit_config"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
 pub fn config_lines_from_content(String) -> Array[String]
 
@@ -24,6 +28,8 @@ pub fn is_valid_section_name(String) -> Bool
 
 pub fn parse_bool_keyword_value(String) -> Bool?
 
+pub fn parse_config(String) -> Array[ConfigEntry] raise ConfigParseError
+
 pub fn parse_config_int_value(String) -> (Int64?, String?)
 
 pub fn parse_config_key(String) -> (String, String?, String)?
@@ -35,8 +41,17 @@ pub fn parse_section_header_line(String) -> (String, String?, String, Bool)?
 pub fn section_matches_for_insert(String, String?, String, String?, Bool) -> Bool
 
 // Errors
+#derive(Eq, @debug.Debug)
+pub(all) suberror ConfigParseError {
+  InvalidConfig(line~ : Int32, reason~ : String)
+}
 
 // Types and methods
+#derive(Eq, @debug.Debug)
+pub(all) struct ConfigEntry {
+  key : String
+  value : String?
+}
 
 // Type aliases
 
