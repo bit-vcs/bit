@@ -43,18 +43,16 @@ pub fn parse_config(
         let (name, tail) = scan_config_name(rest)
         let key = prefix + name.to_lower().to_owned()
         let tail = tail.trim_start(chars=" \t")
-        match tail {
-          [] | ['\n', ..] => {
-            entries.push({ key, value: None, })
-            continue tail, line, prefix
-          }
+        let (value, tail, line) = match tail {
+          [] | ['\n', ..] => (None, tail, line)
           ['=', .. value] => {
             let (value, tail, line) = parse_config_entry_value(value, line)
-            entries.push({ key, value: Some(value), })
-            continue tail, line, prefix
+            (Some(value), tail, line)
           }
           _ => raise InvalidConfig(line~, reason="Expected '=' after key")
         }
+        entries.push({ key, value, })
+        continue tail, line, prefix
       }
       _ => raise InvalidConfig(line~, reason="Expected a section or key")
     }
@@ -67,20 +65,15 @@ fn scan_config_name(
   input : StringView,
   section~ : Bool = false,
 ) -> (StringView, StringView) {
-  let tail = for tail = input
-                 tail is [c, .. rest] &&
-                (
-                  c.is_ascii_alphabetic() ||
-                  c.is_ascii_digit() ||
-                  c == '-' ||
-                  (section && c == '.')
-                )
-                 tail = rest {
-
-  } nobreak {
-    tail
-  }
-  (input[:input.length() - tail.length()], tail)
+  let end = input
+    .find_by(c => {
+      !(c.is_ascii_alphabetic() ||
+      c.is_ascii_digit() ||
+      c == '-' ||
+      (section && c == '.'))
+    })
+    .unwrap_or(input.length())
+  (input[:end], input[end:])
 }
 
 ///|
@@ -123,55 +116,50 @@ fn parse_config_entry_value(
   line : Int32,
 ) -> (String, StringView, Int32) raise ConfigParseError {
   let value = StringBuilder()
-  for rest = input, line = line, quoted = false, spaces = 0 {
-    match rest {
-      [] | ['\n', ..] => {
-        guard !quoted else {
-          raise InvalidConfig(line~, reason="Unclosed quoted value")
-        }
-        break (value.to_string(), rest, line)
+  let mut rest = input
+  let mut line = line
+  let mut quoted = false
+  let mut spaces = 0
+  while rest is [c, .. tail] && c != '\n' {
+    if !quoted && c is ('#' | ';') {
+      break
+    }
+    rest = tail
+    if !quoted && c is (' ' | '\t' | '\r' | '\u000b' | '\u000c') {
+      if !value.is_empty() {
+        spaces += 1
       }
-      ['#' | ';', ..] if !quoted => break (value.to_string(), rest, line)
-      [' ' | '\t' | '\r' | '\u000b' | '\u000c', .. tail] if !quoted =>
-        continue tail,
-          line,
-          quoted,
-          if value.is_empty() {
-            0
-          } else {
-            spaces + 1
+      continue
+    }
+    for _ in 0..<spaces {
+      value.write_char(' ')
+    }
+    spaces = 0
+    match c {
+      '"' => quoted = !quoted
+      '\\' =>
+        if rest is [escape, .. tail] {
+          rest = tail
+          if escape == '\n' {
+            line += 1
+            continue
           }
-      [c, .. tail] => {
-        for _ in 0..<spaces {
-          value.write_char(' ')
+          value.write_char(
+            match escape {
+              't' => '\t'
+              'n' => '\n'
+              'b' => '\u0008'
+              '\\' | '"' => escape
+              _ => raise InvalidConfig(line~, reason="Invalid value escape")
+            },
+          )
         }
-        match c {
-          '"' => continue tail, line, !quoted, 0
-          '\\' =>
-            match tail {
-              ['\n', .. rest] => continue rest, line + 1, quoted, 0
-              [] => continue tail, line, quoted, 0
-              [escape, .. rest] => {
-                value.write_char(
-                  match escape {
-                    't' => '\t'
-                    'n' => '\n'
-                    'b' => '\u0008'
-                    '\\' | '"' => escape
-                    _ =>
-                      raise InvalidConfig(line~, reason="Invalid value escape")
-                  },
-                )
-                continue rest, line, quoted, 0
-              }
-            }
-          '\u0000' => raise InvalidConfig(line~, reason="NUL in value")
-          _ => {
-            value.write_char(c)
-            continue tail, line, quoted, 0
-          }
-        }
-      }
+      '\u0000' => raise InvalidConfig(line~, reason="NUL in value")
+      _ => value.write_char(c)
     }
   }
+  guard !quoted else {
+    raise InvalidConfig(line~, reason="Unclosed quoted value")
+  }
+  (value.to_string(), rest, line)
 }
